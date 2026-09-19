@@ -138,18 +138,20 @@ export const FaqSection: React.FC<FaqSectionProps> = ({ lang, onOpenRegister }) 
         </div>
 
         {/* Contact Hotline Note */}
-        <div className="mt-8 sm:mt-10 text-center p-4 sm:p-5 bg-blue-50/60 border border-blue-200/80 rounded-2xl flex flex-col sm:flex-row items-center justify-center gap-2 text-xs sm:text-sm text-slate-600">
+        <div className="mt-8 sm:mt-10 text-center p-4 sm:p-5 bg-blue-50/60 border border-blue-200/80 rounded-2xl flex flex-col sm:flex-row items-center justify-center gap-2 text-xs sm:text-sm text-slate-600 shadow-2xs">
           <MessageSquare className="w-4 h-4 text-blue-600 shrink-0 hidden sm:block" />
           <span>
             {lang === 'ID' ? 'Punya pertanyaan spesifik seputar sekolah Anda? ' : 'Have specific questions about your institution? '}
           </span>
-          <button
-            onClick={onOpenRegister}
-            className="text-blue-700 font-bold hover:underline cursor-pointer inline-flex items-center gap-1"
+          <a
+            href="https://wa.me/6281312498919?text=Halo%20Tim%20Kawacanaan%2C%20saya%20ingin%20konsultasi%20gratis%20mengenai%20presensi%20sekolah"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-blue-700 hover:text-blue-800 font-bold hover:underline cursor-pointer inline-flex items-center gap-1 transition-colors"
           >
             <span>{lang === 'ID' ? 'Konsultasi Gratis dengan Tim Kami' : 'Free Consultation with Our Team'}</span>
             <span aria-hidden="true">&rarr;</span>
-          </button>
+          </a>
         </div>
 
       </div>

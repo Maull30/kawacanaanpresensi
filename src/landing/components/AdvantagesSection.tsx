@@ -154,17 +154,19 @@ export const AdvantagesSection: React.FC<AdvantagesSectionProps> = ({ lang }) =>
   return (
     <section 
       id="keunggulan" 
-      className="scroll-mt-16 sm:scroll-mt-20 py-14 sm:py-16 lg:py-20 bg-white text-slate-900 relative border-b border-blue-100 antialiased overflow-hidden"
+      className="scroll-mt-16 sm:scroll-mt-20 py-14 sm:py-16 lg:py-20 bg-gradient-to-b from-slate-50 via-blue-50/20 to-slate-50 text-slate-900 relative border-b border-blue-100/80 antialiased overflow-hidden"
     >
-      {/* Background Subtle Grid Pattern */}
-      <div className="absolute inset-0 z-0 pointer-events-none bg-grid-pattern opacity-20" />
+      {/* Background Subtle Grid Texture & Ambient Brand Glow */}
+      <div className="absolute inset-0 z-0 pointer-events-none bg-grid-pattern opacity-25" />
+      <div className="absolute -top-32 -left-20 w-96 h-96 bg-blue-100/40 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute -bottom-32 -right-20 w-96 h-96 bg-indigo-100/35 rounded-full blur-3xl pointer-events-none" />
 
       <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
         
         {/* Header - Balanced Modern Commercial SaaS Style */}
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8 sm:mb-10 lg:mb-12">
           <div className="space-y-2.5 max-w-2xl">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 border border-blue-200 text-blue-800 text-xs font-bold uppercase tracking-wider">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-100/80 border border-blue-200/90 text-blue-800 text-xs font-bold uppercase tracking-wider shadow-2xs">
               <ShieldCheck className="w-3.5 h-3.5 text-blue-700 shrink-0" />
               <span>{lang === 'ID' ? 'KEUNGGULAN PLATFORM SAAS' : 'PLATFORM ADVANTAGES'}</span>
             </div>
@@ -205,7 +207,7 @@ export const AdvantagesSection: React.FC<AdvantagesSectionProps> = ({ lang }) =>
               <div 
                 key={idx}
                 id={`advantage-card-${idx}`}
-                className="w-[82vw] max-w-[300px] sm:w-auto shrink-0 sm:shrink snap-center bg-white hover:bg-slate-50/50 border border-slate-200 hover:border-blue-500 rounded-2xl p-5 sm:p-5.5 transition-all duration-200 hover:shadow-lg hover:shadow-blue-500/10 group flex flex-col justify-between relative overflow-hidden"
+                className="w-[82vw] max-w-[300px] sm:w-auto shrink-0 sm:shrink snap-center bg-white/95 backdrop-blur-xs border border-slate-200/90 hover:border-blue-500/80 rounded-2xl p-5 sm:p-5.5 transition-all duration-200 shadow-xs hover:shadow-md hover:shadow-blue-600/10 group flex flex-col justify-between relative overflow-hidden"
               >
                 {/* Top Subtle Brand Bar on Hover */}
                 <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-600 to-indigo-600 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
@@ -214,7 +216,7 @@ export const AdvantagesSection: React.FC<AdvantagesSectionProps> = ({ lang }) =>
                   {/* Header: Number, Badge & Icon */}
                   <div className="flex items-center justify-between gap-2 mb-3">
                     <div className="flex items-center gap-2">
-                      <span className="font-mono text-xs font-black text-blue-600 bg-blue-50 border border-blue-200/70 px-2 py-0.5 rounded-md">
+                      <span className="font-mono text-xs font-black text-blue-700 bg-blue-50/90 border border-blue-200/80 px-2 py-0.5 rounded-md shadow-2xs">
                         {item.num}
                       </span>
                       <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider truncate">
@@ -222,7 +224,7 @@ export const AdvantagesSection: React.FC<AdvantagesSectionProps> = ({ lang }) =>
                       </span>
                     </div>
 
-                    <div className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center justify-center text-slate-700 group-hover:bg-blue-600 group-hover:text-white group-hover:border-blue-600 transition-all duration-200 shadow-xs shrink-0">
+                    <div className="w-10 h-10 rounded-xl bg-blue-50/70 border border-blue-100/90 flex items-center justify-center text-[#0B2F64] group-hover:bg-blue-600 group-hover:text-white group-hover:border-blue-600 transition-all duration-200 shadow-2xs shrink-0">
                       <Icon className="w-5 h-5" />
                     </div>
                   </div>
@@ -239,7 +241,7 @@ export const AdvantagesSection: React.FC<AdvantagesSectionProps> = ({ lang }) =>
                 </div>
 
                 {/* Bottom Row: SaaS Metric + Active Tag */}
-                <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
+                <div className="pt-3 border-t border-slate-100/90 flex items-center justify-between text-xs">
                   <span className="text-xs font-semibold text-slate-500 font-mono">
                     {item.metric}
                   </span>

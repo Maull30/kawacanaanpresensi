@@ -379,36 +379,6 @@ export const PricingSection: React.FC<PricingSectionProps> = ({ onOpenRegister, 
             );
           })}
         </div>
-
-        {/* Banner Keamanan & Transparansi di Bawah Kartu */}
-        <div className="mt-8 p-3.5 sm:p-4 rounded-xl sm:rounded-2xl bg-white border border-slate-200 text-slate-700 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-xs">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center shrink-0">
-              <ShieldCheck className="w-4 h-4" />
-            </div>
-            <div>
-              <div className="text-xs font-bold text-slate-900">
-                {lang === 'ID' ? 'Transparan, Aman, dan Tanpa Biaya Tersembunyi' : 'Transparent, Secure & No Hidden Costs'}
-              </div>
-              <div className="text-[10px] sm:text-[11px] text-slate-500">
-                {lang === 'ID'
-                  ? 'Paket Gratis tetap aktif selamanya tanpa pemblokiran. Paket berbayar didukung invoice resmi sekolah.'
-                  : 'Free Plan remains active forever without lockdowns. Paid plans include formal school invoices.'}
-              </div>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 text-xs font-bold text-blue-700 shrink-0">
-            <span>{lang === 'ID' ? 'Butuh bantuan memilih paket?' : 'Need guidance choosing a plan?'}</span>
-            <a
-              href="#kontak"
-              className="px-2.5 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 transition-colors text-[11px]"
-            >
-              {lang === 'ID' ? 'Konsultasi Gratis' : 'Free Consultation'}
-            </a>
-          </div>
-        </div>
-
       </div>
     </section>
   );

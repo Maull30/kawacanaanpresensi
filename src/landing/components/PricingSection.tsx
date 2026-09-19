@@ -6,7 +6,7 @@ export type BillingCycle = 'monthly' | 'yearly';
 export type PlanIdType = 'free' | 'teacher' | 'school';
 
 interface PricingSectionProps {
-  onOpenRegister: (planId?: PlanIdType) => void;
+  onOpenRegister: (planId?: PlanIdType, billingCycle?: BillingCycle) => void;
   lang: 'ID' | 'EN';
   customPackagesConfig?: any;
 }
@@ -155,7 +155,7 @@ export const PricingSection: React.FC<PricingSectionProps> = ({ onOpenRegister, 
   ];
 
   const handleCtaClick = (plan: typeof plans[0]) => {
-    onOpenRegister(plan.id);
+    onOpenRegister(plan.id, billingCycle);
   };
 
   return (

@@ -26,11 +26,17 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onEnterSystem,
   const [isFreeStartOpen, setIsFreeStartOpen] = useState(false);
   const [isTeacherRegisterOpen, setIsTeacherRegisterOpen] = useState(false);
   const [selectedPlanId, setSelectedPlanId] = useState<'free' | 'teacher' | 'school'>('school');
+  const [selectedBillingCycle, setSelectedBillingCycle] = useState<'monthly' | 'yearly'>('monthly');
   const [isLegalOpen, setIsLegalOpen] = useState(false);
   const [legalTab, setLegalTab] = useState<LegalTabType>('terms');
   const [lang, setLang] = useState<'ID' | 'EN'>('ID');
 
-  const handleOpenRegister = (planId: 'free' | 'teacher' | 'school' = 'free') => {
+  const handleOpenRegister = (
+    planId: 'free' | 'teacher' | 'school' = 'free',
+    cycle: 'monthly' | 'yearly' = 'monthly'
+  ) => {
+    setSelectedBillingCycle(cycle);
+
     if (planId === 'free') {
       setIsFreeStartOpen(true);
       return;
@@ -100,6 +106,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onEnterSystem,
         onOpenLogin={handleOpenLogin}
         onEnterSystem={onEnterSystem}
         onEnterDashboard={onEnterDashboard}
+        initialBillingCycle={selectedBillingCycle}
         lang={lang}
       />
 
@@ -109,6 +116,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onEnterSystem,
         onClose={() => setIsRegisterOpen(false)}
         onOpenLogin={handleOpenLogin}
         initialPlanId={selectedPlanId}
+        initialBillingCycle={selectedBillingCycle}
         lang={lang}
       />
 

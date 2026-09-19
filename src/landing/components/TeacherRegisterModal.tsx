@@ -35,6 +35,7 @@ interface TeacherRegisterModalProps {
   onOpenLogin: () => void;
   onEnterSystem?: () => void;
   onEnterDashboard?: () => void;
+  initialBillingCycle?: BillingCycle;
   lang: 'ID' | 'EN';
 }
 
@@ -73,6 +74,7 @@ export const TeacherRegisterModal: React.FC<TeacherRegisterModalProps> = ({
   onClose,
   onOpenLogin,
   onEnterDashboard,
+  initialBillingCycle,
   lang,
 }) => {
   const { loginWithCredentials, setActiveView } = useApp();
@@ -93,7 +95,7 @@ export const TeacherRegisterModal: React.FC<TeacherRegisterModalProps> = ({
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [billingCycle, setBillingCycle] = useState<BillingCycle>('monthly');
+  const [billingCycle, setBillingCycle] = useState<BillingCycle>(initialBillingCycle || 'monthly');
 
   // Payment & Success States
   const [paymentSession, setPaymentSession] = useState<PaymentSessionData | null>(null);
@@ -146,13 +148,14 @@ export const TeacherRegisterModal: React.FC<TeacherRegisterModalProps> = ({
     if (isOpen) {
       setFormError('');
       setPaymentCheckMessage(null);
+      setBillingCycle(initialBillingCycle || 'monthly');
     } else {
       if (pollingRef.current) {
         clearInterval(pollingRef.current);
         pollingRef.current = null;
       }
     }
-  }, [isOpen]);
+  }, [isOpen, initialBillingCycle]);
 
   // Real-time polling when waiting for payment in step 3
   useEffect(() => {
@@ -806,9 +809,9 @@ export const TeacherRegisterModal: React.FC<TeacherRegisterModalProps> = ({
           {/* LANGKAH 2: PENDAFTARAN (URUTAN 2 - PERSIS DENGAN FORMULIR MULAI GRATIS)    */}
           {/* ========================================================================= */}
           {step === 2 && (
-            <div className="max-w-lg mx-auto">
+            <div className="w-full">
               {/* Back to Step 1 & Selected Role Banner */}
-              <div className="flex items-center justify-between gap-3 pb-3 mb-3.5 border-b border-slate-100">
+              <div className="flex items-center justify-between gap-3 pb-3 mb-3.5 border-b border-slate-100 flex-wrap">
                 <button
                   type="button"
                   onClick={() => {
@@ -822,7 +825,7 @@ export const TeacherRegisterModal: React.FC<TeacherRegisterModalProps> = ({
                   <span>{lang === 'ID' ? 'Ganti Peran' : 'Change Role'}</span>
                 </button>
 
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1.5 flex-wrap">
                   <span className="text-[11px] text-slate-500 font-medium hidden xs:inline">
                     {lang === 'ID' ? 'Peran:' : 'Role:'}
                   </span>
@@ -847,6 +850,19 @@ export const TeacherRegisterModal: React.FC<TeacherRegisterModalProps> = ({
                       <span>{lang === 'ID' ? 'Guru Mapel' : 'Subject Teacher'}</span>
                     </div>
                   )}
+
+                  {/* Badge Paket Terpilih Otomatis dari Pilihan Section Harga */}
+                  <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold ${
+                    billingCycle === 'yearly'
+                      ? 'bg-amber-50 text-amber-900 border border-amber-200'
+                      : 'bg-blue-50 text-blue-900 border border-blue-200'
+                  }`}>
+                    <span>
+                      {billingCycle === 'yearly'
+                        ? (lang === 'ID' ? 'Paket Tahunan (Rp 60.000 / thn)' : 'Yearly Plan (Rp 60,000 / yr)')
+                        : (lang === 'ID' ? 'Paket Bulanan (Rp 5.000 / bln)' : 'Monthly Plan (Rp 5,000 / mo)')}
+                    </span>
+                  </div>
                 </div>
               </div>
 
@@ -857,8 +873,8 @@ export const TeacherRegisterModal: React.FC<TeacherRegisterModalProps> = ({
                 </h3>
                 <p className="text-xs text-slate-500 mt-1">
                   {lang === 'ID'
-                    ? 'Lengkapi data identitas dan akun pendidik Anda untuk melanjutkan ke pembayaran.'
-                    : 'Fill in your details to proceed to the secure payment step.'}
+                    ? `Lengkapi data identitas dan akun pendidik Anda (${billingCycle === 'yearly' ? 'Paket Tahunan' : 'Paket Bulanan'}) untuk melanjutkan ke pembayaran.`
+                    : `Fill in your educator account details (${billingCycle === 'yearly' ? 'Yearly Plan' : 'Monthly Plan'}) to proceed to payment.`}
                 </p>
               </div>
 
@@ -1006,63 +1022,6 @@ export const TeacherRegisterModal: React.FC<TeacherRegisterModalProps> = ({
                   </div>
                 </div>
 
-                {/* 4. Pilihan Siklus Langganan Paket Guru (Bulanan vs Tahunan) */}
-                <div className="pt-1.5 space-y-2">
-                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                    Siklus Langganan Paket Guru
-                  </label>
-                  <div className="grid grid-cols-2 gap-2.5">
-                    {/* Bulanan */}
-                    <div
-                      onClick={() => setBillingCycle('monthly')}
-                      className={`p-3 rounded-xl border-2 cursor-pointer transition-all ${
-                        billingCycle === 'monthly'
-                          ? 'border-blue-600 bg-blue-50/70 text-blue-900 shadow-xs'
-                          : 'border-slate-200 hover:border-slate-300 bg-white text-slate-700'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold uppercase tracking-wider">Bulanan</span>
-                        <span
-                          className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
-                            billingCycle === 'monthly' ? 'border-blue-600 bg-blue-600' : 'border-slate-300'
-                          }`}
-                        >
-                          {billingCycle === 'monthly' && <Check className="w-2.5 h-2.5 text-white" />}
-                        </span>
-                      </div>
-                      <div className="text-sm font-black text-slate-900 mt-1">Rp 5.000</div>
-                      <span className="text-[10px] text-slate-500">per bulan (fleksibel)</span>
-                    </div>
-
-                    {/* Tahunan */}
-                    <div
-                      onClick={() => setBillingCycle('yearly')}
-                      className={`p-3 rounded-xl border-2 cursor-pointer transition-all relative ${
-                        billingCycle === 'yearly'
-                          ? 'border-blue-600 bg-blue-50/70 text-blue-900 shadow-xs'
-                          : 'border-slate-200 hover:border-slate-300 bg-white text-slate-700'
-                      }`}
-                    >
-                      <span className="absolute -top-2 right-2 px-1.5 py-0.5 rounded bg-blue-600 text-white font-black text-[9px] uppercase tracking-wider">
-                        1 Tahun Penuh
-                      </span>
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold uppercase tracking-wider">Tahunan</span>
-                        <span
-                          className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
-                            billingCycle === 'yearly' ? 'border-blue-600 bg-blue-600' : 'border-slate-300'
-                          }`}
-                        >
-                          {billingCycle === 'yearly' && <Check className="w-2.5 h-2.5 text-white" />}
-                        </span>
-                      </div>
-                      <div className="text-sm font-black text-slate-900 mt-1">Rp 60.000</div>
-                      <span className="text-[10px] text-slate-500">per tahun (12 bulan aktif)</span>
-                    </div>
-                  </div>
-                </div>
-
                 {/* Tombol Lanjut ke Pembayaran */}
                 <div className="pt-2">
                   <button
@@ -1080,8 +1039,8 @@ export const TeacherRegisterModal: React.FC<TeacherRegisterModalProps> = ({
                       <>
                         <span>
                           {lang === 'ID'
-                            ? `Lanjut ke Pembayaran (${formatRupiah(currentPrice)})`
-                            : `Proceed to Payment (${formatRupiah(currentPrice)})`}
+                            ? `Lanjut ke Pembayaran • ${formatRupiah(currentPrice)} ${billingCycle === 'yearly' ? '/ thn' : '/ bln'}`
+                            : `Proceed to Payment • ${formatRupiah(currentPrice)} ${billingCycle === 'yearly' ? '/ yr' : '/ mo'}`}
                         </span>
                         <ArrowRight size={16} />
                       </>
@@ -1101,7 +1060,7 @@ export const TeacherRegisterModal: React.FC<TeacherRegisterModalProps> = ({
           {/* LANGKAH 3: PEMBAYARAN (URUTAN 3 - METODE PEMBAYARAN MIDTRANS)               */}
           {/* ========================================================================= */}
           {step === 3 && paymentSession && (
-            <div className="max-w-lg mx-auto space-y-4">
+            <div className="w-full space-y-4">
               {/* Back to Step 2 & Session Status Header */}
               <div className="flex items-center justify-between gap-3 pb-3 border-b border-slate-100">
                 <button
@@ -1270,7 +1229,7 @@ export const TeacherRegisterModal: React.FC<TeacherRegisterModalProps> = ({
           {/* LANGKAH 4: AKTIF (URUTAN 4 - SUKSES AKTIVASI & KREDENSIAL AKUN)            */}
           {/* ========================================================================= */}
           {step === 4 && registrationSuccessData && (
-            <div className="max-w-lg mx-auto space-y-4 animate-in fade-in zoom-in-95 duration-200">
+            <div className="w-full space-y-4 animate-in fade-in zoom-in-95 duration-200">
               {/* Badge Sukses */}
               <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl text-center space-y-1.5">
                 <div className="w-12 h-12 bg-emerald-600 text-white rounded-full flex items-center justify-center mx-auto shadow-md shadow-emerald-600/20">

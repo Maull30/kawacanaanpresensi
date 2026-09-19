@@ -109,6 +109,7 @@ export interface RegisterModalProps {
   onClose: () => void;
   onOpenLogin?: () => void;
   initialPlanId?: 'free' | 'teacher' | 'school';
+  initialBillingCycle?: 'monthly' | 'yearly';
   lang?: 'ID' | 'EN';
   mode?: 'landing' | 'superadmin';
   onSchoolCreated?: (school: any, admin: any) => void;
@@ -152,6 +153,8 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
   isOpen,
   onClose,
   onOpenLogin,
+  initialPlanId = 'school',
+  initialBillingCycle = 'monthly',
   lang = 'ID',
   mode = 'landing',
   onSchoolCreated,
@@ -168,7 +171,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly');
+  const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>(initialBillingCycle);
 
   // Khusus Superadmin: opsi layanan ruang kerja & masa berlaku
   const [workspaceService, setWorkspaceService] = useState<'school_integrated' | 'teacher_independent'>('school_integrated');
@@ -231,7 +234,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
       setAdminNotes('');
       setNpsn('');
       setWorkspaceService('school_integrated');
-      setBillingCycle('monthly');
+      setBillingCycle(initialBillingCycle || 'monthly');
       setCopiedCredentials(false);
       setCopiedSchoolCode(false);
       setCopiedInvoice(false);
@@ -241,7 +244,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
         pollingRef.current = null;
       }
     }
-  }, [isOpen]);
+  }, [isOpen, initialBillingCycle]);
 
   // Real-time polling when waiting for payment (Landing Page only)
   useEffect(() => {
@@ -1250,44 +1253,25 @@ ${isSuperadmin ? 'Didaftarkan Oleh: SUPER ADMIN' : `Invoice: ${registrationSucce
                 /* Card Landing Page: Sesuai desain referensi screenshot */
                 <div className="lg:col-span-5 bg-gradient-to-b from-[#1D4ED8] via-[#1E40AF] to-[#1E3A8A] text-white rounded-2xl p-4 sm:p-5 flex flex-col justify-between shadow-lg relative overflow-hidden space-y-3">
                   <div className="space-y-3">
-                    {/* Badges Siklus Pembayaran: Bulanan vs Tahunan */}
+                    {/* Badge Siklus Paket Sekolah Terikat Otomatis dari Pilihan Section Harga */}
                     <div className="flex items-center gap-2">
-                      <button
-                        id="btn-billing-monthly"
-                        type="button"
-                        onClick={() => setBillingCycle('monthly')}
-                        className={`px-3 py-1 rounded-full text-[10px] sm:text-[11px] font-bold tracking-wide uppercase transition-all cursor-pointer flex items-center gap-1.5 ${
-                          billingCycle === 'monthly'
-                            ? 'bg-white text-blue-900 shadow-sm ring-2 ring-white/60 font-black'
-                            : 'bg-blue-500/30 text-blue-100 hover:bg-blue-500/50 border border-blue-400/40'
-                        }`}
-                      >
-                        <span>Bulanan</span>
-                        {billingCycle === 'monthly' && (
-                          <span className="w-1.5 h-1.5 rounded-full bg-blue-600 animate-pulse" />
-                        )}
-                      </button>
-                      <button
-                        id="btn-billing-yearly"
-                        type="button"
-                        onClick={() => setBillingCycle('yearly')}
-                        className={`px-3 py-1 rounded-full text-[10px] sm:text-[11px] font-bold tracking-wide uppercase transition-all cursor-pointer flex items-center gap-1.5 ${
+                      <div
+                        className={`px-3.5 py-1 rounded-full text-[10px] sm:text-[11px] font-black tracking-wide uppercase flex items-center gap-1.5 ${
                           billingCycle === 'yearly'
-                            ? 'bg-amber-400 text-slate-950 shadow-sm ring-2 ring-amber-300/80 font-black'
-                            : 'bg-teal-500/30 text-teal-200 hover:bg-teal-500/50 border border-teal-400/40'
+                            ? 'bg-amber-400 text-slate-950 shadow-xs ring-2 ring-amber-300/80 font-black'
+                            : 'bg-white text-blue-900 shadow-xs ring-2 ring-white/60 font-black'
                         }`}
                       >
-                        <span>Tahunan</span>
-                        <span
-                          className={`text-[9px] px-1 py-0.2 rounded font-black ${
-                            billingCycle === 'yearly'
-                              ? 'bg-slate-900 text-amber-300'
-                              : 'bg-amber-400 text-slate-950'
-                          }`}
-                        >
-                          Hemat 2 Bln
-                        </span>
-                      </button>
+                        <span>{billingCycle === 'yearly' ? 'Paket Tahunan' : 'Paket Bulanan'}</span>
+                        {billingCycle === 'yearly' && (
+                          <span className="text-[9px] px-1.5 py-0.2 rounded font-black bg-slate-900 text-amber-300">
+                            Hemat 2 Bln
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-[10px] text-blue-200">
+                        {billingCycle === 'yearly' ? 'Aktif 12 Bulan Penuh' : 'Aktif 1 Bulan'}
+                      </span>
                     </div>
 
                     {/* Title & Description */}

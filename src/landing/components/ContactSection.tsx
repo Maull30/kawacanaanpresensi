@@ -193,48 +193,103 @@ export const ContactSection: React.FC<ContactSectionProps> = ({ lang }) => {
   return (
     <section 
       id="kontak" 
-      className="scroll-mt-16 sm:scroll-mt-20 py-14 sm:py-16 lg:py-20 bg-slate-50/70 text-slate-900 relative border-b border-blue-100 antialiased overflow-hidden"
+      className="scroll-mt-16 sm:scroll-mt-20 pt-16 sm:pt-20 pb-16 sm:pb-24 bg-gradient-to-b from-[#F3F8FF] via-[#E9F3FE] to-[#DCEBFE] text-slate-900 relative antialiased overflow-hidden"
     >
-      {/* Decorative background grid subtle overlay */}
-      <div className="absolute inset-0 z-0 pointer-events-none opacity-[0.03] bg-[radial-gradient(#0B2F64_1px,transparent_1px)] [background-size:24px_24px]" />
-      
-      {/* Ambient decorative glow */}
-      <div className="absolute -top-32 right-1/4 w-96 h-96 bg-blue-100/50 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute -bottom-32 left-1/4 w-96 h-96 bg-emerald-100/40 rounded-full blur-3xl pointer-events-none" />
+      {/* Background Soft Glows & Ambient Orbs */}
+      <div className="absolute top-10 left-10 w-96 h-96 bg-blue-200/30 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute bottom-10 right-10 w-96 h-96 bg-emerald-100/30 rounded-full blur-3xl pointer-events-none" />
+
+      {/* Decorative Dot Matrix Patterns on Left & Right Margins (as in uploaded screenshot) */}
+      <div className="hidden 2xl:block absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none opacity-30 select-none">
+        <div className="grid grid-cols-4 gap-2.5">
+          {[...Array(24)].map((_, i) => (
+            <div key={i} className="w-1.5 h-1.5 rounded-full bg-blue-400" />
+          ))}
+        </div>
+      </div>
+      <div className="hidden 2xl:block absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none opacity-30 select-none">
+        <div className="grid grid-cols-4 gap-2.5">
+          {[...Array(24)].map((_, i) => (
+            <div key={i} className="w-1.5 h-1.5 rounded-full bg-blue-400" />
+          ))}
+        </div>
+      </div>
 
       <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         
-        {/* ================= SECTION HEADER ================= */}
-        <div className="text-center max-w-3xl mx-auto space-y-3 mb-10 sm:mb-12 lg:mb-14">
-          <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-blue-50 border border-blue-200 text-blue-800 text-xs font-bold uppercase tracking-wider font-mono">
-            <Users className="w-3.5 h-3.5 text-blue-700 shrink-0" />
-            <span>{lang === 'ID' ? 'KOMUNITAS RESMI PENDIDIK' : 'OFFICIAL EDUCATOR COMMUNITY'}</span>
+        {/* ================= SECTION HEADER: Pill Badge, Titles, Doodle & 3D Envelope ================= */}
+        <div className="relative text-center max-w-3xl mx-auto mb-10 sm:mb-12 lg:mb-14">
+          
+          {/* Top-Left Playful Handwritten Doodle Note (as in uploaded screenshot) */}
+          <div className="hidden lg:block absolute -top-4 -left-12 xl:-left-20 pointer-events-none select-none text-left">
+            <div className="relative">
+              {/* Doodle Spark Lines */}
+              <div className="absolute -top-3.5 right-6 flex gap-1 rotate-12">
+                <div className="w-1 h-3 bg-blue-500 rounded-full -rotate-15" />
+                <div className="w-1 h-3.5 bg-blue-500 rounded-full" />
+                <div className="w-1 h-3 bg-blue-500 rounded-full rotate-15" />
+              </div>
+              
+              {/* Handwritten Blue Note */}
+              <p className="font-sans font-bold text-base xl:text-lg text-blue-600 -rotate-8 leading-snug tracking-tight">
+                {lang === 'ID' ? 'Jangan ragu' : 'Do not hesitate'}
+                <br />
+                <span className="text-blue-500 font-medium">
+                  {lang === 'ID' ? 'untuk menghubungi' : 'to contact'}
+                </span>
+                <br />
+                <span className="font-extrabold text-blue-700">
+                  {lang === 'ID' ? 'kami!' : 'our team!'}
+                </span>
+              </p>
+
+              {/* Curved Underline Arrow pointing toward the contact container */}
+              <svg className="w-20 h-6 text-blue-400 mt-1 -rotate-6" viewBox="0 0 100 24" fill="none">
+                <path d="M5 12 Q 50 24 95 6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+              </svg>
+            </div>
+          </div>
+
+          {/* Top-Right 3D Stylized Envelope, Phone & Message Illustration */}
+          <div className="hidden lg:block absolute -top-14 -right-12 xl:-right-20 pointer-events-none select-none w-48 xl:w-56">
+            <img 
+              src="/images/contact_envelope_3d.jpg" 
+              alt="3D Contact Message Envelope Illustration" 
+              className="w-full h-auto object-contain drop-shadow-xl rounded-2xl"
+              loading="lazy"
+            />
+          </div>
+
+          {/* Center Pill Badge */}
+          <div className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-blue-100/90 border border-blue-200 text-blue-800 text-xs font-bold tracking-wide shadow-2xs mb-3.5">
+            <MessageSquare className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+            <span>{lang === 'ID' ? 'Hubungi Kami' : 'Contact Us'}</span>
           </div>
           
-          <h2 className="text-2xl sm:text-3xl lg:text-4xl font-black text-[#0B2F64] tracking-tight uppercase leading-tight">
-            {lang === 'ID' ? (
-              <>
-                <span className="block">KOMUNITAS WHATSAPP</span>
-                <span className="block text-blue-600">KAWACANAAN PRESENSI</span>
-              </>
-            ) : (
-              <>
-                <span className="block">WHATSAPP COMMUNITY</span>
-                <span className="block text-blue-600">KAWACANAAN PRESENSI</span>
-              </>
-            )}
+          {/* Main Heading */}
+          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-slate-900 tracking-tight leading-tight max-w-3xl mx-auto">
+            <span>{lang === 'ID' ? 'Kontak Kami' : 'Contact Us'}</span>
+            <span className="block text-blue-600 mt-1">Kawacanaan Presensi</span>
           </h2>
           
-          <p className="text-slate-600 text-xs sm:text-sm md:text-base leading-relaxed font-normal max-w-2xl mx-auto">
+          {/* Subtitle Description */}
+          <p className="mt-3 text-slate-600 text-xs sm:text-sm md:text-base leading-relaxed font-normal max-w-xl mx-auto">
             {lang === 'ID'
-              ? 'Wadah resmi silaturahmi, diskusi praktik baik presensi kurikulum SD, pembaruan format cetak kedinasan, dan konsultasi interaktif bersama rekan pendidik se-Indonesia.'
-              : 'Official space for collaboration, primary curriculum attendance best practices, official kedinasan reporting updates, and interactive peer consultations across Indonesia.'}
+              ? 'Kami siap membantu Anda. Silakan hubungi kami melalui komunitas resmi, konsultasi langsung, atau pindai barcode WhatsApp di bawah ini.'
+              : 'We are ready to assist you. Reach out through our official educator community, direct consultation, or scan the WhatsApp barcode below.'}
           </p>
+
+          {/* Small Center Capsule Indicator (as in screenshot under subtitle) */}
+          <div className="flex items-center justify-center gap-1.5 mt-5">
+            <div className="w-8 h-1.5 bg-blue-600 rounded-full" />
+            <div className="w-1.5 h-1.5 bg-blue-300 rounded-full" />
+            <div className="w-1.5 h-1.5 bg-blue-200 rounded-full" />
+          </div>
         </div>
 
-        {/* ================= MAIN CONTAINER: 2 BALANCED COLUMNS ================= */}
+        {/* ================= MAIN CONTAINER: 2 BALANCED COLUMNS (PRESERVED CONTENT) ================= */}
         <div className="max-w-5xl mx-auto">
-          <div className="bg-white border border-slate-200 rounded-3xl shadow-sm overflow-hidden grid grid-cols-1 lg:grid-cols-12 gap-0 items-stretch">
+          <div className="bg-white border border-blue-100 rounded-3xl shadow-[0_8px_30px_-10px_rgba(37,99,235,0.08)] overflow-hidden grid grid-cols-1 lg:grid-cols-12 gap-0 items-stretch">
             
             {/* ================= LEFT COLUMN: INFORMASI & NILAI KOMUNITAS (7 COLS) ================= */}
             <div className="lg:col-span-7 p-6 sm:p-8 lg:p-10 flex flex-col justify-between space-y-6 sm:space-y-8 border-b lg:border-b-0 lg:border-r border-slate-100">
@@ -485,6 +540,17 @@ export const ContactSection: React.FC<ContactSectionProps> = ({ lang }) => {
         lang={lang}
         onDownloadQr={handleDownloadFlyer}
       />
+
+      {/* Subtle Bottom Wave Curve to Match Flow */}
+      <div className="absolute bottom-0 left-0 right-0 w-full overflow-hidden leading-none pointer-events-none">
+        <svg 
+          className="relative block w-full h-8 sm:h-12 text-white fill-current" 
+          viewBox="0 0 1200 120" 
+          preserveAspectRatio="none"
+        >
+          <path d="M0,0 C150,90 350,-40 500,45 C650,130 900,10 1200,50 L1200,120 L0,120 Z" />
+        </svg>
+      </div>
     </section>
   );
 };

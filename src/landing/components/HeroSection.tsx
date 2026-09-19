@@ -95,17 +95,47 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
             {/* Action Buttons Group (as in screenshot) */}
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4 pt-2 w-full sm:w-auto">
               
-              {/* Primary Button: MULAI GRATIS with Gift Icon & Rounded Corners */}
-              <button
-                type="button"
-                id="btn-hero-trial"
-                onClick={onOpenRegister}
-                className="w-full sm:w-auto bg-[#0066FF] hover:bg-blue-600 active:scale-[0.98] text-white px-7 sm:px-8 py-3.5 sm:py-4 text-xs sm:text-sm font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2.5 cursor-pointer rounded-2xl shadow-lg shadow-blue-500/25 select-none"
-              >
-                <Gift className="w-4 h-4 shrink-0 text-white" />
-                <span>{isId ? 'MULAI GRATIS' : 'START FOR FREE'}</span>
-                <ArrowRight className="w-4 h-4 shrink-0 ml-0.5" />
-              </button>
+              {/* Primary Button: MULAI GRATIS with Rotating Light List Border Beam & Shimmer Sheen */}
+              <div className="relative rounded-2xl w-full sm:w-auto inline-flex items-center justify-center group transition-all duration-300">
+                {/* Ambient Soft Glow Aura behind the rotating light beam */}
+                <div 
+                  className="absolute -inset-0.5 rounded-2xl opacity-70 group-hover:opacity-100 blur-md pointer-events-none transition-opacity duration-300 animate-pulse-aura"
+                  style={{
+                    background: 'conic-gradient(from 0deg, #0066FF, #38bdf8, #818cf8, #60a5fa, #0066FF)'
+                  }}
+                  aria-hidden="true"
+                />
+
+                {/* Masked Border Container: strictly clips the rotating conic gradient to the perimeter */}
+                <div className="relative p-[2.5px] rounded-2xl overflow-hidden w-full sm:w-auto inline-flex items-center justify-center shadow-lg shadow-blue-500/25">
+                  {/* Rotating colorful laser light beam (conic gradient) */}
+                  <div 
+                    className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[320%] aspect-square pointer-events-none animate-spin-border"
+                    style={{
+                      background: 'conic-gradient(from 0deg, #0066FF 0%, #38bdf8 18%, #ffffff 32%, #60a5fa 50%, #818cf8 70%, #0066FF 100%)'
+                    }}
+                    aria-hidden="true"
+                  />
+
+                  {/* Core Button Face with Sheen Sweep */}
+                  <button
+                    type="button"
+                    id="btn-hero-trial"
+                    onClick={onOpenRegister}
+                    className="relative z-10 w-full sm:w-auto bg-[#0066FF] hover:bg-blue-600 active:scale-[0.98] text-white px-7 sm:px-8 py-3.5 sm:py-4 text-xs sm:text-sm font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2.5 cursor-pointer rounded-[13.5px] overflow-hidden select-none"
+                  >
+                    {/* Subtle Light Sheen Reflection pass */}
+                    <div 
+                      className="absolute inset-0 w-1/2 h-full bg-gradient-to-r from-transparent via-white/25 to-transparent pointer-events-none animate-shimmer-sweep" 
+                      aria-hidden="true" 
+                    />
+
+                    <Gift className="relative z-10 w-4 h-4 shrink-0 text-white" />
+                    <span className="relative z-10">{isId ? 'MULAI GRATIS' : 'START FOR FREE'}</span>
+                    <ArrowRight className="relative z-10 w-4 h-4 shrink-0 ml-0.5 group-hover:translate-x-1 transition-transform" />
+                  </button>
+                </div>
+              </div>
 
               {/* Secondary Button: DAFTAR SEKOLAH with Clean Dark Navy Border & Rounded-2xl */}
               <button

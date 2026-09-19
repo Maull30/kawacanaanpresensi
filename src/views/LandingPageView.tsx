@@ -81,7 +81,10 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onEnterSystem,
           onOpenLogin={handleOpenLogin}
           lang={lang}
         />
-        <FeaturesSection lang={lang} />
+        <FeaturesSection 
+          lang={lang} 
+          onOpenRegister={() => handleOpenRegister('school', 'monthly', true)} 
+        />
         <AdvantagesSection lang={lang} onOpenRegister={() => handleOpenRegister('school', 'monthly', true)} />
         <PricingSection onOpenRegister={handleOpenRegister} lang={lang} />
         <TestimonialSection lang={lang} />

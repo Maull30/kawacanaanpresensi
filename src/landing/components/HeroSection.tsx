@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowRight, Sparkles, CheckCircle2, ShieldCheck, School, Calendar, Users, Award, BookOpen } from 'lucide-react';
+import { ArrowRight, School } from 'lucide-react';
 import { DeviceMockup } from './DeviceMockup';
 import { PublicStatsBanner } from './PublicStatsBanner';
 
@@ -98,37 +98,6 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                 <ArrowRight className="w-4 h-4 shrink-0" />
               </button>
 
-            </div>
-
-            {/* Tiga Keunggulan Singkat: DUAL-MODE SD, HARI EFEKTIF, CETAK FORMAT KEDINASAN */}
-            <div className="pt-4 sm:pt-6 border-t border-blue-100 grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 max-w-xl">
-              <div className="p-3.5 bg-blue-50/60 border border-blue-200/80 rounded-xl hover:border-blue-300 transition-colors">
-                <span className="text-[10px] uppercase font-black text-blue-800 tracking-wider flex items-center gap-1.5">
-                  <Users className="w-3.5 h-3.5 text-blue-700 shrink-0" />
-                  {lang === 'ID' ? 'DUAL-MODE PRESENSI SD' : 'DUAL-MODE SD ATTENDANCE'}
-                </span>
-                <p className="text-[11px] sm:text-xs text-slate-600 font-medium mt-1.5 leading-relaxed">
-                  {lang === 'ID' ? 'Presensi harian oleh Wali Kelas & presensi jam pelajaran oleh Guru Mapel.' : 'Daily homeroom logs & subject-by-subject attendance for specialized teachers.'}
-                </p>
-              </div>
-              <div className="p-3.5 bg-blue-50/60 border border-blue-200/80 rounded-xl hover:border-blue-300 transition-colors">
-                <span className="text-[10px] uppercase font-black text-blue-800 tracking-wider flex items-center gap-1.5">
-                  <Calendar className="w-3.5 h-3.5 text-blue-700 shrink-0" />
-                  {lang === 'ID' ? 'HARI BELAJAR EFEKTIF' : 'EFFECTIVE SCHOOL DAYS'}
-                </span>
-                <p className="text-[11px] sm:text-xs text-slate-600 font-medium mt-1.5 leading-relaxed">
-                  {lang === 'ID' ? 'Kalkulasi otomatis hari efektif per bulan & semester ganjil/genap.' : 'Automated effective learning days calculation by month & semester.'}
-                </p>
-              </div>
-              <div className="p-3.5 bg-blue-50/60 border border-blue-200/80 rounded-xl hover:border-blue-300 transition-colors">
-                <span className="text-[10px] uppercase font-black text-blue-800 tracking-wider flex items-center gap-1.5">
-                  <ShieldCheck className="w-3.5 h-3.5 text-blue-700 shrink-0" />
-                  {lang === 'ID' ? 'CETAK FORMAT KEDINASAN' : 'OFFICIAL KEDINASAN REPORTS'}
-                </span>
-                <p className="text-[11px] sm:text-xs text-slate-600 font-medium mt-1.5 leading-relaxed">
-                  {lang === 'ID' ? 'Rekapitulasi siap cetak A4 & PDF lengkap dengan tanda tangan Kepsek & Guru.' : 'Print-ready A4 reports complete with Principal & Teacher signatures.'}
-                </p>
-              </div>
             </div>
 
           </div>

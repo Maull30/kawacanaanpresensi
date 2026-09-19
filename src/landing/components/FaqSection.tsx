@@ -103,75 +103,85 @@ export const FaqSection: React.FC<FaqSectionProps> = ({ lang }) => {
         </div>
       </div>
 
-      <div className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
+      <div className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
         
         {/* ========================================================================= */}
-        {/* SECTION HEADER: Pill Badge, Main Title, Subtitle, Doodle & 3D School      */}
+        {/* SECTION HEADER: Non-overlapping 3-Column / Fluid Layout                    */}
         {/* ========================================================================= */}
-        <div className="relative text-center mb-10 sm:mb-14">
+        <div className="relative mb-10 sm:mb-14">
           
-          {/* Top-Left Playful Handwritten Doodle Note (as in screenshot: "Masih ada pertanyaan?") */}
-          <div className="hidden lg:block absolute -top-2 left-4 xl:left-8 pointer-events-none select-none text-left">
-            <div className="relative">
-              {/* Doodle Spark Lines */}
-              <div className="absolute -top-3 right-6 flex gap-1 rotate-12">
-                <div className="w-1 h-3 bg-blue-500 rounded-full -rotate-15" />
-                <div className="w-1 h-3.5 bg-blue-500 rounded-full" />
-                <div className="w-1 h-3 bg-blue-500 rounded-full rotate-15" />
+          <div className="flex flex-col lg:flex-row items-center justify-between gap-6 lg:gap-4">
+            
+            {/* Left Decorative Doodle (Visible on large screens, cleanly positioned outside text) */}
+            <div className="hidden xl:flex flex-col items-start w-48 pointer-events-none select-none shrink-0 pl-2">
+              <div className="relative">
+                {/* Doodle Spark Lines */}
+                <div className="absolute -top-3.5 right-4 flex gap-1 rotate-12">
+                  <div className="w-1 h-3 bg-blue-500 rounded-full -rotate-15" />
+                  <div className="w-1 h-3.5 bg-blue-500 rounded-full" />
+                  <div className="w-1 h-3 bg-blue-500 rounded-full rotate-15" />
+                </div>
+                
+                {/* Handwritten Blue Note */}
+                <p className="font-sans font-bold text-base text-blue-600 -rotate-6 leading-snug tracking-tight">
+                  {isId ? 'Masih ada' : 'Still have'}
+                  <br />
+                  <span className="font-extrabold text-blue-700">
+                    {isId ? 'pertanyaan?' : 'questions?'}
+                  </span>
+                </p>
+
+                {/* Curved Underline Arrow pointing toward the accordion cards */}
+                <svg className="w-16 h-7 text-blue-500 mt-1 -rotate-6" viewBox="0 0 100 40" fill="none">
+                  <path d="M10 10 Q 30 35 70 30" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+                  <path d="M60 22 L 72 30 L 62 38" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
               </div>
-              
-              {/* Handwritten Blue Note */}
-              <p className="font-sans font-bold text-base xl:text-lg text-blue-600 -rotate-8 leading-snug tracking-tight">
-                {isId ? 'Masih ada' : 'Still have'}
-                <br />
-                <span className="font-extrabold text-blue-700">
-                  {isId ? 'pertanyaan?' : 'questions?'}
-                </span>
+            </div>
+
+            {/* Center Content: Pill, Title, Subtitle, Indicator */}
+            <div className="text-center flex-1 max-w-2xl mx-auto">
+              {/* Center Pill Badge with MessageSquare Icon */}
+              <div className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-blue-100/90 border border-blue-200 text-blue-800 text-xs font-bold tracking-wide shadow-2xs mb-3.5">
+                <MessageSquare className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                <span>{isId ? 'TANYA JAWAB RESMI' : 'FREQUENTLY ASKED QUESTIONS'}</span>
+              </div>
+
+              {/* High-Contrast Main Title */}
+              <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-slate-900 tracking-tight leading-tight">
+                <span>{isId ? 'Pertanyaan yang Sering' : 'Frequently Asked'}</span>
+                <span className="block text-blue-600 mt-1">{isId ? 'Ditanyakan' : 'Questions'}</span>
+              </h2>
+
+              {/* Subtitle Description */}
+              <p className="mt-3 text-slate-600 text-xs sm:text-sm md:text-base leading-relaxed max-w-xl mx-auto font-normal">
+                {isId
+                  ? 'Jawaban lengkap seputar fitur, akses pengguna, dan implementasi sistem Kawacanaan.'
+                  : 'Complete answers regarding features, user access levels, and system implementation of Kawacanaan.'}
               </p>
 
-              {/* Curved Underline Arrow pointing toward the accordion cards */}
-              <svg className="w-16 h-8 text-blue-500 mt-1 -rotate-6" viewBox="0 0 100 40" fill="none">
-                <path d="M10 10 Q 30 35 70 30" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
-                <path d="M60 22 L 72 30 L 62 38" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
+              {/* Small Center Capsule Indicator */}
+              <div className="flex items-center justify-center gap-1.5 mt-5">
+                <div className="w-8 h-1.5 bg-blue-600 rounded-full" />
+                <div className="w-1.5 h-1.5 bg-blue-300 rounded-full" />
+                <div className="w-1.5 h-1.5 bg-blue-200 rounded-full" />
+              </div>
             </div>
+
+            {/* Right 3D Stylized School with Flag, Clock Tower & Textbooks */}
+            <div className="hidden xl:flex justify-end w-48 pointer-events-none select-none shrink-0 pr-2">
+              <div className="w-40 xl:w-44">
+                <img 
+                  src="/images/faq_school_clean.jpg" 
+                  alt="Indonesian Elementary School 3D Illustration" 
+                  className="w-full h-auto object-contain drop-shadow-xl rounded-2xl"
+                  loading="lazy"
+                />
+              </div>
+            </div>
+
           </div>
 
-          {/* Top-Right 3D Stylized School with Flag, Clock Tower & Textbooks */}
-          <div className="hidden lg:block absolute -top-14 right-2 xl:right-4 pointer-events-none select-none w-52 xl:w-60">
-            <img 
-              src="/images/faq_school_books_3d.jpg" 
-              alt="Indonesian Elementary School 3D Illustration" 
-              className="w-full h-auto object-contain drop-shadow-xl rounded-2xl"
-              loading="lazy"
-            />
-          </div>
-
-          {/* Center Pill Badge with MessageSquare Icon */}
-          <div className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-blue-100/90 border border-blue-200 text-blue-800 text-xs font-bold tracking-wide shadow-2xs mb-3.5">
-            <MessageSquare className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-            <span>{isId ? 'TANYA JAWAB RESMI' : 'FREQUENTLY ASKED QUESTIONS'}</span>
-          </div>
-
-          {/* High-Contrast Main Title */}
-          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-slate-900 tracking-tight leading-tight max-w-3xl mx-auto">
-            <span>{isId ? 'Pertanyaan yang Sering' : 'Frequently Asked'}</span>
-            <span className="block text-blue-600 mt-1">{isId ? 'Ditanyakan' : 'Questions'}</span>
-          </h2>
-
-          {/* Subtitle Description */}
-          <p className="mt-3 text-slate-600 text-xs sm:text-sm md:text-base leading-relaxed max-w-xl mx-auto font-normal">
-            {isId
-              ? 'Jawaban lengkap seputar fitur, akses pengguna, dan implementasi sistem Kawacanaan.'
-              : 'Complete answers regarding features, user access levels, and system implementation of Kawacanaan.'}
-          </p>
-
-          {/* Small Center Capsule Indicator (as in screenshot under subtitle) */}
-          <div className="flex items-center justify-center gap-1.5 mt-5">
-            <div className="w-8 h-1.5 bg-blue-600 rounded-full" />
-            <div className="w-1.5 h-1.5 bg-blue-300 rounded-full" />
-            <div className="w-1.5 h-1.5 bg-blue-200 rounded-full" />
-          </div>
         </div>
 
         {/* ========================================================================= */}

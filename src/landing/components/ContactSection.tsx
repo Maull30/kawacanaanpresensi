@@ -215,76 +215,86 @@ export const ContactSection: React.FC<ContactSectionProps> = ({ lang }) => {
         </div>
       </div>
 
-      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
         
-        {/* ================= SECTION HEADER: Pill Badge, Titles, Doodle & 3D Envelope ================= */}
-        <div className="relative text-center max-w-3xl mx-auto mb-10 sm:mb-12 lg:mb-14">
+        {/* ================= SECTION HEADER: Fluid 3-Column / No Overlap Layout ================= */}
+        <div className="relative mb-10 sm:mb-14">
           
-          {/* Top-Left Playful Handwritten Doodle Note (as in uploaded screenshot) */}
-          <div className="hidden lg:block absolute -top-4 -left-12 xl:-left-20 pointer-events-none select-none text-left">
-            <div className="relative">
-              {/* Doodle Spark Lines */}
-              <div className="absolute -top-3.5 right-6 flex gap-1 rotate-12">
-                <div className="w-1 h-3 bg-blue-500 rounded-full -rotate-15" />
-                <div className="w-1 h-3.5 bg-blue-500 rounded-full" />
-                <div className="w-1 h-3 bg-blue-500 rounded-full rotate-15" />
+          <div className="flex flex-col lg:flex-row items-center justify-between gap-6 lg:gap-4">
+            
+            {/* Left Decorative Doodle (Cleanly separated on wide viewports, no text collision) */}
+            <div className="hidden xl:flex flex-col items-start w-48 pointer-events-none select-none shrink-0 pl-2">
+              <div className="relative">
+                {/* Doodle Spark Lines */}
+                <div className="absolute -top-3.5 right-4 flex gap-1 rotate-12">
+                  <div className="w-1 h-3 bg-blue-500 rounded-full -rotate-15" />
+                  <div className="w-1 h-3.5 bg-blue-500 rounded-full" />
+                  <div className="w-1 h-3 bg-blue-500 rounded-full rotate-15" />
+                </div>
+                
+                {/* Handwritten Blue Note */}
+                <p className="font-sans font-bold text-base text-blue-600 -rotate-6 leading-snug tracking-tight">
+                  {lang === 'ID' ? 'Jangan ragu' : 'Do not hesitate'}
+                  <br />
+                  <span className="text-blue-500 font-medium">
+                    {lang === 'ID' ? 'untuk menghubungi' : 'to contact'}
+                  </span>
+                  <br />
+                  <span className="font-extrabold text-blue-700">
+                    {lang === 'ID' ? 'kami!' : 'our team!'}
+                  </span>
+                </p>
+
+                {/* Curved Underline Arrow pointing toward the contact container */}
+                <svg className="w-20 h-6 text-blue-400 mt-1 -rotate-6" viewBox="0 0 100 24" fill="none">
+                  <path d="M5 12 Q 50 24 95 6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+                </svg>
+              </div>
+            </div>
+
+            {/* Center Content: Pill, Title, Subtitle, Indicator */}
+            <div className="text-center flex-1 max-w-2xl mx-auto">
+              {/* Center Pill Badge */}
+              <div className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-blue-100/90 border border-blue-200 text-blue-800 text-xs font-bold tracking-wide shadow-2xs mb-3.5">
+                <MessageSquare className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                <span>{lang === 'ID' ? 'Hubungi Kami' : 'Contact Us'}</span>
               </div>
               
-              {/* Handwritten Blue Note */}
-              <p className="font-sans font-bold text-base xl:text-lg text-blue-600 -rotate-8 leading-snug tracking-tight">
-                {lang === 'ID' ? 'Jangan ragu' : 'Do not hesitate'}
-                <br />
-                <span className="text-blue-500 font-medium">
-                  {lang === 'ID' ? 'untuk menghubungi' : 'to contact'}
-                </span>
-                <br />
-                <span className="font-extrabold text-blue-700">
-                  {lang === 'ID' ? 'kami!' : 'our team!'}
-                </span>
+              {/* Main Heading */}
+              <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-slate-900 tracking-tight leading-tight">
+                <span>{lang === 'ID' ? 'Kontak Kami' : 'Contact Us'}</span>
+                <span className="block text-blue-600 mt-1">Kawacanaan Presensi</span>
+              </h2>
+              
+              {/* Subtitle Description */}
+              <p className="mt-3 text-slate-600 text-xs sm:text-sm md:text-base leading-relaxed font-normal max-w-xl mx-auto">
+                {lang === 'ID'
+                  ? 'Kami siap membantu Anda. Silakan hubungi kami melalui komunitas resmi, konsultasi langsung, atau pindai barcode WhatsApp di bawah ini.'
+                  : 'We are ready to assist you. Reach out through our official educator community, direct consultation, or scan the WhatsApp barcode below.'}
               </p>
 
-              {/* Curved Underline Arrow pointing toward the contact container */}
-              <svg className="w-20 h-6 text-blue-400 mt-1 -rotate-6" viewBox="0 0 100 24" fill="none">
-                <path d="M5 12 Q 50 24 95 6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
-              </svg>
+              {/* Small Center Capsule Indicator */}
+              <div className="flex items-center justify-center gap-1.5 mt-5">
+                <div className="w-8 h-1.5 bg-blue-600 rounded-full" />
+                <div className="w-1.5 h-1.5 bg-blue-300 rounded-full" />
+                <div className="w-1.5 h-1.5 bg-blue-200 rounded-full" />
+              </div>
             </div>
+
+            {/* Right 3D Stylized Envelope, Phone & Message Illustration */}
+            <div className="hidden xl:flex justify-end w-48 pointer-events-none select-none shrink-0 pr-2">
+              <div className="w-40 xl:w-44">
+                <img 
+                  src="/images/contact_envelope_clean.jpg" 
+                  alt="3D Contact Message Envelope Illustration" 
+                  className="w-full h-auto object-contain drop-shadow-xl rounded-2xl"
+                  loading="lazy"
+                />
+              </div>
+            </div>
+
           </div>
 
-          {/* Top-Right 3D Stylized Envelope, Phone & Message Illustration */}
-          <div className="hidden lg:block absolute -top-14 -right-12 xl:-right-20 pointer-events-none select-none w-48 xl:w-56">
-            <img 
-              src="/images/contact_envelope_3d.jpg" 
-              alt="3D Contact Message Envelope Illustration" 
-              className="w-full h-auto object-contain drop-shadow-xl rounded-2xl"
-              loading="lazy"
-            />
-          </div>
-
-          {/* Center Pill Badge */}
-          <div className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-blue-100/90 border border-blue-200 text-blue-800 text-xs font-bold tracking-wide shadow-2xs mb-3.5">
-            <MessageSquare className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-            <span>{lang === 'ID' ? 'Hubungi Kami' : 'Contact Us'}</span>
-          </div>
-          
-          {/* Main Heading */}
-          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-slate-900 tracking-tight leading-tight max-w-3xl mx-auto">
-            <span>{lang === 'ID' ? 'Kontak Kami' : 'Contact Us'}</span>
-            <span className="block text-blue-600 mt-1">Kawacanaan Presensi</span>
-          </h2>
-          
-          {/* Subtitle Description */}
-          <p className="mt-3 text-slate-600 text-xs sm:text-sm md:text-base leading-relaxed font-normal max-w-xl mx-auto">
-            {lang === 'ID'
-              ? 'Kami siap membantu Anda. Silakan hubungi kami melalui komunitas resmi, konsultasi langsung, atau pindai barcode WhatsApp di bawah ini.'
-              : 'We are ready to assist you. Reach out through our official educator community, direct consultation, or scan the WhatsApp barcode below.'}
-          </p>
-
-          {/* Small Center Capsule Indicator (as in screenshot under subtitle) */}
-          <div className="flex items-center justify-center gap-1.5 mt-5">
-            <div className="w-8 h-1.5 bg-blue-600 rounded-full" />
-            <div className="w-1.5 h-1.5 bg-blue-300 rounded-full" />
-            <div className="w-1.5 h-1.5 bg-blue-200 rounded-full" />
-          </div>
         </div>
 
         {/* ================= MAIN CONTAINER: 2 BALANCED COLUMNS (PRESERVED CONTENT) ================= */}

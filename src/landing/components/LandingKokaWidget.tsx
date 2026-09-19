@@ -75,7 +75,7 @@ export interface LandingChatMessage {
 
 interface LandingKokaWidgetProps {
   onOpenLogin: () => void;
-  onOpenRegister: (planId?: 'free' | 'teacher' | 'school' | 'custom') => void;
+  onOpenRegister: (planId?: 'free' | 'teacher' | 'school') => void;
   lang: 'ID' | 'EN';
 }
 

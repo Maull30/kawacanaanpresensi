@@ -1,5 +1,5 @@
 import React from 'react';
-import { Quote, School, CheckCircle2 } from 'lucide-react';
+import { Quote, School, CheckCircle2, Star, MessageSquareQuote } from 'lucide-react';
 
 interface TestimonialSectionProps {
   lang: 'ID' | 'EN';
@@ -13,7 +13,9 @@ export const TestimonialSection: React.FC<TestimonialSectionProps> = ({ lang }) 
       role: 'Kepala Sekolah',
       school: 'SDN 04 Nusantara',
       initials: 'HP',
-      content: 'Pencatatan kehadiran menjadi lebih rapi dan kami tidak perlu lagi mengumpulkan data dari banyak catatan.',
+      rating: 5,
+      tag: 'Efisiensi Administrasi',
+      content: 'Pencatatan kehadiran menjadi sangat tertib dan akurat. Saat pelaporan ke dinas atau akreditasi sekolah, kami tinggal cetak format A4 yang sudah rapi lengkap dengan tanda tangan.',
     },
     {
       id: '2',
@@ -21,7 +23,9 @@ export const TestimonialSection: React.FC<TestimonialSectionProps> = ({ lang }) 
       role: 'Wali Kelas & Guru',
       school: 'SD Bintang Kejora',
       initials: 'SN',
-      content: 'Dashboard membantu kami melihat kondisi kehadiran siswa dengan lebih cepat.',
+      rating: 5,
+      tag: 'Mudah Digunakan Guru',
+      content: 'Dashboard presensi sangat praktis untuk guru kelas 1 sampai 6. Perhitungan sakit, izin, dan alpa otomatis terakumulasi per bulan tanpa perlu rumus excel yang merepotkan.',
     },
     {
       id: '3',
@@ -29,7 +33,9 @@ export const TestimonialSection: React.FC<TestimonialSectionProps> = ({ lang }) 
       role: 'Koordinator Tata Usaha',
       school: 'SD Al-Azhar Mandiri',
       initials: 'RR',
-      content: 'Fitur presensi dan rekapitulasi membuat proses administrasi menjadi lebih terorganisir.',
+      rating: 5,
+      tag: 'Integrasi Data Terpusat',
+      content: 'Tata usaha dapat mengelola rombel dan kalender hari efektif sekolah dengan tenang. Akses multi-peran memastikan data siswa terlindungi dan selalu up-to-date.',
     }
   ] : [
     {
@@ -38,7 +44,9 @@ export const TestimonialSection: React.FC<TestimonialSectionProps> = ({ lang }) 
       role: 'School Principal',
       school: 'SDN 04 Nusantara',
       initials: 'HP',
-      content: 'Attendance logging has become noticeably structured and we no longer have to aggregate data across disconnected records.',
+      rating: 5,
+      tag: 'Administrative Efficiency',
+      content: 'Daily attendance logs are now remarkably organized and accurate. For educational audits and reporting, we simply generate official standard A4 documents with complete signature boxes.',
     },
     {
       id: '2',
@@ -46,7 +54,9 @@ export const TestimonialSection: React.FC<TestimonialSectionProps> = ({ lang }) 
       role: 'Homeroom Teacher',
       school: 'SD Bintang Kejora',
       initials: 'SN',
-      content: 'The dashboard empowers us to assess daily student attendance conditions much faster.',
+      rating: 5,
+      tag: 'Teacher-Friendly',
+      content: 'The platform is intuitive for grade 1 through 6 classroom teachers. Sick leaves, excuses, and absences are compiled automatically every month without spreadsheet headaches.',
     },
     {
       id: '3',
@@ -54,67 +64,92 @@ export const TestimonialSection: React.FC<TestimonialSectionProps> = ({ lang }) 
       role: 'Administrative Coordinator',
       school: 'SD Al-Azhar Mandiri',
       initials: 'RR',
-      content: 'Digital attendance recording and recapitulation features keep all institutional administration truly organized.',
+      rating: 5,
+      tag: 'Centralized Records',
+      content: 'Our administrative staff coordinates class cohorts and effective school days with ease. Granular role-based permissions keep student records reliable and securely safeguarded.',
     }
   ];
 
   return (
-    <section id="testimoni" className="py-16 sm:py-20 lg:py-24 bg-white text-slate-900 relative border-b border-blue-100">
+    <section id="testimoni" className="py-14 sm:py-18 lg:py-24 bg-white text-slate-900 relative border-b border-blue-100 antialiased">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         
-        {/* Header - Educational Style */}
-        <div className="text-left max-w-3xl space-y-4 mb-12 sm:mb-16">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md bg-blue-50 border border-blue-200 text-blue-800 text-[10px] font-bold uppercase tracking-wider">
-            <span>{lang === 'ID' ? 'TESTIMONI PENGGUNA' : 'USER TESTIMONIALS'}</span>
+        {/* Header - Modern Commercial SaaS Style */}
+        <div className="max-w-3xl space-y-3 sm:space-y-4 mb-10 sm:mb-14 lg:mb-16">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 border border-blue-200 text-blue-800 text-xs font-bold uppercase tracking-wider">
+            <MessageSquareQuote className="w-3.5 h-3.5 text-blue-700 shrink-0" />
+            <span>{lang === 'ID' ? 'TESTIMONI RESMI PENGGUNA' : 'CUSTOMER TESTIMONIALS'}</span>
           </div>
-          <h2 className="text-2xl sm:text-4xl lg:text-5xl font-black text-[#0B2F64] tracking-tight uppercase leading-[1.05]">
+
+          <h2 className="text-2xl sm:text-4xl lg:text-5xl font-black text-[#0B2F64] tracking-tight uppercase leading-[1.1]">
             {lang === 'ID' ? (
               <>
-                ADMINISTRASI SEKOLAH<br />
-                <span className="text-blue-600">LEBIH PRAKTIS</span>
+                KEPERCAYAAN SEKOLAH DI<br />
+                <span className="text-blue-600">SELURUH INDONESIA</span>
               </>
             ) : (
               <>
-                MORE PRACTICAL<br />
-                <span className="text-blue-600">SCHOOL ADMINISTRATION</span>
+                TRUSTED BY SCHOOLS<br />
+                <span className="text-blue-600">ACROSS INDONESIA</span>
               </>
             )}
           </h2>
-          <p className="text-slate-600 text-xs sm:text-base lg:text-lg leading-relaxed border-l-4 border-blue-600 pl-3 sm:pl-4 font-normal">
+
+          <p className="text-slate-600 text-sm sm:text-base lg:text-lg leading-relaxed font-normal">
             {lang === 'ID'
-              ? 'Bagaimana ekosistem Kawacanaan membawa kepraktisan dan keteraturan nyata dalam operasional sekolah.'
-              : 'How the Kawacanaan ecosystem delivers genuine practicality and order in day-to-day school operations.'}
+              ? 'Pengalaman nyata kepala sekolah, guru kelas, dan koordinator tata usaha yang merasakan kemudahan sistem presensi Kawacanaan.'
+              : 'Real outcomes and experiences from principals, teachers, and school administrators using the Kawacanaan platform.'}
           </p>
         </div>
 
-        {/* Testimonials Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8">
+        {/* Commercial Testimonials Grid - Responsive across Phone, Tablet, Laptop, PC, Desktop Monitors */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6 lg:gap-8">
           {testimonials.map((t) => (
             <div
               key={t.id}
               id={`testimonial-card-${t.id}`}
-              className="bg-slate-50 border border-slate-200 rounded-xl p-8 flex flex-col justify-between hover:border-blue-500 hover:bg-white hover:shadow-md transition-all shadow-xs group"
+              className="bg-slate-50/70 hover:bg-white border border-slate-200/90 hover:border-blue-500 rounded-2xl p-6 sm:p-7 flex flex-col justify-between transition-all duration-200 hover:shadow-xl hover:shadow-blue-500/10 group relative"
             >
               <div>
-                <Quote className="w-8 h-8 text-blue-300 group-hover:text-blue-600 transition-colors mb-6 stroke-[1.5]" />
+                {/* Top Card Row: Star Rating + Tag */}
+                <div className="flex items-center justify-between gap-2 mb-4">
+                  <div className="flex items-center gap-1">
+                    {[...Array(t.rating)].map((_, i) => (
+                      <Star key={i} className="w-4 h-4 fill-amber-400 text-amber-400" />
+                    ))}
+                  </div>
+                  <span className="text-[10px] sm:text-[11px] font-bold text-blue-700 bg-blue-50 px-2.5 py-0.5 rounded-full border border-blue-200">
+                    {t.tag}
+                  </span>
+                </div>
 
-                {/* Quote Content */}
-                <p className="text-base sm:text-lg text-slate-800 leading-relaxed italic mb-8 font-normal">
-                  "{t.content}"
-                </p>
+                {/* Quote Icon & Content */}
+                <div className="relative mb-6">
+                  <Quote className="w-8 h-8 text-blue-200 group-hover:text-blue-500 transition-colors mb-2 stroke-[1.5]" />
+                  <p className="text-sm sm:text-base text-slate-800 leading-relaxed font-normal">
+                    "{t.content}"
+                  </p>
+                </div>
               </div>
 
               {/* Author Info */}
-              <div className="pt-5 border-t border-slate-200 flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-blue-50 border border-blue-200 text-blue-800 flex items-center justify-center font-bold text-xs shrink-0">
-                  {t.initials}
-                </div>
-                <div>
-                  <h4 className="font-bold text-slate-900 text-sm">{t.name}</h4>
-                  <div className="text-[11px] text-blue-700 font-bold uppercase tracking-wider">{t.role}</div>
-                  <div className="text-[11px] text-slate-500 flex items-center gap-1 mt-0.5">
-                    <School className="w-3 h-3 text-blue-600" /> {t.school}
+              <div className="pt-4 border-t border-slate-200/80 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-[#0B2F64] text-white flex items-center justify-center font-bold text-xs sm:text-sm shrink-0 shadow-xs">
+                    {t.initials}
                   </div>
+                  <div>
+                    <h4 className="font-bold text-slate-900 text-sm leading-tight">{t.name}</h4>
+                    <div className="text-[11px] text-blue-600 font-bold uppercase tracking-wider mt-0.5">{t.role}</div>
+                    <div className="text-[11px] text-slate-500 flex items-center gap-1 mt-0.5">
+                      <School className="w-3 h-3 text-slate-400" /> {t.school}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Verified Icon */}
+                <div className="shrink-0 text-emerald-600" title={lang === 'ID' ? 'Terverifikasi' : 'Verified'}>
+                  <CheckCircle2 className="w-5 h-5" />
                 </div>
               </div>
             </div>

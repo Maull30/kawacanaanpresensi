@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { Check, Sparkles, QrCode, PhoneCall, ArrowRight, ShieldCheck, Building2, User } from 'lucide-react';
+import { Check, Sparkles, QrCode, ArrowRight, ShieldCheck, Building2, User } from 'lucide-react';
 import { formatRupiah } from '../../utils/packageSystem';
 
 export type BillingCycle = 'monthly' | 'yearly';
-export type PlanIdType = 'free' | 'teacher' | 'school' | 'custom';
+export type PlanIdType = 'free' | 'teacher' | 'school';
 
 interface PricingSectionProps {
   onOpenRegister: (planId?: PlanIdType) => void;
@@ -27,7 +27,6 @@ export const PricingSection: React.FC<PricingSectionProps> = ({ onOpenRegister, 
   const freeConfig = customPackagesConfig?.guru_gratis;
   const teacherConfig = customPackagesConfig?.guru_pro;
   const schoolConfig = customPackagesConfig?.sekolah_pro;
-  const customConfig = customPackagesConfig?.sekolah_custom;
 
   // Harga Bulanan & Tahunan
   const teacherMonthlyPrice = teacherConfig?.hargaBulanan ?? teacherConfig?.harga ?? 5000;
@@ -152,55 +151,11 @@ export const PricingSection: React.FC<PricingSectionProps> = ({ onOpenRegister, 
       ctaStyle: 'bg-amber-400 hover:bg-amber-300 text-slate-950 font-black shadow-md shadow-amber-400/20',
       paymentNote: lang === 'ID' ? 'QRIS / Semua Bank & Faktur' : 'QRIS & Official Receipt',
       isCustom: false,
-    },
-
-    // -------------------------------------------------------------
-    // 4. PAKET CUSTOM (Ruang Kerja Yayasan / Instansi Kedinasan)
-    // -------------------------------------------------------------
-    {
-      id: 'custom' as const,
-      name: lang === 'ID' ? 'PAKET CUSTOM' : 'CUSTOM PLAN',
-      workspaceType: lang === 'ID' ? 'Yayasan / Multi-Sekolah / Kedinasan' : 'Foundation / Multi-Campus',
-      workspaceIcon: Building2,
-      price: lang === 'ID' ? 'Kustom' : 'Custom',
-      period: lang === 'ID' ? '/kontrak' : '/contract',
-      originalPrice: null,
-      savingsBadge: lang === 'ID' ? 'Sesuai Kebutuhan' : 'Tailored Tier',
-      subNote: null,
-      tagline: lang === 'ID'
-        ? 'Solusi skala besar untuk Yayasan Pendidikan, Jaringan SD Terpadu, atau Instansi Kedinasan.'
-        : 'Enterprise solutions for School Foundations, Integrated School Networks, or Education Offices.',
-      highlight: false,
-      badge: lang === 'ID' ? 'Enterprise' : 'Enterprise',
-      features: customConfig?.fitur && customConfig.fitur.length > 0 ? customConfig.fitur : [
-        lang === 'ID' ? 'Semua Fitur Paket Sekolah Lengkap' : 'All School Plan Features Included',
-        lang === 'ID' ? 'Mendukung Multi-Sekolah / Cabang' : 'Multi-Campus / School Network',
-        lang === 'ID' ? 'Kapasitas Siswa & Guru Skala Besar' : 'Large-Scale Student & Staff Capacity',
-        lang === 'ID' ? 'Integrasi API Khusus / Dapodik' : 'Custom API Integration / Sync',
-        lang === 'ID' ? 'Layanan White-Label (Domain Sendiri)' : 'White-Label Branding & Custom Domain',
-        lang === 'ID' ? 'Pelatihan Langsung Guru & Operator' : 'On-site Staff Training & Onboarding',
-        lang === 'ID' ? 'Dedicated Account Manager 24/7' : '24/7 Dedicated Account Manager'
-      ],
-      ctaText: lang === 'ID' ? 'Hubungi Tim Kami' : 'Contact Sales',
-      ctaStyle: 'bg-slate-900 hover:bg-black text-white border border-slate-700',
-      paymentNote: lang === 'ID' ? 'SPK / Invoice Institusi Resmi' : 'Formal Institutional Contract',
-      isCustom: true,
     }
   ];
 
   const handleCtaClick = (plan: typeof plans[0]) => {
-    if (plan.isCustom) {
-      // Hubungi via WhatsApp atau Kontak
-      const phone = '6281234567890';
-      const text = encodeURIComponent(
-        lang === 'ID'
-          ? 'Halo Tim Kawacanaan SD, saya tertarik untuk konsultasi Paket Custom / Enterprise untuk yayasan/sekolah kami.'
-          : 'Hello Kawacanaan Team, I would like to inquire about the Custom / Enterprise Plan for our schools.'
-      );
-      window.open(`https://wa.me/${phone}?text=${text}`, '_blank');
-    } else {
-      onOpenRegister(plan.id);
-    }
+    onOpenRegister(plan.id);
   };
 
   return (
@@ -276,14 +231,13 @@ export const PricingSection: React.FC<PricingSectionProps> = ({ onOpenRegister, 
             >
               {p.id === 'free' ? (lang === 'ID' ? 'Gratis' : 'Free') :
                p.id === 'teacher' ? (lang === 'ID' ? 'Guru' : 'Teacher') :
-               p.id === 'school' ? (lang === 'ID' ? 'Sekolah ★' : 'School ★') :
-               (lang === 'ID' ? 'Custom' : 'Custom')}
+               (lang === 'ID' ? 'Sekolah ★' : 'School ★')}
             </button>
           ))}
         </div>
 
-        {/* 4 Kartu: Horizontal Swipe dengan Snap di Mobile, Grid 2 -> 4 di Tablet/Desktop */}
-        <div className="flex md:grid md:grid-cols-2 lg:grid-cols-4 overflow-x-auto md:overflow-x-visible snap-x snap-mandatory gap-3 sm:gap-4 lg:gap-5 items-stretch pb-2 md:pb-0 -mx-3 px-3 sm:mx-0 sm:px-0">
+        {/* 3 Kartu: Horizontal Swipe dengan Snap di Mobile, Grid 3 di Tablet/Desktop */}
+        <div className="flex md:grid md:grid-cols-3 overflow-x-auto md:overflow-x-visible snap-x snap-mandatory gap-4 sm:gap-6 lg:gap-8 items-stretch pb-2 md:pb-0 -mx-3 px-3 sm:mx-0 sm:px-0 max-w-6xl mx-auto">
           {plans.map((plan) => {
             const IconComponent = plan.workspaceIcon;
 
@@ -291,9 +245,9 @@ export const PricingSection: React.FC<PricingSectionProps> = ({ onOpenRegister, 
               <div
                 key={plan.id}
                 id={`pricing-card-${plan.id}`}
-                className={`w-[78vw] min-[360px]:w-[74vw] xs:w-[70vw] sm:w-auto shrink-0 md:shrink snap-center rounded-2xl p-3.5 sm:p-5 lg:p-5 flex flex-col justify-between transition-all relative ${
+                className={`w-[82vw] min-[380px]:w-[78vw] sm:w-[350px] md:w-auto shrink-0 md:shrink snap-center rounded-2xl p-4 sm:p-6 lg:p-6 flex flex-col justify-between transition-all relative ${
                   plan.highlight
-                    ? 'bg-gradient-to-b from-[#0B2F64] to-[#071F42] text-white border-2 border-blue-500 shadow-lg lg:-translate-y-1 ring-2 ring-blue-500/20'
+                    ? 'bg-gradient-to-b from-[#0B2F64] to-[#071F42] text-white border-2 border-blue-500 shadow-xl lg:-translate-y-1.5 ring-2 ring-blue-500/20'
                     : 'bg-white text-slate-900 border border-slate-200 shadow-xs hover:shadow-sm'
                 }`}
               >
@@ -419,11 +373,7 @@ export const PricingSection: React.FC<PricingSectionProps> = ({ onOpenRegister, 
                   id={`btn-select-plan-${plan.id}`}
                 >
                   <span>{plan.ctaText}</span>
-                  {plan.isCustom ? (
-                    <PhoneCall className="w-3.5 h-3.5" />
-                  ) : (
-                    <ArrowRight className="w-3.5 h-3.5" />
-                  )}
+                  <ArrowRight className="w-3.5 h-3.5" />
                 </button>
               </div>
             );

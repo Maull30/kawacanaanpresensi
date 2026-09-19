@@ -8,9 +8,10 @@ import {
   CalendarRange, 
   FileSpreadsheet, 
   CalendarDays,
-  Check,
+  CheckCircle2,
   BookOpen,
-  School
+  School,
+  Sparkles
 } from 'lucide-react';
 
 interface FeaturesSectionProps {
@@ -231,74 +232,78 @@ export const FeaturesSection: React.FC<FeaturesSectionProps> = ({ lang }) => {
   ];
 
   return (
-    <section id="fitur" className="py-16 sm:py-20 lg:py-24 bg-slate-50 text-slate-900 relative border-b border-blue-100">
+    <section id="fitur" className="py-14 sm:py-18 lg:py-24 bg-slate-50 text-slate-900 relative border-b border-blue-100 antialiased overflow-hidden">
       {/* Background Subtle Grid Pattern */}
-      <div className="absolute inset-0 z-0 pointer-events-none bg-grid-pattern opacity-40" />
+      <div className="absolute inset-0 z-0 pointer-events-none bg-grid-pattern opacity-30" />
 
       <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         
-        {/* Section Header - Educational Aesthetic */}
-        <div className="text-left max-w-3xl space-y-4 mb-12 sm:mb-16">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md bg-blue-50 border border-blue-200 text-blue-800 text-[10px] font-bold uppercase tracking-wider">
-            <School className="w-3.5 h-3.5 text-blue-700 shrink-0" />
-            <span>{lang === 'ID' ? 'FITUR UTAMA SEKOLAH DASAR' : 'PRIMARY SCHOOL CORE FEATURES'}</span>
+        {/* Section Header - Commercial SaaS Style */}
+        <div className="max-w-3xl space-y-3 sm:space-y-4 mb-10 sm:mb-14 lg:mb-16">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-100/70 border border-blue-200 text-blue-800 text-xs font-bold tracking-wide">
+            <Sparkles className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+            <span>{lang === 'ID' ? 'MODUL LENGKAP SEKOLAH DASAR' : 'COMPREHENSIVE PRIMARY SUITE'}</span>
           </div>
-          <h2 className="text-xl sm:text-3xl lg:text-5xl font-black text-[#0B2F64] tracking-tight uppercase leading-[1.08]">
+
+          <h2 className="text-2xl sm:text-4xl lg:text-5xl font-black text-[#0B2F64] tracking-tight leading-[1.12]">
             {lang === 'ID' ? (
               <>
-                SISTEM LENGKAP<br />
-                <span className="text-blue-600 whitespace-nowrap">PRESENSI SEKOLAH DASAR</span>
+                Sistem Terpadu Dirancang Khusus untuk{' '}
+                <span className="text-blue-600">Sekolah Dasar</span>
               </>
             ) : (
               <>
-                COMPREHENSIVE<br />
-                <span className="text-blue-600 whitespace-nowrap">PRIMARY ATTENDANCE PLATFORM</span>
+                Integrated Ecosystem Built for{' '}
+                <span className="text-blue-600">Primary Schools</span>
               </>
             )}
           </h2>
-          <p className="text-slate-600 text-xs sm:text-base lg:text-lg leading-relaxed border-l-4 border-blue-600 pl-3 sm:pl-4 font-normal">
+
+          <p className="text-slate-600 text-sm sm:text-base lg:text-lg leading-relaxed font-normal">
             {lang === 'ID' 
-              ? 'Didesain khusus menyesuaikan tata kelola administrasi dan kurikulum Sekolah Dasar, dari rombel kelas 1-6 hingga rekap kedinasan.'
-              : 'Specifically tailored to Primary School curricula and administrative workflows, from Grade 1-6 cohorts to official Kedinasan reporting.'}
+              ? 'Seluruh kebutuhan administrasi, pencatatan rombel kelas 1–6, presensi harian, hingga pencetakan laporan kedinasan dalam satu platform praktis.'
+              : 'End-to-end administration, Grade 1–6 cohort monitoring, daily logs, and official reporting compiled into one powerful, intuitive platform.'}
           </p>
         </div>
 
-        {/* Feature Cards Grid (8 Features) */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {/* Commercial Feature Cards Grid - Ultra Responsive: Phone (1-col) -> Tablet (2-col) -> Laptop (3-col) -> PC/Desktop (4-col) */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5 lg:gap-6">
           {features.map((feature, idx) => {
             const Icon = feature.icon;
             return (
               <div
                 key={idx}
                 id={`feature-card-${idx}`}
-                className="bg-white border border-slate-200 hover:border-blue-500 rounded-xl p-6 hover:shadow-lg transition-all duration-200 flex flex-col justify-between group shadow-xs"
+                className="bg-white border border-slate-200/90 hover:border-blue-500/80 rounded-2xl p-5 sm:p-6 hover:shadow-xl hover:shadow-blue-600/10 transition-all duration-200 flex flex-col justify-between group relative overflow-hidden shadow-xs"
               >
+                {/* Top Subtle Brand Bar on Hover */}
+                <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+
                 <div>
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="w-11 h-11 rounded-lg bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-700 group-hover:bg-blue-700 group-hover:text-white transition-colors">
-                      <Icon className="w-5 h-5" />
+                  {/* Top Bar: Icon + Badge */}
+                  <div className="flex items-center justify-between gap-2 mb-4">
+                    <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-blue-50 border border-blue-150 flex items-center justify-center text-blue-700 group-hover:bg-[#0066FF] group-hover:text-white transition-all duration-200 shadow-xs">
+                      <Icon className="w-5 h-5 sm:w-6 sm:h-6" />
                     </div>
-                    <span className="text-[9px] font-bold uppercase tracking-wider px-2.5 py-1 rounded bg-blue-50/70 text-blue-800 border border-blue-200/80 font-mono">
+                    <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200/80 font-mono">
                       {feature.badge}
                     </span>
                   </div>
 
-                  <h3 className="text-base font-black text-[#0B2F64] mb-2 group-hover:text-blue-600 transition-colors uppercase tracking-tight">
+                  {/* Title & Description */}
+                  <h3 className="text-base sm:text-lg font-black text-[#0B2F64] mb-2 group-hover:text-blue-600 transition-colors uppercase tracking-tight">
                     {feature.title}
                   </h3>
-                  <p className="text-xs text-slate-600 leading-relaxed font-normal mb-4">
+                  <p className="text-xs sm:text-sm text-slate-600 leading-relaxed font-normal mb-5">
                     {feature.desc}
                   </p>
 
-                  {/* Bullet points */}
-                  <div className="space-y-1.5 pt-3 border-t border-slate-100">
-                    <div className="text-[9px] font-bold uppercase tracking-wider text-slate-400 mb-1">
-                      {lang === 'ID' ? 'Fitur & Kemampuan:' : 'Features & Capabilities:'}
-                    </div>
+                  {/* Bullet points - Clean directly rendered list without 'Fitur & Kemampuan' */}
+                  <div className="space-y-2 pt-4 border-t border-slate-100">
                     {feature.items.map((item, i) => (
-                      <div key={i} className="flex items-center gap-1.5 text-xs text-slate-700">
-                        <Check className="w-3 h-3 text-blue-600 shrink-0 stroke-[3]" />
-                        <span>{item}</span>
+                      <div key={i} className="flex items-start gap-2 text-xs sm:text-sm text-slate-700">
+                        <CheckCircle2 className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+                        <span className="leading-snug">{item}</span>
                       </div>
                     ))}
                   </div>

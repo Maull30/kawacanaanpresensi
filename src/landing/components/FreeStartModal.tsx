@@ -15,9 +15,10 @@ import {
   AlertCircle,
   Loader2,
   X,
-  CheckCircle2,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
+import waliKelasWanitaImg from '../../assets/images/wali_kelas_wanita_1789830539387.jpg';
+import guruMapelPriaImg from '../../assets/images/guru_mapel_pria_1789830556851.jpg';
 
 interface FreeStartModalProps {
   isOpen: boolean;
@@ -29,124 +30,6 @@ interface FreeStartModalProps {
 }
 
 type RoleType = 'homeroom' | 'subject';
-
-/* Professional Vector Illustration for Homeroom Teacher / Wali Kelas */
-const HomeroomGraphic: React.FC<{ className?: string }> = ({ className = "w-14 h-14 shrink-0" }) => (
-  <div className={`relative flex items-center justify-center select-none ${className}`}>
-    <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full drop-shadow-xs">
-      <defs>
-        <linearGradient id="hrGrad" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="#2563EB" />
-          <stop offset="100%" stopColor="#1D4ED8" />
-        </linearGradient>
-        <linearGradient id="hrCard" x1="0" y1="0" x2="0" y2="44" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="#FFFFFF" />
-          <stop offset="100%" stopColor="#F8FAFC" />
-        </linearGradient>
-      </defs>
-
-      {/* Rounded squircle background */}
-      <rect width="64" height="64" rx="14" fill="url(#hrGrad)" />
-
-      {/* Modern Attendance Roster Card */}
-      <g transform="translate(11, 10)">
-        {/* Roster sheet */}
-        <rect width="42" height="44" rx="5" fill="url(#hrCard)" stroke="#DBEAFE" strokeWidth="0.8" />
-        
-        {/* Header bar */}
-        <rect x="5" y="5" width="18" height="3" rx="1.5" fill="#1E3A8A" />
-        <circle cx="36" cy="6.5" r="2" fill="#10B981" />
-        <line x1="5" y1="11" x2="37" y2="11" stroke="#E2E8F0" strokeWidth="0.8" />
-
-        {/* Row 1: Student item with Hadir checkmark */}
-        <circle cx="8" cy="17" r="2.2" fill="#93C5FD" />
-        <rect x="13" y="15.5" width="14" height="3" rx="1.5" fill="#64748B" />
-        <rect x="30" y="14.5" width="7" height="5" rx="2" fill="#DCFCE7" />
-        <path d="M31.8 17 L33 18.2 L35.2 16" stroke="#16A34A" strokeWidth="0.9" strokeLinecap="round" strokeLinejoin="round" />
-
-        {/* Row 2: Student item with Sakit badge */}
-        <circle cx="8" cy="25" r="2.2" fill="#CBD5E1" />
-        <rect x="13" y="23.5" width="12" height="3" rx="1.5" fill="#94A3B8" />
-        <rect x="30" y="22.5" width="7" height="5" rx="2" fill="#FEF3C7" />
-        <circle cx="33.5" cy="25" r="1" fill="#D97706" />
-
-        {/* Row 3: Student item with Izin badge */}
-        <circle cx="8" cy="33" r="2.2" fill="#93C5FD" />
-        <rect x="13" y="31.5" width="15" height="3" rx="1.5" fill="#64748B" />
-        <rect x="30" y="30.5" width="7" height="5" rx="2" fill="#E0F2FE" />
-        <circle cx="33.5" cy="33" r="1" fill="#0284C7" />
-      </g>
-
-      {/* Verified Seal Badge */}
-      <circle cx="51" cy="49" r="8.5" fill="#FFFFFF" />
-      <circle cx="51" cy="49" r="7" fill="#1D4ED8" />
-      <path d="M48.2 49 L49.9 50.7 L53.8 46.8" stroke="#FFFFFF" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  </div>
-);
-
-/* Professional Vector Illustration for Subject Teacher / Guru Mapel */
-const SubjectGraphic: React.FC<{ className?: string }> = ({ className = "w-14 h-14 shrink-0" }) => (
-  <div className={`relative flex items-center justify-center select-none ${className}`}>
-    <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full drop-shadow-xs">
-      <defs>
-        <linearGradient id="subGrad" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="#059669" />
-          <stop offset="100%" stopColor="#047857" />
-        </linearGradient>
-        <linearGradient id="subCard" x1="0" y1="0" x2="0" y2="44" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="#FFFFFF" />
-          <stop offset="100%" stopColor="#F8FAFC" />
-        </linearGradient>
-      </defs>
-
-      {/* Rounded squircle background */}
-      <rect width="64" height="64" rx="14" fill="url(#subGrad)" />
-
-      {/* Digital Teaching Schedule Matrix */}
-      <g transform="translate(11, 10)">
-        {/* Schedule card */}
-        <rect width="42" height="44" rx="5" fill="url(#subCard)" stroke="#A7F3D0" strokeWidth="0.8" />
-
-        {/* Header bar: Timetable title & active indicator */}
-        <rect x="5" y="5" width="16" height="3" rx="1.5" fill="#064E3B" />
-        <rect x="29" y="4.5" width="8" height="4" rx="1.5" fill="#10B981" />
-        <line x1="5" y1="11" x2="37" y2="11" stroke="#E2E8F0" strokeWidth="0.8" />
-
-        {/* Period 1: Class 4A */}
-        <g transform="translate(5, 14)">
-          <rect width="32" height="6.5" rx="2" fill="#ECFDF5" stroke="#A7F3D0" strokeWidth="0.6" />
-          <rect x="2" y="1.8" width="2" height="3" rx="1" fill="#059669" />
-          <rect x="6" y="2" width="13" height="2.5" rx="1.2" fill="#065F46" />
-          <circle cx="28" cy="3.2" r="1.3" fill="#10B981" />
-        </g>
-
-        {/* Period 2: Class 5B */}
-        <g transform="translate(5, 23)">
-          <rect width="32" height="6.5" rx="2" fill="#F8FAFC" stroke="#E2E8F0" strokeWidth="0.6" />
-          <rect x="2" y="1.8" width="2" height="3" rx="1" fill="#64748B" />
-          <rect x="6" y="2" width="16" height="2.5" rx="1.2" fill="#475569" />
-          <circle cx="28" cy="3.2" r="1.3" fill="#94A3B8" />
-        </g>
-
-        {/* Period 3: Class 6A */}
-        <g transform="translate(5, 32)">
-          <rect width="32" height="6.5" rx="2" fill="#ECFDF5" stroke="#A7F3D0" strokeWidth="0.6" />
-          <rect x="2" y="1.8" width="2" height="3" rx="1" fill="#059669" />
-          <rect x="6" y="2" width="11" height="2.5" rx="1.2" fill="#065F46" />
-          <circle cx="28" cy="3.2" r="1.3" fill="#10B981" />
-        </g>
-      </g>
-
-      {/* Floating Clock Period Badge */}
-      <circle cx="51" cy="49" r="8.5" fill="#FFFFFF" />
-      <circle cx="51" cy="49" r="7" fill="#047857" />
-      <circle cx="51" cy="49" r="0.9" fill="#FFFFFF" />
-      <line x1="51" y1="49" x2="51" y2="45.5" stroke="#FFFFFF" strokeWidth="1.1" strokeLinecap="round" />
-      <line x1="51" y1="49" x2="53.8" y2="49" stroke="#FFFFFF" strokeWidth="1.1" strokeLinecap="round" />
-    </svg>
-  </div>
-);
 
 export const FreeStartModal: React.FC<FreeStartModalProps> = ({
   isOpen,
@@ -329,47 +212,59 @@ export const FreeStartModal: React.FC<FreeStartModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 md:p-6 bg-slate-900/60 backdrop-blur-xs overflow-y-auto animate-in fade-in duration-150">
-      <div className="relative w-full max-w-2xl bg-white rounded-2xl sm:rounded-3xl shadow-2xl border border-slate-200/90 overflow-hidden my-auto animate-in zoom-in-95 duration-200 flex flex-col max-h-[calc(100dvh-1rem)] sm:max-h-[90vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 bg-slate-900/60 backdrop-blur-xs overflow-y-auto animate-in fade-in duration-150">
+      <div className="relative w-full max-w-xl md:max-w-2xl bg-white rounded-2xl sm:rounded-3xl shadow-2xl border border-slate-200/90 overflow-hidden my-auto animate-in zoom-in-95 duration-200 flex flex-col max-h-[calc(100dvh-1rem)] sm:max-h-[90vh]">
         
         {/* ========================================================================= */}
-        {/* TOP HEADER: Minimalist Logo, Badge & Stepper                              */}
+        {/* TOP HEADER: Brand Logo Kawacanaan & Stepper 1 Pilih Peran 2 Buat Akun    */}
         {/* ========================================================================= */}
-        <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-3.5 border-b border-slate-100 bg-white shrink-0">
-          {/* Brand / Logo */}
-          <div className="flex items-center gap-2 sm:gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-xs shrink-0">
-              <GraduationCap className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
+        <div className="flex items-center justify-between px-3.5 sm:px-6 py-2.5 sm:py-3.5 border-b border-slate-100 bg-white shrink-0">
+          {/* Brand / Logo Kawacanaan SD */}
+          <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
+            <div className="w-8 h-8 sm:w-9 sm:h-9 bg-gradient-to-br from-blue-700 via-blue-800 to-indigo-900 rounded-xl flex items-center justify-center text-white font-black text-sm sm:text-base shadow-sm shadow-blue-700/25 shrink-0 border border-blue-500/40 relative">
+              <span className="relative z-10">K</span>
             </div>
-            <div className="flex items-center gap-2">
-              <span className="font-bold text-slate-900 text-sm sm:text-base tracking-tight">PresensiEdu</span>
-              <span className="px-2 py-0.5 rounded-md bg-blue-50 text-blue-600 border border-blue-200/70 text-[10px] font-bold uppercase tracking-wider">
-                GRATIS
+            <div className="flex items-center gap-1.5">
+              <span className="font-black text-slate-900 text-sm sm:text-base tracking-tight uppercase">
+                Kawacanaan
+              </span>
+              <span className="px-1.5 py-0.5 bg-blue-100/90 text-blue-800 text-[9px] font-black rounded font-mono uppercase tracking-wider border border-blue-200/80">
+                SD
               </span>
             </div>
           </div>
 
           {/* Stepper & Close Button */}
-          <div className="flex items-center gap-3 sm:gap-4">
-            {/* Stepper indicator */}
-            <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium">
-              <span className={`w-5 h-5 rounded-full font-bold flex items-center justify-center text-[10px] ${
-                step === 1 ? 'bg-blue-600 text-white' : 'bg-blue-100 text-blue-700'
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+            {/* Stepper Indicator: 1 Pilih Peran -> 2 Buat Akun */}
+            <div className="flex items-center gap-1 sm:gap-1.5 text-xs">
+              <div className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 rounded-lg text-[10px] sm:text-xs font-bold transition-all ${
+                step === 1 
+                  ? 'bg-blue-600 text-white shadow-xs' 
+                  : 'bg-blue-50 text-blue-700 border border-blue-200/70'
               }`}>
-                {step > 1 ? '✓' : '1'}
-              </span>
-              <span className={`hidden sm:inline font-semibold ${step === 1 ? 'text-blue-600' : 'text-slate-600'}`}>
-                {lang === 'ID' ? 'Peran' : 'Role'}
-              </span>
-              <span className="text-slate-300">/</span>
-              <span className={`w-5 h-5 rounded-full font-bold flex items-center justify-center text-[10px] ${
-                step === 2 ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-400'
+                <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] sm:text-[10px] ${
+                  step === 1 ? 'bg-white text-blue-600 font-black' : 'bg-blue-600 text-white font-bold'
+                }`}>
+                  {step > 1 ? '✓' : '1'}
+                </span>
+                <span>{lang === 'ID' ? 'Pilih Peran' : 'Select Role'}</span>
+              </div>
+
+              <span className="text-slate-300 font-bold text-[10px] sm:text-xs">→</span>
+
+              <div className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 rounded-lg text-[10px] sm:text-xs font-bold transition-all ${
+                step === 2 
+                  ? 'bg-blue-600 text-white shadow-xs' 
+                  : 'bg-slate-100 text-slate-400'
               }`}>
-                2
-              </span>
-              <span className={`hidden sm:inline font-semibold ${step === 2 ? 'text-blue-600' : 'text-slate-400'}`}>
-                {lang === 'ID' ? 'Akun' : 'Account'}
-              </span>
+                <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] sm:text-[10px] ${
+                  step === 2 ? 'bg-white text-blue-600 font-black' : 'bg-slate-300 text-white font-bold'
+                }`}>
+                  2
+                </span>
+                <span>{lang === 'ID' ? 'Buat Akun' : 'Create Account'}</span>
+              </div>
             </div>
 
             {/* Close Button */}
@@ -385,16 +280,16 @@ export const FreeStartModal: React.FC<FreeStartModalProps> = ({
         </div>
 
         {/* Modal Scrollable Content Body */}
-        <div className="p-4 sm:p-5 md:p-6 overflow-y-auto flex-1">
+        <div className="p-3.5 sm:p-5 md:p-6 overflow-y-auto flex-1">
 
           {/* ========================================================================= */}
-          {/* LANGKAH 1: PILIH PERAN MINIMALIS                                          */}
+          {/* LANGKAH 1: PILIH PERAN (URUTAN 1)                                         */}
           {/* ========================================================================= */}
           {step === 1 && (
             <div>
               {/* Minimalist Heading */}
-              <div className="mb-4 sm:mb-5">
-                <h2 className="text-lg sm:text-xl font-bold text-slate-900 tracking-tight">
+              <div className="mb-3.5 sm:mb-5">
+                <h2 className="text-base sm:text-xl font-bold text-slate-900 tracking-tight">
                   {lang === 'ID' ? 'Pilih Peran Pendidik' : 'Select Your Educator Role'}
                 </h2>
                 <p className="mt-0.5 text-xs text-slate-500">
@@ -404,41 +299,47 @@ export const FreeStartModal: React.FC<FreeStartModalProps> = ({
                 </p>
               </div>
 
-              {/* Two Role Selection Cards - Minimalist & Compact */}
+              {/* Two Role Selection Cards - Responsive for Mobile & Desktop */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 
                 {/* KARTU 1: WALI KELAS */}
                 <div 
-                  className="bg-white border border-slate-200 hover:border-blue-500 rounded-xl sm:rounded-2xl p-4 relative flex flex-col justify-between shadow-2xs hover:shadow-md transition-all duration-150 group"
+                  className="bg-white border border-slate-200 hover:border-blue-500 rounded-xl sm:rounded-2xl p-3 sm:p-4 relative flex flex-col justify-between shadow-2xs hover:shadow-md transition-all duration-150 group"
                 >
                   <div>
-                    {/* Top Row: Info & Professional Graphic */}
-                    <div className="flex items-start justify-between gap-3">
+                    {/* Top Row: 3D Educator Avatar & Title */}
+                    <div className="flex items-center gap-3">
+                      <div className="relative w-16 h-16 sm:w-20 sm:h-20 shrink-0 rounded-xl sm:rounded-2xl overflow-hidden border-2 border-blue-100 shadow-2xs bg-blue-50/60">
+                        <img
+                          src={waliKelasWanitaImg}
+                          alt="Wali Kelas"
+                          className="w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-300"
+                          referrerPolicy="no-referrer"
+                        />
+                      </div>
+
                       <div className="flex-1 min-w-0">
-                        <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center mb-2">
-                          <Users className="w-4 h-4" />
+                        <div className="w-fit px-2 py-0.5 rounded bg-blue-50 text-blue-700 text-[10px] font-bold uppercase tracking-wider mb-1">
+                          Wali Kelas
                         </div>
-                        <h3 className="text-base font-bold text-slate-900 tracking-tight">
+                        <h3 className="text-sm sm:text-base font-bold text-slate-900 tracking-tight leading-snug">
                           {lang === 'ID' ? 'Wali Kelas' : 'Homeroom Teacher'}
                         </h3>
-                        <p className="text-[11px] font-semibold text-blue-600 mt-0.5">
+                        <p className="text-[11px] font-semibold text-blue-600 mt-0.5 truncate">
                           {lang === 'ID' ? 'Presensi Harian Kelas SD' : 'Class Attendance & Recap'}
                         </p>
                       </div>
-
-                      {/* Professional Graphic */}
-                      <HomeroomGraphic className="w-12 h-12 shrink-0" />
                     </div>
 
                     {/* Brief Description */}
-                    <p className="text-xs text-slate-600 mt-2.5 leading-relaxed">
+                    <p className="text-xs text-slate-600 mt-2.5 leading-relaxed line-clamp-2 sm:line-clamp-none">
                       {lang === 'ID'
                         ? 'Kelola presensi seluruh siswa satu kelas, rekap bulanan otomatis, dan cetak format kedinasan.'
                         : 'Manage daily attendance for your classroom students, monthly recaps, and official reports.'}
                     </p>
 
                     {/* Feature Badges */}
-                    <div className="mt-3 flex flex-wrap gap-1.5">
+                    <div className="mt-2.5 flex flex-wrap gap-1.5">
                       <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-slate-50 border border-slate-200/80 text-slate-600 text-[10px] font-medium">
                         {lang === 'ID' ? 'Format Kedinasan' : 'Official Report'}
                       </span>
@@ -453,7 +354,7 @@ export const FreeStartModal: React.FC<FreeStartModalProps> = ({
                     type="button"
                     onClick={() => handleSelectRole('homeroom')}
                     id="btn-choose-homeroom"
-                    className="mt-4 w-full bg-blue-600 hover:bg-blue-700 active:scale-[0.99] text-white font-semibold py-2.5 px-3.5 rounded-xl flex items-center justify-center gap-1.5 shadow-xs transition-all cursor-pointer text-xs min-h-[40px]"
+                    className="mt-3.5 sm:mt-4 w-full bg-blue-600 hover:bg-blue-700 active:scale-[0.99] text-white font-semibold py-2.5 px-3.5 rounded-xl flex items-center justify-center gap-1.5 shadow-xs transition-all cursor-pointer text-xs min-h-[44px]"
                   >
                     <span>{lang === 'ID' ? 'Pilih Wali Kelas' : 'Select Homeroom'}</span>
                     <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
@@ -462,36 +363,42 @@ export const FreeStartModal: React.FC<FreeStartModalProps> = ({
 
                 {/* KARTU 2: GURU MAPEL */}
                 <div 
-                  className="bg-white border border-slate-200 hover:border-emerald-500 rounded-xl sm:rounded-2xl p-4 relative flex flex-col justify-between shadow-2xs hover:shadow-md transition-all duration-150 group"
+                  className="bg-white border border-slate-200 hover:border-emerald-500 rounded-xl sm:rounded-2xl p-3 sm:p-4 relative flex flex-col justify-between shadow-2xs hover:shadow-md transition-all duration-150 group"
                 >
                   <div>
-                    {/* Top Row: Info & Professional Graphic */}
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex-1 min-w-0">
-                        <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center mb-2">
-                          <BookOpen className="w-4 h-4" />
-                        </div>
-                        <h3 className="text-base font-bold text-slate-900 tracking-tight">
-                          {lang === 'ID' ? 'Guru Mapel' : 'Subject Teacher'}
-                        </h3>
-                        <p className="text-[11px] font-semibold text-emerald-600 mt-0.5">
-                          {lang === 'ID' ? 'Presensi Mata Pelajaran SD' : 'Subject Attendance & Journal'}
-                        </p>
+                    {/* Top Row: 3D Educator Avatar & Title */}
+                    <div className="flex items-center gap-3">
+                      <div className="relative w-16 h-16 sm:w-20 sm:h-20 shrink-0 rounded-xl sm:rounded-2xl overflow-hidden border-2 border-emerald-100 shadow-2xs bg-emerald-50/60">
+                        <img
+                          src={guruMapelPriaImg}
+                          alt="Guru Mapel"
+                          className="w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-300"
+                          referrerPolicy="no-referrer"
+                        />
                       </div>
 
-                      {/* Professional Graphic */}
-                      <SubjectGraphic className="w-12 h-12 shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <div className="w-fit px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 text-[10px] font-bold uppercase tracking-wider mb-1">
+                          Guru Mapel
+                        </div>
+                        <h3 className="text-sm sm:text-base font-bold text-slate-900 tracking-tight leading-snug">
+                          {lang === 'ID' ? 'Guru Mapel' : 'Subject Teacher'}
+                        </h3>
+                        <p className="text-[11px] font-semibold text-emerald-600 mt-0.5 truncate">
+                          {lang === 'ID' ? 'Presensi Jam Pelajaran SD' : 'Subject Attendance & Journal'}
+                        </p>
+                      </div>
                     </div>
 
                     {/* Brief Description */}
-                    <p className="text-xs text-slate-600 mt-2.5 leading-relaxed">
+                    <p className="text-xs text-slate-600 mt-2.5 leading-relaxed line-clamp-2 sm:line-clamp-none">
                       {lang === 'ID'
                         ? 'Catat kehadiran per jam pelajaran (PJOK, PAI, dll), kelola multi-rombel, dan jurnal mengajar.'
                         : 'Record attendance by subject periods, manage multiple classroom groups, and teaching journals.'}
                     </p>
 
                     {/* Feature Badges */}
-                    <div className="mt-3 flex flex-wrap gap-1.5">
+                    <div className="mt-2.5 flex flex-wrap gap-1.5">
                       <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-slate-50 border border-slate-200/80 text-slate-600 text-[10px] font-medium">
                         {lang === 'ID' ? 'Jadwal Jam Mengajar' : 'Teaching Periods'}
                       </span>
@@ -506,7 +413,7 @@ export const FreeStartModal: React.FC<FreeStartModalProps> = ({
                     type="button"
                     onClick={() => handleSelectRole('subject')}
                     id="btn-choose-subject"
-                    className="mt-4 w-full bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] text-white font-semibold py-2.5 px-3.5 rounded-xl flex items-center justify-center gap-1.5 shadow-xs transition-all cursor-pointer text-xs min-h-[40px]"
+                    className="mt-3.5 sm:mt-4 w-full bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] text-white font-semibold py-2.5 px-3.5 rounded-xl flex items-center justify-center gap-1.5 shadow-xs transition-all cursor-pointer text-xs min-h-[44px]"
                   >
                     <span>{lang === 'ID' ? 'Pilih Guru Mapel' : 'Select Subject'}</span>
                     <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
@@ -516,8 +423,8 @@ export const FreeStartModal: React.FC<FreeStartModalProps> = ({
               </div>
 
               {/* Minimalist Bottom Footer */}
-              <div className="mt-5 pt-3.5 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-2.5 text-xs text-slate-500">
-                <div className="flex items-center gap-2 font-medium text-[11px]">
+              <div className="mt-4 sm:mt-5 pt-3 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-500">
+                <div className="flex items-center gap-1.5 font-medium text-[11px]">
                   <ShieldCheck className="w-3.5 h-3.5 text-blue-600 shrink-0" />
                   <span>{lang === 'ID' ? 'Data tersimpan aman & tanpa kartu kredit' : 'Secure data storage & no credit card required'}</span>
                 </div>
@@ -541,7 +448,7 @@ export const FreeStartModal: React.FC<FreeStartModalProps> = ({
           )}
 
           {/* ========================================================================= */}
-          {/* LANGKAH 2: FORMULIR BUAT AKUN (STEP 02)                                  */}
+          {/* LANGKAH 2: FORMULIR BUAT AKUN (URUTAN 2)                                  */}
           {/* ========================================================================= */}
           {step === 2 && (
             <div className="max-w-lg mx-auto">
@@ -566,12 +473,22 @@ export const FreeStartModal: React.FC<FreeStartModalProps> = ({
                   </span>
                   {selectedRole === 'homeroom' ? (
                     <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200 text-xs font-bold">
-                      <HomeroomGraphic className="w-4 h-4 shrink-0" />
+                      <img
+                        src={waliKelasWanitaImg}
+                        alt="Wali Kelas"
+                        className="w-4 h-4 rounded-full object-cover shrink-0"
+                        referrerPolicy="no-referrer"
+                      />
                       <span>{lang === 'ID' ? 'Wali Kelas' : 'Homeroom Teacher'}</span>
                     </div>
                   ) : (
                     <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold">
-                      <SubjectGraphic className="w-4 h-4 shrink-0" />
+                      <img
+                        src={guruMapelPriaImg}
+                        alt="Guru Mapel"
+                        className="w-4 h-4 rounded-full object-cover shrink-0"
+                        referrerPolicy="no-referrer"
+                      />
                       <span>{lang === 'ID' ? 'Guru Mapel' : 'Subject Teacher'}</span>
                     </div>
                   )}
@@ -579,11 +496,11 @@ export const FreeStartModal: React.FC<FreeStartModalProps> = ({
               </div>
 
               {/* Title Header */}
-              <div className="mb-5">
-                <h3 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
+              <div className="mb-4 sm:mb-5">
+                <h3 className="text-lg sm:text-2xl font-black text-slate-900 tracking-tight">
                   {lang === 'ID' ? 'Buat Akun Pendidik Anda' : 'Create Your Educator Account'}
                 </h3>
-                <p className="text-xs sm:text-sm text-slate-500 mt-1">
+                <p className="text-xs text-slate-500 mt-1">
                   {lang === 'ID'
                     ? 'Lengkapi data akun untuk langsung mengakses Ruang Kerja digital gratis.'
                     : 'Fill in your details to immediately access your free digital workspace.'}

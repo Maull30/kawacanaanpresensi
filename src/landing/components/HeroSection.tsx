@@ -1,6 +1,7 @@
 import React from 'react';
 import { ArrowRight, Sparkles, CheckCircle2, ShieldCheck, School, Calendar, Users, Award, BookOpen } from 'lucide-react';
 import { DeviceMockup } from './DeviceMockup';
+import { PublicStatsBanner } from './PublicStatsBanner';
 
 interface HeroSectionProps {
   onOpenRegister: () => void;
@@ -139,6 +140,11 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
             </div>
           </div>
 
+        </div>
+
+        {/* Spanduk Statistik Aktual Beranda */}
+        <div className="mt-10 sm:mt-12 lg:mt-16 w-full">
+          <PublicStatsBanner lang={lang} />
         </div>
       </div>
 

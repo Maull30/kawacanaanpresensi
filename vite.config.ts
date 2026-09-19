@@ -117,6 +117,8 @@ function apiDevMiddleware(): Plugin {
 
             if (req.method === 'GET' || req.method === 'HEAD') {
               await processRequest('');
+            } else if (req.body !== undefined && typeof req.body === 'object' && Object.keys(req.body).length > 0) {
+              await processRequest(JSON.stringify(req.body));
             } else {
               let bodyStr = '';
               req.on('data', (chunk: Buffer) => {
@@ -124,6 +126,13 @@ function apiDevMiddleware(): Plugin {
               });
               req.on('end', async () => {
                 await processRequest(bodyStr);
+              });
+              req.on('error', (err: any) => {
+                if (!res.writableEnded) {
+                  res.statusCode = 500;
+                  res.setHeader('Content-Type', 'application/json');
+                  res.end(JSON.stringify({ error: err?.message || 'Request stream error' }));
+                }
               });
             }
             return;
@@ -189,6 +198,10 @@ export default defineConfig(() => {
       hmr: process.env.DISABLE_HMR !== 'true',
       // Disable file watching when DISABLE_HMR is true to save CPU during agent edits.
       watch: process.env.DISABLE_HMR === 'true' ? null : {},
+    },
+    preview: {
+      host: '0.0.0.0',
+      port: 3000,
     },
   };
 });

@@ -71,45 +71,51 @@ export const TestimonialSection: React.FC<TestimonialSectionProps> = ({ lang }) 
   ];
 
   return (
-    <section id="testimoni" className="py-14 sm:py-18 lg:py-24 bg-white text-slate-900 relative border-b border-blue-100 antialiased">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <section id="testimoni" className="scroll-mt-16 sm:scroll-mt-20 py-14 sm:py-16 lg:py-20 bg-white text-slate-900 relative border-b border-blue-100 antialiased overflow-hidden">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
         
-        {/* Header - Modern Commercial SaaS Style */}
-        <div className="max-w-3xl space-y-3 sm:space-y-4 mb-10 sm:mb-14 lg:mb-16">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 border border-blue-200 text-blue-800 text-xs font-bold uppercase tracking-wider">
-            <MessageSquareQuote className="w-3.5 h-3.5 text-blue-700 shrink-0" />
-            <span>{lang === 'ID' ? 'TESTIMONI RESMI PENGGUNA' : 'CUSTOMER TESTIMONIALS'}</span>
+        {/* Header - Balanced Commercial SaaS Style */}
+        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8 sm:mb-10 lg:mb-12">
+          <div className="space-y-2.5 max-w-2xl">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 border border-blue-200 text-blue-800 text-xs font-bold uppercase tracking-wider">
+              <MessageSquareQuote className="w-3.5 h-3.5 text-blue-700 shrink-0" />
+              <span>{lang === 'ID' ? 'TESTIMONI RESMI PENGGUNA' : 'CUSTOMER TESTIMONIALS'}</span>
+            </div>
+
+            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-black text-[#0B2F64] tracking-tight uppercase leading-tight">
+              {lang === 'ID' ? (
+                <>
+                  Kepercayaan Sekolah di <span className="text-blue-600">Seluruh Indonesia</span>
+                </>
+              ) : (
+                <>
+                  Trusted by Schools <span className="text-blue-600">Across Indonesia</span>
+                </>
+              )}
+            </h2>
+
+            <p className="text-slate-600 text-xs sm:text-sm md:text-base leading-relaxed font-normal">
+              {lang === 'ID'
+                ? 'Pengalaman nyata kepala sekolah, guru kelas, dan koordinator tata usaha yang merasakan kemudahan sistem presensi Kawacanaan.'
+                : 'Real outcomes and experiences from principals, teachers, and school administrators using the Kawacanaan platform.'}
+            </p>
           </div>
 
-          <h2 className="text-2xl sm:text-4xl lg:text-5xl font-black text-[#0B2F64] tracking-tight uppercase leading-[1.1]">
-            {lang === 'ID' ? (
-              <>
-                KEPERCAYAAN SEKOLAH DI<br />
-                <span className="text-blue-600">SELURUH INDONESIA</span>
-              </>
-            ) : (
-              <>
-                TRUSTED BY SCHOOLS<br />
-                <span className="text-blue-600">ACROSS INDONESIA</span>
-              </>
-            )}
-          </h2>
-
-          <p className="text-slate-600 text-sm sm:text-base lg:text-lg leading-relaxed font-normal">
-            {lang === 'ID'
-              ? 'Pengalaman nyata kepala sekolah, guru kelas, dan koordinator tata usaha yang merasakan kemudahan sistem presensi Kawacanaan.'
-              : 'Real outcomes and experiences from principals, teachers, and school administrators using the Kawacanaan platform.'}
-          </p>
+          {/* Swipe indicator hint for mobile only */}
+          <div className="flex sm:hidden items-center gap-1.5 text-xs font-bold text-blue-700">
+            <span>{lang === 'ID' ? 'Geser testimoni' : 'Swipe reviews'}</span>
+            <span className="text-sm">→</span>
+          </div>
         </div>
 
         {/* Commercial Testimonials Grid - Responsive across Phone, Tablet, Laptop, PC, Desktop Monitors */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6 lg:gap-8">
+        <div className="flex sm:grid sm:grid-cols-2 lg:grid-cols-3 overflow-x-auto sm:overflow-x-visible snap-x snap-mandatory gap-4 sm:gap-6 lg:gap-8 pb-3 sm:pb-0 -mx-4 px-4 sm:mx-0 sm:px-0">
           {testimonials.map((t) => (
-            <div
-              key={t.id}
-              id={`testimonial-card-${t.id}`}
-              className="bg-slate-50/70 hover:bg-white border border-slate-200/90 hover:border-blue-500 rounded-2xl p-6 sm:p-7 flex flex-col justify-between transition-all duration-200 hover:shadow-xl hover:shadow-blue-500/10 group relative"
-            >
+              <div
+                key={t.id}
+                id={`testimonial-card-${t.id}`}
+                className="w-[84vw] max-w-[340px] sm:w-auto shrink-0 sm:shrink snap-center bg-slate-50/70 hover:bg-white border border-slate-200 hover:border-blue-500 rounded-2xl p-5 sm:p-6 lg:p-7 flex flex-col justify-between transition-all duration-200 hover:shadow-xl hover:shadow-blue-500/10 group relative"
+              >
               <div>
                 {/* Top Card Row: Star Rating + Tag */}
                 <div className="flex items-center justify-between gap-2 mb-4">

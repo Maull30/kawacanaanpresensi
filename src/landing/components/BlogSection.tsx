@@ -67,19 +67,19 @@ export const BlogSection: React.FC<BlogSectionProps> = ({ lang }) => {
   return (
     <section 
       id="blog" 
-      className="scroll-mt-16 sm:scroll-mt-20 lg:min-h-[calc(100vh-4.5rem)] flex flex-col justify-center py-6 sm:py-8 lg:py-10 bg-slate-50 text-slate-900 relative border-b border-blue-100 antialiased overflow-hidden"
+      className="scroll-mt-16 sm:scroll-mt-20 py-14 sm:py-16 lg:py-20 bg-slate-50 text-slate-900 relative border-b border-blue-100 antialiased overflow-hidden"
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
         
-        {/* Header - Compact Educational Insights */}
-        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 mb-5 sm:mb-6 lg:mb-7">
-          <div className="space-y-1.5 max-w-2xl">
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-blue-100/80 border border-blue-200 text-blue-800 text-[11px] font-bold uppercase tracking-wider">
-              <BookOpen className="w-3 h-3 text-blue-700 shrink-0" />
+        {/* Header - Balanced Educational Insights */}
+        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8 sm:mb-10 lg:mb-12">
+          <div className="space-y-2.5 max-w-2xl">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-100/80 border border-blue-200 text-blue-800 text-xs font-bold uppercase tracking-wider">
+              <BookOpen className="w-3.5 h-3.5 text-blue-700 shrink-0" />
               <span>{lang === 'ID' ? 'BLOG & INFORMASI SEKOLAH' : 'BLOG & SCHOOL INSIGHTS'}</span>
             </div>
 
-            <h2 className="text-xl sm:text-3xl lg:text-4xl font-black text-[#0B2F64] tracking-tight uppercase leading-tight">
+            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-black text-[#0B2F64] tracking-tight uppercase leading-tight">
               {lang === 'ID' ? (
                 <>
                   Tips & <span className="text-blue-600">Digitalisasi Sekolah</span>
@@ -91,7 +91,7 @@ export const BlogSection: React.FC<BlogSectionProps> = ({ lang }) => {
               )}
             </h2>
 
-            <p className="text-slate-600 text-xs sm:text-sm lg:text-base leading-relaxed font-normal">
+            <p className="text-slate-600 text-xs sm:text-sm md:text-base leading-relaxed font-normal">
               {lang === 'ID'
                 ? 'Edukasi dan panduan praktis pengelolaan presensi serta administrasi sekolah dasar.'
                 : 'Actionable guidance and practical insights for primary school attendance administration.'}
@@ -99,57 +99,57 @@ export const BlogSection: React.FC<BlogSectionProps> = ({ lang }) => {
           </div>
 
           {/* Swipe indicator hint for mobile only */}
-          <div className="flex sm:hidden items-center gap-1 text-[11px] font-bold text-blue-700">
+          <div className="flex sm:hidden items-center gap-1.5 text-xs font-bold text-blue-700">
             <span>{lang === 'ID' ? 'Geser artikel' : 'Swipe articles'}</span>
-            <ArrowRight className="w-3 h-3" />
+            <ArrowRight className="w-3.5 h-3.5" />
           </div>
         </div>
 
-        {/* Blog Cards Grid: Swipeable on Mobile, 3 Columns on Desktop */}
-        <div className="flex sm:grid sm:grid-cols-2 lg:grid-cols-3 overflow-x-auto sm:overflow-x-visible snap-x snap-mandatory gap-3.5 sm:gap-4 lg:gap-5 pb-2 sm:pb-0 -mx-4 px-4 sm:mx-0 sm:px-0">
+        {/* Blog Cards Grid: Responsive across Phone, Tablet, Laptop, and Desktop Monitors */}
+        <div className="flex sm:grid sm:grid-cols-2 lg:grid-cols-3 overflow-x-auto sm:overflow-x-visible snap-x snap-mandatory gap-4 sm:gap-6 lg:gap-8 pb-3 sm:pb-0 -mx-4 px-4 sm:mx-0 sm:px-0">
           {posts.map((post) => (
             <article
               key={post.id}
               id={`blog-card-${post.id}`}
-              className="w-[80vw] max-w-[320px] sm:w-auto shrink-0 sm:shrink snap-center bg-white border border-slate-200/90 rounded-xl overflow-hidden hover:border-blue-500 hover:shadow-md transition-all group flex flex-col justify-between shadow-xs"
+              className="w-[84vw] max-w-[340px] sm:w-auto shrink-0 sm:shrink snap-center bg-white border border-slate-200 hover:border-blue-500 rounded-2xl overflow-hidden hover:shadow-lg hover:shadow-blue-500/10 transition-all group flex flex-col justify-between"
             >
               <div>
                 {/* Thumbnail image */}
-                <div className="relative h-32 sm:h-36 overflow-hidden bg-slate-100 block">
+                <div className="relative h-44 sm:h-48 overflow-hidden bg-slate-100 block">
                   <img 
                     src={post.image} 
                     alt={post.title} 
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                     referrerPolicy="no-referrer"
                   />
-                  <span className="absolute top-2.5 left-2.5 bg-[#0B2F64]/90 backdrop-blur-xs text-white px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider">
+                  <span className="absolute top-3 left-3 bg-[#0B2F64]/90 backdrop-blur-xs text-white px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider">
                     {post.category}
                   </span>
                 </div>
 
-                <div className="p-3.5 sm:p-4 space-y-1.5">
-                  <div className="flex items-center gap-2 text-[10px] font-semibold text-slate-500">
+                <div className="p-5 sm:p-6 space-y-2.5">
+                  <div className="flex items-center gap-2 text-xs font-semibold text-slate-500">
                     <span className="flex items-center gap-1">
-                      <Calendar className="w-3 h-3" /> {post.date}
+                      <Calendar className="w-3.5 h-3.5" /> {post.date}
                     </span>
                     <span>•</span>
                     <span className="flex items-center gap-1">
-                      <Clock className="w-3 h-3" /> {post.readTime}
+                      <Clock className="w-3.5 h-3.5" /> {post.readTime}
                     </span>
                   </div>
 
-                  <h3 className="text-xs sm:text-sm font-bold text-[#0B2F64] group-hover:text-blue-600 transition-colors leading-snug line-clamp-2">
+                  <h3 className="text-base sm:text-lg font-bold text-[#0B2F64] group-hover:text-blue-600 transition-colors leading-snug line-clamp-2">
                     {post.title}
                   </h3>
 
-                  <p className="text-[11px] sm:text-xs text-slate-600 leading-relaxed font-normal line-clamp-2">
+                  <p className="text-xs sm:text-sm text-slate-600 leading-relaxed font-normal line-clamp-2">
                     {post.snippet}
                   </p>
                 </div>
               </div>
 
-              <div className="p-3.5 sm:p-4 pt-0">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-blue-700 group-hover:text-blue-900 flex items-center gap-1">
+              <div className="p-5 sm:p-6 pt-0">
+                <span className="text-xs sm:text-sm font-bold uppercase tracking-wider text-blue-700 group-hover:text-blue-900 flex items-center gap-1">
                   {lang === 'ID' ? 'Baca Selengkapnya →' : 'Read Article →'}
                 </span>
               </div>

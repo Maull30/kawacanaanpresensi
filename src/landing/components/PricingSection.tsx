@@ -159,17 +159,17 @@ export const PricingSection: React.FC<PricingSectionProps> = ({ onOpenRegister, 
   };
 
   return (
-    <section id="harga" className="py-10 sm:py-16 lg:py-20 bg-slate-50 text-slate-900 relative border-b border-blue-100 antialiased">
-      <div className="max-w-7xl mx-auto px-3.5 sm:px-6 lg:px-8">
+    <section id="harga" className="scroll-mt-16 sm:scroll-mt-20 py-14 sm:py-16 lg:py-20 bg-slate-50 text-slate-900 relative border-b border-blue-100 antialiased">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         
         {/* Header Seksi */}
-        <div className="text-center max-w-3xl mx-auto space-y-2 sm:space-y-3 mb-6 sm:mb-10">
-          <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-blue-50 border border-blue-200 text-blue-800 text-[10px] sm:text-[11px] font-bold uppercase tracking-wider font-mono">
+        <div className="text-center max-w-3xl mx-auto space-y-2.5 mb-8 sm:mb-10 lg:mb-12">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 border border-blue-200 text-blue-800 text-xs font-bold uppercase tracking-wider font-mono">
             <QrCode className="w-3.5 h-3.5 text-blue-700 shrink-0" />
             <span>{lang === 'ID' ? 'PILIHAN LISENSI & HARGA RESMI' : 'OFFICIAL LICENSING & PRICING'}</span>
           </div>
 
-          <h2 className="text-xl sm:text-3xl lg:text-4xl font-black text-[#0B2F64] tracking-tight uppercase leading-tight">
+          <h2 className="text-2xl sm:text-3xl lg:text-4xl font-black text-[#0B2F64] tracking-tight uppercase leading-tight">
             {lang === 'ID' ? (
               <>PILIH PAKET SESUAI <span className="text-blue-600">RUANG KERJA ANDA</span></>
             ) : (
@@ -177,7 +177,7 @@ export const PricingSection: React.FC<PricingSectionProps> = ({ onOpenRegister, 
             )}
           </h2>
 
-          <p className="text-slate-600 text-xs sm:text-sm leading-relaxed max-w-2xl mx-auto">
+          <p className="text-slate-600 text-xs sm:text-sm md:text-base leading-relaxed max-w-2xl mx-auto font-normal">
             {lang === 'ID'
               ? 'Paket ditentukan berdasarkan ruang kerja: mulai dari Ruang Kerja Individu hingga Ruang Kerja Sekolah terpadu.'
               : 'Plans are organized by workspace: from standalone personal workspaces for individual teachers to fully integrated institutional school deployment.'}

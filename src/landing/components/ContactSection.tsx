@@ -209,37 +209,36 @@ export const ContactSection: React.FC<ContactSectionProps> = ({ lang, onOpenRegi
   };
 
   return (
-    <section id="kontak" className="py-14 sm:py-20 lg:py-24 bg-white text-slate-900 relative border-b border-blue-100">
+    <section id="kontak" className="scroll-mt-16 sm:scroll-mt-20 py-14 sm:py-16 lg:py-20 bg-white text-slate-900 relative border-b border-blue-100 antialiased">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         
-        {/* Header - Educational Style */}
-        <div className="text-left max-w-3xl space-y-3 sm:space-y-4 mb-10 sm:mb-14">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md bg-blue-50 border border-blue-200 text-blue-800 text-[10px] font-bold uppercase tracking-wider font-mono">
+        {/* Header - Balanced Educational Style */}
+        <div className="text-left max-w-3xl space-y-2.5 mb-8 sm:mb-10 lg:mb-12">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 border border-blue-200 text-blue-800 text-xs font-bold uppercase tracking-wider font-mono">
+            <MessageSquare className="w-3.5 h-3.5 text-blue-700 shrink-0" />
             <span>{lang === 'ID' ? 'HUBUNGI KAMI & KOMUNITAS' : 'CONTACT & COMMUNITY'}</span>
           </div>
-          <h2 className="text-xl sm:text-3xl lg:text-5xl font-black text-[#0B2F64] tracking-tight uppercase leading-[1.08]">
+          <h2 className="text-2xl sm:text-3xl lg:text-4xl font-black text-[#0B2F64] tracking-tight uppercase leading-tight">
             {lang === 'ID' ? (
               <>
-                KONSULTASI & ADOPSI<br />
-                <span className="text-blue-600 whitespace-nowrap">PRESENSI SEKOLAH DASAR</span>
+                Konsultasi & Adopsi <span className="text-blue-600">Presensi SD</span>
               </>
             ) : (
               <>
-                CONSULTATION & ADOPTION<br />
-                <span className="text-blue-600 whitespace-nowrap">PRIMARY ATTENDANCE</span>
+                Consultation & Adoption <span className="text-blue-600">Primary Attendance</span>
               </>
             )}
           </h2>
-          <p className="text-slate-600 text-xs sm:text-base lg:text-lg leading-relaxed border-l-4 border-blue-600 pl-3 sm:pl-4 font-normal">
+          <p className="text-slate-600 text-xs sm:text-sm md:text-base leading-relaxed border-l-3 border-blue-600 pl-3 sm:pl-4 font-normal max-w-2xl">
             {lang === 'ID'
               ? 'Konsultasikan kebutuhan presensi rombel kelas 1-6 dan format administrasi Kedinasan untuk sekolah Anda, atau bergabung langsung dengan komunitas pendidik kami.'
               : 'Consult attendance requirements for Grade 1-6 cohorts and official Kedinasan reporting formats, or join our educator community directly.'}
           </p>
 
-          <div className="pt-2 flex flex-wrap items-center gap-3 sm:gap-4">
+          <div className="pt-2 flex flex-wrap items-center gap-3">
             <a
               href="#komunitas-wa"
-              className="px-5 py-3 sm:px-6 sm:py-3.5 bg-blue-700 hover:bg-blue-800 text-white font-bold text-xs uppercase tracking-wider transition-all rounded-lg shadow-sm inline-flex items-center gap-2 cursor-pointer"
+              className="px-4.5 py-2.5 sm:px-5 sm:py-3 bg-blue-700 hover:bg-blue-800 text-white font-bold text-xs uppercase tracking-wider transition-all rounded-xl shadow-xs inline-flex items-center gap-2 cursor-pointer"
             >
               <Users className="w-4 h-4" />
               <span>{lang === 'ID' ? 'GABUNG KOMUNITAS' : 'JOIN COMMUNITY'}</span>
@@ -247,7 +246,7 @@ export const ContactSection: React.FC<ContactSectionProps> = ({ lang, onOpenRegi
             <button
               type="button"
               onClick={onOpenRegister}
-              className="px-5 py-3 sm:px-6 sm:py-3.5 bg-white border border-blue-200 hover:border-blue-700 text-blue-900 font-bold text-xs uppercase tracking-wider transition-all rounded-lg shadow-xs inline-flex items-center gap-2 cursor-pointer"
+              className="px-4.5 py-2.5 sm:px-5 sm:py-3 bg-white border border-blue-200 hover:border-blue-700 text-blue-900 font-bold text-xs uppercase tracking-wider transition-all rounded-xl shadow-xs inline-flex items-center gap-2 cursor-pointer"
             >
               <School className="w-4 h-4 text-blue-700" />
               <span>{lang === 'ID' ? 'DAFTARKAN SEKOLAH' : 'REGISTER SCHOOL'}</span>

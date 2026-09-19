@@ -325,4 +325,61 @@
   background-image: radial-gradient(rgba(11, 47, 100, 0.12) 1.2px, transparent 1.2px);
 }
 
+/* Rotating colorful border beam (conic gradient border effect) */
+@keyframes spinBorder {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin-border {
+  animation: spinBorder 3s linear infinite;
+}
+
+@keyframes spinBorderFast {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin-border-fast {
+  animation: spinBorderFast 2s linear infinite;
+}
+
+/* Light sheen / shimmer sweeping across button */
+@keyframes shimmerSweep {
+  0% {
+    transform: translateX(-150%) skewX(-20deg);
+  }
+  40%, 100% {
+    transform: translateX(250%) skewX(-20deg);
+  }
+}
+
+.animate-shimmer-sweep {
+  animation: shimmerSweep 3.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+/* Pulse glow for button */
+@keyframes pulseAura {
+  0%, 100% {
+    opacity: 0.6;
+    transform: scale(0.98);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.02);
+  }
+}
+
+.animate-pulse-aura {
+  animation: pulseAura 2.5s ease-in-out infinite;
+}
+
 

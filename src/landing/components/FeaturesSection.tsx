@@ -214,13 +214,13 @@ export const FeaturesSection: React.FC<FeaturesSectionProps> = ({ lang }) => {
           <h2 className="text-2xl sm:text-4xl lg:text-5xl font-black text-[#0B2F64] tracking-tight leading-[1.12]">
             {lang === 'ID' ? (
               <>
-                Sistem Terpadu Dirancang Khusus untuk{' '}
+                Fitur Kawacanaan{' '}
                 <span className="text-blue-600">Sekolah Dasar</span>
               </>
             ) : (
               <>
-                Integrated Ecosystem Built for{' '}
-                <span className="text-blue-600">Primary Schools</span>
+                Kawacanaan Primary{' '}
+                <span className="text-blue-600">School Features</span>
               </>
             )}
           </h2>

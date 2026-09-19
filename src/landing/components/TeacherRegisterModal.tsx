@@ -3,7 +3,7 @@ import {
   GraduationCap,
   BookOpen,
   ArrowLeft,
-  ChevronRight,
+  ArrowRight,
   User,
   Mail,
   Lock,
@@ -11,7 +11,6 @@ import {
   EyeOff,
   AlertCircle,
   Loader2,
-  Sparkles,
   X,
   ShieldCheck,
   CheckCircle2,
@@ -19,13 +18,16 @@ import {
   Copy,
   Check,
   CreditCard,
-  Building2,
-  Clock,
-  ArrowRight,
   RefreshCw,
   Zap,
+  Clock,
+  Sparkles,
+  Wallet,
+  Building2,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
+import waliKelasWanitaImg from '../../assets/images/wali_kelas_wanita_1789830539387.jpg';
+import guruMapelPriaImg from '../../assets/images/guru_mapel_pria_1789830556851.jpg';
 
 interface TeacherRegisterModalProps {
   isOpen: boolean;
@@ -76,14 +78,14 @@ export const TeacherRegisterModal: React.FC<TeacherRegisterModalProps> = ({
   const { loginWithCredentials, setActiveView } = useApp();
 
   // Wizard Steps:
-  // 1: Pilih Peran (Wali Kelas / Guru Mapel)
-  // 2: Formulir Identitas, Akun & Siklus Pembayaran
-  // 3: Integrasi Pembayaran Midtrans (Snap / Gateway)
-  // 4: Paket Guru Aktif (Kredensial & Ruang Kerja Individu)
+  // 1: Pilih Peran
+  // 2: Pendaftaran (Form Identitas & Akun)
+  // 3: Pembayaran (Metode Pembayaran Midtrans)
+  // 4: Aktif (Kredensial & Ruang Kerja Aktif)
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
   const [selectedRole, setSelectedRole] = useState<RoleType>('homeroom');
 
-  // Form Fields (Identitas & Akun Guru)
+  // Form Fields (Pendaftaran)
   const [fullName, setFullName] = useState('');
   const [username, setUsername] = useState('');
   const [usernameManuallyEdited, setUsernameManuallyEdited] = useState(false);
@@ -91,7 +93,6 @@ export const TeacherRegisterModal: React.FC<TeacherRegisterModalProps> = ({
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [billingCycle, setBillingCycle] = useState<BillingCycle>('monthly');
 
   // Payment & Success States
@@ -190,7 +191,7 @@ export const TeacherRegisterModal: React.FC<TeacherRegisterModalProps> = ({
 
   if (!isOpen) return null;
 
-  // Auto-generate suggested username from Full Name (SAMA DENGAN ONBOARDING MULAI GRATIS)
+  // Auto-generate suggested username from Full Name (sama dengan FreeStartModal)
   const handleFullNameChange = (name: string) => {
     setFullName(name);
     if (!usernameManuallyEdited) {
@@ -338,10 +339,10 @@ export const TeacherRegisterModal: React.FC<TeacherRegisterModalProps> = ({
       setStep(3);
 
       // Auto-launch Snap popup if available
-      if (session.snapToken && window.snap) {
+      if (session.snapToken && (window as any).snap) {
         setTimeout(() => {
           handleLaunchSnap(session.snapToken!);
-        }, 500);
+        }, 400);
       }
     } catch (err: any) {
       setFormError(err.message || (lang === 'ID' ? 'Terjadi kesalahan sistem.' : 'A system error occurred.'));
@@ -352,14 +353,14 @@ export const TeacherRegisterModal: React.FC<TeacherRegisterModalProps> = ({
 
   // Launch Midtrans Snap Modal
   const handleLaunchSnap = (token: string) => {
-    if (!window.snap) {
+    if (!(window as any).snap) {
       setPaymentCheckMessage(
         'Komponen Midtrans Snap belum siap. Silakan klik tombol Cek Status atau Verifikasi Instan di bawah.'
       );
       return;
     }
 
-    window.snap.pay(token, {
+    (window as any).snap.pay(token, {
       onSuccess: () => {
         handleCompleteActivation(paymentSession);
       },
@@ -485,544 +486,737 @@ export const TeacherRegisterModal: React.FC<TeacherRegisterModalProps> = ({
   return (
     <div
       id="teacher-register-modal-backdrop"
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in duration-200"
+      className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 bg-slate-900/60 backdrop-blur-xs overflow-y-auto animate-in fade-in duration-150"
     >
       <div
         id="teacher-register-modal-content"
-        className="bg-white rounded-2xl w-full max-w-xl max-h-[92vh] flex flex-col shadow-2xl border border-blue-200 overflow-hidden relative"
+        className="relative w-full max-w-xl md:max-w-2xl bg-white rounded-2xl sm:rounded-3xl shadow-2xl border border-slate-200/90 overflow-hidden my-auto animate-in zoom-in-95 duration-200 flex flex-col max-h-[calc(100dvh-1rem)] sm:max-h-[90vh]"
       >
-        {/* Header Modal */}
-        <div className="bg-gradient-to-r from-blue-900 via-blue-800 to-blue-700 text-white p-4 sm:p-5 flex items-center justify-between shrink-0 border-b border-blue-700/50">
-          <div className="flex items-center gap-3">
-            {step > 1 && step < 4 && (
-              <button
-                type="button"
-                id="btn-teacher-back"
-                onClick={() => {
-                  if (step === 2) setStep(1);
-                  if (step === 3) setStep(2);
-                }}
-                className="w-8 h-8 rounded-lg bg-blue-800/80 hover:bg-blue-700 active:scale-95 flex items-center justify-center text-blue-100 transition-colors cursor-pointer border border-blue-600/60"
-                aria-label="Kembali"
-              >
-                <ArrowLeft className="w-4 h-4" />
-              </button>
-            )}
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="px-2 py-0.5 rounded bg-amber-400 text-slate-950 font-black text-[10px] uppercase tracking-wider">
-                  PAKET GURU PRO
-                </span>
-                <span className="text-xs text-blue-200 font-medium">Ruang Kerja Individu</span>
-              </div>
-              <h2 className="text-base sm:text-lg font-bold text-white leading-tight mt-0.5">
-                {step === 1 && (lang === 'ID' ? 'Pilih Peran Guru Sekolah Dasar' : 'Select Primary School Teacher Role')}
-                {step === 2 && (lang === 'ID' ? 'Identitas Akun & Langganan Guru' : 'Teacher Account & Subscription')}
-                {step === 3 && (lang === 'ID' ? 'Pembayaran Midtrans Gateway' : 'Midtrans Payment Gateway')}
-                {step === 4 && (lang === 'ID' ? 'Paket Guru Pro Berhasil Aktif!' : 'Teacher Pro Workspace Activated!')}
-              </h2>
+        {/* ========================================================================= */}
+        {/* TOP HEADER: Brand Logo Kawacanaan & Stepper (1 Peran, 2 Daftar, 3 Bayar, 4 Aktif) */}
+        {/* ========================================================================= */}
+        <div className="flex items-center justify-between px-3.5 sm:px-6 py-2.5 sm:py-3.5 border-b border-slate-100 bg-white shrink-0">
+          {/* Brand / Logo Kawacanaan SD */}
+          <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
+            <div className="w-8 h-8 sm:w-9 sm:h-9 bg-gradient-to-br from-blue-700 via-blue-800 to-indigo-900 rounded-xl flex items-center justify-center text-white font-black text-sm sm:text-base shadow-sm shadow-blue-700/25 shrink-0 border border-blue-500/40 relative">
+              <span className="relative z-10">K</span>
+            </div>
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span className="font-black text-slate-900 text-sm sm:text-base tracking-tight uppercase truncate">
+                Kawacanaan
+              </span>
+              <span className="px-1.5 py-0.5 bg-blue-100/90 text-blue-800 text-[9px] font-black rounded font-mono uppercase tracking-wider border border-blue-200/80 shrink-0">
+                SD
+              </span>
+              <span className="px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 text-[9px] sm:text-[10px] font-extrabold uppercase tracking-wider border border-amber-200/80 hidden xs:inline-flex shrink-0">
+                Paket Guru
+              </span>
             </div>
           </div>
-          <button
-            type="button"
-            id="btn-teacher-close"
-            onClick={onClose}
-            className="w-8 h-8 rounded-lg bg-blue-800/60 hover:bg-blue-700 active:scale-95 flex items-center justify-center text-blue-100 transition-colors cursor-pointer border border-blue-600/40"
-            aria-label="Tutup"
-          >
-            <X className="w-4 h-4" />
-          </button>
+
+          {/* Stepper Indicator (1 Pilih Peran -> 2 Pendaftaran -> 3 Pembayaran -> 4 Aktif) & Close Button */}
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+            {/* Stepper Indicator */}
+            <div className="flex items-center gap-1 sm:gap-1.5 text-xs">
+              {/* Step 1: Pilih Peran */}
+              <div
+                className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 rounded-lg text-[10px] sm:text-xs font-bold transition-all ${
+                  step === 1
+                    ? 'bg-blue-600 text-white shadow-xs'
+                    : step > 1
+                    ? 'bg-blue-50 text-blue-700 border border-blue-200/70'
+                    : 'bg-slate-100 text-slate-400'
+                }`}
+              >
+                <span
+                  className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] sm:text-[10px] ${
+                    step === 1
+                      ? 'bg-white text-blue-600 font-black'
+                      : step > 1
+                      ? 'bg-blue-600 text-white font-bold'
+                      : 'bg-slate-300 text-white font-bold'
+                  }`}
+                >
+                  {step > 1 ? '✓' : '1'}
+                </span>
+                <span className="hidden sm:inline">{lang === 'ID' ? 'Pilih Peran' : 'Role'}</span>
+              </div>
+
+              <span className="text-slate-300 font-bold text-[10px] sm:text-xs">→</span>
+
+              {/* Step 2: Pendaftaran */}
+              <div
+                className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 rounded-lg text-[10px] sm:text-xs font-bold transition-all ${
+                  step === 2
+                    ? 'bg-blue-600 text-white shadow-xs'
+                    : step > 2
+                    ? 'bg-blue-50 text-blue-700 border border-blue-200/70'
+                    : 'bg-slate-100 text-slate-400'
+                }`}
+              >
+                <span
+                  className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] sm:text-[10px] ${
+                    step === 2
+                      ? 'bg-white text-blue-600 font-black'
+                      : step > 2
+                      ? 'bg-blue-600 text-white font-bold'
+                      : 'bg-slate-300 text-white font-bold'
+                  }`}
+                >
+                  {step > 2 ? '✓' : '2'}
+                </span>
+                <span className="hidden sm:inline">{lang === 'ID' ? 'Pendaftaran' : 'Register'}</span>
+              </div>
+
+              <span className="text-slate-300 font-bold text-[10px] sm:text-xs">→</span>
+
+              {/* Step 3: Pembayaran */}
+              <div
+                className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 rounded-lg text-[10px] sm:text-xs font-bold transition-all ${
+                  step === 3
+                    ? 'bg-blue-600 text-white shadow-xs'
+                    : step > 3
+                    ? 'bg-blue-50 text-blue-700 border border-blue-200/70'
+                    : 'bg-slate-100 text-slate-400'
+                }`}
+              >
+                <span
+                  className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] sm:text-[10px] ${
+                    step === 3
+                      ? 'bg-white text-blue-600 font-black'
+                      : step > 3
+                      ? 'bg-blue-600 text-white font-bold'
+                      : 'bg-slate-300 text-white font-bold'
+                  }`}
+                >
+                  {step > 3 ? '✓' : '3'}
+                </span>
+                <span className="hidden sm:inline">{lang === 'ID' ? 'Pembayaran' : 'Payment'}</span>
+              </div>
+
+              <span className="text-slate-300 font-bold text-[10px] sm:text-xs">→</span>
+
+              {/* Step 4: Aktif */}
+              <div
+                className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 rounded-lg text-[10px] sm:text-xs font-bold transition-all ${
+                  step === 4 ? 'bg-emerald-600 text-white shadow-xs' : 'bg-slate-100 text-slate-400'
+                }`}
+              >
+                <span
+                  className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] sm:text-[10px] ${
+                    step === 4 ? 'bg-white text-emerald-600 font-black' : 'bg-slate-300 text-white font-bold'
+                  }`}
+                >
+                  {step === 4 ? '✓' : '4'}
+                </span>
+                <span className="hidden sm:inline">{lang === 'ID' ? 'Aktif' : 'Active'}</span>
+              </div>
+            </div>
+
+            {/* Close Button */}
+            <button
+              type="button"
+              id="btn-teacher-close"
+              onClick={onClose}
+              className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-full transition-colors cursor-pointer min-w-[32px] min-h-[32px] flex items-center justify-center"
+              aria-label="Tutup"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
-        {/* Indikator Progres Langkah (Steps) */}
-        <div className="bg-blue-50/70 border-b border-blue-100 px-4 sm:px-6 py-2.5 flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-1.5 sm:gap-2 text-xs font-semibold">
-            <span
-              className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${
-                step >= 1 ? 'bg-blue-700 text-white' : 'bg-slate-200 text-slate-500'
-              }`}
-            >
-              1
-            </span>
-            <span className={step === 1 ? 'text-blue-900 font-bold' : 'text-slate-500'}>Peran</span>
-            <span className="text-slate-300">/</span>
-
-            <span
-              className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${
-                step >= 2 ? 'bg-blue-700 text-white' : 'bg-slate-200 text-slate-500'
-              }`}
-            >
-              2
-            </span>
-            <span className={step === 2 ? 'text-blue-900 font-bold' : 'text-slate-500'}>Data Akun</span>
-            <span className="text-slate-300">/</span>
-
-            <span
-              className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${
-                step >= 3 ? 'bg-blue-700 text-white' : 'bg-slate-200 text-slate-500'
-              }`}
-            >
-              3
-            </span>
-            <span className={step === 3 ? 'text-blue-900 font-bold' : 'text-slate-500'}>Midtrans</span>
-            <span className="text-slate-300">/</span>
-
-            <span
-              className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${
-                step === 4 ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-500'
-              }`}
-            >
-              ✓
-            </span>
-            <span className={step === 4 ? 'text-emerald-700 font-bold' : 'text-slate-500'}>Aktif</span>
-          </div>
-          <div className="text-[11px] font-bold text-blue-800 bg-white border border-blue-200 px-2 py-0.5 rounded shadow-2xs">
-            {billingCycle === 'yearly' ? 'Tahunan (Hemat 2 Bln)' : 'Bulanan'}
-          </div>
-        </div>
-
-        {/* Body Modal Scrollable */}
-        <div className="p-4 sm:p-6 overflow-y-auto flex-1 space-y-4">
+        {/* Modal Scrollable Content Body */}
+        <div className="p-3.5 sm:p-5 md:p-6 overflow-y-auto flex-1">
           {/* ========================================================================= */}
-          {/* STEP 1: PILIH PERAN GURU (SAMA PERSIS DENGAN FITUR ONBOARDING MULAI GRATIS) */}
+          {/* LANGKAH 1: PILIH PERAN (URUTAN 1 - PERSIS DENGAN MULAI GRATIS)             */}
           {/* ========================================================================= */}
           {step === 1 && (
-            <div className="space-y-4">
-              <div className="text-center max-w-md mx-auto mb-2">
-                <h3 className="text-sm sm:text-base font-bold text-slate-900">
+            <div>
+              {/* Minimalist Heading */}
+              <div className="mb-3.5 sm:mb-5">
+                <div className="flex items-center justify-between gap-2 mb-1">
+                  <h2 className="text-base sm:text-xl font-bold text-slate-900 tracking-tight">
+                    {lang === 'ID' ? 'Pilih Peran Guru Sekolah Dasar' : 'Select Primary School Teacher Role'}
+                  </h2>
+                  <span className="text-[10px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200 shrink-0">
+                    Ruang Kerja Individu Pro
+                  </span>
+                </div>
+                <p className="text-xs text-slate-500">
                   {lang === 'ID'
-                    ? 'Pilih Peran Guru di Sekolah Dasar Anda'
-                    : 'Choose Your Primary School Teacher Role'}
-                </h3>
-                <p className="text-xs text-slate-500 mt-1">
-                  {lang === 'ID'
-                    ? 'Paket Guru Pro memberikan Ruang Kerja Individu mandiri dengan kapasitas rombel dan siswa lebih luas.'
-                    : 'Teacher Pro Plan provides an independent Teacher Workspace with extended class and student capacity.'}
+                    ? 'Pilih modul presensi yang sesuai dengan tugas mengajar Anda. Paket Guru memberikan kapasitas rombel dan siswa mandiri.'
+                    : 'Choose the attendance module that fits your teaching role with independent workspace capacity.'}
                 </p>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 pt-1">
-                {/* 1. Wali Kelas / Guru Kelas */}
-                <button
-                  type="button"
-                  id="btn-teacher-role-homeroom"
-                  onClick={() => handleSelectRole('homeroom')}
-                  className="p-4 rounded-xl border-2 border-blue-200 hover:border-blue-600 bg-blue-50/40 hover:bg-blue-50/80 transition-all text-left flex flex-col justify-between group active:scale-[0.98] cursor-pointer shadow-xs"
-                >
+              {/* Two Role Selection Cards - Responsive for Mobile & Desktop (Persis Mulai Gratis) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                {/* KARTU 1: WALI KELAS */}
+                <div className="bg-white border border-slate-200 hover:border-blue-500 rounded-xl sm:rounded-2xl p-3 sm:p-4 relative flex flex-col justify-between shadow-2xs hover:shadow-md transition-all duration-150 group">
                   <div>
-                    <div className="w-10 h-10 rounded-lg bg-blue-700 text-white flex items-center justify-center mb-3 group-hover:scale-105 transition-transform shadow-xs">
-                      <GraduationCap className="w-5 h-5" />
+                    {/* Top Row: 3D Educator Avatar & Title */}
+                    <div className="flex items-center gap-3">
+                      <div className="relative w-16 h-16 sm:w-20 sm:h-20 shrink-0 rounded-xl sm:rounded-2xl overflow-hidden border-2 border-blue-100 shadow-2xs bg-blue-50/60">
+                        <img
+                          src={waliKelasWanitaImg}
+                          alt="Wali Kelas"
+                          className="w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-300"
+                          referrerPolicy="no-referrer"
+                        />
+                      </div>
+
+                      <div className="flex-1 min-w-0">
+                        <div className="w-fit px-2 py-0.5 rounded bg-blue-50 text-blue-700 text-[10px] font-bold uppercase tracking-wider mb-1">
+                          Wali Kelas
+                        </div>
+                        <h3 className="text-sm sm:text-base font-bold text-slate-900 tracking-tight leading-snug">
+                          {lang === 'ID' ? 'Wali Kelas / Guru Kelas' : 'Homeroom Teacher'}
+                        </h3>
+                        <p className="text-[11px] font-semibold text-blue-600 mt-0.5 truncate">
+                          {lang === 'ID' ? 'Presensi Harian Kelas SD' : 'Class Attendance & Recap'}
+                        </p>
+                      </div>
                     </div>
-                    <div className="inline-block px-2 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-800 mb-1.5 uppercase">
-                      {lang === 'ID' ? 'Kapasitas: 1 Kelas' : 'Capacity: 1 Class'}
-                    </div>
-                    <h4 className="text-sm font-bold text-slate-900 group-hover:text-blue-700 transition-colors">
-                      {lang === 'ID' ? 'Wali Kelas / Guru Kelas' : 'Homeroom Teacher'}
-                    </h4>
-                    <p className="text-xs text-slate-600 mt-1.5 leading-relaxed">
+
+                    {/* Brief Description */}
+                    <p className="text-xs text-slate-600 mt-2.5 leading-relaxed line-clamp-2 sm:line-clamp-none">
                       {lang === 'ID'
-                        ? 'Kapasitas 1 kelas (maks. 50 siswa). Akses data & visualisasi presensi terbatas khusus untuk kelas dia sendiri.'
-                        : 'Capacity 1 class (max 50 students). Data and visualization access strictly limited to own class.'}
+                        ? 'Kelola presensi seluruh siswa satu kelas, rekap bulanan otomatis, dan cetak format kedinasan resmi.'
+                        : 'Manage daily attendance for your classroom students, monthly recaps, and official reports.'}
                     </p>
+
+                    {/* Feature Badges */}
+                    <div className="mt-2.5 flex flex-wrap gap-1.5">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-blue-50 border border-blue-200/80 text-blue-700 text-[10px] font-semibold">
+                        1 Rombel (50 Siswa)
+                      </span>
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-slate-50 border border-slate-200/80 text-slate-600 text-[10px] font-medium">
+                        {lang === 'ID' ? 'Format Kedinasan' : 'Official Report'}
+                      </span>
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-slate-50 border border-slate-200/80 text-slate-600 text-[10px] font-medium">
+                        {lang === 'ID' ? 'Hari Efektif Otomatis' : 'Auto School Days'}
+                      </span>
+                    </div>
                   </div>
-                  <div className="pt-3 mt-3 border-t border-blue-100/80 flex items-center justify-between text-xs font-bold text-blue-700">
+
+                  {/* Action Button */}
+                  <button
+                    type="button"
+                    onClick={() => handleSelectRole('homeroom')}
+                    id="btn-choose-teacher-homeroom"
+                    className="mt-3.5 sm:mt-4 w-full bg-blue-600 hover:bg-blue-700 active:scale-[0.99] text-white font-semibold py-2.5 px-3.5 rounded-xl flex items-center justify-center gap-1.5 shadow-xs transition-all cursor-pointer text-xs min-h-[44px]"
+                  >
                     <span>{lang === 'ID' ? 'Pilih Wali Kelas' : 'Select Homeroom'}</span>
-                    <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                  </div>
-                </button>
+                    <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
+                  </button>
+                </div>
 
-                {/* 2. Guru Mata Pelajaran */}
-                <button
-                  type="button"
-                  id="btn-teacher-role-subject"
-                  onClick={() => handleSelectRole('subject')}
-                  className="p-4 rounded-xl border-2 border-blue-200 hover:border-blue-600 bg-blue-50/40 hover:bg-blue-50/80 transition-all text-left flex flex-col justify-between group active:scale-[0.98] cursor-pointer shadow-xs"
-                >
+                {/* KARTU 2: GURU MAPEL */}
+                <div className="bg-white border border-slate-200 hover:border-emerald-500 rounded-xl sm:rounded-2xl p-3 sm:p-4 relative flex flex-col justify-between shadow-2xs hover:shadow-md transition-all duration-150 group">
                   <div>
-                    <div className="w-10 h-10 rounded-lg bg-blue-700 text-white flex items-center justify-center mb-3 group-hover:scale-105 transition-transform shadow-xs">
-                      <BookOpen className="w-5 h-5" />
+                    {/* Top Row: 3D Educator Avatar & Title */}
+                    <div className="flex items-center gap-3">
+                      <div className="relative w-16 h-16 sm:w-20 sm:h-20 shrink-0 rounded-xl sm:rounded-2xl overflow-hidden border-2 border-emerald-100 shadow-2xs bg-emerald-50/60">
+                        <img
+                          src={guruMapelPriaImg}
+                          alt="Guru Mapel"
+                          className="w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-300"
+                          referrerPolicy="no-referrer"
+                        />
+                      </div>
+
+                      <div className="flex-1 min-w-0">
+                        <div className="w-fit px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 text-[10px] font-bold uppercase tracking-wider mb-1">
+                          Guru Mapel
+                        </div>
+                        <h3 className="text-sm sm:text-base font-bold text-slate-900 tracking-tight leading-snug">
+                          {lang === 'ID' ? 'Guru Mata Pelajaran' : 'Subject Teacher'}
+                        </h3>
+                        <p className="text-[11px] font-semibold text-emerald-600 mt-0.5 truncate">
+                          {lang === 'ID' ? 'Presensi Jam Pelajaran SD' : 'Subject Attendance & Journal'}
+                        </p>
+                      </div>
                     </div>
-                    <div className="inline-block px-2 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-800 mb-1.5 uppercase">
-                      {lang === 'ID' ? 'Kapasitas: Maks. 6 Kelas' : 'Capacity: Max 6 Classes'}
-                    </div>
-                    <h4 className="text-sm font-bold text-slate-900 group-hover:text-blue-700 transition-colors">
-                      {lang === 'ID' ? 'Guru Mata Pelajaran' : 'Specialized Subject Teacher'}
-                    </h4>
-                    <p className="text-xs text-slate-600 mt-1.5 leading-relaxed">
+
+                    {/* Brief Description */}
+                    <p className="text-xs text-slate-600 mt-2.5 leading-relaxed line-clamp-2 sm:line-clamp-none">
                       {lang === 'ID'
-                        ? 'Kapasitas maksimal 6 kelas (maks. 50 siswa/kelas). Akses data dan visualisasi presensi untuk 6 kelas berbeda.'
-                        : 'Capacity up to 6 classes (max 50 students/class). Access data and visualizations for 6 different classes.'}
+                        ? 'Catat kehadiran per jam pelajaran (PJOK, PAI, dll), kelola multi-rombel hingga 6 kelas, dan jurnal.'
+                        : 'Record attendance by subject periods, manage up to 6 classroom groups, and teaching journals.'}
                     </p>
+
+                    {/* Feature Badges */}
+                    <div className="mt-2.5 flex flex-wrap gap-1.5">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-emerald-50 border border-emerald-200/80 text-emerald-700 text-[10px] font-semibold">
+                        Maks. 6 Rombel (300 Siswa)
+                      </span>
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-slate-50 border border-slate-200/80 text-slate-600 text-[10px] font-medium">
+                        {lang === 'ID' ? 'Jadwal Jam Mengajar' : 'Teaching Periods'}
+                      </span>
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-slate-50 border border-slate-200/80 text-slate-600 text-[10px] font-medium">
+                        {lang === 'ID' ? 'Jurnal Pembelajaran' : 'Teaching Journal'}
+                      </span>
+                    </div>
                   </div>
-                  <div className="pt-3 mt-3 border-t border-blue-100/80 flex items-center justify-between text-xs font-bold text-blue-700">
+
+                  {/* Action Button */}
+                  <button
+                    type="button"
+                    onClick={() => handleSelectRole('subject')}
+                    id="btn-choose-teacher-subject"
+                    className="mt-3.5 sm:mt-4 w-full bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] text-white font-semibold py-2.5 px-3.5 rounded-xl flex items-center justify-center gap-1.5 shadow-xs transition-all cursor-pointer text-xs min-h-[44px]"
+                  >
                     <span>{lang === 'ID' ? 'Pilih Guru Mapel' : 'Select Subject'}</span>
-                    <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                  </div>
-                </button>
-              </div>
-
-              {/* Rincian Fasilitas Paket Guru */}
-              <div className="p-3.5 bg-blue-50/60 border border-blue-200 rounded-xl space-y-2 mt-3">
-                <div className="text-xs font-bold text-blue-900 flex items-center gap-1.5">
-                  <Sparkles className="w-3.5 h-3.5 text-blue-600" />
-                  <span>Kebijakan Kapasitas Ruang Kerja Individu:</span>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] text-slate-700 font-medium">
-                  <div className="flex items-center gap-1.5">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                    <span>Wali Kelas (1 Kelas) | Guru Mapel (Maks. 6 Kelas)</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                    <span>Kapasitas Maksimal 50 Siswa per Kelas</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                    <span>Presensi Jam Mapel & Rombel Mandiri</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                    <span>Cetak Rekap Laporan Format Kedinasan</span>
-                  </div>
+                    <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
+                  </button>
                 </div>
               </div>
 
-              {/* Aturan Pendaftaran & Immutability Notice */}
-              <div className="p-2.5 sm:p-3 bg-amber-50 border border-amber-200 rounded-xl text-[11px] text-amber-900 leading-relaxed flex items-start gap-2 mt-3">
-                <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-                <div>
-                  <strong>{lang === 'ID' ? 'Aturan Pendaftaran:' : 'Registration Rule:'}</strong>{' '}
-                  {lang === 'ID'
-                    ? 'Peran kunci yang Anda pilih bersifat permanen dan tidak dapat diubah lagi setelah akun dibuat karena menyangkut aturan paket & kapasitas ruang kerja.'
-                    : 'The selected key role is permanent and cannot be changed after registration due to package rules & workspace capacity.'}
+              {/* Minimalist Bottom Footer */}
+              <div className="mt-4 sm:mt-5 pt-3 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-500">
+                <div className="flex items-center gap-1.5 font-medium text-[11px]">
+                  <ShieldCheck className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                  <span>
+                    {lang === 'ID'
+                      ? 'Ruang Kerja Individu Pro • Pembayaran Gateway Midtrans Resmi'
+                      : 'Teacher Workspace Pro • Official Midtrans Gateway'}
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-1 font-medium text-[11px]">
+                  <span>{lang === 'ID' ? 'Sudah punya akun?' : 'Have an account?'}</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onClose();
+                      onOpenLogin();
+                    }}
+                    className="font-bold text-blue-600 hover:underline cursor-pointer inline-flex items-center gap-0.5 py-0.5"
+                  >
+                    <span>{lang === 'ID' ? 'Masuk' : 'Sign in'}</span>
+                    <ArrowRight className="w-3 h-3" />
+                  </button>
                 </div>
               </div>
             </div>
           )}
 
           {/* ========================================================================= */}
-          {/* STEP 2: FORMULIR IDENTITAS, AKUN & SIKLUS PEMBAYARAN MIDTRANS             */}
+          {/* LANGKAH 2: PENDAFTARAN (URUTAN 2 - PERSIS DENGAN FORMULIR MULAI GRATIS)    */}
           {/* ========================================================================= */}
           {step === 2 && (
-            <form onSubmit={handleSubmitAndProceedPayment} className="space-y-4">
+            <div className="max-w-lg mx-auto">
+              {/* Back to Step 1 & Selected Role Banner */}
+              <div className="flex items-center justify-between gap-3 pb-3 mb-3.5 border-b border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStep(1);
+                    setFormError('');
+                  }}
+                  className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-600 hover:text-blue-600 transition-colors cursor-pointer py-1"
+                  id="btn-back-to-step1"
+                >
+                  <ArrowLeft className="w-3.5 h-3.5" />
+                  <span>{lang === 'ID' ? 'Ganti Peran' : 'Change Role'}</span>
+                </button>
+
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[11px] text-slate-500 font-medium hidden xs:inline">
+                    {lang === 'ID' ? 'Peran:' : 'Role:'}
+                  </span>
+                  {selectedRole === 'homeroom' ? (
+                    <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200 text-xs font-bold">
+                      <img
+                        src={waliKelasWanitaImg}
+                        alt="Wali Kelas"
+                        className="w-4 h-4 rounded-full object-cover shrink-0"
+                        referrerPolicy="no-referrer"
+                      />
+                      <span>{lang === 'ID' ? 'Wali Kelas' : 'Homeroom Teacher'}</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold">
+                      <img
+                        src={guruMapelPriaImg}
+                        alt="Guru Mapel"
+                        className="w-4 h-4 rounded-full object-cover shrink-0"
+                        referrerPolicy="no-referrer"
+                      />
+                      <span>{lang === 'ID' ? 'Guru Mapel' : 'Subject Teacher'}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Title Header */}
+              <div className="mb-4 sm:mb-5">
+                <h3 className="text-lg sm:text-2xl font-black text-slate-900 tracking-tight">
+                  {lang === 'ID' ? 'Pendaftaran Akun Guru Pro' : 'Teacher Pro Registration'}
+                </h3>
+                <p className="text-xs text-slate-500 mt-1">
+                  {lang === 'ID'
+                    ? 'Lengkapi data identitas dan akun pendidik Anda untuk melanjutkan ke pembayaran.'
+                    : 'Fill in your details to proceed to the secure payment step.'}
+                </p>
+              </div>
+
+              {/* Error Alert Banner */}
               {formError && (
-                <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs flex items-start gap-2 animate-in fade-in">
-                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                  <span>{formError}</span>
+                <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs sm:text-sm flex items-start gap-2 mb-4">
+                  <AlertCircle size={16} className="shrink-0 mt-0.5" />
+                  <span className="font-semibold leading-tight">{formError}</span>
                 </div>
               )}
 
-              {/* Peran yang dipilih */}
-              <div className="p-2.5 bg-blue-50 border border-blue-200 rounded-xl flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-lg bg-blue-700 text-white flex items-center justify-center shrink-0">
-                    {selectedRole === 'homeroom' ? (
-                      <GraduationCap className="w-4 h-4" />
-                    ) : (
-                      <BookOpen className="w-4 h-4" />
-                    )}
+              <form onSubmit={handleSubmitAndProceedPayment} className="space-y-3.5">
+                {/* 1. Nama Lengkap Guru */}
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                    {lang === 'ID' ? 'Nama Lengkap Guru' : 'Full Name'} <span className="text-rose-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <User className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      required
+                      value={fullName}
+                      onChange={(e) => handleFullNameChange(e.target.value)}
+                      placeholder="Contoh: Dra. Sri Wahyuni, M.Pd"
+                      className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm font-medium text-slate-900 bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-600/20 outline-none transition-all h-11"
+                      id="input-teacher-fullname"
+                    />
                   </div>
+                </div>
+
+                {/* 2. Username & Email (Grid 2 Kolom) */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* Username */}
                   <div>
-                    <span className="text-[10px] text-blue-700 font-bold uppercase tracking-wider block">
-                      Peran Terpilih:
-                    </span>
-                    <span className="text-xs font-bold text-slate-900">
-                      {selectedRole === 'homeroom' ? 'Wali Kelas / Guru Kelas' : 'Guru Mata Pelajaran (Mapel)'}
-                    </span>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setStep(1)}
-                  className="text-xs text-blue-700 font-bold hover:underline cursor-pointer"
-                >
-                  Ubah
-                </button>
-              </div>
-
-              {/* 1. Nama Lengkap Guru */}
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                  <User className="w-3.5 h-3.5 text-blue-700" />
-                  <span>{lang === 'ID' ? 'Nama Lengkap Guru' : 'Teacher Full Name'}</span>
-                  <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  id="input-teacher-fullname"
-                  value={fullName}
-                  onChange={(e) => handleFullNameChange(e.target.value)}
-                  placeholder="Contoh: Budi Santoso, S.Pd"
-                  className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:border-blue-600 focus:ring-1 focus:ring-blue-600 outline-none transition-all"
-                  required
-                />
-              </div>
-
-              {/* 2. Username Akun (Otomatis dari Nama Lengkap, Sama Seperti Mulai Gratis) */}
-              <div className="space-y-1">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                    <Sparkles className="w-3.5 h-3.5 text-blue-700" />
-                    <span>{lang === 'ID' ? 'Username Akun (Otomatis)' : 'Account Username (Automated)'}</span>
-                    <span className="text-red-500">*</span>
-                  </label>
-                  {usernameManuallyEdited && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setUsernameManuallyEdited(false);
-                        handleFullNameChange(fullName);
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                        Username <span className="text-rose-500">*</span>
+                      </label>
+                      {usernameManuallyEdited && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setUsernameManuallyEdited(false);
+                            handleFullNameChange(fullName);
+                          }}
+                          className="text-[10px] text-blue-600 font-bold hover:underline cursor-pointer"
+                        >
+                          Reset
+                        </button>
+                      )}
+                    </div>
+                    <input
+                      type="text"
+                      required
+                      value={username}
+                      onChange={(e) => {
+                        setUsernameManuallyEdited(true);
+                        setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9._-]/g, ''));
                       }}
-                      className="text-[10px] text-blue-700 font-bold hover:underline cursor-pointer flex items-center gap-1"
-                    >
-                      <RefreshCw className="w-2.5 h-2.5" />
-                      Reset Otomatis
-                    </button>
-                  )}
-                </div>
-                <input
-                  type="text"
-                  id="input-teacher-username"
-                  value={username}
-                  onChange={(e) => {
-                    setUsername(e.target.value);
-                    setUsernameManuallyEdited(true);
-                  }}
-                  placeholder="budi.santoso"
-                  className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:border-blue-600 focus:ring-1 focus:ring-blue-600 outline-none transition-all font-mono lowercase"
-                  required
-                />
-                <span className="text-[10px] text-slate-400 block">
-                  Dihasilkan otomatis dari nama lengkap Anda (dapat disesuaikan).
-                </span>
-              </div>
-
-              {/* 3. Email (Opsional) */}
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                  <Mail className="w-3.5 h-3.5 text-blue-700" />
-                  <span>{lang === 'ID' ? 'Email Resmi / Korespondensi' : 'Official Email'}</span>
-                  <span className="text-slate-400 font-normal text-[11px]">(Opsional)</span>
-                </label>
-                <input
-                  type="email"
-                  id="input-teacher-email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="guru@sekolah.sch.id (opsional)"
-                  className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:border-blue-600 focus:ring-1 focus:ring-blue-600 outline-none transition-all"
-                />
-              </div>
-
-              {/* 4. Kata Sandi & Konfirmasi Sandi */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                    <Lock className="w-3.5 h-3.5 text-blue-700" />
-                    <span>{lang === 'ID' ? 'Kata Sandi' : 'Password'}</span>
-                    <span className="text-red-500">*</span>
-                  </label>
-                  <div className="relative">
-                    <input
-                      type={showPassword ? 'text' : 'password'}
-                      id="input-teacher-password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      placeholder="Minimal 6 karakter"
-                      className="w-full pl-3.5 pr-9 py-2.5 text-xs bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:border-blue-600 focus:ring-1 focus:ring-blue-600 outline-none transition-all"
-                      required
+                      placeholder="username.anda"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm font-mono font-medium text-slate-900 bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-600/20 outline-none transition-all h-11"
+                      id="input-teacher-username"
                     />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
-                    >
-                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
                   </div>
-                </div>
 
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                      <Lock className="w-3.5 h-3.5 text-blue-700" />
-                      <span>{lang === 'ID' ? 'Ulangi Kata Sandi' : 'Confirm Password'}</span>
-                      <span className="text-red-500">*</span>
+                  {/* Email */}
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                      Email (Opsional)
                     </label>
-                    {confirmPassword && password === confirmPassword && (
-                      <span className="text-[10px] text-emerald-600 font-bold flex items-center gap-0.5">
-                        <Check className="w-3 h-3" /> Cocok
-                      </span>
-                    )}
+                    <div className="relative">
+                      <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        placeholder="guru@sekolah.sch.id"
+                        className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm font-medium text-slate-900 bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-600/20 outline-none transition-all h-11"
+                        id="input-teacher-email"
+                      />
+                    </div>
                   </div>
-                  <div className="relative">
-                    <input
-                      type={showConfirmPassword ? 'text' : 'password'}
-                      id="input-teacher-confirm-password"
-                      value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
-                      placeholder="Ketik ulang kata sandi"
-                      className="w-full pl-3.5 pr-9 py-2.5 text-xs bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:border-blue-600 focus:ring-1 focus:ring-blue-600 outline-none transition-all"
-                      required
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                </div>
+
+                {/* 3. Kata Sandi & Konfirmasi Sandi (Grid 2 Kolom) */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* Kata Sandi */}
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                      Kata Sandi <span className="text-rose-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                      <input
+                        type={showPassword ? 'text' : 'password'}
+                        required
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        placeholder="Min. 6 karakter"
+                        className="w-full pl-10 pr-10 py-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm font-medium text-slate-900 bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-600/20 outline-none transition-all h-11"
+                        id="input-teacher-password"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 w-7 h-7 flex items-center justify-center cursor-pointer"
+                        aria-label="Tampilkan sandi"
+                      >
+                        {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Konfirmasi Sandi */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                        Ulangi Sandi <span className="text-rose-500">*</span>
+                      </label>
+                      {confirmPassword && password === confirmPassword && (
+                        <span className="text-[10px] text-emerald-600 font-bold flex items-center gap-0.5">
+                          <Check className="w-3 h-3" /> Cocok
+                        </span>
+                      )}
+                    </div>
+                    <div className="relative">
+                      <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                      <input
+                        type={showPassword ? 'text' : 'password'}
+                        required
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        placeholder="Ketik ulang sandi"
+                        className={`w-full pl-10 pr-3.5 py-2.5 rounded-xl border text-xs sm:text-sm font-medium text-slate-900 bg-white focus:ring-2 focus:ring-blue-600/20 outline-none transition-all h-11 ${
+                          confirmPassword && password === confirmPassword
+                            ? 'border-emerald-400 focus:border-emerald-500'
+                            : confirmPassword && password !== confirmPassword
+                            ? 'border-amber-400 focus:border-amber-500'
+                            : 'border-slate-300 focus:border-blue-600'
+                        }`}
+                        id="input-teacher-confirm-password"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* 4. Pilihan Siklus Langganan Paket Guru (Bulanan vs Tahunan) */}
+                <div className="pt-1.5 space-y-2">
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                    Siklus Langganan Paket Guru
+                  </label>
+                  <div className="grid grid-cols-2 gap-2.5">
+                    {/* Bulanan */}
+                    <div
+                      onClick={() => setBillingCycle('monthly')}
+                      className={`p-3 rounded-xl border-2 cursor-pointer transition-all ${
+                        billingCycle === 'monthly'
+                          ? 'border-blue-600 bg-blue-50/70 text-blue-900 shadow-xs'
+                          : 'border-slate-200 hover:border-slate-300 bg-white text-slate-700'
+                      }`}
                     >
-                      {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Pilihan Siklus Pembayaran (Monthly / Yearly) */}
-              <div className="pt-2 space-y-2">
-                <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                  <CreditCard className="w-3.5 h-3.5 text-blue-700" />
-                  <span>{lang === 'ID' ? 'Pilih Siklus Langganan Paket Guru' : 'Select Subscription Cycle'}</span>
-                </label>
-                <div className="grid grid-cols-2 gap-2.5">
-                  {/* Bulanan */}
-                  <div
-                    onClick={() => setBillingCycle('monthly')}
-                    className={`p-3 rounded-xl border-2 cursor-pointer transition-all ${
-                      billingCycle === 'monthly'
-                        ? 'border-blue-600 bg-blue-50/70 text-blue-900 shadow-xs'
-                        : 'border-slate-200 hover:border-slate-300 bg-white text-slate-700'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold uppercase tracking-wider">Bulanan</span>
-                      <span
-                        className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
-                          billingCycle === 'monthly' ? 'border-blue-600 bg-blue-600' : 'border-slate-300'
-                        }`}
-                      >
-                        {billingCycle === 'monthly' && <Check className="w-2.5 h-2.5 text-white" />}
-                      </span>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold uppercase tracking-wider">Bulanan</span>
+                        <span
+                          className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                            billingCycle === 'monthly' ? 'border-blue-600 bg-blue-600' : 'border-slate-300'
+                          }`}
+                        >
+                          {billingCycle === 'monthly' && <Check className="w-2.5 h-2.5 text-white" />}
+                        </span>
+                      </div>
+                      <div className="text-sm font-black text-slate-900 mt-1">Rp 5.000</div>
+                      <span className="text-[10px] text-slate-500">per bulan (fleksibel)</span>
                     </div>
-                    <div className="text-sm font-extrabold text-slate-900 mt-1">Rp 5.000</div>
-                    <span className="text-[10px] text-slate-500">per bulan (tagihan fleksibel)</span>
-                  </div>
 
-                  {/* Tahunan */}
-                  <div
-                    onClick={() => setBillingCycle('yearly')}
-                    className={`p-3 rounded-xl border-2 cursor-pointer transition-all relative ${
-                      billingCycle === 'yearly'
-                        ? 'border-blue-600 bg-blue-50/70 text-blue-900 shadow-xs'
-                        : 'border-slate-200 hover:border-slate-300 bg-white text-slate-700'
-                    }`}
-                  >
-                    <span className="absolute -top-2 right-2 px-1.5 py-0.5 rounded bg-blue-600 text-white font-black text-[9px] uppercase tracking-wider">
-                      Aktif 1 Tahun
-                    </span>
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold uppercase tracking-wider">Tahunan</span>
-                      <span
-                        className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
-                          billingCycle === 'yearly' ? 'border-blue-600 bg-blue-600' : 'border-slate-300'
-                        }`}
-                      >
-                        {billingCycle === 'yearly' && <Check className="w-2.5 h-2.5 text-white" />}
+                    {/* Tahunan */}
+                    <div
+                      onClick={() => setBillingCycle('yearly')}
+                      className={`p-3 rounded-xl border-2 cursor-pointer transition-all relative ${
+                        billingCycle === 'yearly'
+                          ? 'border-blue-600 bg-blue-50/70 text-blue-900 shadow-xs'
+                          : 'border-slate-200 hover:border-slate-300 bg-white text-slate-700'
+                      }`}
+                    >
+                      <span className="absolute -top-2 right-2 px-1.5 py-0.5 rounded bg-blue-600 text-white font-black text-[9px] uppercase tracking-wider">
+                        1 Tahun Penuh
                       </span>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold uppercase tracking-wider">Tahunan</span>
+                        <span
+                          className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                            billingCycle === 'yearly' ? 'border-blue-600 bg-blue-600' : 'border-slate-300'
+                          }`}
+                        >
+                          {billingCycle === 'yearly' && <Check className="w-2.5 h-2.5 text-white" />}
+                        </span>
+                      </div>
+                      <div className="text-sm font-black text-slate-900 mt-1">Rp 60.000</div>
+                      <span className="text-[10px] text-slate-500">per tahun (12 bulan aktif)</span>
                     </div>
-                    <div className="text-sm font-extrabold text-slate-900 mt-1">Rp 60.000</div>
-                    <span className="text-[10px] text-slate-500">per tahun (12 bulan penuh)</span>
                   </div>
                 </div>
-              </div>
 
-              {/* Tombol Daftar & Lanjutkan ke Pembayaran */}
-              <div className="pt-2">
-                <button
-                  type="submit"
-                  id="btn-teacher-submit-payment"
-                  disabled={isSubmitting}
-                  className="w-full py-3.5 bg-blue-700 hover:bg-blue-800 active:scale-[0.99] text-white text-xs font-bold uppercase tracking-wider rounded-xl shadow-md shadow-blue-700/20 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
-                >
-                  {isSubmitting ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      <span>{lang === 'ID' ? 'Menyiapkan Akun & Midtrans...' : 'Preparing Midtrans...'}</span>
-                    </>
-                  ) : (
-                    <>
-                      <span>
-                        {lang === 'ID'
-                          ? `Daftar & Lanjutkan ke Pembayaran (${formatRupiah(currentPrice)})`
-                          : `Register & Proceed to Payment (${formatRupiah(currentPrice)})`}
-                      </span>
-                      <ArrowRight className="w-4 h-4" />
-                    </>
-                  )}
-                </button>
-                <div className="flex items-center justify-center gap-2 text-[10px] text-slate-400 mt-2">
-                  <ShieldCheck className="w-3.5 h-3.5 text-blue-700" />
-                  <span>Didukung Gateway Resmi Midtrans • Pembayaran QRIS & Virtual Account Real-Time</span>
+                {/* Tombol Lanjut ke Pembayaran */}
+                <div className="pt-2">
+                  <button
+                    type="submit"
+                    disabled={isSubmitting}
+                    className="w-full py-3.5 px-5 rounded-2xl bg-blue-600 hover:bg-blue-700 active:scale-[0.99] text-white font-bold text-xs sm:text-sm uppercase tracking-wider transition-all shadow-md shadow-blue-600/20 flex items-center justify-center gap-2 disabled:opacity-60 cursor-pointer min-h-[46px]"
+                    id="btn-submit-teacher-registration"
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <Loader2 size={16} className="animate-spin" />
+                        <span>{lang === 'ID' ? 'Menyiapkan Pembayaran...' : 'Preparing Payment...'}</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>
+                          {lang === 'ID'
+                            ? `Lanjut ke Pembayaran (${formatRupiah(currentPrice)})`
+                            : `Proceed to Payment (${formatRupiah(currentPrice)})`}
+                        </span>
+                        <ArrowRight size={16} />
+                      </>
+                    )}
+                  </button>
+
+                  <div className="flex items-center justify-center gap-1.5 text-[10px] text-slate-400 mt-2">
+                    <ShieldCheck className="w-3.5 h-3.5 text-blue-600" />
+                    <span>Didukung Midtrans Gateway • QRIS, VA Bank & E-Wallet Real-Time</span>
+                  </div>
                 </div>
-              </div>
-            </form>
+              </form>
+            </div>
           )}
 
           {/* ========================================================================= */}
-          {/* STEP 3: INTEGRASI PEMBAYARAN MIDTRANS GATEWAY (QRIS / VA / SNAP)          */}
+          {/* LANGKAH 3: PEMBAYARAN (URUTAN 3 - METODE PEMBAYARAN MIDTRANS)               */}
           {/* ========================================================================= */}
           {step === 3 && paymentSession && (
-            <div className="space-y-4">
-              <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl space-y-3">
-                <div className="flex items-start justify-between">
+            <div className="max-w-lg mx-auto space-y-4">
+              {/* Back to Step 2 & Session Status Header */}
+              <div className="flex items-center justify-between gap-3 pb-3 border-b border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStep(2);
+                    setFormError('');
+                  }}
+                  className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-600 hover:text-blue-600 transition-colors cursor-pointer py-1"
+                  id="btn-back-to-step2"
+                >
+                  <ArrowLeft className="w-3.5 h-3.5" />
+                  <span>{lang === 'ID' ? 'Ubah Data Pendaftaran' : 'Edit Registration'}</span>
+                </button>
+
+                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200 text-xs font-bold">
+                  <CreditCard className="w-3.5 h-3.5" />
+                  <span>Sesi Pembayaran Aktif</span>
+                </div>
+              </div>
+
+              {/* Rincian Tagihan Order */}
+              <div className="p-3.5 sm:p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
+                <div className="flex items-start justify-between gap-3">
                   <div>
-                    <span className="text-[10px] font-bold text-blue-700 uppercase tracking-wider">
-                      Tagihan Paket Guru Pro
+                    <span className="text-[10px] font-bold text-blue-700 uppercase tracking-wider block">
+                      Paket Guru Pro
                     </span>
-                    <h3 className="text-base font-extrabold text-slate-900">{paymentSession.planTitle}</h3>
+                    <h4 className="text-sm sm:text-base font-extrabold text-slate-900 mt-0.5">
+                      {paymentSession.planTitle}
+                    </h4>
                     <p className="text-xs text-slate-600 mt-0.5">
-                      Ruang Kerja Individu Guru • {paymentSession.teacherFullName} ({paymentSession.role})
+                      {paymentSession.teacherFullName} • {paymentSession.role}
                     </p>
                   </div>
-                  <div className="text-right">
+                  <div className="text-right shrink-0">
                     <span className="text-[10px] text-slate-400 uppercase font-mono block">Total Tagihan</span>
-                    <span className="text-lg font-black text-blue-700">{formatRupiah(paymentSession.amount)}</span>
+                    <span className="text-base sm:text-lg font-black text-blue-700">
+                      {formatRupiah(paymentSession.amount)}
+                    </span>
                   </div>
                 </div>
 
-                <div className="pt-2.5 border-t border-blue-200/60 flex items-center justify-between text-xs">
-                  <div className="flex items-center gap-1.5 font-mono text-slate-600">
-                    <span className="text-slate-400">Invoice No:</span>
+                <div className="pt-2 border-t border-slate-200/80 flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-1.5 font-mono text-slate-600 text-[11px]">
+                    <span className="text-slate-400">Invoice:</span>
                     <span className="font-bold text-slate-800">{paymentSession.orderId}</span>
                   </div>
                   <button
                     type="button"
                     onClick={() => copyToClipboard(paymentSession.orderId, 'invoice')}
-                    className="text-[11px] text-blue-700 font-bold hover:underline flex items-center gap-1 cursor-pointer"
+                    className="text-[11px] text-blue-600 font-bold hover:underline flex items-center gap-1 cursor-pointer"
                   >
                     {copiedField === 'invoice' ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
-                    <span>{copiedField === 'invoice' ? 'Disalin' : 'Salin Invoice'}</span>
+                    <span>{copiedField === 'invoice' ? 'Disalin' : 'Salin'}</span>
                   </button>
                 </div>
               </div>
 
+              {/* Tampilan Pilihan Metode Pembayaran yang Tersedia */}
+              <div className="p-3.5 bg-blue-50/50 border border-blue-200/80 rounded-2xl space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                    <Wallet className="w-3.5 h-3.5 text-blue-600" />
+                    <span>Metode Pembayaran Resmi</span>
+                  </span>
+                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100/70 px-2 py-0.5 rounded-full">
+                    Aktivasi Otomatis
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  {/* Metode 1: QRIS */}
+                  <div className="p-2.5 bg-white border border-blue-100 rounded-xl flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center shrink-0 border border-blue-200/60">
+                      <QrCode className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <span className="font-bold text-slate-800 block text-[11px]">QRIS Instan</span>
+                      <span className="text-[10px] text-slate-500">GoPay, OVO, Dana, BCA</span>
+                    </div>
+                  </div>
+
+                  {/* Metode 2: Virtual Account */}
+                  <div className="p-2.5 bg-white border border-blue-100 rounded-xl flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center shrink-0 border border-blue-200/60">
+                      <Building2 className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <span className="font-bold text-slate-800 block text-[11px]">Virtual Account</span>
+                      <span className="text-[10px] text-slate-500">BCA, Mandiri, BRI, BNI</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               {/* Status Menunggu Pembayaran */}
-              <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-center gap-3 text-amber-800 text-xs">
-                <Clock className="w-5 h-5 shrink-0 animate-pulse text-amber-600" />
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-center gap-2.5 text-amber-900 text-xs">
+                <Clock className="w-4 h-4 shrink-0 animate-pulse text-amber-600" />
                 <div className="flex-1">
-                  <span className="font-bold block">Menunggu Pembayaran Midtrans</span>
-                  <span className="text-[11px] text-amber-700">
-                    Sistem secara otomatis mendeteksi pembayaran via Snap/QRIS/Bank Transfer setiap 4 detik.
+                  <span className="font-bold block">Menunggu Konfirmasi Pembayaran</span>
+                  <span className="text-[11px] text-amber-700 leading-tight block">
+                    Sistem mendeteksi pembayaran Midtrans secara otomatis setiap 4 detik.
                   </span>
                 </div>
               </div>
 
               {paymentCheckMessage && (
-                <div className="p-3 rounded-xl bg-blue-50 border border-blue-200 text-blue-900 text-xs flex items-center gap-2">
+                <div className="p-2.5 rounded-xl bg-blue-50 border border-blue-200 text-blue-900 text-xs flex items-center gap-2">
                   <AlertCircle className="w-4 h-4 shrink-0 text-blue-600" />
                   <span>{paymentCheckMessage}</span>
                 </div>
               )}
 
-              {/* Action Buttons Pembayaran */}
+              {/* Tombol Aksi Pembayaran */}
               <div className="space-y-2 pt-1">
                 {/* 1. Tombol Buka Snap */}
                 {paymentSession.snapToken && (
@@ -1030,10 +1224,10 @@ export const TeacherRegisterModal: React.FC<TeacherRegisterModalProps> = ({
                     type="button"
                     id="btn-teacher-open-snap"
                     onClick={() => handleLaunchSnap(paymentSession.snapToken!)}
-                    className="w-full py-3.5 bg-blue-700 hover:bg-blue-800 active:scale-[0.99] text-white text-xs font-bold uppercase tracking-wider rounded-xl shadow-md shadow-blue-700/20 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                    className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 active:scale-[0.99] text-white text-xs font-bold uppercase tracking-wider rounded-2xl shadow-md shadow-blue-600/20 transition-all flex items-center justify-center gap-2 cursor-pointer"
                   >
                     <QrCode className="w-4 h-4" />
-                    <span>Bayar Sekarang via Midtrans Snap</span>
+                    <span>Bayar Sekarang via Midtrans</span>
                   </button>
                 )}
 
@@ -1043,42 +1237,40 @@ export const TeacherRegisterModal: React.FC<TeacherRegisterModalProps> = ({
                   id="btn-teacher-check-status"
                   disabled={isCheckingPayment}
                   onClick={() => handleCheckStatus(paymentSession.orderId)}
-                  className="w-full py-3 border border-blue-700 bg-white hover:bg-blue-50 active:scale-[0.99] text-blue-800 text-xs font-bold uppercase tracking-wider rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
+                  className="w-full py-2.5 border border-slate-300 bg-white hover:bg-slate-50 active:scale-[0.99] text-slate-700 text-xs font-bold uppercase tracking-wider rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
                 >
                   {isCheckingPayment ? (
-                    <Loader2 className="w-4 h-4 animate-spin text-blue-700" />
+                    <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
                   ) : (
-                    <RefreshCw className="w-4 h-4 text-blue-700" />
+                    <RefreshCw className="w-4 h-4 text-slate-500" />
                   )}
-                  <span>Cek Status Pembayaran (Midtrans)</span>
+                  <span>Cek Status Pembayaran</span>
                 </button>
 
-                {/* 3. Tombol Simulasi Pembayaran Instan (Sandbox) */}
+                {/* 3. Tombol Simulasi Pembayaran Instan (Sandbox / Preview Demo) */}
                 <button
                   type="button"
                   id="btn-teacher-simulate-settlement"
                   disabled={isCheckingPayment}
                   onClick={() => handleSimulatePayment(paymentSession.orderId)}
-                  className="w-full py-2.5 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-800 active:scale-[0.99] text-xs font-bold uppercase tracking-wider rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-60"
+                  className="w-full py-2 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-800 active:scale-[0.99] text-xs font-bold uppercase tracking-wider rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-60"
                 >
                   <Zap className="w-3.5 h-3.5 text-emerald-600" />
                   <span>Verifikasi Instan (Simulasi Sandbox)</span>
                 </button>
               </div>
 
-              <div className="text-center">
-                <span className="text-[11px] text-slate-400">
-                  Untuk pengujian sandbox lokal/preview, gunakan tombol <strong>Verifikasi Instan</strong> untuk aktivasi langsung.
-                </span>
+              <div className="text-center text-[10px] text-slate-400">
+                Gunakan tombol <strong>Verifikasi Instan</strong> untuk aktivasi instan pada pengujian demo.
               </div>
             </div>
           )}
 
           {/* ========================================================================= */}
-          {/* STEP 4: PAKET GURU AKTIF (KREDENSIAL & RUANG KERJA INDIVIDU GURU)          */}
+          {/* LANGKAH 4: AKTIF (URUTAN 4 - SUKSES AKTIVASI & KREDENSIAL AKUN)            */}
           {/* ========================================================================= */}
           {step === 4 && registrationSuccessData && (
-            <div className="space-y-4 animate-in fade-in zoom-in-95 duration-200">
+            <div className="max-w-lg mx-auto space-y-4 animate-in fade-in zoom-in-95 duration-200">
               {/* Badge Sukses */}
               <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl text-center space-y-1.5">
                 <div className="w-12 h-12 bg-emerald-600 text-white rounded-full flex items-center justify-center mx-auto shadow-md shadow-emerald-600/20">
@@ -1089,16 +1281,16 @@ export const TeacherRegisterModal: React.FC<TeacherRegisterModalProps> = ({
                 </h3>
                 <p className="text-xs text-emerald-700 max-w-md mx-auto">
                   {lang === 'ID'
-                    ? `Selamat! Ruang Kerja Individu Pro Anda telah aktif selama ${registrationSuccessData.expiresInDays} hari. Pembayaran Midtrans telah lunas dan terintegrasi.`
+                    ? `Selamat! Ruang Kerja Individu Pro Anda telah aktif selama ${registrationSuccessData.expiresInDays} hari. Pembayaran Midtrans telah lunas dan terverifikasi.`
                     : `Congratulations! Your Teacher Workspace is now active for ${registrationSuccessData.expiresInDays} days.`}
                 </p>
               </div>
 
               {/* Rincian Kredensial Akun Guru */}
-              <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
+              <div className="p-3.5 sm:p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
                 <div className="flex items-center justify-between border-b border-slate-200 pb-2.5">
                   <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                    <User className="w-4 h-4 text-blue-700" />
+                    <User className="w-4 h-4 text-blue-600" />
                     <span>Kredensial Akun Guru Pro</span>
                   </span>
                   <span className="px-2 py-0.5 rounded bg-blue-100 text-blue-800 text-[10px] font-bold uppercase">
@@ -1106,7 +1298,7 @@ export const TeacherRegisterModal: React.FC<TeacherRegisterModalProps> = ({
                   </span>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
                   {/* Username */}
                   <div className="p-2.5 bg-white border border-slate-200 rounded-xl">
                     <span className="text-[10px] text-slate-400 uppercase font-mono block">Username Login:</span>
@@ -1117,7 +1309,7 @@ export const TeacherRegisterModal: React.FC<TeacherRegisterModalProps> = ({
                       <button
                         type="button"
                         onClick={() => copyToClipboard(registrationSuccessData.username, 'cred_user')}
-                        className="text-blue-700 hover:text-blue-800 cursor-pointer"
+                        className="text-blue-600 hover:text-blue-700 cursor-pointer"
                       >
                         {copiedField === 'cred_user' ? (
                           <Check className="w-3.5 h-3.5 text-emerald-600" />
@@ -1139,7 +1331,7 @@ export const TeacherRegisterModal: React.FC<TeacherRegisterModalProps> = ({
                         <button
                           type="button"
                           onClick={() => copyToClipboard(registrationSuccessData.password!, 'cred_pwd')}
-                          className="text-blue-700 hover:text-blue-800 cursor-pointer"
+                          className="text-blue-600 hover:text-blue-700 cursor-pointer"
                         >
                           {copiedField === 'cred_pwd' ? (
                             <Check className="w-3.5 h-3.5 text-emerald-600" />
@@ -1159,7 +1351,7 @@ export const TeacherRegisterModal: React.FC<TeacherRegisterModalProps> = ({
                     </span>
                   </div>
 
-                  {/* No Invoice */}
+                  {/* Status Pembayaran */}
                   <div className="p-2.5 bg-white border border-slate-200 rounded-xl">
                     <span className="text-[10px] text-slate-400 uppercase font-mono block">Status Pembayaran:</span>
                     <span className="font-bold text-emerald-700 text-xs block mt-0.5">
@@ -1176,7 +1368,7 @@ export const TeacherRegisterModal: React.FC<TeacherRegisterModalProps> = ({
                   id="btn-teacher-enter-workspace"
                   disabled={isSubmitting}
                   onClick={handleEnterDashboard}
-                  className="w-full py-3.5 bg-blue-700 hover:bg-blue-800 active:scale-[0.99] text-white text-xs font-bold uppercase tracking-wider rounded-xl shadow-md shadow-blue-700/20 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
+                  className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 active:scale-[0.99] text-white text-xs font-bold uppercase tracking-wider rounded-2xl shadow-md shadow-blue-600/20 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
                 >
                   {isSubmitting ? (
                     <>
@@ -1185,7 +1377,7 @@ export const TeacherRegisterModal: React.FC<TeacherRegisterModalProps> = ({
                     </>
                   ) : (
                     <>
-                      <span>{lang === 'ID' ? 'Masuk ke Ruang Kerja Individu' : 'Enter Teacher Workspace'}</span>
+                      <span>{lang === 'ID' ? 'Masuk ke Ruang Kerja Saya' : 'Enter My Workspace'}</span>
                       <ArrowRight className="w-4 h-4" />
                     </>
                   )}
@@ -1200,7 +1392,11 @@ export const TeacherRegisterModal: React.FC<TeacherRegisterModalProps> = ({
                   }}
                   className="w-full py-2.5 border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer"
                 >
-                  {copiedField === 'all' ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                  {copiedField === 'all' ? (
+                    <Check className="w-3.5 h-3.5 text-emerald-600" />
+                  ) : (
+                    <Copy className="w-3.5 h-3.5" />
+                  )}
                   <span>{copiedField === 'all' ? 'Seluruh Kredensial Disalin!' : 'Salin Seluruh Kredensial'}</span>
                 </button>
               </div>

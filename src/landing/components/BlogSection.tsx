@@ -6,34 +6,6 @@ interface BlogSectionProps {
 }
 
 export const BlogSection: React.FC<BlogSectionProps> = ({ lang }) => {
-  const categories = lang === 'ID' ? [
-    {
-      name: 'DIGITALISASI SEKOLAH',
-      desc: 'Membahas perkembangan teknologi untuk mendukung administrasi dan pembelajaran.'
-    },
-    {
-      name: 'MANAJEMEN KEHADIRAN',
-      desc: 'Tips mengelola data kehadiran siswa dengan lebih efektif.'
-    },
-    {
-      name: 'ADMINISTRASI SEKOLAH',
-      desc: 'Informasi dan solusi untuk membantu pekerjaan administrasi sekolah.'
-    }
-  ] : [
-    {
-      name: 'SCHOOL DIGITALIZATION',
-      desc: 'Discussing technological advancements that support administration and learning workflows.'
-    },
-    {
-      name: 'ATTENDANCE MANAGEMENT',
-      desc: 'Actionable tips for managing student attendance data with precision and ease.'
-    },
-    {
-      name: 'SCHOOL ADMINISTRATION',
-      desc: 'Insights and streamlined solutions to assist school administrative staff and educators.'
-    }
-  ];
-
   const posts = lang === 'ID' ? [
     {
       id: '1',
@@ -41,7 +13,7 @@ export const BlogSection: React.FC<BlogSectionProps> = ({ lang }) => {
       category: 'DIGITALISASI SEKOLAH',
       readTime: '4 menit baca',
       date: '18 Agu 2026',
-      snippet: 'Membahas perkembangan teknologi untuk mendukung administrasi presensi dan pembelajaran yang lebih terstruktur di era modern.',
+      snippet: 'Membahas efisiensi teknologi presensi digital dalam merapikan administrasi rombel dan pelaporan kedinasan.',
       image: '/images/blog/330-ribu-sekolah-akan-dibekali-layar-digital-pintar-tahun-ini-1758534297510_169.jpeg',
     },
     {
@@ -50,7 +22,7 @@ export const BlogSection: React.FC<BlogSectionProps> = ({ lang }) => {
       category: 'MANAJEMEN KEHADIRAN',
       readTime: '5 menit baca',
       date: '12 Agu 2026',
-      snippet: 'Tips praktis menyusun dan menganalisis rekapitulasi presensi harian, mingguan, hingga semester tanpa kesalahan manual.',
+      snippet: 'Langkah praktis menyusun rekapitulasi kehadiran bulanan dan semester tanpa risiko rumus manual spreadsheet.',
       image: '/images/blog/batas-usia-masuk-sd-diperbarui-anak-di-bawah-7-tahun-bisa-sekolah-dengan-syarat-ini-154159.webp',
     },
     {
@@ -59,138 +31,126 @@ export const BlogSection: React.FC<BlogSectionProps> = ({ lang }) => {
       category: 'ADMINISTRASI SEKOLAH',
       readTime: '6 menit baca',
       date: '05 Agu 2026',
-      snippet: 'Informasi dan solusi terintegrasi untuk menyederhanakan alur pekerjaan tata usaha dan dewan guru di lingkungan sekolah.',
+      snippet: 'Panduan menyederhanakan alur kerja tata usaha dan dewan guru SD dalam pembuatan berkas kedinasan siap cetak.',
       image: '/images/blog/IFP_Elementary_School-_4259-scaled.jpg',
     }
   ] : [
     {
       id: '1',
       title: 'Why Should Schools Transition to Digital Attendance Systems?',
-      category: 'SCHOOL DIGITALIZATION',
+      category: 'DIGITALIZATION',
       readTime: '4 min read',
       date: 'Aug 18, 2026',
-      snippet: 'Exploring how technology modernizes attendance administration and structured school learning in the digital era.',
+      snippet: 'Exploring how modern attendance tools streamline primary school administration and regulatory reports.',
       image: '/images/blog/330-ribu-sekolah-akan-dibekali-layar-digital-pintar-tahun-ini-1758534297510_169.jpeg',
     },
     {
       id: '2',
       title: 'How to Manage Student Attendance Summaries Efficiently',
-      category: 'ATTENDANCE MANAGEMENT',
+      category: 'MANAGEMENT',
       readTime: '5 min read',
       date: 'Aug 12, 2026',
-      snippet: 'Practical tips to compile and analyze daily, weekly, and semester-long attendance recaps without manual human errors.',
+      snippet: 'Practical steps to compile monthly and term attendance records without spreadsheet errors.',
       image: '/images/blog/batas-usia-masuk-sd-diperbarui-anak-di-bawah-7-tahun-bisa-sekolah-dengan-syarat-ini-154159.webp',
     },
     {
       id: '3',
       title: 'School Administration Digitization: From Data to Reporting',
-      category: 'SCHOOL ADMINISTRATION',
+      category: 'ADMINISTRATION',
       readTime: '6 min read',
       date: 'Aug 05, 2026',
-      snippet: 'Integrated insights and workflow solutions to simplify administrative tasks for school staff and teachers.',
+      snippet: 'Comprehensive insights into simplifying primary school workflows into print-ready institutional formats.',
       image: '/images/blog/IFP_Elementary_School-_4259-scaled.jpg',
     }
   ];
 
   return (
-    <section id="blog" className="py-16 sm:py-20 lg:py-24 bg-slate-50 text-slate-900 relative border-b border-blue-100">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <section 
+      id="blog" 
+      className="scroll-mt-16 sm:scroll-mt-20 lg:min-h-[calc(100vh-4.5rem)] flex flex-col justify-center py-6 sm:py-8 lg:py-10 bg-slate-50 text-slate-900 relative border-b border-blue-100 antialiased overflow-hidden"
+    >
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
         
-        {/* Header - Educational Style */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between mb-12 sm:mb-16 gap-6">
-          <div className="space-y-4">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md bg-blue-50 border border-blue-200 text-blue-800 text-[10px] font-bold uppercase tracking-wider">
-              <span>{lang === 'ID' ? 'BLOG & INFORMASI' : 'BLOG & INSIGHTS'}</span>
+        {/* Header - Compact Educational Insights */}
+        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 mb-5 sm:mb-6 lg:mb-7">
+          <div className="space-y-1.5 max-w-2xl">
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-blue-100/80 border border-blue-200 text-blue-800 text-[11px] font-bold uppercase tracking-wider">
+              <BookOpen className="w-3 h-3 text-blue-700 shrink-0" />
+              <span>{lang === 'ID' ? 'BLOG & INFORMASI SEKOLAH' : 'BLOG & SCHOOL INSIGHTS'}</span>
             </div>
-            <h2 className="text-2xl sm:text-4xl lg:text-5xl font-black text-[#0B2F64] tracking-tight uppercase leading-[1.05]">
+
+            <h2 className="text-xl sm:text-3xl lg:text-4xl font-black text-[#0B2F64] tracking-tight uppercase leading-tight">
               {lang === 'ID' ? (
                 <>
-                  TIPS &<br />
-                  <span className="text-blue-600">DIGITALISASI SEKOLAH</span>
+                  Tips & <span className="text-blue-600">Digitalisasi Sekolah</span>
                 </>
               ) : (
                 <>
-                  TIPS &<br />
-                  <span className="text-blue-600">SCHOOL DIGITALIZATION</span>
+                  Tips & <span className="text-blue-600">School Digitalization</span>
                 </>
               )}
             </h2>
-            <p className="text-slate-600 text-xs sm:text-base lg:text-lg max-w-2xl border-l-4 border-blue-600 pl-3 sm:pl-4 font-normal">
+
+            <p className="text-slate-600 text-xs sm:text-sm lg:text-base leading-relaxed font-normal">
               {lang === 'ID'
-                ? 'Edukasi, wawasan, dan panduan praktis pengelolaan presensi dan administrasi sekolah.'
-                : 'Education, insights, and practical guides for school attendance and administrative management.'}
+                ? 'Edukasi dan panduan praktis pengelolaan presensi serta administrasi sekolah dasar.'
+                : 'Actionable guidance and practical insights for primary school attendance administration.'}
             </p>
           </div>
 
-          <a 
-            href="#blog" 
-            className="text-blue-700 hover:text-blue-900 font-bold text-xs uppercase tracking-wider flex items-center gap-2 self-start md:self-auto py-2 border-b-2 border-blue-700"
-          >
-            <span>{lang === 'ID' ? 'Lihat Semua Artikel' : 'View All Articles'}</span>
-            <ArrowRight className="w-4 h-4" />
-          </a>
+          {/* Swipe indicator hint for mobile only */}
+          <div className="flex sm:hidden items-center gap-1 text-[11px] font-bold text-blue-700">
+            <span>{lang === 'ID' ? 'Geser artikel' : 'Swipe articles'}</span>
+            <ArrowRight className="w-3 h-3" />
+          </div>
         </div>
 
-        {/* Categories Overview */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-12">
-          {categories.map((cat, idx) => (
-            <div key={idx} className="p-4 bg-white border border-slate-200 rounded-xl shadow-xs">
-              <span className="text-[10px] font-black uppercase tracking-wider text-blue-700 block mb-1">
-                {cat.name}
-              </span>
-              <p className="text-xs text-slate-600 font-normal">
-                {cat.desc}
-              </p>
-            </div>
-          ))}
-        </div>
-
-        {/* Blog Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8">
+        {/* Blog Cards Grid: Swipeable on Mobile, 3 Columns on Desktop */}
+        <div className="flex sm:grid sm:grid-cols-2 lg:grid-cols-3 overflow-x-auto sm:overflow-x-visible snap-x snap-mandatory gap-3.5 sm:gap-4 lg:gap-5 pb-2 sm:pb-0 -mx-4 px-4 sm:mx-0 sm:px-0">
           {posts.map((post) => (
             <article
               key={post.id}
               id={`blog-card-${post.id}`}
-              className="bg-white border border-slate-200 rounded-xl overflow-hidden hover:border-blue-500 hover:shadow-md transition-all group flex flex-col justify-between shadow-xs"
+              className="w-[80vw] max-w-[320px] sm:w-auto shrink-0 sm:shrink snap-center bg-white border border-slate-200/90 rounded-xl overflow-hidden hover:border-blue-500 hover:shadow-md transition-all group flex flex-col justify-between shadow-xs"
             >
               <div>
                 {/* Thumbnail image */}
-                <div className="relative aspect-16/10 overflow-hidden bg-slate-100 block">
+                <div className="relative h-32 sm:h-36 overflow-hidden bg-slate-100 block">
                   <img 
                     src={post.image} 
                     alt={post.title} 
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                     referrerPolicy="no-referrer"
                   />
-                  <span className="absolute top-3 left-3 bg-[#0B2F64] text-white px-2.5 py-1 rounded text-[9px] font-bold uppercase tracking-wider shadow-xs">
+                  <span className="absolute top-2.5 left-2.5 bg-[#0B2F64]/90 backdrop-blur-xs text-white px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider">
                     {post.category}
                   </span>
                 </div>
 
-                <div className="p-5 sm:p-6 lg:p-7 space-y-3">
-                  <div className="flex items-center gap-3 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                <div className="p-3.5 sm:p-4 space-y-1.5">
+                  <div className="flex items-center gap-2 text-[10px] font-semibold text-slate-500">
                     <span className="flex items-center gap-1">
-                      <Calendar className="w-3.5 h-3.5" /> {post.date}
+                      <Calendar className="w-3 h-3" /> {post.date}
                     </span>
                     <span>•</span>
                     <span className="flex items-center gap-1">
-                      <Clock className="w-3.5 h-3.5" /> {post.readTime}
+                      <Clock className="w-3 h-3" /> {post.readTime}
                     </span>
                   </div>
 
-                  <h3 className="text-base sm:text-lg font-black text-[#0B2F64] group-hover:text-blue-600 transition-colors leading-snug uppercase">
+                  <h3 className="text-xs sm:text-sm font-bold text-[#0B2F64] group-hover:text-blue-600 transition-colors leading-snug line-clamp-2">
                     {post.title}
                   </h3>
 
-                  <p className="text-xs sm:text-sm text-slate-600 leading-relaxed font-normal">
+                  <p className="text-[11px] sm:text-xs text-slate-600 leading-relaxed font-normal line-clamp-2">
                     {post.snippet}
                   </p>
                 </div>
               </div>
 
-              <div className="p-6 sm:p-7 pt-0">
-                <span className="text-xs font-bold uppercase tracking-wider text-blue-700 group-hover:text-blue-900 flex items-center gap-1">
-                  {lang === 'ID' ? 'Baca Selengkapnya →' : 'Read Full Article →'}
+              <div className="p-3.5 sm:p-4 pt-0">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-blue-700 group-hover:text-blue-900 flex items-center gap-1">
+                  {lang === 'ID' ? 'Baca Selengkapnya →' : 'Read Article →'}
                 </span>
               </div>
             </article>

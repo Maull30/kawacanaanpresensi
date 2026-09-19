@@ -59,17 +59,25 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
               <span>{isId ? 'SISTEM PRESENSI DIGITAL SEKOLAH DASAR' : 'PRIMARY SCHOOL DIGITAL ATTENDANCE SYSTEM'}</span>
             </div>
 
-            {/* Main Headline (as in screenshot) */}
-            <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-[44px] xl:text-[52px] leading-[1.08] font-black tracking-tight text-slate-900 uppercase">
+            {/* Main Headline with 2 Dedicated Scaled Lines */}
+            <h1 className="leading-[1.1] sm:leading-[1.08] font-black tracking-tight uppercase select-none">
               {isId ? (
                 <>
-                  <span className="block">PRESENSI SEKOLAH DASAR</span>
-                  <span className="block text-[#0066FF] mt-1">LEBIH TERTIB & AKURAT</span>
+                  <span className="block text-[22px] min-[380px]:text-[26px] sm:text-3xl md:text-4xl lg:text-[38px] xl:text-[46px] text-slate-900 whitespace-normal sm:whitespace-nowrap">
+                    PRESENSI SEKOLAH DASAR
+                  </span>
+                  <span className="block text-[24px] min-[380px]:text-[28px] sm:text-3xl md:text-4xl lg:text-[42px] xl:text-[50px] text-[#0066FF] mt-1 whitespace-normal sm:whitespace-nowrap">
+                    LEBIH TERTIB & AKURAT
+                  </span>
                 </>
               ) : (
                 <>
-                  <span className="block">PRIMARY ATTENDANCE</span>
-                  <span className="block text-[#0066FF] mt-1">STRUCTURED & PRECISE</span>
+                  <span className="block text-[22px] min-[380px]:text-[26px] sm:text-3xl md:text-4xl lg:text-[38px] xl:text-[46px] text-slate-900 whitespace-normal sm:whitespace-nowrap">
+                    PRIMARY ATTENDANCE
+                  </span>
+                  <span className="block text-[24px] min-[380px]:text-[28px] sm:text-3xl md:text-4xl lg:text-[42px] xl:text-[50px] text-[#0066FF] mt-1 whitespace-normal sm:whitespace-nowrap">
+                    STRUCTURED & PRECISE
+                  </span>
                 </>
               )}
             </h1>

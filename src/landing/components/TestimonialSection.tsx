@@ -85,11 +85,13 @@ export const TestimonialSection: React.FC<TestimonialSectionProps> = ({ lang }) 
             <h2 className="text-2xl sm:text-3xl lg:text-4xl font-black text-[#0B2F64] tracking-tight uppercase leading-tight">
               {lang === 'ID' ? (
                 <>
-                  Kepercayaan Sekolah di <span className="text-blue-600">Seluruh Indonesia</span>
+                  <span className="block">Kepercayaan Sekolah</span>
+                  <span className="block text-blue-600">di Seluruh Indonesia</span>
                 </>
               ) : (
                 <>
-                  Trusted by Schools <span className="text-blue-600">Across Indonesia</span>
+                  <span className="block">Trusted by Schools</span>
+                  <span className="block text-blue-600">Across Indonesia</span>
                 </>
               )}
             </h2>

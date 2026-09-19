@@ -214,11 +214,13 @@ export const ContactSection: React.FC<ContactSectionProps> = ({ lang }) => {
           <h2 className="text-2xl sm:text-3xl lg:text-4xl font-black text-[#0B2F64] tracking-tight uppercase leading-tight">
             {lang === 'ID' ? (
               <>
-                KOMUNITAS WHATSAPP <span className="text-blue-600">KAWACANAAN PRESENSI</span>
+                <span className="block">KOMUNITAS WHATSAPP</span>
+                <span className="block text-blue-600">KAWACANAAN PRESENSI</span>
               </>
             ) : (
               <>
-                WHATSAPP COMMUNITY <span className="text-blue-600">KAWACANAAN PRESENSI</span>
+                <span className="block">WHATSAPP COMMUNITY</span>
+                <span className="block text-blue-600">KAWACANAAN PRESENSI</span>
               </>
             )}
           </h2>

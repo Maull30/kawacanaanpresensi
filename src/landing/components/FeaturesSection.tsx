@@ -94,10 +94,12 @@ export const FeaturesSection: React.FC<FeaturesSectionProps> = ({ lang }) => {
   return (
     <section 
       id="fitur" 
-      className="scroll-mt-16 sm:scroll-mt-20 py-14 sm:py-16 lg:py-20 bg-slate-50 text-slate-900 relative border-b border-blue-100 antialiased overflow-hidden"
+      className="scroll-mt-16 sm:scroll-mt-20 py-14 sm:py-16 lg:py-20 bg-gradient-to-b from-slate-50 via-blue-50/25 to-slate-50 text-slate-900 relative border-b border-blue-100 antialiased overflow-hidden"
     >
-      {/* Background Subtle Grid Pattern */}
-      <div className="absolute inset-0 z-0 pointer-events-none bg-grid-pattern opacity-25" />
+      {/* Background Subtle Grid Pattern & Ambient Branding Lighting */}
+      <div className="absolute inset-0 z-0 pointer-events-none bg-grid-pattern opacity-20" />
+      <div className="absolute -top-24 right-0 w-96 h-96 bg-blue-100/40 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute -bottom-24 left-0 w-96 h-96 bg-sky-100/35 rounded-full blur-3xl pointer-events-none" />
 
       <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
         
@@ -112,11 +114,13 @@ export const FeaturesSection: React.FC<FeaturesSectionProps> = ({ lang }) => {
             <h2 className="text-2xl sm:text-3xl lg:text-4xl font-black text-[#0B2F64] tracking-tight uppercase leading-tight">
               {lang === 'ID' ? (
                 <>
-                  Fitur Kawacanaan <span className="text-blue-600">Sekolah Dasar</span>
+                  <span className="block">Fitur Kawacanaan</span>
+                  <span className="block text-blue-600">Sekolah Dasar</span>
                 </>
               ) : (
                 <>
-                  Kawacanaan Primary <span className="text-blue-600">School Features</span>
+                  <span className="block">Kawacanaan Features</span>
+                  <span className="block text-blue-600">Primary School</span>
                 </>
               )}
             </h2>
@@ -143,7 +147,7 @@ export const FeaturesSection: React.FC<FeaturesSectionProps> = ({ lang }) => {
               <div
                 key={idx}
                 id={`feature-card-${idx}`}
-                className="w-[84vw] max-w-[340px] sm:w-auto shrink-0 sm:shrink snap-center bg-white border border-slate-200 hover:border-blue-500 rounded-2xl p-5 sm:p-6 hover:shadow-lg hover:shadow-blue-500/10 transition-all duration-200 flex flex-col justify-between group relative overflow-hidden"
+                className="w-[84vw] max-w-[340px] sm:w-auto shrink-0 sm:shrink snap-center bg-white border border-slate-200/90 shadow-sm hover:shadow-md hover:shadow-blue-900/5 hover:border-blue-500 rounded-2xl p-5 sm:p-6 transition-all duration-200 flex flex-col justify-between group relative overflow-hidden"
               >
                 {/* Top Subtle Brand Bar on Hover */}
                 <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-600 to-indigo-600 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />

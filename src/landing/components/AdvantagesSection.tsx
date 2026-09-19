@@ -172,11 +172,13 @@ export const AdvantagesSection: React.FC<AdvantagesSectionProps> = ({ lang }) =>
             <h2 className="text-2xl sm:text-3xl lg:text-4xl font-black text-[#0B2F64] tracking-tight uppercase leading-tight">
               {lang === 'ID' ? (
                 <>
-                  Keunggulan Khusus <span className="text-blue-600">Sekolah Dasar</span>
+                  <span className="block">Keunggulan Khusus</span>
+                  <span className="block text-blue-600">Sekolah Dasar</span>
                 </>
               ) : (
                 <>
-                  Purpose-Built For <span className="text-blue-600">Primary Schools</span>
+                  <span className="block">Purpose-Built For</span>
+                  <span className="block text-blue-600">Primary Schools</span>
                 </>
               )}
             </h2>

@@ -623,8 +623,8 @@ ${isSuperadmin ? 'Didaftarkan Oleh: SUPER ADMIN' : `Invoice: ${registrationSucce
                     : paymentSession
                     ? 'Gateway Pembayaran Midtrans'
                     : isSuperadmin
-                    ? 'Tambah Satuan Pendidikan & Ruang Kerja'
-                    : 'Pendaftaran Satuan Pendidikan SD'}
+                    ? 'Pendaftaran Satuan Pendidikan'
+                    : 'Pendaftaran Sekolah SD'}
                 </h2>
               </div>
             </div>
@@ -641,7 +641,7 @@ ${isSuperadmin ? 'Didaftarkan Oleh: SUPER ADMIN' : `Invoice: ${registrationSucce
                   }`}
                 >
                   <span className="w-3.5 h-3.5 rounded-full bg-white/20 flex items-center justify-center text-[9px] font-bold">1</span>
-                  <span>Onboarding</span>
+                  <span>Pendaftaran</span>
                 </div>
                 <div className="h-0.5 w-2 sm:w-3 bg-white/20" />
                 <div
@@ -659,7 +659,7 @@ ${isSuperadmin ? 'Didaftarkan Oleh: SUPER ADMIN' : `Invoice: ${registrationSucce
                 </span>
               </div>
             ) : (
-              /* Step Indicator Landing Page: 3 Langkah (Onboarding -> Pembayaran -> Aktif) */
+              /* Step Indicator Landing Page: 3 Langkah (Pendaftaran -> Pembayaran -> Aktif) */
               <div className="flex items-center gap-1 sm:gap-1.5 text-[10px] sm:text-[11px] font-semibold shrink-0">
                 <div
                   className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full ${
@@ -669,7 +669,7 @@ ${isSuperadmin ? 'Didaftarkan Oleh: SUPER ADMIN' : `Invoice: ${registrationSucce
                   }`}
                 >
                   <span className="w-3.5 h-3.5 rounded-full bg-white/20 flex items-center justify-center text-[9px] font-bold">1</span>
-                  <span>Onboarding</span>
+                  <span>Pendaftaran</span>
                 </div>
                 <div className="h-0.5 w-2 sm:w-3 bg-white/20" />
                 <div
@@ -1168,7 +1168,7 @@ ${isSuperadmin ? 'Didaftarkan Oleh: SUPER ADMIN' : `Invoice: ${registrationSucce
                 </div>
               ) : (
                 /* Card Landing Page: Siklus Pembayaran, Biaya & Fasilitas Komersial */
-                <div className="lg:col-span-5 bg-gradient-to-br from-slate-900 via-[#0B254E] to-[#0A1E3F] text-white rounded-2xl p-4 sm:p-5 flex flex-col justify-between space-y-3.5 shadow-inner border border-blue-900/60">
+                <div className="lg:col-span-5 bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 text-white rounded-2xl p-4 sm:p-5 flex flex-col justify-between space-y-3.5 shadow-md border border-blue-800/40">
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
@@ -1180,7 +1180,7 @@ ${isSuperadmin ? 'Didaftarkan Oleh: SUPER ADMIN' : `Invoice: ${registrationSucce
                             Paket Sekolah Pro
                           </div>
                           <div className="text-[10px] text-blue-200">
-                            Presensi terpadu 1 SD penuh
+                            Presensi terpadu 1 SD
                           </div>
                         </div>
                       </div>
@@ -1225,12 +1225,12 @@ ${isSuperadmin ? 'Didaftarkan Oleh: SUPER ADMIN' : `Invoice: ${registrationSucce
                         <div className="text-lg sm:text-xl font-black text-white">
                           {formatRupiah(activeAmount)}
                           <span className="text-xs font-normal text-slate-300 ml-1">
-                            /{billingCycle === 'yearly' ? 'thn' : 'bln'}
+                            /{billingCycle === 'yearly' ? 'tahun' : 'bulan'}
                           </span>
                         </div>
                         {billingCycle === 'yearly' && (
                           <div className="text-[10px] text-emerald-400 font-bold">
-                            Hemat Rp 50.000 (2 Bulan) • Promo Perdana
+                            Hemat Rp 50.000 (2 Bulan Gratis)
                           </div>
                         )}
                       </div>
@@ -1242,32 +1242,32 @@ ${isSuperadmin ? 'Didaftarkan Oleh: SUPER ADMIN' : `Invoice: ${registrationSucce
                         <div className="w-4 h-4 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
                           <Check className="w-3 h-3" />
                         </div>
-                        <span>Total 12 Kelas Paralel (1A–6B)</span>
+                        <span>12 Rombel Lengkap (1A–6B)</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <div className="w-4 h-4 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
                           <Check className="w-3 h-3" />
                         </div>
-                        <span>Kapasitas Maks. 50 Siswa per Kelas</span>
+                        <span>Maks. 50 Siswa per Rombel</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <div className="w-4 h-4 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
                           <Check className="w-3 h-3" />
                         </div>
-                        <span>Multi-Akun Guru Mapel & Wali Kelas</span>
+                        <span>Multi-Akun Guru & Wali Kelas</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <div className="w-4 h-4 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
                           <Check className="w-3 h-3" />
                         </div>
-                        <span>Cetak Rekap Format Kedinasan Resmi</span>
+                        <span>Rekap Format Kedinasan Resmi</span>
                       </div>
                     </div>
                   </div>
 
                   <div className="text-[10px] text-blue-200/80 bg-white/5 p-2 rounded-xl border border-white/10 flex items-center gap-2">
                     <ShieldCheck className="w-4 h-4 text-amber-300 shrink-0" />
-                    <span>Gateway Resmi Midtrans (QRIS, VA Bank) & Terintegrasi Super Admin.</span>
+                    <span>Midtrans Gateway (QRIS, VA Bank) • Aktivasi Otomatis</span>
                   </div>
                 </div>
               )}
@@ -1287,7 +1287,7 @@ ${isSuperadmin ? 'Didaftarkan Oleh: SUPER ADMIN' : `Invoice: ${registrationSucce
                       type="text"
                       value={schoolName}
                       onChange={(e) => setSchoolName(e.target.value)}
-                      placeholder="Contoh: SD Negeri 01 Menteng / SD Harapan Bangsa"
+                      placeholder="Contoh: SD Negeri 01 Menteng"
                       required
                       className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs sm:text-sm font-medium text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition-all bg-white shadow-2xs h-10"
                     />
@@ -1469,7 +1469,7 @@ ${isSuperadmin ? 'Didaftarkan Oleh: SUPER ADMIN' : `Invoice: ${registrationSucce
                     id="btn-submit-registration"
                     type="submit"
                     disabled={isSubmitting}
-                    className={`w-full py-2.5 sm:py-3 px-5 rounded-xl font-bold text-xs sm:text-sm uppercase tracking-wider text-white shadow-md active:scale-[0.99] transition-all inline-flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 min-h-[42px] ${
+                    className={`w-full py-2.5 sm:py-3 px-5 rounded-xl font-bold text-xs sm:text-sm uppercase tracking-wider text-white shadow-md active:scale-[0.99] transition-all inline-flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 min-h-[44px] ${
                       isSuperadmin
                         ? 'bg-gradient-to-r from-indigo-600 via-indigo-700 to-indigo-800 hover:from-indigo-700 hover:to-indigo-900'
                         : 'bg-gradient-to-r from-blue-700 via-indigo-700 to-blue-800 hover:from-blue-800 hover:to-indigo-800'
@@ -1487,7 +1487,7 @@ ${isSuperadmin ? 'Didaftarkan Oleh: SUPER ADMIN' : `Invoice: ${registrationSucce
                       </>
                     ) : (
                       <>
-                        <span>Daftar & Lanjutkan Pembayaran ({formatRupiah(activeAmount)})</span>
+                        <span>Daftar & Lanjut Bayar ({formatRupiah(activeAmount)})</span>
                         <ArrowRight className="w-4 h-4" />
                       </>
                     )}
@@ -1495,8 +1495,8 @@ ${isSuperadmin ? 'Didaftarkan Oleh: SUPER ADMIN' : `Invoice: ${registrationSucce
 
                   <div className="text-center text-[10px] text-slate-400">
                     {isSuperadmin
-                      ? 'Sekolah dan akun administrator akan langsung tersimpan & aktif di panel Super Admin.'
-                      : 'Terhubung ke Gateway Pembayaran Midtrans & terintegrasi otomatis ke database pusat.'}
+                      ? 'Sekolah dan admin langsung tersimpan & aktif di panel Super Admin.'
+                      : 'Pembayaran aman via Midtrans • Aktivasi otomatis ke database pusat.'}
                   </div>
                 </div>
               </div>

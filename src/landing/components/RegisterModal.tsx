@@ -1253,25 +1253,48 @@ ${isSuperadmin ? 'Didaftarkan Oleh: SUPER ADMIN' : `Invoice: ${registrationSucce
                 /* Card Landing Page: Sesuai desain referensi screenshot */
                 <div className="lg:col-span-5 bg-gradient-to-b from-[#1D4ED8] via-[#1E40AF] to-[#1E3A8A] text-white rounded-2xl p-4 sm:p-5 flex flex-col justify-between shadow-lg relative overflow-hidden space-y-3">
                   <div className="space-y-3">
-                    {/* Badge Siklus Paket Sekolah Terikat Otomatis dari Pilihan Section Harga */}
-                    <div className="flex items-center gap-2">
-                      <div
-                        className={`px-3.5 py-1 rounded-full text-[10px] sm:text-[11px] font-black tracking-wide uppercase flex items-center gap-1.5 ${
-                          billingCycle === 'yearly'
-                            ? 'bg-amber-400 text-slate-950 shadow-xs ring-2 ring-amber-300/80 font-black'
-                            : 'bg-white text-blue-900 shadow-xs ring-2 ring-white/60 font-black'
-                        }`}
-                      >
-                        <span>{billingCycle === 'yearly' ? 'Paket Tahunan' : 'Paket Bulanan'}</span>
-                        {billingCycle === 'yearly' && (
-                          <span className="text-[9px] px-1.5 py-0.2 rounded font-black bg-slate-900 text-amber-300">
+                    {/* Pilihan Siklus Pembayaran: Bulanan atau Tahunan */}
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between text-[11px] font-semibold text-blue-100">
+                        <span>Pilihan Periode Langganan:</span>
+                        <span className="text-[10px] text-amber-300 font-bold">
+                          {billingCycle === 'yearly' ? 'Hemat 2 Bulan (Promo)' : 'Bayar per Bulan'}
+                        </span>
+                      </div>
+                      <div className="bg-black/25 p-1 rounded-xl border border-white/20 flex items-center gap-1">
+                        <button
+                          type="button"
+                          id="btn-school-billing-monthly"
+                          onClick={() => setBillingCycle('monthly')}
+                          className={`flex-1 py-1.5 px-2.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer ${
+                            billingCycle === 'monthly'
+                              ? 'bg-white text-blue-900 shadow-sm'
+                              : 'text-blue-100 hover:text-white hover:bg-white/10'
+                          }`}
+                        >
+                          <span>Bulanan</span>
+                          <span className={`text-[10px] font-medium ${billingCycle === 'monthly' ? 'text-blue-700' : 'text-blue-200'}`}>
+                            (Rp 25rb/bln)
+                          </span>
+                        </button>
+                        <button
+                          type="button"
+                          id="btn-school-billing-yearly"
+                          onClick={() => setBillingCycle('yearly')}
+                          className={`flex-1 py-1.5 px-2.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer relative ${
+                            billingCycle === 'yearly'
+                              ? 'bg-amber-400 text-slate-950 shadow-sm font-black'
+                              : 'text-blue-100 hover:text-white hover:bg-white/10'
+                          }`}
+                        >
+                          <span>Tahunan</span>
+                          <span className={`text-[9px] px-1.5 py-0.2 rounded font-black ${
+                            billingCycle === 'yearly' ? 'bg-slate-900 text-amber-300' : 'bg-amber-400 text-slate-950'
+                          }`}>
                             Hemat 2 Bln
                           </span>
-                        )}
+                        </button>
                       </div>
-                      <span className="text-[10px] text-blue-200">
-                        {billingCycle === 'yearly' ? 'Aktif 12 Bulan Penuh' : 'Aktif 1 Bulan'}
-                      </span>
                     </div>
 
                     {/* Title & Description */}
@@ -1350,19 +1373,50 @@ ${isSuperadmin ? 'Didaftarkan Oleh: SUPER ADMIN' : `Invoice: ${registrationSucce
               {/* KOLOM KANAN: Form Input Fields & Tombol Submit */}
               <div className="lg:col-span-7 mt-3 lg:mt-0 flex flex-col justify-between space-y-3">
                 <div className="space-y-2.5 sm:space-y-3">
-                  {/* Header Form Title matching screenshot */}
-                  <div className="flex items-center gap-2.5 pb-2 border-b border-slate-100">
-                    <div className="w-8 h-8 rounded-lg bg-blue-50 border border-blue-100 text-blue-600 flex items-center justify-center shrink-0 shadow-2xs">
-                      <School className="w-4 h-4" />
+                  {/* Header Form Title matching screenshot with mobile cycle toggle */}
+                  <div className="flex items-center justify-between pb-2 border-b border-slate-100 gap-2">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="w-8 h-8 rounded-lg bg-blue-50 border border-blue-100 text-blue-600 flex items-center justify-center shrink-0 shadow-2xs">
+                        <School className="w-4 h-4" />
+                      </div>
+                      <div className="min-w-0">
+                        <h3 className="text-sm sm:text-base font-bold text-slate-900 leading-tight truncate">
+                          Data Sekolah
+                        </h3>
+                        <p className="text-[11px] sm:text-xs text-slate-500 mt-0.5 truncate">
+                          Lengkapi informasi sekolah Anda untuk melanjutkan.
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <h3 className="text-sm sm:text-base font-bold text-slate-900 leading-tight">
-                        Data Sekolah
-                      </h3>
-                      <p className="text-[11px] sm:text-xs text-slate-500 mt-0.5">
-                        Lengkapi informasi sekolah Anda untuk melanjutkan.
-                      </p>
-                    </div>
+
+                    {!isSuperadmin && (
+                      <div className="lg:hidden flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200 shrink-0">
+                        <button
+                          type="button"
+                          id="btn-school-mobile-cycle-monthly"
+                          onClick={() => setBillingCycle('monthly')}
+                          className={`px-2 py-1 rounded text-[10px] font-bold transition-all cursor-pointer ${
+                            billingCycle === 'monthly'
+                              ? 'bg-white text-blue-700 shadow-xs'
+                              : 'text-slate-600 hover:text-slate-900'
+                          }`}
+                        >
+                          Bulanan
+                        </button>
+                        <button
+                          type="button"
+                          id="btn-school-mobile-cycle-yearly"
+                          onClick={() => setBillingCycle('yearly')}
+                          className={`px-2 py-1 rounded text-[10px] font-bold transition-all cursor-pointer ${
+                            billingCycle === 'yearly'
+                              ? 'bg-amber-400 text-slate-950 shadow-xs font-black'
+                              : 'text-slate-600 hover:text-slate-900'
+                          }`}
+                        >
+                          Tahunan
+                        </button>
+                      </div>
+                    )}
                   </div>
 
                   {/* 1. NAMA SEKOLAH (Full width) */}

@@ -504,116 +504,84 @@ export const TeacherRegisterModal: React.FC<TeacherRegisterModalProps> = ({
             <div className="w-8 h-8 sm:w-9 sm:h-9 bg-gradient-to-br from-blue-700 via-blue-800 to-indigo-900 rounded-xl flex items-center justify-center text-white font-black text-sm sm:text-base shadow-sm shadow-blue-700/25 shrink-0 border border-blue-500/40 relative">
               <span className="relative z-10">K</span>
             </div>
-            <div className="flex items-center gap-1.5 min-w-0">
-              <span className="font-black text-slate-900 text-sm sm:text-base tracking-tight uppercase truncate">
+            <div className="flex items-center gap-1.5">
+              <span className="font-black text-slate-900 text-sm sm:text-base tracking-tight uppercase">
                 Kawacanaan
               </span>
-              <span className="px-1.5 py-0.5 bg-blue-100/90 text-blue-800 text-[9px] font-black rounded font-mono uppercase tracking-wider border border-blue-200/80 shrink-0">
+              <span className="px-1.5 py-0.5 bg-blue-100/90 text-blue-800 text-[9px] font-black rounded font-mono uppercase tracking-wider border border-blue-200/80">
                 SD
-              </span>
-              <span className="px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 text-[9px] sm:text-[10px] font-extrabold uppercase tracking-wider border border-amber-200/80 hidden xs:inline-flex shrink-0">
-                Paket Guru
               </span>
             </div>
           </div>
 
-          {/* Stepper Indicator (1 Pilih Peran -> 2 Pendaftaran -> 3 Pembayaran -> 4 Aktif) & Close Button */}
+          {/* Stepper Indicator & Close Button (Persis Mulai Gratis) */}
           <div className="flex items-center gap-2 sm:gap-3 shrink-0">
             {/* Stepper Indicator */}
             <div className="flex items-center gap-1 sm:gap-1.5 text-xs">
-              {/* Step 1: Pilih Peran */}
-              <div
-                className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 rounded-lg text-[10px] sm:text-xs font-bold transition-all ${
-                  step === 1
-                    ? 'bg-blue-600 text-white shadow-xs'
-                    : step > 1
-                    ? 'bg-blue-50 text-blue-700 border border-blue-200/70'
-                    : 'bg-slate-100 text-slate-400'
-                }`}
-              >
-                <span
-                  className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] sm:text-[10px] ${
-                    step === 1
-                      ? 'bg-white text-blue-600 font-black'
-                      : step > 1
-                      ? 'bg-blue-600 text-white font-bold'
-                      : 'bg-slate-300 text-white font-bold'
-                  }`}
-                >
-                  {step > 1 ? '✓' : '1'}
-                </span>
-                <span className="hidden sm:inline">{lang === 'ID' ? 'Pilih Peran' : 'Role'}</span>
-              </div>
+              {step <= 2 ? (
+                <>
+                  <div
+                    className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 rounded-lg text-[10px] sm:text-xs font-bold transition-all ${
+                      step === 1
+                        ? 'bg-blue-600 text-white shadow-xs'
+                        : 'bg-blue-50 text-blue-700 border border-blue-200/70'
+                    }`}
+                  >
+                    <span
+                      className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] sm:text-[10px] ${
+                        step === 1 ? 'bg-white text-blue-600 font-black' : 'bg-blue-600 text-white font-bold'
+                      }`}
+                    >
+                      {step > 1 ? '✓' : '1'}
+                    </span>
+                    <span>{lang === 'ID' ? 'Pilih Peran' : 'Select Role'}</span>
+                  </div>
 
-              <span className="text-slate-300 font-bold text-[10px] sm:text-xs">→</span>
+                  <span className="text-slate-300 font-bold text-[10px] sm:text-xs">→</span>
 
-              {/* Step 2: Pendaftaran */}
-              <div
-                className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 rounded-lg text-[10px] sm:text-xs font-bold transition-all ${
-                  step === 2
-                    ? 'bg-blue-600 text-white shadow-xs'
-                    : step > 2
-                    ? 'bg-blue-50 text-blue-700 border border-blue-200/70'
-                    : 'bg-slate-100 text-slate-400'
-                }`}
-              >
-                <span
-                  className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] sm:text-[10px] ${
-                    step === 2
-                      ? 'bg-white text-blue-600 font-black'
-                      : step > 2
-                      ? 'bg-blue-600 text-white font-bold'
-                      : 'bg-slate-300 text-white font-bold'
-                  }`}
-                >
-                  {step > 2 ? '✓' : '2'}
-                </span>
-                <span className="hidden sm:inline">{lang === 'ID' ? 'Pendaftaran' : 'Register'}</span>
-              </div>
+                  <div
+                    className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 rounded-lg text-[10px] sm:text-xs font-bold transition-all ${
+                      step === 2
+                        ? 'bg-blue-600 text-white shadow-xs'
+                        : 'bg-slate-100 text-slate-400'
+                    }`}
+                  >
+                    <span
+                      className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] sm:text-[10px] ${
+                        step === 2 ? 'bg-white text-blue-600 font-black' : 'bg-slate-300 text-white font-bold'
+                      }`}
+                    >
+                      2
+                    </span>
+                    <span>{lang === 'ID' ? 'Buat Akun' : 'Create Account'}</span>
+                  </div>
+                </>
+              ) : step === 3 ? (
+                <>
+                  <div className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 rounded-lg text-[10px] sm:text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200/70">
+                    <span className="w-4 h-4 rounded-full flex items-center justify-center text-[9px] sm:text-[10px] bg-blue-600 text-white font-bold">
+                      ✓
+                    </span>
+                    <span>{lang === 'ID' ? 'Akun Guru' : 'Account'}</span>
+                  </div>
 
-              <span className="text-slate-300 font-bold text-[10px] sm:text-xs">→</span>
+                  <span className="text-slate-300 font-bold text-[10px] sm:text-xs">→</span>
 
-              {/* Step 3: Pembayaran */}
-              <div
-                className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 rounded-lg text-[10px] sm:text-xs font-bold transition-all ${
-                  step === 3
-                    ? 'bg-blue-600 text-white shadow-xs'
-                    : step > 3
-                    ? 'bg-blue-50 text-blue-700 border border-blue-200/70'
-                    : 'bg-slate-100 text-slate-400'
-                }`}
-              >
-                <span
-                  className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] sm:text-[10px] ${
-                    step === 3
-                      ? 'bg-white text-blue-600 font-black'
-                      : step > 3
-                      ? 'bg-blue-600 text-white font-bold'
-                      : 'bg-slate-300 text-white font-bold'
-                  }`}
-                >
-                  {step > 3 ? '✓' : '3'}
-                </span>
-                <span className="hidden sm:inline">{lang === 'ID' ? 'Pembayaran' : 'Payment'}</span>
-              </div>
-
-              <span className="text-slate-300 font-bold text-[10px] sm:text-xs">→</span>
-
-              {/* Step 4: Aktif */}
-              <div
-                className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 rounded-lg text-[10px] sm:text-xs font-bold transition-all ${
-                  step === 4 ? 'bg-emerald-600 text-white shadow-xs' : 'bg-slate-100 text-slate-400'
-                }`}
-              >
-                <span
-                  className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] sm:text-[10px] ${
-                    step === 4 ? 'bg-white text-emerald-600 font-black' : 'bg-slate-300 text-white font-bold'
-                  }`}
-                >
-                  {step === 4 ? '✓' : '4'}
-                </span>
-                <span className="hidden sm:inline">{lang === 'ID' ? 'Aktif' : 'Active'}</span>
-              </div>
+                  <div className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 rounded-lg text-[10px] sm:text-xs font-bold bg-blue-600 text-white shadow-xs">
+                    <span className="w-4 h-4 rounded-full flex items-center justify-center text-[9px] sm:text-[10px] bg-white text-blue-600 font-black">
+                      3
+                    </span>
+                    <span>{lang === 'ID' ? 'Pembayaran' : 'Payment'}</span>
+                  </div>
+                </>
+              ) : (
+                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] sm:text-xs font-bold bg-emerald-600 text-white shadow-xs">
+                  <span className="w-4 h-4 rounded-full flex items-center justify-center text-[9px] sm:text-[10px] bg-white text-emerald-600 font-black">
+                    ✓
+                  </span>
+                  <span>{lang === 'ID' ? 'Akun Aktif' : 'Active'}</span>
+                </div>
+              )}
             </div>
 
             {/* Close Button */}
@@ -636,21 +604,48 @@ export const TeacherRegisterModal: React.FC<TeacherRegisterModalProps> = ({
           {/* ========================================================================= */}
           {step === 1 && (
             <div>
-              {/* Minimalist Heading */}
+              {/* Minimalist Heading with Billing Cycle Switcher */}
               <div className="mb-3.5 sm:mb-5">
-                <div className="flex items-center justify-between gap-2 mb-1">
-                  <h2 className="text-base sm:text-xl font-bold text-slate-900 tracking-tight">
-                    {lang === 'ID' ? 'Pilih Peran Guru Sekolah Dasar' : 'Select Primary School Teacher Role'}
-                  </h2>
-                  <span className="text-[10px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200 shrink-0">
-                    Ruang Kerja Individu Pro
-                  </span>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 mb-1">
+                  <div>
+                    <h2 className="text-base sm:text-xl font-bold text-slate-900 tracking-tight">
+                      {lang === 'ID' ? 'Pilih Peran Pendidik' : 'Select Educator Role'}
+                    </h2>
+                    <p className="mt-0.5 text-xs text-slate-500">
+                      {lang === 'ID'
+                        ? 'Pilih modul presensi yang sesuai dengan tugas mengajar Anda di sekolah.'
+                        : 'Choose the attendance module that fits your teaching assignment.'}
+                    </p>
+                  </div>
+
+                  {/* Pilihan Siklus Bulanan atau Tahunan */}
+                  <div className="bg-slate-100 p-1 rounded-xl border border-slate-200 flex items-center shrink-0 self-start sm:self-center shadow-2xs">
+                    <button
+                      type="button"
+                      id="btn-teacher-cycle-monthly"
+                      onClick={() => setBillingCycle('monthly')}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                        billingCycle === 'monthly'
+                          ? 'bg-white text-blue-700 shadow-xs'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      Bulanan ({formatRupiah(monthlyPrice)})
+                    </button>
+                    <button
+                      type="button"
+                      id="btn-teacher-cycle-yearly"
+                      onClick={() => setBillingCycle('yearly')}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                        billingCycle === 'yearly'
+                          ? 'bg-amber-400 text-slate-950 shadow-xs font-black'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      Tahunan ({formatRupiah(yearlyPrice)})
+                    </button>
+                  </div>
                 </div>
-                <p className="text-xs text-slate-500">
-                  {lang === 'ID'
-                    ? 'Pilih modul presensi yang sesuai dengan tugas mengajar Anda. Paket Guru memberikan kapasitas rombel dan siswa mandiri.'
-                    : 'Choose the attendance module that fits your teaching role with independent workspace capacity.'}
-                </p>
               </div>
 
               {/* Two Role Selection Cards - Responsive for Mobile & Desktop (Persis Mulai Gratis) */}
@@ -809,7 +804,7 @@ export const TeacherRegisterModal: React.FC<TeacherRegisterModalProps> = ({
           {/* LANGKAH 2: PENDAFTARAN (URUTAN 2 - PERSIS DENGAN FORMULIR MULAI GRATIS)    */}
           {/* ========================================================================= */}
           {step === 2 && (
-            <div className="w-full">
+            <div className="max-w-lg mx-auto">
               {/* Back to Step 1 & Selected Role Banner */}
               <div className="flex items-center justify-between gap-3 pb-3 mb-3.5 border-b border-slate-100 flex-wrap">
                 <button
@@ -851,17 +846,32 @@ export const TeacherRegisterModal: React.FC<TeacherRegisterModalProps> = ({
                     </div>
                   )}
 
-                  {/* Badge Paket Terpilih Otomatis dari Pilihan Section Harga */}
-                  <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold ${
-                    billingCycle === 'yearly'
-                      ? 'bg-amber-50 text-amber-900 border border-amber-200'
-                      : 'bg-blue-50 text-blue-900 border border-blue-200'
-                  }`}>
-                    <span>
-                      {billingCycle === 'yearly'
-                        ? (lang === 'ID' ? 'Paket Tahunan (Rp 60.000 / thn)' : 'Yearly Plan (Rp 60,000 / yr)')
-                        : (lang === 'ID' ? 'Paket Bulanan (Rp 5.000 / bln)' : 'Monthly Plan (Rp 5,000 / mo)')}
-                    </span>
+                  {/* Pilihan Siklus Bulanan/Tahunan */}
+                  <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200 shadow-2xs">
+                    <button
+                      type="button"
+                      id="btn-step2-cycle-monthly"
+                      onClick={() => setBillingCycle('monthly')}
+                      className={`px-2 py-0.5 rounded text-[11px] font-bold transition-all cursor-pointer ${
+                        billingCycle === 'monthly'
+                          ? 'bg-white text-blue-700 shadow-xs'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      Bulanan ({formatRupiah(monthlyPrice)})
+                    </button>
+                    <button
+                      type="button"
+                      id="btn-step2-cycle-yearly"
+                      onClick={() => setBillingCycle('yearly')}
+                      className={`px-2 py-0.5 rounded text-[11px] font-bold transition-all cursor-pointer ${
+                        billingCycle === 'yearly'
+                          ? 'bg-amber-400 text-slate-950 shadow-xs font-black'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      Tahunan ({formatRupiah(yearlyPrice)})
+                    </button>
                   </div>
                 </div>
               </div>
@@ -1060,7 +1070,7 @@ export const TeacherRegisterModal: React.FC<TeacherRegisterModalProps> = ({
           {/* LANGKAH 3: PEMBAYARAN (URUTAN 3 - METODE PEMBAYARAN MIDTRANS)               */}
           {/* ========================================================================= */}
           {step === 3 && paymentSession && (
-            <div className="w-full space-y-4">
+            <div className="max-w-lg mx-auto space-y-3.5">
               {/* Back to Step 2 & Session Status Header */}
               <div className="flex items-center justify-between gap-3 pb-3 border-b border-slate-100">
                 <button
@@ -1229,7 +1239,7 @@ export const TeacherRegisterModal: React.FC<TeacherRegisterModalProps> = ({
           {/* LANGKAH 4: AKTIF (URUTAN 4 - SUKSES AKTIVASI & KREDENSIAL AKUN)            */}
           {/* ========================================================================= */}
           {step === 4 && registrationSuccessData && (
-            <div className="w-full space-y-4 animate-in fade-in zoom-in-95 duration-200">
+            <div className="max-w-lg mx-auto space-y-3.5 animate-in fade-in zoom-in-95 duration-200">
               {/* Badge Sukses */}
               <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl text-center space-y-1.5">
                 <div className="w-12 h-12 bg-emerald-600 text-white rounded-full flex items-center justify-center mx-auto shadow-md shadow-emerald-600/20">

@@ -141,14 +141,14 @@ export const FeaturesSection: React.FC<FeaturesSectionProps> = ({ lang, onOpenRe
   return (
     <section 
       id="fitur" 
-      className="scroll-mt-16 sm:scroll-mt-20 py-14 sm:py-16 lg:py-20 bg-gradient-to-b from-[#F2F8FF] via-[#EAF3FE] to-[#DCEBFE] text-slate-900 relative antialiased overflow-hidden"
+      className="scroll-mt-16 sm:scroll-mt-20 pt-16 sm:pt-20 pb-12 sm:pb-16 bg-gradient-to-b from-[#F2F8FF] via-[#EAF3FE] to-[#DCEBFE] text-slate-900 relative antialiased overflow-hidden"
     >
       {/* Gentle Floating Atmospheric Background Orbs */}
       <div className="absolute top-10 left-1/4 w-80 h-80 bg-blue-200/30 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute top-40 right-10 w-96 h-96 bg-sky-200/40 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute bottom-20 left-10 w-72 h-72 bg-indigo-100/30 rounded-full blur-3xl pointer-events-none" />
 
-      <div className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
+      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
         
         {/* ========================================================================= */}
         {/* SECTION HEADER: Pill Badge, Main Title, Subtitle & Playful Doodles       */}

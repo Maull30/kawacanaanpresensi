@@ -27,15 +27,18 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onEnterSystem,
   const [isTeacherRegisterOpen, setIsTeacherRegisterOpen] = useState(false);
   const [selectedPlanId, setSelectedPlanId] = useState<'free' | 'teacher' | 'school'>('school');
   const [selectedBillingCycle, setSelectedBillingCycle] = useState<'monthly' | 'yearly'>('monthly');
+  const [allowSchoolCycleChange, setAllowSchoolCycleChange] = useState<boolean>(true);
   const [isLegalOpen, setIsLegalOpen] = useState(false);
   const [legalTab, setLegalTab] = useState<LegalTabType>('terms');
   const [lang, setLang] = useState<'ID' | 'EN'>('ID');
 
   const handleOpenRegister = (
     planId: 'free' | 'teacher' | 'school' = 'free',
-    cycle: 'monthly' | 'yearly' = 'monthly'
+    cycle: 'monthly' | 'yearly' = 'monthly',
+    allowCycleSelection: boolean = false
   ) => {
     setSelectedBillingCycle(cycle);
+    setAllowSchoolCycleChange(allowCycleSelection);
 
     if (planId === 'free') {
       setIsFreeStartOpen(true);
@@ -66,7 +69,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onEnterSystem,
       <Navbar
         onOpenLogin={handleOpenLogin}
         onOpenRegister={() => handleOpenRegister('free')}
-        onOpenRegisterSchool={() => handleOpenRegister('school')}
+        onOpenRegisterSchool={() => handleOpenRegister('school', 'monthly', true)}
         lang={lang}
         setLang={setLang}
       />
@@ -74,17 +77,17 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onEnterSystem,
       <main className="relative">
         <HeroSection
           onOpenRegister={() => handleOpenRegister('free')}
-          onOpenRegisterSchool={() => handleOpenRegister('school')}
+          onOpenRegisterSchool={() => handleOpenRegister('school', 'monthly', true)}
           onOpenLogin={handleOpenLogin}
           lang={lang}
         />
         <FeaturesSection lang={lang} />
-        <AdvantagesSection lang={lang} onOpenRegister={() => handleOpenRegister('school')} />
+        <AdvantagesSection lang={lang} onOpenRegister={() => handleOpenRegister('school', 'monthly', true)} />
         <PricingSection onOpenRegister={handleOpenRegister} lang={lang} />
         <TestimonialSection lang={lang} />
         <BlogSection lang={lang} />
         <FaqSection lang={lang} onOpenRegister={() => handleOpenRegister('free')} />
-        <ContactSection lang={lang} onOpenRegister={() => handleOpenRegister('school')} />
+        <ContactSection lang={lang} onOpenRegister={() => handleOpenRegister('school', 'monthly', true)} />
       </main>
 
       <Footer lang={lang} onOpenLegal={handleOpenLegal} />
@@ -117,6 +120,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onEnterSystem,
         onOpenLogin={handleOpenLogin}
         initialPlanId={selectedPlanId}
         initialBillingCycle={selectedBillingCycle}
+        allowCycleChange={allowSchoolCycleChange}
         lang={lang}
       />
 

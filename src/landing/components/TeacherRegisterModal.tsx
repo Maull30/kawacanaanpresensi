@@ -618,32 +618,15 @@ export const TeacherRegisterModal: React.FC<TeacherRegisterModalProps> = ({
                     </p>
                   </div>
 
-                  {/* Pilihan Siklus Bulanan atau Tahunan */}
-                  <div className="bg-slate-100 p-1 rounded-xl border border-slate-200 flex items-center shrink-0 self-start sm:self-center shadow-2xs">
-                    <button
-                      type="button"
-                      id="btn-teacher-cycle-monthly"
-                      onClick={() => setBillingCycle('monthly')}
-                      className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                        billingCycle === 'monthly'
-                          ? 'bg-white text-blue-700 shadow-xs'
-                          : 'text-slate-600 hover:text-slate-900'
-                      }`}
-                    >
-                      Bulanan ({formatRupiah(monthlyPrice)})
-                    </button>
-                    <button
-                      type="button"
-                      id="btn-teacher-cycle-yearly"
-                      onClick={() => setBillingCycle('yearly')}
-                      className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                        billingCycle === 'yearly'
-                          ? 'bg-amber-400 text-slate-950 shadow-xs font-black'
-                          : 'text-slate-600 hover:text-slate-900'
-                      }`}
-                    >
-                      Tahunan ({formatRupiah(yearlyPrice)})
-                    </button>
+                  {/* Badge Paket Sesuai Pilihan Section Harga (Tanpa Opsi Pilihan di Popup) */}
+                  <div className={`px-3 py-1 rounded-full text-xs font-bold shrink-0 self-start sm:self-center border shadow-2xs ${
+                    billingCycle === 'yearly'
+                      ? 'bg-amber-50 text-amber-900 border-amber-300'
+                      : 'bg-blue-50 text-blue-900 border-blue-200'
+                  }`}>
+                    {billingCycle === 'yearly'
+                      ? (lang === 'ID' ? `Paket Guru Tahunan (${formatRupiah(yearlyPrice)}/thn)` : `Yearly Teacher Plan (${formatRupiah(yearlyPrice)}/yr)`)
+                      : (lang === 'ID' ? `Paket Guru Bulanan (${formatRupiah(monthlyPrice)}/bln)` : `Monthly Teacher Plan (${formatRupiah(monthlyPrice)}/mo)`)}
                   </div>
                 </div>
               </div>
@@ -846,32 +829,17 @@ export const TeacherRegisterModal: React.FC<TeacherRegisterModalProps> = ({
                     </div>
                   )}
 
-                  {/* Pilihan Siklus Bulanan/Tahunan */}
-                  <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200 shadow-2xs">
-                    <button
-                      type="button"
-                      id="btn-step2-cycle-monthly"
-                      onClick={() => setBillingCycle('monthly')}
-                      className={`px-2 py-0.5 rounded text-[11px] font-bold transition-all cursor-pointer ${
-                        billingCycle === 'monthly'
-                          ? 'bg-white text-blue-700 shadow-xs'
-                          : 'text-slate-600 hover:text-slate-900'
-                      }`}
-                    >
-                      Bulanan ({formatRupiah(monthlyPrice)})
-                    </button>
-                    <button
-                      type="button"
-                      id="btn-step2-cycle-yearly"
-                      onClick={() => setBillingCycle('yearly')}
-                      className={`px-2 py-0.5 rounded text-[11px] font-bold transition-all cursor-pointer ${
-                        billingCycle === 'yearly'
-                          ? 'bg-amber-400 text-slate-950 shadow-xs font-black'
-                          : 'text-slate-600 hover:text-slate-900'
-                      }`}
-                    >
-                      Tahunan ({formatRupiah(yearlyPrice)})
-                    </button>
+                  {/* Badge Paket Sesuai Pilihan Section Harga (Tanpa Opsi Pilihan di Popup) */}
+                  <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border shadow-2xs ${
+                    billingCycle === 'yearly'
+                      ? 'bg-amber-50 text-amber-900 border-amber-300'
+                      : 'bg-blue-50 text-blue-900 border-blue-200'
+                  }`}>
+                    <span>
+                      {billingCycle === 'yearly'
+                        ? (lang === 'ID' ? `Paket Tahunan (${formatRupiah(yearlyPrice)} / thn)` : `Yearly Plan (${formatRupiah(yearlyPrice)} / yr)`)
+                        : (lang === 'ID' ? `Paket Bulanan (${formatRupiah(monthlyPrice)} / bln)` : `Monthly Plan (${formatRupiah(monthlyPrice)} / mo)`)}
+                    </span>
                   </div>
                 </div>
               </div>

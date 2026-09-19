@@ -110,6 +110,7 @@ export interface RegisterModalProps {
   onOpenLogin?: () => void;
   initialPlanId?: 'free' | 'teacher' | 'school';
   initialBillingCycle?: 'monthly' | 'yearly';
+  allowCycleChange?: boolean;
   lang?: 'ID' | 'EN';
   mode?: 'landing' | 'superadmin';
   onSchoolCreated?: (school: any, admin: any) => void;
@@ -155,6 +156,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
   onOpenLogin,
   initialPlanId = 'school',
   initialBillingCycle = 'monthly',
+  allowCycleChange = true,
   lang = 'ID',
   mode = 'landing',
   onSchoolCreated,
@@ -1253,49 +1255,72 @@ ${isSuperadmin ? 'Didaftarkan Oleh: SUPER ADMIN' : `Invoice: ${registrationSucce
                 /* Card Landing Page: Sesuai desain referensi screenshot */
                 <div className="lg:col-span-5 bg-gradient-to-b from-[#1D4ED8] via-[#1E40AF] to-[#1E3A8A] text-white rounded-2xl p-4 sm:p-5 flex flex-col justify-between shadow-lg relative overflow-hidden space-y-3">
                   <div className="space-y-3">
-                    {/* Pilihan Siklus Pembayaran: Bulanan atau Tahunan */}
-                    <div className="space-y-1.5">
-                      <div className="flex items-center justify-between text-[11px] font-semibold text-blue-100">
-                        <span>Pilihan Periode Langganan:</span>
-                        <span className="text-[10px] text-amber-300 font-bold">
-                          {billingCycle === 'yearly' ? 'Hemat 2 Bulan (Promo)' : 'Bayar per Bulan'}
+                    {/* Pilihan Siklus Pembayaran (Aktif untuk Beranda, Terkunci tanpa tombol untuk Section Harga) */}
+                    {allowCycleChange ? (
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between text-[11px] font-semibold text-blue-100">
+                          <span>Pilihan Periode Langganan:</span>
+                          <span className="text-[10px] text-amber-300 font-bold">
+                            {billingCycle === 'yearly' ? 'Hemat 2 Bulan (Promo)' : 'Bayar per Bulan'}
+                          </span>
+                        </div>
+                        <div className="bg-black/25 p-1 rounded-xl border border-white/20 flex items-center gap-1">
+                          <button
+                            type="button"
+                            id="btn-school-billing-monthly"
+                            onClick={() => setBillingCycle('monthly')}
+                            className={`flex-1 py-1.5 px-2.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer ${
+                              billingCycle === 'monthly'
+                                ? 'bg-white text-blue-900 shadow-sm'
+                                : 'text-blue-100 hover:text-white hover:bg-white/10'
+                            }`}
+                          >
+                            <span>Bulanan</span>
+                            <span className={`text-[10px] font-medium ${billingCycle === 'monthly' ? 'text-blue-700' : 'text-blue-200'}`}>
+                              (Rp 25rb/bln)
+                            </span>
+                          </button>
+                          <button
+                            type="button"
+                            id="btn-school-billing-yearly"
+                            onClick={() => setBillingCycle('yearly')}
+                            className={`flex-1 py-1.5 px-2.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer relative ${
+                              billingCycle === 'yearly'
+                                ? 'bg-amber-400 text-slate-950 shadow-sm font-black'
+                                : 'text-blue-100 hover:text-white hover:bg-white/10'
+                            }`}
+                          >
+                            <span>Tahunan</span>
+                            <span className={`text-[9px] px-1.5 py-0.2 rounded font-black ${
+                              billingCycle === 'yearly' ? 'bg-slate-900 text-amber-300' : 'bg-amber-400 text-slate-950'
+                            }`}>
+                              Hemat 2 Bln
+                            </span>
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      /* Tampilan badge statis khusus saat dipilih dari Section Harga (tanpa pilihan bulanan/tahunan) */
+                      <div className="flex items-center gap-2">
+                        <div
+                          className={`px-3.5 py-1.5 rounded-full text-xs font-black tracking-wide uppercase flex items-center gap-1.5 ${
+                            billingCycle === 'yearly'
+                              ? 'bg-amber-400 text-slate-950 shadow-xs ring-2 ring-amber-300/80'
+                              : 'bg-white text-blue-900 shadow-xs ring-2 ring-white/60'
+                          }`}
+                        >
+                          <span>{billingCycle === 'yearly' ? 'Paket Tahunan' : 'Paket Bulanan'}</span>
+                          {billingCycle === 'yearly' && (
+                            <span className="text-[9px] px-1.5 py-0.5 rounded font-black bg-slate-900 text-amber-300">
+                              Hemat 2 Bln
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-[11px] text-blue-100 font-medium">
+                          {billingCycle === 'yearly' ? 'Aktif 12 Bulan (Rp 250.000)' : 'Aktif 1 Bulan (Rp 25.000)'}
                         </span>
                       </div>
-                      <div className="bg-black/25 p-1 rounded-xl border border-white/20 flex items-center gap-1">
-                        <button
-                          type="button"
-                          id="btn-school-billing-monthly"
-                          onClick={() => setBillingCycle('monthly')}
-                          className={`flex-1 py-1.5 px-2.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer ${
-                            billingCycle === 'monthly'
-                              ? 'bg-white text-blue-900 shadow-sm'
-                              : 'text-blue-100 hover:text-white hover:bg-white/10'
-                          }`}
-                        >
-                          <span>Bulanan</span>
-                          <span className={`text-[10px] font-medium ${billingCycle === 'monthly' ? 'text-blue-700' : 'text-blue-200'}`}>
-                            (Rp 25rb/bln)
-                          </span>
-                        </button>
-                        <button
-                          type="button"
-                          id="btn-school-billing-yearly"
-                          onClick={() => setBillingCycle('yearly')}
-                          className={`flex-1 py-1.5 px-2.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer relative ${
-                            billingCycle === 'yearly'
-                              ? 'bg-amber-400 text-slate-950 shadow-sm font-black'
-                              : 'text-blue-100 hover:text-white hover:bg-white/10'
-                          }`}
-                        >
-                          <span>Tahunan</span>
-                          <span className={`text-[9px] px-1.5 py-0.2 rounded font-black ${
-                            billingCycle === 'yearly' ? 'bg-slate-900 text-amber-300' : 'bg-amber-400 text-slate-950'
-                          }`}>
-                            Hemat 2 Bln
-                          </span>
-                        </button>
-                      </div>
-                    </div>
+                    )}
 
                     {/* Title & Description */}
                     <div>
@@ -1389,7 +1414,7 @@ ${isSuperadmin ? 'Didaftarkan Oleh: SUPER ADMIN' : `Invoice: ${registrationSucce
                       </div>
                     </div>
 
-                    {!isSuperadmin && (
+                    {!isSuperadmin && allowCycleChange && (
                       <div className="lg:hidden flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200 shrink-0">
                         <button
                           type="button"
@@ -1416,6 +1441,15 @@ ${isSuperadmin ? 'Didaftarkan Oleh: SUPER ADMIN' : `Invoice: ${registrationSucce
                           Tahunan
                         </button>
                       </div>
+                    )}
+                    {!isSuperadmin && !allowCycleChange && (
+                      <span className={`lg:hidden px-2 py-0.5 rounded-full text-[10px] font-bold shrink-0 border ${
+                        billingCycle === 'yearly'
+                          ? 'bg-amber-100 text-amber-950 border-amber-300'
+                          : 'bg-blue-100 text-blue-900 border-blue-200'
+                      }`}>
+                        {billingCycle === 'yearly' ? 'Tahunan' : 'Bulanan'}
+                      </span>
                     )}
                   </div>
 

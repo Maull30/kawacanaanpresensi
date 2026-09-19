@@ -647,25 +647,25 @@ ${isSuperadmin ? 'Didaftarkan Oleh: SUPER ADMIN' : `Invoice: ${registrationSucce
     >
       <div
         id="register-school-card"
-        className="relative w-full max-w-lg sm:max-w-2xl lg:max-w-[940px] xl:max-w-[960px] bg-white rounded-2xl sm:rounded-3xl shadow-2xl border border-slate-200/90 overflow-hidden my-auto flex flex-col max-h-[calc(100dvh-1rem)] sm:max-h-[calc(100dvh-2rem)] lg:max-h-[88vh]"
+        className="relative w-full max-w-md sm:max-w-xl lg:max-w-[780px] xl:max-w-[800px] bg-white rounded-2xl sm:rounded-3xl shadow-2xl border border-slate-200/90 overflow-hidden my-auto flex flex-col max-h-[calc(100dvh-1.5rem)] sm:max-h-[calc(100dvh-2.5rem)] lg:max-h-[85vh]"
       >
         {/* Header Modal - Clean White Minimalist matching Navbar & Screenshot */}
         <div
           id="modal-header"
-          className="relative bg-white border-b border-slate-100 text-slate-900 px-4 py-3 sm:px-6 sm:py-3.5 shrink-0"
+          className="relative bg-white border-b border-slate-100 text-slate-900 px-4 py-2.5 sm:px-5 sm:py-3 shrink-0"
         >
           <button
             id="btn-close-register-modal"
             onClick={onClose}
-            className="absolute top-2.5 sm:top-3.5 right-3 sm:right-4 w-8 h-8 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer flex items-center justify-center z-10"
+            className="absolute top-2.5 sm:top-3 right-3 sm:right-4 w-7 h-7 sm:w-8 sm:h-8 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer flex items-center justify-center z-10"
             aria-label="Tutup modal"
           >
             <X className="w-4 h-4 sm:w-5 sm:h-5" />
           </button>
 
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between pr-8 sm:pr-12 gap-2 sm:gap-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between pr-8 sm:pr-12 gap-2 sm:gap-3">
             <div className="flex items-center gap-2.5 sm:gap-3">
-              <div className="w-9 h-9 sm:w-10 sm:h-10 bg-gradient-to-br from-blue-700 via-blue-800 to-indigo-900 rounded-xl flex items-center justify-center text-white font-black text-base sm:text-lg shadow-md shadow-blue-700/25 shrink-0 border border-blue-500/40 relative">
+              <div className="w-8 h-8 sm:w-9 sm:h-9 bg-gradient-to-br from-blue-700 via-blue-800 to-indigo-900 rounded-xl flex items-center justify-center text-white font-black text-sm sm:text-base shadow-md shadow-blue-700/25 shrink-0 border border-blue-500/40 relative">
                 <span className="relative z-10">K</span>
               </div>
               <div>
@@ -673,12 +673,14 @@ ${isSuperadmin ? 'Didaftarkan Oleh: SUPER ADMIN' : `Invoice: ${registrationSucce
                   <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-slate-500">
                     {isSuperadmin ? 'SUPER ADMIN' : 'KAWACANAAN SD'}
                   </span>
-                  <span className="inline-flex items-center gap-1 text-[9px] sm:text-[10px] bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-full font-bold text-blue-700">
-                    <ShieldCheck className="w-2.5 h-2.5 text-blue-600" />
-                    {isSuperadmin ? 'Aktivasi Instan' : 'Paket Sekolah Pro'}
-                  </span>
+                  {isSuperadmin && (
+                    <span className="inline-flex items-center gap-1 text-[9px] sm:text-[10px] bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-full font-bold text-blue-700">
+                      <ShieldCheck className="w-2.5 h-2.5 text-blue-600" />
+                      Aktivasi Instan
+                    </span>
+                  )}
                 </div>
-                <h2 className="text-sm sm:text-base font-bold tracking-tight text-slate-900 leading-snug">
+                <h2 className="text-xs sm:text-sm font-bold tracking-tight text-slate-900 leading-snug">
                   {registrationSuccessData
                     ? isSuperadmin
                       ? 'Sekolah & Admin Berhasil Diterbitkan'
@@ -1086,7 +1088,7 @@ ${isSuperadmin ? 'Didaftarkan Oleh: SUPER ADMIN' : `Invoice: ${registrationSucce
           <form
             id="register-school-form"
             onSubmit={handleSubmit}
-            className="p-4 sm:p-5 lg:p-6 space-y-3 overflow-y-auto lg:overflow-visible flex-1"
+            className="p-3 sm:p-4 lg:p-4.5 space-y-2.5 overflow-y-auto lg:overflow-visible flex-1"
           >
             {submitError && (
               <div
@@ -1102,7 +1104,7 @@ ${isSuperadmin ? 'Didaftarkan Oleh: SUPER ADMIN' : `Invoice: ${registrationSucce
             )}
 
             {/* Layout 2 Kolom Profesional Layaknya Aplikasi Komersial */}
-            <div className="lg:grid lg:grid-cols-12 lg:gap-5 items-stretch">
+            <div className="lg:grid lg:grid-cols-12 lg:gap-4 items-stretch">
               {/* KOLOM KIRI: Superadmin Panel vs Landing Commercial Card */}
               {isSuperadmin ? (
                 /* Card Khusus Superadmin: Pilihan Ruang Kerja, Masa Aktif & Fasilitas Lengkap */
@@ -1246,67 +1248,103 @@ ${isSuperadmin ? 'Didaftarkan Oleh: SUPER ADMIN' : `Invoice: ${registrationSucce
                 </div>
               ) : (
                 /* Card Landing Page: Sesuai desain referensi screenshot */
-                <div className="lg:col-span-5 bg-gradient-to-b from-[#1D4ED8] via-[#1E40AF] to-[#1E3A8A] text-white rounded-2xl sm:rounded-3xl p-5 sm:p-6 flex flex-col justify-between shadow-lg relative overflow-hidden space-y-4">
-                  <div className="space-y-3.5 sm:space-y-4">
-                    {/* Badges */}
+                <div className="lg:col-span-5 bg-gradient-to-b from-[#1D4ED8] via-[#1E40AF] to-[#1E3A8A] text-white rounded-2xl p-4 sm:p-5 flex flex-col justify-between shadow-lg relative overflow-hidden space-y-3">
+                  <div className="space-y-3">
+                    {/* Badges Siklus Pembayaran: Bulanan vs Tahunan */}
                     <div className="flex items-center gap-2">
-                      <span className="px-3 py-1 rounded-full text-[10px] sm:text-[11px] font-bold tracking-wide uppercase bg-blue-500/40 text-white border border-blue-400/40">
-                        Paket Sekolah Pro
-                      </span>
-                      <span className="px-3 py-1 rounded-full text-[10px] sm:text-[11px] font-bold tracking-wide bg-teal-500/30 text-teal-200 border border-teal-400/40">
-                        Rekomendasi
-                      </span>
+                      <button
+                        id="btn-billing-monthly"
+                        type="button"
+                        onClick={() => setBillingCycle('monthly')}
+                        className={`px-3 py-1 rounded-full text-[10px] sm:text-[11px] font-bold tracking-wide uppercase transition-all cursor-pointer flex items-center gap-1.5 ${
+                          billingCycle === 'monthly'
+                            ? 'bg-white text-blue-900 shadow-sm ring-2 ring-white/60 font-black'
+                            : 'bg-blue-500/30 text-blue-100 hover:bg-blue-500/50 border border-blue-400/40'
+                        }`}
+                      >
+                        <span>Bulanan</span>
+                        {billingCycle === 'monthly' && (
+                          <span className="w-1.5 h-1.5 rounded-full bg-blue-600 animate-pulse" />
+                        )}
+                      </button>
+                      <button
+                        id="btn-billing-yearly"
+                        type="button"
+                        onClick={() => setBillingCycle('yearly')}
+                        className={`px-3 py-1 rounded-full text-[10px] sm:text-[11px] font-bold tracking-wide uppercase transition-all cursor-pointer flex items-center gap-1.5 ${
+                          billingCycle === 'yearly'
+                            ? 'bg-amber-400 text-slate-950 shadow-sm ring-2 ring-amber-300/80 font-black'
+                            : 'bg-teal-500/30 text-teal-200 hover:bg-teal-500/50 border border-teal-400/40'
+                        }`}
+                      >
+                        <span>Tahunan</span>
+                        <span
+                          className={`text-[9px] px-1 py-0.2 rounded font-black ${
+                            billingCycle === 'yearly'
+                              ? 'bg-slate-900 text-amber-300'
+                              : 'bg-amber-400 text-slate-950'
+                          }`}
+                        >
+                          Hemat 2 Bln
+                        </span>
+                      </button>
                     </div>
 
                     {/* Title & Description */}
                     <div>
-                      <h3 className="text-xl sm:text-2xl font-extrabold text-white tracking-tight leading-snug">
+                      <h3 className="text-lg sm:text-xl font-extrabold text-white tracking-tight leading-snug">
                         Presensi Terpadu untuk Seluruh Kelas
                       </h3>
-                      <p className="mt-1.5 sm:mt-2 text-xs sm:text-sm text-blue-100/85 leading-relaxed font-normal">
+                      <p className="mt-1 text-xs text-blue-100/85 leading-relaxed font-normal">
                         Solusi lengkap untuk mengelola presensi siswa di seluruh kelas dengan mudah, aman dan efisien.
                       </p>
                     </div>
 
                     {/* School Graphic & Investment Price */}
-                    <div className="flex items-center gap-3 sm:gap-4 py-1.5 bg-white/5 sm:bg-transparent rounded-2xl p-2.5 sm:p-0 border border-white/10 sm:border-0">
-                      <SchoolIllustration className="w-16 h-16 sm:w-20 sm:h-20 shrink-0 drop-shadow-md" />
+                    <div className="flex items-center gap-3 py-1 bg-white/5 rounded-xl p-2 border border-white/10">
+                      <SchoolIllustration className="w-14 h-14 sm:w-16 sm:h-16 shrink-0 drop-shadow-md" />
                       <div>
-                        <span className="text-[11px] sm:text-xs text-blue-200 font-medium block">
+                        <span className="text-[10px] sm:text-[11px] text-blue-200 font-medium block">
                           Biaya Investasi
                         </span>
-                        <div className="text-2xl sm:text-3xl font-black text-white tracking-tight flex items-baseline gap-1">
+                        <div className="text-xl sm:text-2xl font-black text-white tracking-tight flex items-baseline gap-1">
                           <span>{formatRupiah(activeAmount)}</span>
                           <span className="text-xs sm:text-sm font-normal text-blue-200">
                             /{billingCycle === 'yearly' ? 'tahun' : 'bulan'}
                           </span>
                         </div>
+                        {billingCycle === 'yearly' && (
+                          <div className="text-[10px] text-emerald-300 font-bold flex items-center gap-1 mt-0.5">
+                            <Check className="w-3 h-3 stroke-[3]" />
+                            <span>Hemat Rp 50.000 (2 Bulan Gratis)</span>
+                          </div>
+                        )}
                       </div>
                     </div>
 
                     {/* Feature Checklist */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-2 sm:gap-2.5 pt-1">
-                      <div className="flex items-center gap-2.5 text-xs sm:text-sm text-white/95 font-medium">
-                        <div className="w-5 h-5 rounded-full bg-blue-500/70 text-white flex items-center justify-center shrink-0 border border-blue-300/40 shadow-xs">
-                          <Check className="w-3.5 h-3.5 stroke-[3]" />
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-2 pt-0.5">
+                      <div className="flex items-center gap-2 text-xs text-white/95 font-medium">
+                        <div className="w-4.5 h-4.5 rounded-full bg-blue-500/70 text-white flex items-center justify-center shrink-0 border border-blue-300/40 shadow-xs">
+                          <Check className="w-3 h-3 stroke-[3]" />
                         </div>
                         <span>12 Rombel Lengkap (1A–6B)</span>
                       </div>
-                      <div className="flex items-center gap-2.5 text-xs sm:text-sm text-white/95 font-medium">
-                        <div className="w-5 h-5 rounded-full bg-blue-500/70 text-white flex items-center justify-center shrink-0 border border-blue-300/40 shadow-xs">
-                          <Check className="w-3.5 h-3.5 stroke-[3]" />
+                      <div className="flex items-center gap-2 text-xs text-white/95 font-medium">
+                        <div className="w-4.5 h-4.5 rounded-full bg-blue-500/70 text-white flex items-center justify-center shrink-0 border border-blue-300/40 shadow-xs">
+                          <Check className="w-3 h-3 stroke-[3]" />
                         </div>
                         <span>Maks. 50 Siswa per Rombel</span>
                       </div>
-                      <div className="flex items-center gap-2.5 text-xs sm:text-sm text-white/95 font-medium">
-                        <div className="w-5 h-5 rounded-full bg-blue-500/70 text-white flex items-center justify-center shrink-0 border border-blue-300/40 shadow-xs">
-                          <Check className="w-3.5 h-3.5 stroke-[3]" />
+                      <div className="flex items-center gap-2 text-xs text-white/95 font-medium">
+                        <div className="w-4.5 h-4.5 rounded-full bg-blue-500/70 text-white flex items-center justify-center shrink-0 border border-blue-300/40 shadow-xs">
+                          <Check className="w-3 h-3 stroke-[3]" />
                         </div>
                         <span>Multi-Akun Guru & Wali Kelas</span>
                       </div>
-                      <div className="flex items-center gap-2.5 text-xs sm:text-sm text-white/95 font-medium">
-                        <div className="w-5 h-5 rounded-full bg-blue-500/70 text-white flex items-center justify-center shrink-0 border border-blue-300/40 shadow-xs">
-                          <Check className="w-3.5 h-3.5 stroke-[3]" />
+                      <div className="flex items-center gap-2 text-xs text-white/95 font-medium">
+                        <div className="w-4.5 h-4.5 rounded-full bg-blue-500/70 text-white flex items-center justify-center shrink-0 border border-blue-300/40 shadow-xs">
+                          <Check className="w-3 h-3 stroke-[3]" />
                         </div>
                         <span>Rekap Format Kedinasan Resmi</span>
                       </div>
@@ -1314,11 +1352,11 @@ ${isSuperadmin ? 'Didaftarkan Oleh: SUPER ADMIN' : `Invoice: ${registrationSucce
                   </div>
 
                   {/* Bottom Info Pill */}
-                  <div className="mt-3 sm:mt-4 p-2.5 sm:p-3 rounded-2xl bg-blue-950/50 border border-white/10 flex items-center gap-2.5 text-xs text-blue-100">
-                    <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-xl bg-blue-500/30 flex items-center justify-center shrink-0 border border-blue-400/30">
-                      <ShieldCheck className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-200" />
+                  <div className="p-2 sm:p-2.5 rounded-xl bg-blue-950/50 border border-white/10 flex items-center gap-2 text-xs text-blue-100">
+                    <div className="w-5 h-5 rounded-lg bg-blue-500/30 flex items-center justify-center shrink-0 border border-blue-400/30">
+                      <ShieldCheck className="w-3.5 h-3.5 text-blue-200" />
                     </div>
-                    <span className="text-[11px] sm:text-xs font-medium leading-tight">
+                    <span className="text-[10px] sm:text-[11px] font-medium leading-tight">
                       Midtrans Gateway (QRIS, VA Bank) + Aktivasi Otomatis
                     </span>
                   </div>
@@ -1326,26 +1364,26 @@ ${isSuperadmin ? 'Didaftarkan Oleh: SUPER ADMIN' : `Invoice: ${registrationSucce
               )}
 
               {/* KOLOM KANAN: Form Input Fields & Tombol Submit */}
-              <div className="lg:col-span-7 mt-4 lg:mt-0 flex flex-col justify-between space-y-4">
-                <div className="space-y-3 sm:space-y-3.5">
+              <div className="lg:col-span-7 mt-3 lg:mt-0 flex flex-col justify-between space-y-3">
+                <div className="space-y-2.5 sm:space-y-3">
                   {/* Header Form Title matching screenshot */}
-                  <div className="flex items-start gap-3 pb-1 border-b border-slate-100">
-                    <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-100 text-blue-600 flex items-center justify-center shrink-0 shadow-2xs">
-                      <School className="w-5 h-5" />
+                  <div className="flex items-center gap-2.5 pb-2 border-b border-slate-100">
+                    <div className="w-8 h-8 rounded-lg bg-blue-50 border border-blue-100 text-blue-600 flex items-center justify-center shrink-0 shadow-2xs">
+                      <School className="w-4 h-4" />
                     </div>
                     <div>
-                      <h3 className="text-base sm:text-lg font-bold text-slate-900 leading-tight">
+                      <h3 className="text-sm sm:text-base font-bold text-slate-900 leading-tight">
                         Data Sekolah
                       </h3>
-                      <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
+                      <p className="text-[11px] sm:text-xs text-slate-500 mt-0.5">
                         Lengkapi informasi sekolah Anda untuk melanjutkan.
                       </p>
                     </div>
                   </div>
 
-                  {/* 1. NAMA SEKOLAH */}
+                  {/* 1. NAMA SEKOLAH (Full width) */}
                   <div>
-                    <label className="text-xs font-bold text-slate-800 uppercase tracking-wider block mb-1.5 flex items-center gap-1.5">
+                    <label className="text-[11px] sm:text-xs font-bold text-slate-700 uppercase tracking-wider block mb-1 flex items-center gap-1.5">
                       <School className="w-3.5 h-3.5 text-blue-600" />
                       <span>Nama Satuan Pendidikan / Sekolah</span>
                       <span className="text-rose-500">*</span>
@@ -1357,14 +1395,14 @@ ${isSuperadmin ? 'Didaftarkan Oleh: SUPER ADMIN' : `Invoice: ${registrationSucce
                       onChange={(e) => setSchoolName(e.target.value)}
                       placeholder="Contoh: SD Negeri 01 Menteng"
                       required
-                      className="w-full px-3.5 py-2.5 rounded-xl sm:rounded-2xl border border-slate-200 text-xs sm:text-sm font-medium text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition-all bg-white shadow-2xs h-11 sm:h-12"
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs sm:text-sm font-medium text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition-all bg-white shadow-2xs h-9.5 sm:h-10"
                     />
                   </div>
 
-                  {/* 2. NAMA LENGKAP ADMIN & 3. USERNAME (2 Kolom Grid) */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-3.5">
+                  {/* 2. NAMA LENGKAP ADMIN & 3. USERNAME (2 Kolom Seimbang) */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3">
                     <div>
-                      <label className="text-xs font-bold text-slate-800 uppercase tracking-wider block mb-1.5 flex items-center gap-1.5">
+                      <label className="text-[11px] sm:text-xs font-bold text-slate-700 uppercase tracking-wider block mb-1 flex items-center gap-1.5">
                         <User className="w-3.5 h-3.5 text-blue-600" />
                         <span>Nama Lengkap Admin</span>
                         <span className="text-rose-500">*</span>
@@ -1376,13 +1414,13 @@ ${isSuperadmin ? 'Didaftarkan Oleh: SUPER ADMIN' : `Invoice: ${registrationSucce
                         onChange={(e) => handleAdminNameChange(e.target.value)}
                         placeholder="Contoh: Dra. Hj. Siti Aminah, M.Pd"
                         required
-                        className="w-full px-3.5 py-2.5 rounded-xl sm:rounded-2xl border border-slate-200 text-xs sm:text-sm font-medium text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition-all bg-white shadow-2xs h-11 sm:h-12"
+                        className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs sm:text-sm font-medium text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition-all bg-white shadow-2xs h-9.5 sm:h-10"
                       />
                     </div>
 
                     <div>
-                      <div className="flex items-center justify-between mb-1.5">
-                        <label className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-[11px] sm:text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
                           <User className="w-3.5 h-3.5 text-blue-600" />
                           <span>Username Admin</span>
                           <span className="text-rose-500">*</span>
@@ -1396,7 +1434,7 @@ ${isSuperadmin ? 'Didaftarkan Oleh: SUPER ADMIN' : `Invoice: ${registrationSucce
                             Reset
                           </button>
                         ) : (
-                          <span className="text-[10px] bg-blue-50 text-blue-600 font-bold px-2 py-0.5 rounded-full border border-blue-200">
+                          <span className="text-[9px] bg-blue-50 text-blue-600 font-bold px-1.5 py-0.5 rounded-full border border-blue-200">
                             Otomatis
                           </span>
                         )}
@@ -1408,96 +1446,93 @@ ${isSuperadmin ? 'Didaftarkan Oleh: SUPER ADMIN' : `Invoice: ${registrationSucce
                         onChange={(e) => handleUsernameChange(e.target.value)}
                         placeholder="admin.sekolah"
                         required
-                        className="w-full px-3.5 py-2.5 rounded-xl sm:rounded-2xl border border-slate-200 text-xs sm:text-sm font-medium text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition-all bg-white shadow-2xs h-11 sm:h-12"
+                        className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs sm:text-sm font-medium text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition-all bg-white shadow-2xs h-9.5 sm:h-10"
                       />
                     </div>
                   </div>
 
-                  {/* 4. EMAIL & KATA SANDI (2 Kolom Grid) */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-3.5">
+                  {/* 4. KATA SANDI & ULANGI SANDI (2 Kolom Seimbang) */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3">
                     <div>
-                      <label className="text-xs font-bold text-slate-800 uppercase tracking-wider block mb-1.5 flex items-center gap-1.5">
-                        <Mail className="w-3.5 h-3.5 text-blue-600" />
-                        <span>Email Resmi (Opsional)</span>
+                      <label className="text-[11px] sm:text-xs font-bold text-slate-700 uppercase tracking-wider block mb-1 flex items-center gap-1">
+                        <Lock className="w-3.5 h-3.5 text-blue-600" />
+                        <span>Kata Sandi</span>
+                        <span className="text-rose-500">*</span>
                       </label>
-                      <input
-                        id="input-email"
-                        type="email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        placeholder="admin@sekolah.sch.id"
-                        className="w-full px-3.5 py-2.5 rounded-xl sm:rounded-2xl border border-slate-200 text-xs sm:text-sm font-medium text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition-all bg-white shadow-2xs h-11 sm:h-12"
-                      />
+                      <div className="relative">
+                        <input
+                          id="input-password"
+                          type={showPassword ? 'text' : 'password'}
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                          placeholder="Min 6 karakter"
+                          required
+                          minLength={6}
+                          className="w-full px-3 py-2 pr-8 rounded-xl border border-slate-200 text-xs font-medium text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition-all bg-white shadow-2xs h-9.5 sm:h-10"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer p-0.5"
+                          tabIndex={-1}
+                        >
+                          {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                        </button>
+                      </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-2">
-                      {/* KATA SANDI */}
-                      <div>
-                        <label className="text-xs font-bold text-slate-800 uppercase tracking-wider block mb-1.5 flex items-center gap-1">
-                          <Lock className="w-3.5 h-3.5 text-blue-600" />
-                          <span>Sandi</span>
-                          <span className="text-rose-500">*</span>
-                        </label>
-                        <div className="relative">
-                          <input
-                            id="input-password"
-                            type={showPassword ? 'text' : 'password'}
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            placeholder="Min 6 char"
-                            required
-                            minLength={6}
-                            className="w-full px-3 py-2.5 pr-8 rounded-xl sm:rounded-2xl border border-slate-200 text-xs font-medium text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition-all bg-white shadow-2xs h-11 sm:h-12"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => setShowPassword(!showPassword)}
-                            className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer p-0.5"
-                            tabIndex={-1}
-                          >
-                            {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* ULANGI KATA SANDI */}
-                      <div>
-                        <label className="text-xs font-bold text-slate-800 uppercase tracking-wider block mb-1.5 flex items-center gap-1">
-                          <Lock className="w-3.5 h-3.5 text-blue-600" />
-                          <span>Ulangi</span>
-                          <span className="text-rose-500">*</span>
-                        </label>
-                        <div className="relative">
-                          <input
-                            id="input-confirm-password"
-                            type={showConfirmPassword ? 'text' : 'password'}
-                            value={confirmPassword}
-                            onChange={(e) => setConfirmPassword(e.target.value)}
-                            placeholder="Ketik ulang"
-                            required
-                            minLength={6}
-                            className={`w-full px-3 py-2.5 pr-8 rounded-xl sm:rounded-2xl border text-xs font-medium text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition-all bg-white shadow-2xs h-11 sm:h-12 ${
-                              confirmPassword && password === confirmPassword
-                                ? 'border-emerald-400 bg-emerald-50/20'
-                                : confirmPassword && password !== confirmPassword
-                                ? 'border-amber-400 bg-amber-50/20'
-                                : 'border-slate-200'
-                            }`}
-                          />
-                          <button
-                            type="button"
-                            onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                            className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer p-0.5"
-                            tabIndex={-1}
-                          >
-                            {showConfirmPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                          </button>
-                        </div>
+                    <div>
+                      <label className="text-[11px] sm:text-xs font-bold text-slate-700 uppercase tracking-wider block mb-1 flex items-center gap-1">
+                        <Lock className="w-3.5 h-3.5 text-blue-600" />
+                        <span>Ulangi Sandi</span>
+                        <span className="text-rose-500">*</span>
+                      </label>
+                      <div className="relative">
+                        <input
+                          id="input-confirm-password"
+                          type={showConfirmPassword ? 'text' : 'password'}
+                          value={confirmPassword}
+                          onChange={(e) => setConfirmPassword(e.target.value)}
+                          placeholder="Ketik ulang sandi"
+                          required
+                          minLength={6}
+                          className={`w-full px-3 py-2 pr-8 rounded-xl border text-xs font-medium text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition-all bg-white shadow-2xs h-9.5 sm:h-10 ${
+                            confirmPassword && password === confirmPassword
+                              ? 'border-emerald-400 bg-emerald-50/20'
+                              : confirmPassword && password !== confirmPassword
+                              ? 'border-amber-400 bg-amber-50/20'
+                              : 'border-slate-200'
+                          }`}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer p-0.5"
+                          tabIndex={-1}
+                        >
+                          {showConfirmPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                        </button>
                       </div>
                     </div>
                   </div>
 
-                  {/* 5. KHUSUS SUPERADMIN: NPSN & CATATAN INTERNAL */}
+                  {/* 5. EMAIL RESMI (Full width seimbang) */}
+                  <div>
+                    <label className="text-[11px] sm:text-xs font-bold text-slate-700 uppercase tracking-wider block mb-1 flex items-center gap-1.5">
+                      <Mail className="w-3.5 h-3.5 text-blue-600" />
+                      <span>Email Resmi (Opsional)</span>
+                    </label>
+                    <input
+                      id="input-email"
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="admin@sekolah.sch.id (untuk bukti aktivasi)"
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs sm:text-sm font-medium text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition-all bg-white shadow-2xs h-9.5 sm:h-10"
+                    />
+                  </div>
+
+                  {/* 6. KHUSUS SUPERADMIN: NPSN & CATATAN INTERNAL */}
                   {isSuperadmin && (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1 border-t border-slate-100">
                       <div>
@@ -1511,7 +1546,7 @@ ${isSuperadmin ? 'Didaftarkan Oleh: SUPER ADMIN' : `Invoice: ${registrationSucce
                           value={npsn}
                           onChange={(e) => setNpsn(e.target.value)}
                           placeholder="Nomor Pokok Sekolah Nasional"
-                          className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs sm:text-sm font-medium text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-indigo-600/20 focus:border-indigo-600 transition-all bg-white shadow-2xs h-10"
+                          className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs sm:text-sm font-medium text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-indigo-600/20 focus:border-indigo-600 transition-all bg-white shadow-2xs h-9.5 sm:h-10"
                         />
                       </div>
 
@@ -1526,7 +1561,7 @@ ${isSuperadmin ? 'Didaftarkan Oleh: SUPER ADMIN' : `Invoice: ${registrationSucce
                           value={adminNotes}
                           onChange={(e) => setAdminNotes(e.target.value)}
                           placeholder="Contoh: Sekolah binaan dinas, aktivasi mandiri"
-                          className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs sm:text-sm font-medium text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-indigo-600/20 focus:border-indigo-600 transition-all bg-white shadow-2xs h-10"
+                          className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs sm:text-sm font-medium text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-indigo-600/20 focus:border-indigo-600 transition-all bg-white shadow-2xs h-9.5 sm:h-10"
                         />
                       </div>
                     </div>
@@ -1534,12 +1569,12 @@ ${isSuperadmin ? 'Didaftarkan Oleh: SUPER ADMIN' : `Invoice: ${registrationSucce
                 </div>
 
                 {/* SUBMIT BUTTON & FOOTER NOTE matching screenshot */}
-                <div className="pt-2 space-y-2">
+                <div className="pt-2 space-y-1.5">
                   <button
                     id="btn-submit-registration"
                     type="submit"
                     disabled={isSubmitting}
-                    className={`w-full py-3.5 sm:py-4 px-6 rounded-2xl font-black text-xs sm:text-sm uppercase tracking-wider text-white shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 min-h-[48px] active:scale-[0.99] ${
+                    className={`w-full py-2.5 sm:py-3 px-5 rounded-xl font-black text-xs sm:text-sm uppercase tracking-wider text-white shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 min-h-[44px] active:scale-[0.99] ${
                       isSuperadmin
                         ? 'bg-gradient-to-r from-indigo-600 via-indigo-700 to-indigo-800 hover:from-indigo-700 hover:to-indigo-900 shadow-indigo-600/25'
                         : 'bg-blue-600 hover:bg-blue-700 shadow-blue-600/25'
@@ -1563,7 +1598,7 @@ ${isSuperadmin ? 'Didaftarkan Oleh: SUPER ADMIN' : `Invoice: ${registrationSucce
                     )}
                   </button>
 
-                  <div className="text-center text-xs text-slate-400 flex items-center justify-center gap-1.5 pt-0.5">
+                  <div className="text-center text-[11px] text-slate-400 flex items-center justify-center gap-1.5 pt-0.5">
                     <Lock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                     <span>
                       {isSuperadmin

@@ -4,7 +4,6 @@ import { supabase } from '../lib/supabase';
 import { SchoolLogo } from './SchoolLogo';
 import { UserProfileModal } from './UserProfileModal';
 import { ChangePasswordModal } from './ChangePasswordModal';
-import { JoinSchoolModal } from './JoinSchoolModal';
 import { 
   LogOut, 
   UserCircle, 
@@ -38,11 +37,6 @@ export const Header: React.FC = () => {
     academicEvents,
     userWorkspaces,
     activeWorkspace,
-    isJoinSchoolModalOpen,
-    setIsJoinSchoolModalOpen,
-    switchToSchoolWorkspace,
-    switchToPersonalWorkspace,
-    setIsSelectingWorkspace,
     openOnboarding,
     logout,
     isSchoolPro
@@ -62,24 +56,6 @@ export const Header: React.FC = () => {
     (currentUser?.subscriptionPlan === 'mulai' && !currentUser?.schoolId);
 
   const isCurrentlyPersonal = isPersonalWorkspace;
-
-  // Aturan Opsi B: Pendidik pada sekolah yang aktif Paket Sekolah Pro dikunci 100% pada Ruang Kerja Sekolah
-  const canSwitchWorkspace =
-    currentUser &&
-    (currentUser.role === 'WALI KELAS' || currentUser.role === 'GURU MAPEL') &&
-    currentUser.role !== 'ADMIN' &&
-    currentUser.role !== 'KEPALA SEKOLAH' &&
-    currentUser.role !== 'SUPER_ADMIN' &&
-    currentUser.role !== 'SISWA' &&
-    (!isSchoolPro || isCurrentlyPersonal);
-
-  const existingSchoolWs = userWorkspaces.find(
-    (ws) => ws.workspaceType !== 'personal' && ws.workspaceType !== 'individu'
-  );
-
-  const existingPersonalWs = userWorkspaces.find(
-    (ws) => ws.workspaceType === 'personal' || ws.workspaceType === 'individu'
-  );
 
   const notifStorageKey = useMemo(() => {
     const userId = currentUser?.id || currentUser?.username || 'guest';
@@ -361,33 +337,21 @@ export const Header: React.FC = () => {
             {currentUser ? (
               <div className="flex items-center gap-1.5 sm:gap-2.5">
 
-                {/* Compact Workspace Indicator & Switcher Button (Only in School Workspace) */}
-                {currentUser.role !== 'SUPER_ADMIN' && currentUser.role !== 'SISWA' && !isCurrentlyPersonal && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (canSwitchWorkspace) {
-                        setIsSelectingWorkspace(true);
-                      }
-                    }}
-                    disabled={!canSwitchWorkspace}
-                    title={
-                      canSwitchWorkspace
-                        ? `Klik untuk beralih ruang kerja (Saat ini: Ruang Kerja Sekolah)`
-                        : `Ruang Kerja: ${schoolProfile.namaSekolah || 'Ruang Kerja Sekolah'}`
-                    }
-                    className="inline-flex items-center gap-1.5 px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-full border text-xs font-bold transition-all select-none bg-indigo-50 hover:bg-indigo-100 border-indigo-200 text-indigo-800 cursor-pointer active:scale-95 shadow-2xs"
-                    id="btn-header-workspace-indicator"
+                {/* Compact Permanent Workspace Indicator */}
+                {currentUser.role !== 'SUPER_ADMIN' && currentUser.role !== 'SISWA' && (
+                  <div
+                    title={`Ruang Kerja: ${isCurrentlyPersonal ? 'Ruang Kerja Individu' : (schoolProfile.namaSekolah || 'Ruang Kerja Sekolah')}`}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-full border text-xs font-bold select-none bg-slate-50 border-slate-200/90 text-slate-700 shadow-2xs"
+                    id="header-workspace-indicator"
                   >
-                    <Building2 size={13} className="text-indigo-600 shrink-0" />
-                    <span className="hidden sm:inline">Ruang Kerja Sekolah</span>
-                    <span className="sm:hidden text-[11px] font-extrabold">Sekolah</span>
-                    {canSwitchWorkspace && (
-                      <span className="text-[9px] px-1 py-0.5 rounded font-black uppercase bg-indigo-200/80 text-indigo-900">
-                        Ganti
-                      </span>
-                    )}
-                  </button>
+                    <Building2 size={13} className={isCurrentlyPersonal ? "text-emerald-600 shrink-0" : "text-indigo-600 shrink-0"} />
+                    <span className="hidden sm:inline">
+                      {isCurrentlyPersonal ? 'Ruang Kerja Individu' : (schoolProfile.namaSekolah || 'Ruang Kerja Sekolah')}
+                    </span>
+                    <span className="sm:hidden text-[11px] font-extrabold">
+                      {isCurrentlyPersonal ? 'Individu' : 'Sekolah'}
+                    </span>
+                  </div>
                 )}
                 
                 {/* Date Pill (Desktop & Tablet) */}
@@ -537,50 +501,6 @@ export const Header: React.FC = () => {
 
                       {/* Menu List */}
                       <div className="mt-4 space-y-1">
-                        {/* Workspace Info & Switcher between Ruang Kerja Sekolah and Ruang Kerja Individu */}
-                        {canSwitchWorkspace && (
-                          <>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setShowProfileDropdown(false);
-                                if (isCurrentlyPersonal) {
-                                  setIsJoinSchoolModalOpen(true);
-                                } else {
-                                  void switchToPersonalWorkspace();
-                                }
-                              }}
-                              className="w-full flex items-center justify-between px-3 py-2.5 rounded-2xl text-sm font-medium text-slate-700 hover:text-blue-600 hover:bg-blue-50/60 transition-colors group cursor-pointer"
-                              id="btn-menu-ganti-workspace"
-                            >
-                              <div className="flex items-center gap-3.5 min-w-0">
-                                {isCurrentlyPersonal ? (
-                                  <Building2 className="w-5 h-5 text-indigo-500 group-hover:text-blue-600 transition-colors stroke-[1.75] shrink-0" />
-                                ) : (
-                                  <UserCheck className="w-5 h-5 text-emerald-500 group-hover:text-emerald-600 transition-colors stroke-[1.75] shrink-0" />
-                                )}
-                                <div className="text-left min-w-0">
-                                  <div className="font-semibold truncate">
-                                    {isCurrentlyPersonal ? 'Ruang Kerja Sekolah' : 'Ruang Kerja Individu'}
-                                  </div>
-                                  <div className="text-[10px] text-slate-500 font-normal truncate">
-                                    {isCurrentlyPersonal 
-                                      ? 'Onboarding dengan kode sekolah' 
-                                      : (existingPersonalWs ? 'Kembali ke Ruang Kerja Individu' : 'Buka Ruang Kerja Individu')}
-                                  </div>
-                                </div>
-                              </div>
-                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-black shrink-0 ${
-                                isCurrentlyPersonal ? 'bg-indigo-100 text-indigo-800' : 'bg-emerald-100 text-emerald-800'
-                              }`}>
-                                {isCurrentlyPersonal ? 'Sekolah' : 'Individu'}
-                              </span>
-                            </button>
-                            
-                            <div className="border-t border-slate-100 my-1.5" />
-                          </>
-                        )}
-
                         {/* 1. Profil Pengguna */}
                         <button
                           type="button"
@@ -658,12 +578,6 @@ export const Header: React.FC = () => {
       <ChangePasswordModal
         isOpen={showPasswordModal}
         onClose={() => setShowPasswordModal(false)}
-      />
-
-      {/* Join School Modal */}
-      <JoinSchoolModal
-        isOpen={isJoinSchoolModalOpen}
-        onClose={() => setIsJoinSchoolModalOpen(false)}
       />
     </>
   );

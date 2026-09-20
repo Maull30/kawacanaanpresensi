@@ -57,8 +57,6 @@ export const KalenderAkademikView: React.FC = () => {
     effectiveDaysConfig,
     getBaseStudyDaysForMonth,
     setActiveView,
-    switchToPersonalWorkspace,
-    switchToSchoolWorkspace,
     showToast,
     isSchoolPro,
   } = useApp();
@@ -472,24 +470,10 @@ export const KalenderAkademikView: React.FC = () => {
                 </span>
               </div>
               <p className="text-[11px] sm:text-xs text-amber-800 leading-relaxed">
-                {isSchoolPro
-                  ? `Di ruang kerja sekolah, jadwal hari efektif belajar (${activeStudyDays.length} hari: ${activeStudyDaysText}) dan agenda dikelola terpusat oleh Admin Sekolah.`
-                  : `Di ruang kerja sekolah, jadwal hari efektif belajar (${activeStudyDays.length} hari: ${activeStudyDaysText}) dan agenda dikelola oleh Admin Sekolah. Untuk mengatur hari belajar efektif mandiri, silakan beralih ke Ruang Kerja Individu.`}
+                Di ruang kerja sekolah, jadwal hari efektif belajar ({activeStudyDays.length} hari: {activeStudyDaysText}) dan agenda dikelola terpusat oleh Admin Sekolah.
               </p>
             </div>
           </div>
-          {!isSchoolPro && (
-            <button
-              type="button"
-              onClick={switchToPersonalWorkspace}
-              id="btn-switch-to-personal-ws-from-calendar"
-              className="px-3.5 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 active:scale-95 text-white font-extrabold text-xs shadow-xs transition-all flex items-center justify-center gap-1.5 shrink-0 cursor-pointer"
-            >
-              <User size={13} />
-              <span>Beralih ke Ruang Kerja Individu</span>
-              <ArrowRight size={13} />
-            </button>
-          )}
         </div>
       )}
 
@@ -906,18 +890,6 @@ export const KalenderAkademikView: React.FC = () => {
                     <p className="text-[11px] text-slate-600 leading-relaxed">
                       Jadwal sekolah: <b>{activeStudyDaysText}</b> (diatur oleh Admin Sekolah).
                     </p>
-                    {!isSchoolPro && (
-                      <button
-                        type="button"
-                        onClick={switchToPersonalWorkspace}
-                        id="btn-switch-ws-from-card"
-                        className="w-full mt-1 px-3 py-1.5 rounded-xl bg-amber-100 hover:bg-amber-200 text-amber-900 text-xs font-bold transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
-                      >
-                        <User size={12} />
-                        <span>Atur Mandiri di Ruang Kerja Individu</span>
-                        <ArrowRight size={12} />
-                      </button>
-                    )}
                   </div>
                 )}
               </div>

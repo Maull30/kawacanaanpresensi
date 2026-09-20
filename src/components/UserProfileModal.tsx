@@ -41,9 +41,6 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
     students, 
     activeWorkspace, 
     userWorkspaces,
-    switchToSchoolWorkspace, 
-    switchToPersonalWorkspace,
-    setIsJoinSchoolModalOpen,
     isSchoolPro
   } = useApp();
 
@@ -106,25 +103,6 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
     activeWorkspace?.workspaceType === 'individu' ||
     (currentUser.subscriptionPlan === 'mulai' && !currentUser.schoolId);
 
-  // Workspace Switching Permission Check:
-  // Allowed ONLY for Wali Kelas and Guru Mapel. Admin and Kepala Sekolah are strictly forbidden.
-  // Aturan Opsi B: Pendidik pada sekolah yang aktif Paket Sekolah Pro dikunci 100% pada Ruang Kerja Sekolah.
-  const canSwitchWorkspace =
-    (currentUser.role === 'WALI KELAS' || currentUser.role === 'GURU MAPEL') &&
-    currentUser.role !== 'ADMIN' &&
-    currentUser.role !== 'KEPALA SEKOLAH' &&
-    currentUser.role !== 'SUPER_ADMIN' &&
-    currentUser.role !== 'SISWA' &&
-    (!isSchoolPro || isCurrentlyPersonal);
-
-  const existingSchoolWs = userWorkspaces.find(
-    (ws) => ws.workspaceType !== 'personal' && ws.workspaceType !== 'individu'
-  );
-
-  const existingPersonalWs = userWorkspaces.find(
-    (ws) => ws.workspaceType === 'personal' || ws.workspaceType === 'individu'
-  );
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
       <div 
@@ -156,11 +134,9 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                 <span className={`inline-block px-2.5 py-0.5 text-[10px] font-extrabold uppercase rounded-full border shadow-2xs ${roleInfo.bg}`}>
                   {roleInfo.label}
                 </span>
-                {canSwitchWorkspace && (
-                  <span className="text-white text-xs font-semibold">
-                    {isCurrentlyPersonal ? 'Ruang Kerja Individu' : 'Ruang Kerja Sekolah'}
-                  </span>
-                )}
+                <span className="text-white text-xs font-semibold">
+                  {isCurrentlyPersonal ? 'Ruang Kerja Individu' : 'Ruang Kerja Sekolah'}
+                </span>
               </div>
             </div>
           </div>
@@ -168,76 +144,30 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
 
         {/* Modal Body */}
         <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
-          {/* Section: Fitur Ganti Ruang Kerja (Khusus Wali Kelas & Guru Mapel) */}
-          {canSwitchWorkspace && (
-            <div className="bg-gradient-to-br from-slate-50 to-blue-50/40 border border-blue-200/80 rounded-2xl p-4 space-y-3 shadow-2xs">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-700">
-                  <Layers size={15} className="text-blue-600" />
-                  <span>Ruang Kerja Pendidik</span>
-                </div>
+          {/* Section: Status Ruang Kerja Akun Permanen */}
+          <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-600">
+                <Building2 size={15} className="text-indigo-600" />
+                <span>Ruang Kerja Akun</span>
               </div>
-
-              <div className="p-3 bg-white rounded-xl border border-slate-200/90 text-xs space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] uppercase font-bold text-slate-400">Ruang Aktif Saat Ini:</span>
-                  <span className="text-xs font-bold text-slate-800">
-                    {isCurrentlyPersonal ? 'Ruang Kerja Individu' : 'Ruang Kerja Sekolah'}
-                  </span>
-                </div>
-                <div className="font-bold text-slate-900 text-sm truncate">
-                  {activeWorkspace?.workspaceName || (isCurrentlyPersonal ? 'Ruang Kerja Individu' : schoolProfile.namaSekolah || 'SD Negeri Nusantara')}
-                </div>
-              </div>
-
-              {/* Action Button to Switch */}
-              {isCurrentlyPersonal ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    onClose();
-                    setIsJoinSchoolModalOpen(true);
-                  }}
-                  className="w-full flex items-center justify-between p-3.5 rounded-xl bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white font-bold text-xs transition-all shadow-sm hover:shadow active:scale-98 cursor-pointer group"
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center shrink-0">
-                      <Building2 size={16} />
-                    </div>
-                    <div className="text-left min-w-0">
-                      <div className="text-xs font-black uppercase tracking-tight">Ruang Kerja Sekolah</div>
-                      <div className="text-[10px] text-blue-100 font-normal truncate">
-                        Onboarding dengan kode sekolah resmi
-                      </div>
-                    </div>
-                  </div>
-                  <ChevronRight size={16} className="text-white/80 group-hover:translate-x-1 transition-transform shrink-0" />
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => {
-                    onClose();
-                    void switchToPersonalWorkspace();
-                  }}
-                  className="w-full flex items-center justify-between p-3.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold text-xs transition-all shadow-sm hover:shadow active:scale-98 cursor-pointer group"
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center shrink-0">
-                      <UserCheck size={16} />
-                    </div>
-                    <div className="text-left min-w-0">
-                      <div className="text-xs font-black uppercase tracking-tight">Ruang Kerja Individu</div>
-                      <div className="text-[10px] text-emerald-100 font-normal truncate">
-                        {existingPersonalWs ? 'Kembali ke Ruang Kerja Individu' : 'Buka Ruang Kerja Individu'}
-                      </div>
-                    </div>
-                  </div>
-                  <ChevronRight size={16} className="text-white/80 group-hover:translate-x-1 transition-transform shrink-0" />
-                </button>
-              )}
+              <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black ${
+                isCurrentlyPersonal ? 'bg-emerald-100 text-emerald-800' : 'bg-indigo-100 text-indigo-800'
+              }`}>
+                {isCurrentlyPersonal ? 'Ruang Kerja Individu' : 'Ruang Kerja Sekolah'}
+              </span>
             </div>
-          )}
+
+            <div className="p-3 bg-white rounded-xl border border-slate-200/90 text-xs space-y-1">
+              <div className="text-[10px] uppercase font-bold text-slate-400">Nama Ruang Kerja:</div>
+              <div className="font-bold text-slate-900 text-sm truncate">
+                {activeWorkspace?.workspaceName || (isCurrentlyPersonal ? 'Ruang Kerja Individu' : schoolProfile.namaSekolah || 'SD Negeri')}
+              </div>
+              <div className="text-[11px] text-slate-500 pt-0.5">
+                Ruang kerja ini terikat secara permanen dengan akun Anda.
+              </div>
+            </div>
+          </div>
 
           {/* Section: Akun & Akses */}
           <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 space-y-3">

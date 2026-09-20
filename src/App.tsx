@@ -17,7 +17,6 @@ import { LandingPageView } from './views/LandingPageView';
 import { SuperAdminView } from './views/SuperAdminView';
 import { SetupSuperAdminView } from './views/SetupSuperAdminView';
 import { OnboardingView } from './views/OnboardingView';
-import { WorkspaceSelectorView } from './views/WorkspaceSelectorView';
 import { AppLoginLoadingScreen } from './components/AppLoginLoadingScreen';
 import { AppAuthLoadingSkeleton } from './components/DashboardSkeleton';
 import { BookLoadingModal } from './components/BookLoader';
@@ -137,8 +136,6 @@ const MainAppContent: React.FC = () => {
     showToast, 
     passwordRecovery, 
     isOnboarding, 
-    isSelectingWorkspace, 
-    selectWorkspace, 
     openOnboarding, 
     loadUserDataAfterOnboarding,
     isAuthChecking,
@@ -176,11 +173,10 @@ const MainAppContent: React.FC = () => {
     return params.get('page') !== 'login' && params.get('page') !== 'setup';
   });
 
-  // Pastikan landing page tertutup jika user sudah login, sedang onboarding, memilih workspace, recovery password, atau OAuth pending
+  // Pastikan landing page tertutup jika user sudah login, sedang onboarding, recovery password, atau OAuth pending
   React.useEffect(() => {
     if (
       isOnboarding ||
-      isSelectingWorkspace ||
       currentUser ||
       passwordRecovery ||
       isAuthCallbackUrl() ||
@@ -193,7 +189,7 @@ const MainAppContent: React.FC = () => {
     ) {
       setShowLanding(false);
     }
-  }, [isOnboarding, isSelectingWorkspace, currentUser, passwordRecovery, isAuthChecking, isLoginPreparing]);
+  }, [isOnboarding, currentUser, passwordRecovery, isAuthChecking, isLoginPreparing]);
 
   // Handle browser back / forward navigation (PopState)
   React.useEffect(() => {
@@ -274,19 +270,7 @@ const MainAppContent: React.FC = () => {
     );
   }
 
-  // 2. Jika user memiliki multi-workspace dan perlu memilih ruang kerja aktif (Ruang Kerja Sekolah / Ruang Kerja Individu)
-  if (isSelectingWorkspace) {
-    return (
-      <div className="min-h-screen bg-[#F8FAFC]">
-        <WorkspaceSelectorView
-          onSelectWorkspace={(ws) => void selectWorkspace(ws)}
-        />
-        <ToastContainer />
-      </div>
-    );
-  }
-
-  // 3. Jika sedang dalam proses login awal (kredensial / Google OAuth) dan profil belum ter-hydrate,
+  // 2. Jika sedang dalam proses login awal (kredensial / Google OAuth) dan profil belum ter-hydrate,
   // tampilkan LoginView dengan overlay loading screen di tengah sehingga background halaman login tetap terlihat dengan blur ringan.
   // BUKAN saat reload dashboard biasa.
   if ((isLoginPreparing || isAuthCallbackUrl()) && !currentUser) {

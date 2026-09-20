@@ -582,41 +582,31 @@ export default async function handler(req: any, res: any) {
         }
       }
 
+      // ATURAN STRICT SINGLE WORKSPACE:
+      // Setiap pengguna hanya memiliki tepat 1 ruang kerja permanen yang melekat ke akunnya.
       const isPersonalProfile =
-        profile?.workspace_type === 'personal' ||
+        (profile as any)?.workspace_type === 'personal' ||
         (profile as any)?.registration_mode === 'personal';
+      let targetSchoolId: string | null = profile?.school_id || (profile as any)?.workspace_id || null;
 
-      // Kumpulkan seluruh kandidat school ID yang sah dan terverifikasi untuk user ini
-      const candidateSchoolIds: string[] = [];
-      const addCandidate = (id?: string | null) => {
-        const s = String(id || '').trim();
-        if (s && s !== 'null' && s !== 'undefined' && !candidateSchoolIds.includes(s)) {
-          candidateSchoolIds.push(s);
-        }
-      };
-
-      // 1. Dari profile aktif
-      addCandidate(profile?.school_id);
-
-      // 2. Dari owned schools (mis. ruang kerja individu atau sekolah milik user ini)
-      for (const s of ownedSchools || []) {
-        addCandidate(s.id);
+      // Jika profil belum memiliki school_id (misal pendaftaran awal), cari apakah user telah memiliki sekolah/ruang kerja
+      if (!targetSchoolId && ownedSchools && ownedSchools.length > 0) {
+        targetSchoolId = ownedSchools[0].id;
+        try {
+          await db.from('profiles').update({ school_id: targetSchoolId, workspace_id: targetSchoolId }).eq('id', userId);
+        } catch (_) {}
       }
 
-      // 3. Dari data guru resmi di mana akun ini tertaut
-      for (const t of allTeacherRecords) {
-        addCandidate(t.school_id);
+      // Jika masih belum ada, cek apakah tertaut ke data guru di suatu sekolah
+      if (!targetSchoolId && allTeacherRecords.length > 0) {
+        targetSchoolId = allTeacherRecords[0].school_id;
+        try {
+          await db.from('profiles').update({ school_id: targetSchoolId, workspace_id: targetSchoolId }).eq('id', userId);
+        } catch (_) {}
       }
 
-      // 4. Dari auth user metadata:
-      // Hanya sertakan personal_workspace_id jika ada
-      addCandidate(workspaceAuth.user.user_metadata?.personal_workspace_id);
-
-      // Hanya izinkan school_workspace_id jika profil bukan akun khusus personal
-      if (!isPersonalProfile) {
-        addCandidate(workspaceAuth.user.user_metadata?.school_workspace_id);
-        addCandidate(workspaceAuth.user.user_metadata?.linked_school_id);
-      }
+      // Hanya izinkan 1 ruang kerja (tidak ada opsi multiple workspaces)
+      const candidateSchoolIds: string[] = targetSchoolId ? [targetSchoolId] : [];
 
       for (const sId of candidateSchoolIds) {
         if (!sId || visitedSchoolIds.has(sId)) continue;
@@ -806,6 +796,15 @@ export default async function handler(req: any, res: any) {
         .eq('id', userId)
         .maybeSingle();
       if (currentProfileError) throw currentProfileError;
+
+      // ATURAN STRICT SINGLE WORKSPACE: Akun yang sudah punya ruang kerja tidak bisa membuat ruang kerja baru
+      if (currentProfile?.school_id) {
+        return json(res, 400, {
+          ok: false,
+          error: 'Akun Anda telah terikat secara permanen dengan ruang kerja saat ini. Sesuai kebijakan KawaCanaan, Anda tidak dapat membuat ruang kerja baru.',
+        });
+      }
+
       const role = normalizeTeacherRole(currentProfile?.role);
       if (!['WALI KELAS', 'GURU MAPEL'].includes(role)) {
         return json(res, 403, { error: 'Ruang kerja individu guru hanya dapat dibuat setelah role guru ditetapkan melalui onboarding/assignment yang valid.' });
@@ -954,230 +953,11 @@ export default async function handler(req: any, res: any) {
     // 3.1b. SWITCH ACTIVE WORKSPACE ATOMICALLY
     // -------------------------------------------------------------
     if (action === 'switch_workspace') {
-      const switchToken = String(req.headers.authorization || '').replace(/^Bearer\s+/i, '').trim();
-      if (!switchToken) {
-        return json(res, 401, { error: 'Sesi login diperlukan untuk beralih ruang kerja.' });
-      }
-      const { data: switchAuth, error: switchAuthErr } = await db.auth.getUser(switchToken);
-      if (switchAuthErr || !switchAuth.user) {
-        return json(res, 401, { error: 'Sesi login tidak valid atau telah kedaluwarsa.' });
-      }
-      const userId = switchAuth.user.id;
-      const targetWorkspaceId = String(body.workspace_id || body.workspaceId || '').trim();
-      if (!targetWorkspaceId) {
-        return json(res, 400, { error: 'Target workspace_id wajib disertakan.' });
-      }
-
-      // Ambil data sekolah target
-      const { data: targetSchool, error: schoolErr } = await db
-        .from('schools')
-        .select('*')
-        .eq('id', targetWorkspaceId)
-        .maybeSingle();
-      if (schoolErr || !targetSchool) {
-        return json(res, 404, { error: 'Ruang kerja target tidak ditemukan.' });
-      }
-      await checkAndDowngradeExpiredSchool(db, targetSchool);
-
-      const isPersonal =
-        targetSchool.workspace_type === 'personal' ||
-        targetSchool.workspace_type === 'individu' ||
-        targetSchool.is_personal === true;
-
-      const { data: currentProfile } = await db
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .maybeSingle();
-
-      // OPSI B (Kunci Total): Jika target adalah ruang kerja individu, periksa apakah sekolah aktif Paket Sekolah Pro
-      if (isPersonal) {
-        let activeSchoolPro = false;
-        let schoolName = '';
-        const now = new Date();
-
-        if (currentProfile?.school_id && currentProfile.school_id !== targetWorkspaceId) {
-          const { data: userSchool } = await db
-            .from('schools')
-            .select('name, plan, status, subscription_expires_at')
-            .eq('id', currentProfile.school_id)
-            .maybeSingle();
-
-          if (userSchool) {
-            const isPro = ['school', 'sekolah_pro', 'sekolah'].includes(userSchool.plan);
-            const isNotSuspended = userSchool.status !== 'suspended' && userSchool.status !== 'inactive';
-            const isNotExpired = !userSchool.subscription_expires_at || new Date(userSchool.subscription_expires_at) > now;
-            if (isPro && isNotSuspended && isNotExpired) {
-              activeSchoolPro = true;
-              schoolName = userSchool.name || 'sekolah Anda';
-            }
-          }
-        }
-
-        if (activeSchoolPro) {
-          return json(res, 403, {
-            error: `Sekolah Anda (${schoolName}) sedang aktif berlangganan Paket Sekolah Pro. Akses Ruang Kerja Individu dinonaktifkan dan seluruh aktivitas guru dipusatkan di Ruang Kerja Sekolah.`,
-          });
-        }
-      }
-
-      const fullName = currentProfile?.name || currentProfile?.username || 'Pendidik';
-      const nip = currentProfile?.nip || null;
-
-      // PERLINDUNGAN KEAMANAN: Blokir eskalasi peran ke SUPER_ADMIN
-      const isCallerSuperAdmin = currentProfile?.role === 'SUPER_ADMIN';
-      const requestedRole = body.role ? String(body.role).toUpperCase().trim() : '';
-      if (requestedRole === 'SUPER_ADMIN' && !isCallerSuperAdmin) {
-        return json(res, 403, { error: 'Aksi ditolak: Penetapan hak akses SUPER_ADMIN tidak diizinkan.' });
-      }
-
-      // Validasi keanggotaan sah pada workspace target (mencegah BOLA / cross-tenant hopping)
-      const isOwner = targetSchool.owner_id === userId;
-      const isAlreadyInSchool = currentProfile?.school_id === targetWorkspaceId;
-
-      let isTeacherInSchool = false;
-      let existingTeacherRole: string | null = null;
-      if (currentProfile?.teacher_id) {
-        const { data: tRow } = await db
-          .from('teachers')
-          .select('id, tugas_utama')
-          .eq('school_id', targetWorkspaceId)
-          .eq('id', currentProfile.teacher_id)
-          .maybeSingle();
-        if (tRow) {
-          isTeacherInSchool = true;
-          existingTeacherRole = tRow.tugas_utama === 'Wali Kelas' ? 'WALI KELAS' : 'GURU MAPEL';
-        }
-      }
-      if (!isTeacherInSchool) {
-        const { data: tRow2 } = await db
-          .from('teachers')
-          .select('id, tugas_utama')
-          .eq('school_id', targetWorkspaceId)
-          .or(`profile_id.eq.${userId},email.eq.${switchAuth.user.email || 'none'}`)
-          .maybeSingle();
-        if (tRow2) {
-          isTeacherInSchool = true;
-          existingTeacherRole = tRow2.tugas_utama === 'Wali Kelas' ? 'WALI KELAS' : 'GURU MAPEL';
-        }
-      }
-
-      let isStudentInSchool = false;
-      if (currentProfile?.student_id) {
-        const { data: sRow } = await db
-          .from('students')
-          .select('id')
-          .eq('school_id', targetWorkspaceId)
-          .eq('id', currentProfile.student_id)
-          .maybeSingle();
-        if (sRow) isStudentInSchool = true;
-      }
-
-      // Akses hanya sah jika pengguna adalah pemilik, sudah terdaftar di sekolah, guru, siswa, atau Super Admin
-      const isAuthorizedMember = isPersonal ? (isOwner || isCallerSuperAdmin) : (isCallerSuperAdmin || isOwner || isAlreadyInSchool || isTeacherInSchool || isStudentInSchool);
-      if (!isAuthorizedMember) {
-        return json(res, 403, { error: 'Akses ditolak: Anda belum terdaftar sebagai anggota yang sah di sekolah ini.' });
-      }
-
-      // Tentukan peran secara authoritative (tidak mempercayai body.role secara buta)
-      let targetRole = 'WALI KELAS';
-      if (isCallerSuperAdmin) {
-        targetRole = 'SUPER_ADMIN';
-      } else if (isPersonal) {
-        const validPersonalRoles = ['WALI KELAS', 'GURU MAPEL'];
-        targetRole = validPersonalRoles.includes(requestedRole) ? requestedRole : (validPersonalRoles.includes(currentProfile?.role) ? currentProfile.role : 'WALI KELAS');
-      } else {
-        if (isOwner) {
-          targetRole = requestedRole === 'KEPALA SEKOLAH' ? 'KEPALA SEKOLAH' : 'ADMIN';
-        } else if (isStudentInSchool || currentProfile?.role === 'SISWA') {
-          targetRole = 'SISWA';
-        } else if (isTeacherInSchool) {
-          targetRole = existingTeacherRole || (['WALI KELAS', 'GURU MAPEL'].includes(requestedRole) ? requestedRole : 'WALI KELAS');
-        } else {
-          const allowedRoles = ['ADMIN', 'KEPALA SEKOLAH', 'WALI KELAS', 'GURU MAPEL'];
-          targetRole = allowedRoles.includes(currentProfile?.role) ? currentProfile.role : 'WALI KELAS';
-        }
-      }
-
-      let linkedTeacher: any = null;
-      if (['WALI KELAS', 'GURU MAPEL'].includes(targetRole)) {
-        try {
-          linkedTeacher = await ensureTeacherForAccount({
-            profileId: userId,
-            schoolId: targetWorkspaceId,
-            nama: fullName,
-            nip,
-            jenisKelamin: 'L',
-            tugasUtama: targetRole === 'WALI KELAS' ? 'Wali Kelas' : 'Guru Mapel',
-          });
-        } catch (ensureErr: any) {
-          console.warn('[switch_workspace] ensureTeacherForAccount warning:', ensureErr?.message);
-        }
-      }
-
-      // Update profil secara atomik: school_id dan teacher_id di-update bersamaan!
-      const profileUpdates: any = {
-        school_id: targetWorkspaceId,
-        teacher_id: linkedTeacher?.id || null,
-        workspace_type: isPersonal ? 'personal' : 'school',
-      };
-      if (targetRole) {
-        profileUpdates.role = targetRole;
-      }
-
-      const { error: profileUpdateErr } = await db
-        .from('profiles')
-        .update(profileUpdates)
-        .eq('id', userId);
-
-      if (profileUpdateErr) {
-        console.error('[switch_workspace] profile update error:', profileUpdateErr);
-        return json(res, 500, { error: `Gagal memperbarui profil ruang kerja: ${profileUpdateErr.message}` });
-      }
-
-      const { data: sp } = await db
-        .from('school_profile')
-        .select('nama_sekolah, npsn')
-        .eq('school_id', targetWorkspaceId)
-        .maybeSingle();
-
-      const wsObj = {
-        id: `ws-mem-${userId}-${targetWorkspaceId}`,
-        userId,
-        workspaceId: targetWorkspaceId,
-        workspaceCode: targetSchool.code ? String(targetSchool.code).replace(/^SCH-?/i, '').trim().toUpperCase() : null,
-        role: targetRole,
-        workspaceName: isPersonal ? 'Ruang Kerja Individu' : (targetSchool.name || sp?.nama_sekolah || 'Ruang Kerja Sekolah'),
-        workspaceType: targetSchool.workspace_type || (isPersonal ? 'personal' : 'school'),
-        registrationMode: isPersonal ? 'personal' : 'school',
-        npsn: targetSchool.npsn || sp?.npsn || null,
-        subscriptionPlan: normalizePlan(targetSchool.plan),
-        joinedAt: targetSchool.created_at || new Date().toISOString(),
-      };
-
-      // Simpan status ruang kerja di user_metadata Supabase Auth agar awet
-      try {
-        const currentMeta = switchAuth.user.user_metadata || {};
-        if (!isPersonal) {
-          await db.auth.admin.updateUserById(userId, {
-            user_metadata: {
-              ...currentMeta,
-              school_workspace_id: targetWorkspaceId,
-              school_workspace_role: targetRole,
-              school_workspace_name: wsObj.workspaceName,
-            },
-          });
-        } else {
-          await db.auth.admin.updateUserById(userId, {
-            user_metadata: {
-              ...currentMeta,
-              personal_workspace_id: targetWorkspaceId,
-            },
-          });
-        }
-      } catch (_) {}
-
-      return json(res, 200, { ok: true, success: true, workspace: wsObj, teacher: linkedTeacher });
+      return json(res, 403, {
+        ok: false,
+        success: false,
+        error: 'Sistem KawaCanaan Presensi menggunakan model 1 Pengguna = 1 Ruang Kerja Permanen. Pergantian ruang kerja tidak diizinkan.',
+      });
     }
 
     // -------------------------------------------------------------
@@ -1199,6 +979,20 @@ export default async function handler(req: any, res: any) {
       }
       const rawCode = String(body.code || body.schoolCode || body.schoolId || '').trim();
       const effectiveUserId = authenticatedUserId;
+
+      // ATURAN STRICT SINGLE WORKSPACE: Akun yang sudah memiliki ruang kerja tidak dapat bergabung ke sekolah lain
+      const { data: existingProf } = await db
+        .from('profiles')
+        .select('id, school_id, workspace_type')
+        .eq('id', effectiveUserId)
+        .maybeSingle();
+
+      if (existingProf?.school_id) {
+        return json(res, 400, {
+          ok: false,
+          error: 'Akun Anda telah terikat secara permanen dengan ruang kerja saat ini. Pengguna individu atau sekolah tidak dapat beralih atau bergabung ke sekolah lain.',
+        });
+      }
       const role = String(body.role || '').toUpperCase();
       const teacherName = String(body.teacherName || body.name || '').trim();
       const nip = String(body.nip || '-').trim();

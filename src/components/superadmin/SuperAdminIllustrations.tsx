@@ -236,3 +236,107 @@ export const ServerRackIllustration: React.FC<{ className?: string }> = ({ class
     </div>
   );
 };
+
+/**
+ * 3D Front School Building Illustration with clouds and pillars
+ * matching the header banner in the reference image.
+ */
+export const SchoolBuildingIllustration: React.FC<{ className?: string }> = ({ className = "w-36 h-20" }) => {
+  return (
+    <div className={`relative flex items-center justify-center select-none pointer-events-none ${className}`}>
+      <svg
+        viewBox="0 0 200 110"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+        className="w-full h-full drop-shadow-md overflow-visible"
+      >
+        <defs>
+          <linearGradient id="cloudGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#E0F2FE" stopOpacity="0.8" />
+            <stop offset="100%" stopColor="#BAE6FD" stopOpacity="0.4" />
+          </linearGradient>
+          <linearGradient id="roofGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#3B82F6" />
+            <stop offset="100%" stopColor="#1D4ED8" />
+          </linearGradient>
+          <linearGradient id="wallGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#FFFFFF" />
+            <stop offset="100%" stopColor="#EFF6FF" />
+          </linearGradient>
+          <linearGradient id="doorGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#2563EB" />
+            <stop offset="100%" stopColor="#1E40AF" />
+          </linearGradient>
+        </defs>
+
+        {/* Floating Soft Blue Clouds */}
+        <path
+          d="M 20 50 Q 20 40 30 40 Q 35 30 48 32 Q 60 30 65 40 Q 75 40 75 50 Z"
+          fill="url(#cloudGrad)"
+        />
+        <path
+          d="M 135 45 Q 135 35 145 35 Q 150 25 163 27 Q 175 25 180 35 Q 190 35 190 45 Z"
+          fill="url(#cloudGrad)"
+        />
+
+        {/* Base Foundation / Steps */}
+        <rect x="40" y="88" width="120" height="6" rx="2" fill="#93C5FD" />
+        <rect x="48" y="84" width="104" height="5" rx="1.5" fill="#BFDBFE" />
+
+        {/* Left Wing Building */}
+        <rect x="46" y="52" width="34" height="34" rx="2" fill="url(#wallGrad)" stroke="#60A5FA" strokeWidth="1.2" />
+        {/* Left Wing Roof */}
+        <path d="M 44 52 L 63 38 L 82 52 Z" fill="url(#roofGrad)" />
+        {/* Left Windows */}
+        <rect x="52" y="58" width="8" height="10" rx="1" fill="#3B82F6" />
+        <rect x="66" y="58" width="8" height="10" rx="1" fill="#3B82F6" />
+        <rect x="52" y="72" width="8" height="8" rx="1" fill="#60A5FA" />
+        <rect x="66" y="72" width="8" height="8" rx="1" fill="#60A5FA" />
+
+        {/* Right Wing Building */}
+        <rect x="120" y="52" width="34" height="34" rx="2" fill="url(#wallGrad)" stroke="#60A5FA" strokeWidth="1.2" />
+        {/* Right Wing Roof */}
+        <path d="M 118 52 L 137 38 L 156 52 Z" fill="url(#roofGrad)" />
+        {/* Right Windows */}
+        <rect x="126" y="58" width="8" height="10" rx="1" fill="#3B82F6" />
+        <rect x="140" y="58" width="8" height="10" rx="1" fill="#3B82F6" />
+        <rect x="126" y="72" width="8" height="8" rx="1" fill="#60A5FA" />
+        <rect x="140" y="72" width="8" height="8" rx="1" fill="#60A5FA" />
+
+        {/* Main Central Tower */}
+        <rect x="76" y="40" width="48" height="46" rx="2" fill="url(#wallGrad)" stroke="#3B82F6" strokeWidth="1.4" />
+        
+        {/* Main Center Triangular Pediment */}
+        <path d="M 72 40 L 100 18 L 128 40 Z" fill="url(#roofGrad)" stroke="#2563EB" strokeWidth="1" />
+        
+        {/* Clock Tower / Small Bell Spire */}
+        <rect x="94" y="10" width="12" height="12" rx="2" fill="url(#wallGrad)" stroke="#3B82F6" strokeWidth="1" />
+        <path d="M 92 10 L 100 2 L 108 10 Z" fill="#1D4ED8" />
+        <circle cx="100" cy="16" r="3.5" fill="#3B82F6" />
+        {/* Small Flag on top */}
+        <line x1="100" y1="2" x2="100" y2="-4" stroke="#1E40AF" strokeWidth="1.2" />
+        <path d="M 100 -4 L 108 -1 L 100 2 Z" fill="#EF4444" />
+
+        {/* Central Entrance Pillars (4 Pillars) */}
+        <rect x="80" y="44" width="4" height="40" rx="1" fill="#DBEAFE" stroke="#93C5FD" strokeWidth="0.8" />
+        <rect x="89" y="44" width="4" height="40" rx="1" fill="#DBEAFE" stroke="#93C5FD" strokeWidth="0.8" />
+        <rect x="107" y="44" width="4" height="40" rx="1" fill="#DBEAFE" stroke="#93C5FD" strokeWidth="0.8" />
+        <rect x="116" y="44" width="4" height="40" rx="1" fill="#DBEAFE" stroke="#93C5FD" strokeWidth="0.8" />
+
+        {/* Grand Arch Doorway */}
+        <path
+          d="M 94 84 L 94 65 C 94 60 106 60 106 65 L 106 84 Z"
+          fill="url(#doorGrad)"
+          stroke="#1E3A8A"
+          strokeWidth="1"
+        />
+        <line x1="100" y1="63" x2="100" y2="84" stroke="#93C5FD" strokeWidth="0.8" />
+
+        {/* Round decorative window on Central Pediment */}
+        <circle cx="100" cy="30" r="5" fill="#EFF6FF" stroke="#3B82F6" strokeWidth="1" />
+        <line x1="100" y1="25" x2="100" y2="35" stroke="#3B82F6" strokeWidth="0.8" />
+        <line x1="95" y1="30" x2="105" y2="30" stroke="#3B82F6" strokeWidth="0.8" />
+      </svg>
+    </div>
+  );
+};

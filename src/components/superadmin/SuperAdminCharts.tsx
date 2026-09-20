@@ -423,3 +423,144 @@ export const TenantDonutChart: React.FC<{
     </div>
   );
 };
+
+/**
+ * Service Summary Donut Chart for Schools Management View
+ * Matches the reference image: Donut with 49 Total Sekolah and status breakdown.
+ */
+export const ServiceSummaryDonutChart: React.FC<{
+  activeCount?: number;
+  inactiveCount?: number;
+  attentionCount?: number;
+  totalCount?: number;
+}> = ({
+  activeCount = 42,
+  inactiveCount = 4,
+  attentionCount = 5,
+  totalCount = 49,
+}) => {
+  const total = totalCount || activeCount + inactiveCount + attentionCount || 1;
+
+  const data = [
+    { label: 'Aktif', count: activeCount, color: '#10B981', pct: ((activeCount / total) * 100).toFixed(1) },
+    { label: 'Nonaktif', count: inactiveCount, color: '#64748B', pct: ((inactiveCount / total) * 100).toFixed(1) },
+    { label: 'Perlu Perhatian', count: attentionCount, color: '#F59E0B', pct: ((attentionCount / total) * 100).toFixed(1) },
+  ];
+
+  const size = 120;
+  const center = size / 2;
+  const radius = 42;
+  const strokeWidth = 14;
+  const circumference = 2 * Math.PI * radius;
+
+  let accumulatedPercent = 0;
+
+  return (
+    <div className="flex items-center justify-between gap-3 pt-2">
+      {/* Donut Circle */}
+      <div className="relative w-28 h-28 shrink-0 flex items-center justify-center">
+        <svg viewBox={`0 0 ${size} ${size}`} className="w-full h-full -rotate-90">
+          {data.map((item) => {
+            const percent = item.count / total;
+            const strokeDasharray = `${percent * circumference} ${circumference}`;
+            const strokeDashoffset = -accumulatedPercent * circumference;
+            accumulatedPercent += percent;
+
+            return (
+              <circle
+                key={item.label}
+                cx={center}
+                cy={center}
+                r={radius}
+                fill="transparent"
+                stroke={item.color}
+                strokeWidth={strokeWidth}
+                strokeDasharray={strokeDasharray}
+                strokeDashoffset={strokeDashoffset}
+                strokeLinecap="round"
+                className="transition-all duration-300 hover:opacity-85"
+              />
+            );
+          })}
+        </svg>
+
+        {/* Center text in donut */}
+        <div className="absolute inset-0 flex flex-col items-center justify-center select-none pointer-events-none">
+          <span className="text-xl font-black text-slate-900 leading-none">{total}</span>
+          <span className="text-[9px] font-semibold text-slate-400 mt-0.5">Total Sekolah</span>
+        </div>
+      </div>
+
+      {/* Legend on the right */}
+      <div className="flex-1 space-y-2 min-w-0 pl-1">
+        {data.map((item) => (
+          <div key={item.label} className="flex items-center justify-between text-xs">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
+              <span className="text-slate-700 font-semibold truncate text-[11px]">{item.label}</span>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <span className="font-bold text-slate-900 text-xs">{item.count}</span>
+              <span className="text-[10px] text-slate-400 w-9 text-right font-mono">{item.pct.replace('.', ',')}%</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+/**
+ * Package Distribution Progress Bar for Schools Management View
+ * Matches the reference image: Gratis, Basic, Pro, Enterprise with horizontal bars.
+ */
+export const PackageDistributionBarChart: React.FC<{
+  distribution?: {
+    gratis: number;
+    basic: number;
+    pro: number;
+    enterprise: number;
+  };
+}> = ({
+  distribution = { gratis: 18, basic: 17, pro: 11, enterprise: 3 },
+}) => {
+  const total = distribution.gratis + distribution.basic + distribution.pro + distribution.enterprise || 1;
+
+  const packages = [
+    { label: 'Gratis', count: distribution.gratis, color: 'bg-sky-400', barColor: '#38BDF8' },
+    { label: 'Basic', count: distribution.basic, color: 'bg-blue-500', barColor: '#3B82F6' },
+    { label: 'Pro', count: distribution.pro, color: 'bg-purple-500', barColor: '#A855F7' },
+    { label: 'Enterprise', count: distribution.enterprise, color: 'bg-indigo-700', barColor: '#4338CA' },
+  ];
+
+  return (
+    <div className="space-y-2.5 pt-2">
+      {packages.map((pkg) => {
+        const pct = ((pkg.count / total) * 100);
+        return (
+          <div key={pkg.label} className="flex items-center gap-3 text-xs">
+            <div className="w-20 font-medium text-slate-600 text-[11px] flex items-center gap-1.5 shrink-0">
+              <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: pkg.barColor }} />
+              <span>{pkg.label}</span>
+            </div>
+            <div className="flex-1 bg-slate-100 h-2 rounded-full overflow-hidden">
+              <div
+                className="h-full rounded-full transition-all duration-500"
+                style={{
+                  width: `${Math.max(pct, 4)}%`,
+                  backgroundColor: pkg.barColor,
+                }}
+              />
+            </div>
+            <div className="flex items-center gap-1.5 shrink-0 text-right w-14 justify-end">
+              <span className="font-bold text-slate-800 text-xs">{pkg.count}</span>
+              <span className="text-[10px] text-slate-400 font-mono">
+                {pct.toFixed(1).replace('.', ',')}%
+              </span>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+};

@@ -476,3 +476,181 @@ export const PaymentCardIllustration: React.FC<{ className?: string }> = ({ clas
   );
 };
 
+/**
+ * 3D System Settings Laptop Illustration with floating gear, shield & soft background leaves
+ * matching the header banner in the reference image for Pengaturan Sistem.
+ */
+export const SystemBannerIllustration: React.FC<{ className?: string }> = ({ className = "w-44 sm:w-56 h-28 sm:h-32" }) => {
+  return (
+    <div className={`relative flex items-center justify-end select-none pointer-events-none ${className}`}>
+      <svg
+        viewBox="0 0 260 160"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+        className="w-full h-full drop-shadow-xl overflow-visible"
+      >
+        <defs>
+          <linearGradient id="sysSoftBg" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#60A5FA" stopOpacity="0.4" />
+            <stop offset="100%" stopColor="#38BDF8" stopOpacity="0.1" />
+          </linearGradient>
+          <linearGradient id="sysLaptopBody" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#E2E8F0" />
+            <stop offset="50%" stopColor="#CBD5E1" />
+            <stop offset="100%" stopColor="#94A3B8" />
+          </linearGradient>
+          <linearGradient id="sysLaptopBezel" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#1E293B" />
+            <stop offset="100%" stopColor="#0F172A" />
+          </linearGradient>
+          <linearGradient id="sysShield" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#34D399" />
+            <stop offset="100%" stopColor="#059669" />
+          </linearGradient>
+          <linearGradient id="sysGearGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#38BDF8" />
+            <stop offset="50%" stopColor="#0284C7" />
+            <stop offset="100%" stopColor="#0369A1" />
+          </linearGradient>
+          <filter id="sysGlow" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur stdDeviation="5" result="blur" />
+            <feComposite in="SourceGraphic" in2="blur" operator="over" />
+          </filter>
+        </defs>
+
+        {/* Ambient background soft leaves/shapes */}
+        <path
+          d="M 20 140 C 25 90, 60 70, 75 135 Z"
+          fill="#93C5FD"
+          opacity="0.35"
+        />
+        <path
+          d="M 35 145 C 45 105, 80 85, 95 140 Z"
+          fill="#60A5FA"
+          opacity="0.25"
+        />
+        <circle cx="210" cy="40" r="28" fill="url(#sysSoftBg)" />
+
+        {/* Ground shadow */}
+        <ellipse cx="125" cy="138" rx="85" ry="14" fill="#38BDF8" opacity="0.2" />
+
+        {/* Laptop Base Keyboard Plate */}
+        <path
+          d="M 55 125 L 185 125 L 210 142 L 30 142 Z"
+          fill="url(#sysLaptopBody)"
+          stroke="#94A3B8"
+          strokeWidth="1.2"
+        />
+        {/* Laptop Base Front Lip */}
+        <path
+          d="M 30 142 L 210 142 L 208 146 L 32 146 Z"
+          fill="#64748B"
+        />
+        {/* Trackpad */}
+        <path
+          d="M 108 132 L 138 132 L 142 139 L 104 139 Z"
+          fill="#CBD5E1"
+          stroke="#94A3B8"
+          strokeWidth="0.8"
+        />
+
+        {/* Keyboard keys */}
+        <path
+          d="M 62 127 L 178 127 L 175 131 L 60 131 Z"
+          fill="#475569"
+          opacity="0.6"
+        />
+
+        {/* Laptop Screen Lid */}
+        <g transform="matrix(0.97, -0.08, 0.12, 0.98, 12, 10)">
+          {/* Bezel */}
+          <rect
+            x="48"
+            y="22"
+            width="142"
+            height="96"
+            rx="7"
+            fill="url(#sysLaptopBezel)"
+            stroke="#64748B"
+            strokeWidth="1.8"
+          />
+          {/* Display */}
+          <rect
+            x="53"
+            y="27"
+            width="132"
+            height="86"
+            rx="4"
+            fill="#F8FAFC"
+          />
+
+          {/* Screen Top Bar */}
+          <rect x="53" y="27" width="132" height="11" fill="#0284C7" />
+          <circle cx="60" cy="32.5" r="2" fill="#BAE6FD" />
+          <rect x="66" y="30.5" width="24" height="4" rx="2" fill="#E0F2FE" />
+          <circle cx="177" cy="32.5" r="2" fill="#E0F2FE" />
+
+          {/* Sidebar */}
+          <rect x="53" y="38" width="20" height="75" fill="#0F172A" />
+          <rect x="57" y="44" width="12" height="3" rx="1.5" fill="#38BDF8" />
+          <rect x="57" y="50" width="12" height="2.5" rx="1" fill="#64748B" />
+          <rect x="57" y="56" width="12" height="2.5" rx="1" fill="#64748B" />
+          <rect x="57" y="62" width="12" height="2.5" rx="1" fill="#64748B" />
+
+          {/* Content Cards */}
+          <rect x="78" y="42" width="48" height="18" rx="3" fill="#EFF6FF" stroke="#BFDBFE" strokeWidth="0.8" />
+          <rect x="82" y="46" width="12" height="2.5" rx="1" fill="#0284C7" />
+          <rect x="82" y="51" width="22" height="4" rx="1" fill="#0369A1" />
+
+          <rect x="131" y="42" width="48" height="18" rx="3" fill="#F0FDF4" stroke="#BBF7D0" strokeWidth="0.8" />
+          <rect x="135" y="46" width="12" height="2.5" rx="1" fill="#16A34A" />
+          <rect x="135" y="51" width="22" height="4" rx="1" fill="#15803D" />
+
+          {/* Table / List Lines */}
+          <rect x="78" y="65" width="101" height="42" rx="3" fill="#FFFFFF" stroke="#E2E8F0" strokeWidth="0.8" />
+          <rect x="82" y="70" width="30" height="3" rx="1.5" fill="#94A3B8" />
+          <rect x="150" y="70" width="24" height="3" rx="1.5" fill="#38BDF8" />
+          <line x1="82" y1="77" x2="175" y2="77" stroke="#F1F5F9" strokeWidth="1" />
+          <rect x="82" y="82" width="40" height="3" rx="1.5" fill="#CBD5E1" />
+          <rect x="156" y="82" width="18" height="3" rx="1.5" fill="#22C55E" />
+          <line x1="82" y1="89" x2="175" y2="89" stroke="#F1F5F9" strokeWidth="1" />
+          <rect x="82" y="94" width="35" height="3" rx="1.5" fill="#CBD5E1" />
+          <rect x="148" y="94" width="26" height="3" rx="1.5" fill="#60A5FA" />
+        </g>
+
+        {/* Floating Blue 3D Gear / Cog on the Right */}
+        <g transform="translate(195, 38)">
+          <circle cx="16" cy="16" r="14" fill="url(#sysGearGrad)" filter="url(#sysGlow)" />
+          {/* Gear teeth */}
+          <rect x="13" y="-1" width="6" height="34" rx="2" fill="url(#sysGearGrad)" />
+          <rect x="-1" y="13" width="34" height="6" rx="2" fill="url(#sysGearGrad)" />
+          <rect x="3.5" y="3.5" width="25" height="5" rx="2" transform="rotate(45 16 16)" fill="url(#sysGearGrad)" />
+          <rect x="3.5" y="3.5" width="25" height="5" rx="2" transform="rotate(-45 16 16)" fill="url(#sysGearGrad)" />
+          {/* Inner hole */}
+          <circle cx="16" cy="16" r="7" fill="#F8FAFC" />
+          <circle cx="16" cy="16" r="4.5" fill="#0284C7" />
+        </g>
+
+        {/* Floating Green Security Shield Badge with Checkmark */}
+        <g transform="translate(182, 85)">
+          <ellipse cx="16" cy="20" rx="15" ry="16" fill="#10B981" opacity="0.3" filter="url(#sysGlow)" />
+          <path
+            d="M 16 4 L 29 9 C 29 20 23 29 16 34 C 9 29 3 20 3 9 Z"
+            fill="url(#sysShield)"
+            stroke="#FFFFFF"
+            strokeWidth="1.6"
+          />
+          <path
+            d="M 11 19 L 14.5 22.5 L 21.5 15"
+            fill="none"
+            stroke="#FFFFFF"
+            strokeWidth="2.2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </g>
+      </svg>
+    </div>
+  );
+};
+

@@ -48,6 +48,7 @@ import { getTenantLifecycleInfo } from '../../utils/tenantLifecycle';
 import { SchoolOnboardingModal } from '../SchoolOnboardingModal';
 import { SchoolBuildingIllustration } from './SuperAdminIllustrations';
 import { ServiceSummaryDonutChart, PackageDistributionBarChart } from './SuperAdminCharts';
+import { SchoolActivitiesView } from './SchoolActivitiesView';
 
 export type SchoolDetailTab = 'profil-lisensi' | 'pengguna-akses' | 'riwayat-audit';
 
@@ -164,12 +165,9 @@ export const SchoolsSection: React.FC<{
   useEffect(() => {
     if (activeSubTab === 'tambah') {
       setIsCreateOpen(true);
-    } else if (activeSubTab === 'paket') {
+    } else if (activeSubTab === 'aktivitas') {
       setSelectedSchoolId(null);
-      setIsAdvancedFilterOpen(true);
-    } else if (activeSubTab === 'pengguna') {
-      setSelectedSchoolId(null);
-    } else if (activeSubTab === 'semua') {
+    } else if (activeSubTab === 'manajemen' || activeSubTab === 'semua') {
       setSelectedSchoolId(null);
       setStatusFilter('all');
       setPlanFilter('all');
@@ -219,7 +217,7 @@ export const SchoolsSection: React.FC<{
     setDetailData(null);
     setActiveMenuSchoolId(null);
     loadSchools();
-    onSubTabChange?.('semua');
+    onSubTabChange?.('manajemen');
   };
 
   // Filtered schools list
@@ -692,6 +690,20 @@ export const SchoolsSection: React.FC<{
   };
 
   // =========================================================================
+  // SUBMENU AKTIVITAS SEKOLAH (AUDIT LOG & LINIMASA AKTIVITAS MULTI-TENANT)
+  // =========================================================================
+  if (activeSubTab === 'aktivitas' && !selectedSchoolId) {
+    return (
+      <SchoolActivitiesView
+        call={call}
+        showToast={showToast}
+        schools={schools}
+        onSelectSchool={handleSelectSchool}
+      />
+    );
+  }
+
+  // =========================================================================
   // TAMPILAN DETAIL SEKOLAH (3 TAB TERFOKUS)
   // =========================================================================
   if (selectedSchoolId) {
@@ -714,7 +726,7 @@ export const SchoolsSection: React.FC<{
             <button
               onClick={handleBackToList}
               className="p-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition cursor-pointer shrink-0"
-              title="Kembali ke Direktori Sekolah"
+              title="Kembali ke Manajemen Sekolah"
             >
               <ArrowLeft size={18} />
             </button>
@@ -1463,215 +1475,105 @@ export const SchoolsSection: React.FC<{
 
   return (
     <div className="space-y-5">
-      {/* 1. HEADER SECTION DENGAN BANNER MULTI-TENANT */}
+      {/* 1. HEADER SECTION MANAJEMEN SEKOLAH */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3.5">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-blue-500/20 shrink-0">
-            <Building2 size={24} />
+          <div className="w-11 h-11 rounded-2xl bg-blue-600 text-white flex items-center justify-center shadow-md shadow-blue-500/20 shrink-0">
+            <Building2 size={22} />
           </div>
           <div>
-            <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-              Manajemen Sekolah
-            </h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
+                Manajemen Sekolah
+              </h1>
+              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-blue-50 text-blue-700 border border-blue-200">
+                Multi-Tenant SaaS
+              </span>
+            </div>
             <p className="text-xs text-slate-500 mt-0.5">
-              Kelola seluruh sekolah, tenant, paket, dan status layanan.
+              Kelola seluruh sekolah, tenant, paket lisensi, dan status operasional instansi.
             </p>
           </div>
         </div>
 
-        {/* Banner Ilustrasi SaaS di Kanan */}
-        <div className="hidden lg:flex items-center gap-4 bg-gradient-to-r from-blue-50/90 via-indigo-50/70 to-slate-50 border border-blue-100/90 rounded-2xl px-4 py-2 shadow-xs">
-          <div>
-            <div className="flex items-center gap-1.5 text-[11px] font-bold text-blue-700">
-              <Sparkles size={13} className="text-blue-600" />
-              <span>Multi-Tenant SaaS</span>
-            </div>
-            <p className="text-[11px] text-slate-500 font-medium mt-0.5">
-              Lebih mudah. Lebih terkontrol. Lebih baik.
-            </p>
-          </div>
-          <SchoolBuildingIllustration className="w-24 h-12 shrink-0" />
+        {/* Action Controls Kanan */}
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={loadSchools}
+            disabled={loading}
+            className="p-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition cursor-pointer disabled:opacity-50"
+            title="Muat Ulang Data Sekolah"
+          >
+            <RefreshCw size={15} className={loading ? 'animate-spin text-blue-600' : ''} />
+          </button>
+
+          <button
+            type="button"
+            onClick={handleExportSchools}
+            className="px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold flex items-center gap-1.5 cursor-pointer transition shadow-xs"
+            title="Ekspor CSV Data Sekolah"
+          >
+            <Download size={14} />
+            <span className="hidden sm:inline">Ekspor CSV</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setIsCreateOpen(true)}
+            className="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-xs flex items-center gap-1.5 cursor-pointer transition shrink-0"
+          >
+            <Plus size={15} />
+            <span>Tambah Sekolah</span>
+          </button>
         </div>
       </div>
 
-      {/* 2. STATS KPI CARDS (4 KARTU METRIK UTAMA) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4">
-        {/* Total Sekolah */}
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-xs p-4 flex flex-col justify-between">
-          <div className="flex items-start justify-between">
-            <div>
-              <span className="text-xs font-semibold text-slate-500">Total Sekolah</span>
-              <div className="text-2xl sm:text-3xl font-black text-slate-900 mt-1">
-                {stats.total}
-              </div>
-            </div>
-            <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
-              <Building2 size={20} />
-            </div>
-          </div>
-          <div className="text-[11px] font-semibold text-emerald-600 mt-3 flex items-center gap-1">
-            <span>↑ 2 baru minggu ini</span>
-          </div>
-        </div>
-
-        {/* Sekolah Aktif */}
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-xs p-4 flex flex-col justify-between">
-          <div className="flex items-start justify-between">
-            <div>
-              <span className="text-xs font-semibold text-slate-500">Sekolah Aktif</span>
-              <div className="text-2xl sm:text-3xl font-black text-slate-900 mt-1">
-                {stats.active}
-              </div>
-            </div>
-            <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
-              <CheckCircle2 size={20} />
-            </div>
-          </div>
-          <div className="mt-3 space-y-1.5">
-            <div className="text-[11px] font-semibold text-slate-500">
-              {((stats.active / stats.total) * 100).toFixed(1).replace('.', ',')}% dari total
-            </div>
-            <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
-              <div
-                className="bg-emerald-500 h-full rounded-full"
-                style={{ width: `${Math.min(100, (stats.active / stats.total) * 100)}%` }}
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Perlu Perhatian */}
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-xs p-4 flex flex-col justify-between">
-          <div className="flex items-start justify-between">
-            <div>
-              <span className="text-xs font-semibold text-slate-500">Perlu Perhatian</span>
-              <div className="text-2xl sm:text-3xl font-black text-slate-900 mt-1">
-                {stats.attention}
-              </div>
-            </div>
-            <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
-              <AlertTriangle size={20} />
-            </div>
-          </div>
-          <div className="mt-3 space-y-1.5">
-            <div className="text-[11px] font-semibold text-slate-500">
-              {((stats.attention / stats.total) * 100).toFixed(1).replace('.', ',')}% dari total
-            </div>
-            <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
-              <div
-                className="bg-amber-500 h-full rounded-full"
-                style={{ width: `${Math.min(100, (stats.attention / stats.total) * 100)}%` }}
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Masa Berlaku Akan Habis */}
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-xs p-4 flex flex-col justify-between">
-          <div className="flex items-start justify-between">
-            <div>
-              <span className="text-xs font-semibold text-slate-500">Masa Berlaku Akan Habis</span>
-              <div className="text-2xl sm:text-3xl font-black text-slate-900 mt-1">
-                {stats.expiringSoon}
-              </div>
-            </div>
-            <div className="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
-              <Clock size={20} />
-            </div>
-          </div>
-          <div className="mt-3 space-y-1.5">
-            <div className="text-[11px] font-semibold text-slate-500">
-              {((stats.expiringSoon / stats.total) * 100).toFixed(1).replace('.', ',')}% dari total
-            </div>
-            <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
-              <div
-                className="bg-rose-500 h-full rounded-full"
-                style={{ width: `${Math.min(100, (stats.expiringSoon / stats.total) * 100)}%` }}
-              />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* 3. MAIN 2-COLUMN LAYOUT: KIRI TABEL & FILTER, KANAN WIDGETS */}
-      <div className="grid grid-cols-1 xl:grid-cols-12 gap-5 items-start">
-        {/* =============================================================== */}
-        {/* KOLOM KIRI (xl:col-span-8): TOOLBAR FILTER + TABEL DIREKTORI    */}
-        {/* =============================================================== */}
-        <div className="xl:col-span-8 space-y-4">
-          {/* TOOLBAR FILTER CARD */}
-          <div className="bg-white p-3.5 rounded-2xl border border-slate-100 shadow-xs flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-2.5">
-            {/* Input Pencarian */}
-            <div className="relative flex-1">
-              <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input
-                type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Cari sekolah, NPSN, kode akses..."
-                className="w-full pl-9 pr-8 py-2 rounded-xl border border-slate-200 text-xs font-medium focus:outline-blue-600 placeholder:text-slate-400"
-              />
-              {search && (
-                <button
-                  type="button"
-                  onClick={() => setSearch('')}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
-                >
-                  <X size={14} />
-                </button>
-              )}
-            </div>
-
-            {/* Filter Dropdowns */}
-            <div className="flex flex-wrap items-center gap-2">
-              {/* Dropdown Status */}
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value as any)}
-                className="px-3 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 bg-white hover:border-slate-300 focus:outline-blue-600 cursor-pointer"
-              >
-                <option value="all">Semua Status</option>
-                <option value="active">Aktif</option>
-                <option value="inactive">Nonaktif</option>
-                <option value="attention">Perlu Perhatian</option>
-              </select>
-
-              {/* Dropdown Paket */}
-              <select
-                value={planFilter}
-                onChange={(e) => setPlanFilter(e.target.value as any)}
-                className="px-3 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 bg-white hover:border-slate-300 focus:outline-blue-600 cursor-pointer"
-              >
-                <option value="all">Semua Paket</option>
-                <option value="free">Gratis</option>
-                <option value="basic">Basic</option>
-                <option value="pro">Pro</option>
-                <option value="enterprise">Enterprise</option>
-              </select>
-
-              {/* Dropdown Masa Berlaku */}
-              <select
-                value={expiryFilter}
-                onChange={(e) => setExpiryFilter(e.target.value as any)}
-                className="px-3 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 bg-white hover:border-slate-300 focus:outline-blue-600 cursor-pointer"
-              >
-                <option value="all">Semua Masa Berlaku</option>
-                <option value="safe">Aman (&gt; 30 Hari)</option>
-                <option value="expiring">Segera Habis (≤ 30 Hari)</option>
-                <option value="expired">Kedaluwarsa</option>
-              </select>
-
-              {/* Tombol Tambah Sekolah */}
+      {/* 2. TABEL DAFTAR SEKOLAH & TENANT (FULL-WIDTH SAAS VIEW) */}
+      <div className="w-full space-y-4">
+        {/* TOOLBAR FILTER CARD */}
+        <div className="bg-white p-3.5 rounded-2xl border border-slate-100 shadow-xs flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
+          {/* Input Pencarian */}
+          <div className="relative flex-1">
+            <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setCurrentPage(1);
+              }}
+              placeholder="Cari nama sekolah, NPSN, kode akses..."
+              className="w-full pl-9 pr-8 py-2 rounded-xl border border-slate-200 text-xs font-medium focus:outline-blue-600 placeholder:text-slate-400"
+            />
+            {search && (
               <button
                 type="button"
-                onClick={() => setIsCreateOpen(true)}
-                className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-xs flex items-center gap-1.5 cursor-pointer transition shrink-0"
+                onClick={() => setSearch('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
               >
-                <Plus size={15} />
-                <span>Tambah Sekolah</span>
+                <X size={14} />
               </button>
-            </div>
+            )}
           </div>
+
+          {/* Filter Dropdown Status */}
+          <div className="flex items-center gap-2">
+            <select
+              value={statusFilter}
+              onChange={(e) => {
+                setStatusFilter(e.target.value as any);
+                setCurrentPage(1);
+              }}
+              className="px-3 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 bg-white hover:border-slate-300 focus:outline-blue-600 cursor-pointer"
+            >
+              <option value="all">Semua Status</option>
+              <option value="active">Aktif</option>
+              <option value="inactive">Nonaktif</option>
+              <option value="attention">Perlu Perhatian</option>
+            </select>
+          </div>
+        </div>
 
           {/* TABEL DIREKTORI SEKOLAH & TENANT */}
           <div className="bg-white rounded-2xl border border-slate-100 shadow-xs overflow-hidden">
@@ -2038,187 +1940,6 @@ export const SchoolsSection: React.FC<{
             )}
           </div>
         </div>
-
-        {/* =============================================================== */}
-        {/* KOLOM KANAN (xl:col-span-4): 5 KARTU STATISTIK & AKSI CEPAT     */}
-        {/* =============================================================== */}
-        <div className="xl:col-span-4 space-y-4">
-          {/* CARD 1: RINGKASAN LAYANAN (DONUT CHART) */}
-          <div className="bg-white rounded-2xl border border-slate-100 shadow-xs p-4">
-            <div className="flex items-center justify-between pb-2.5 border-b border-slate-100">
-              <div className="flex items-center gap-2">
-                <div className="w-6 h-6 rounded-md bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
-                  <Activity size={13} />
-                </div>
-                <h3 className="text-xs font-black text-slate-900">Ringkasan Layanan</h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setStatusFilter('all')}
-                className="text-[11px] font-bold text-blue-600 hover:text-blue-700 cursor-pointer"
-              >
-                Lihat Detail &gt;
-              </button>
-            </div>
-
-            <ServiceSummaryDonutChart
-              activeCount={stats.active}
-              inactiveCount={stats.inactive}
-              attentionCount={stats.attention}
-              totalCount={stats.total}
-            />
-          </div>
-
-          {/* CARD 2: DISTRIBUSI PAKET (BAR PROGRESS) */}
-          <div className="bg-white rounded-2xl border border-slate-100 shadow-xs p-4">
-            <div className="flex items-center justify-between pb-2.5 border-b border-slate-100">
-              <div className="flex items-center gap-2">
-                <div className="w-6 h-6 rounded-md bg-purple-50 text-purple-600 flex items-center justify-center font-bold">
-                  <Layers size={13} />
-                </div>
-                <h3 className="text-xs font-black text-slate-900">Distribusi Paket</h3>
-              </div>
-            </div>
-
-            <PackageDistributionBarChart distribution={stats.pkgDist} />
-          </div>
-
-          {/* CARD 3: MASA BERLAKU AKAN HABIS */}
-          <div className="bg-white rounded-2xl border border-slate-100 shadow-xs p-4">
-            <div className="flex items-center justify-between pb-2.5 border-b border-slate-100">
-              <div className="flex items-center gap-2">
-                <div className="w-6 h-6 rounded-md bg-rose-50 text-rose-600 flex items-center justify-center font-bold">
-                  <Clock size={13} />
-                </div>
-                <h3 className="text-xs font-black text-slate-900">Masa Berlaku Akan Habis</h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setExpiryFilter('expiring')}
-                className="text-[11px] font-bold text-blue-600 hover:text-blue-700 cursor-pointer"
-              >
-                Lihat Semua &gt;
-              </button>
-            </div>
-
-            <div className="space-y-2.5 pt-2">
-              {expiringSchoolsList.map((item, idx) => (
-                <div
-                  key={item.id || idx}
-                  onClick={() => {
-                    const targetSchool = schools.find((s) => s.id === item.id);
-                    if (targetSchool) handleSelectSchool(targetSchool);
-                  }}
-                  className="p-2.5 rounded-xl border border-slate-100 bg-slate-50/50 hover:bg-blue-50/40 hover:border-blue-200 transition cursor-pointer flex items-center justify-between"
-                >
-                  <div className="min-w-0 pr-2">
-                    <div className="font-bold text-xs text-slate-800 truncate">{item.name}</div>
-                    <div className="text-[10px] text-slate-400 mt-0.5">Masa Berlaku: {item.date}</div>
-                  </div>
-                  <span
-                    className={`px-2 py-0.5 rounded-full text-[10px] font-bold shrink-0 ${
-                      item.daysLeft <= 14
-                        ? 'bg-rose-50 text-rose-700 border border-rose-200'
-                        : 'bg-amber-50 text-amber-700 border border-amber-200'
-                    }`}
-                  >
-                    {item.daysLeft} hari lagi
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* CARD 4: AKTIVITAS TERBARU */}
-          <div className="bg-white rounded-2xl border border-slate-100 shadow-xs p-4">
-            <div className="flex items-center justify-between pb-2.5 border-b border-slate-100">
-              <div className="flex items-center gap-2">
-                <div className="w-6 h-6 rounded-md bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
-                  <Zap size={13} />
-                </div>
-                <h3 className="text-xs font-black text-slate-900">Aktivitas Terbaru</h3>
-              </div>
-              <button
-                type="button"
-                className="text-[11px] font-bold text-blue-600 hover:text-blue-700 cursor-pointer"
-              >
-                Lihat Semua &gt;
-              </button>
-            </div>
-
-            <div className="space-y-3 pt-2">
-              {recentActivities.map((act) => {
-                const Icon = act.icon;
-                return (
-                  <div key={act.id} className="flex items-start gap-2.5">
-                    <div
-                      className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${act.iconColor}`}
-                    >
-                      <Icon size={14} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between gap-1">
-                        <span className="text-xs font-bold text-slate-900 truncate">
-                          {act.target}
-                        </span>
-                        <span
-                          className={`text-[9px] font-bold px-1.5 py-0.2 rounded border shrink-0 ${act.badgeColor}`}
-                        >
-                          {act.badge}
-                        </span>
-                      </div>
-                      <p className="text-[10px] text-slate-500 mt-0.5 truncate">{act.title}</p>
-                      <span className="text-[9px] text-slate-400 block mt-0.5">{act.time}</span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* CARD 5: BANNER AKSI CEPAT (GRADIENT BLUE CARD) */}
-          <div className="bg-gradient-to-br from-blue-600 via-indigo-600 to-indigo-700 rounded-2xl p-4 text-white shadow-md shadow-blue-500/10 space-y-3">
-            <div>
-              <h4 className="text-xs font-black tracking-tight flex items-center gap-1.5">
-                <Sparkles size={14} className="text-blue-200" />
-                <span>Kelola Sekolah Lebih Mudah</span>
-              </h4>
-              <p className="text-[11px] text-blue-100/90 mt-1 leading-relaxed">
-                Tambah sekolah, impor data, atau unduh laporan.
-              </p>
-            </div>
-
-            <div className="flex flex-wrap gap-2 pt-1">
-              <button
-                type="button"
-                onClick={() => setIsCreateOpen(true)}
-                className="px-3 py-1.5 bg-white text-blue-700 hover:bg-blue-50 text-[11px] font-bold rounded-xl shadow-xs transition cursor-pointer flex items-center gap-1"
-              >
-                <Plus size={13} />
-                <span>Tambah Sekolah</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setIsImportModalOpen(true)}
-                className="px-3 py-1.5 bg-white/20 hover:bg-white/30 text-white text-[11px] font-bold rounded-xl backdrop-blur-xs transition cursor-pointer flex items-center gap-1"
-              >
-                <Upload size={13} />
-                <span>Import Data</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={handleExportSchools}
-                className="px-3 py-1.5 bg-white/20 hover:bg-white/30 text-white text-[11px] font-bold rounded-xl backdrop-blur-xs transition cursor-pointer flex items-center gap-1"
-              >
-                <Download size={13} />
-                <span>Ekspor Laporan</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
 
       {/* Modal Import Data Sekolah */}
       {isImportModalOpen && (

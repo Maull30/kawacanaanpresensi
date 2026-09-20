@@ -12,6 +12,8 @@ import {
   ChevronRight,
   X,
   ShieldCheck,
+  RefreshCw,
+  Clock,
 } from 'lucide-react';
 import { LaptopIllustration } from './SuperAdminIllustrations';
 import { MetricSparkline, ActivityChart } from './SuperAdminCharts';
@@ -38,11 +40,14 @@ export const OverviewSection: React.FC<OverviewSectionProps> = ({
   const [data, setData] = useState<any>(null);
   const [payments, setPayments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
   const [showGuideModal, setShowGuideModal] = useState(false);
   const [activeMenuSchoolId, setActiveMenuSchoolId] = useState<string | null>(null);
 
-  const load = async () => {
-    setLoading(true);
+  const load = async (isSilent = false) => {
+    if (!isSilent) setLoading(true);
+    else setIsRefreshing(true);
     try {
       const [dash, pays] = await Promise.all([
         call('dashboard').catch(() => null),
@@ -50,86 +55,62 @@ export const OverviewSection: React.FC<OverviewSectionProps> = ({
       ]);
       setData(dash);
       setPayments(pays?.payments || []);
+      setLastUpdated(new Date());
     } catch (e: any) {
-      showToast(e.message || 'Gagal memuat ringkasan data.', 'error');
+      if (!isSilent) {
+        showToast(e.message || 'Gagal memuat ringkasan data.', 'error');
+      }
     } finally {
       setLoading(false);
+      setIsRefreshing(false);
     }
   };
 
   useEffect(() => {
     load();
+    // Auto-refresh data setiap 45 detik untuk memastikan status realtime
+    const timer = setInterval(() => {
+      load(true);
+    }, 45000);
+    return () => clearInterval(timer);
   }, []);
 
   const totals = data?.totals || {};
   const dbSchools = data?.schools || [];
 
-  // Hitung pembayaran bulan ini
+  // Hitung pembayaran bulan ini secara riil
   const currentMonthStr = new Date().toISOString().slice(0, 7);
-  let thisMonthPaidTotal = 0;
-  payments.forEach((p: any) => {
-    const isThisMonth = (p.createdAt || p.created_at || '').startsWith(currentMonthStr);
-    const isSettled = p.status === 'paid' || p.status === 'SETTLED';
-    if (isSettled && isThisMonth) {
-      thisMonthPaidTotal += Number(p.totalAmount || p.total_amount || p.amount || 0);
-    }
+  let thisMonthPaidTotal = totals.thisMonthRevenue ?? 0;
+  if (!thisMonthPaidTotal && payments.length > 0) {
+    payments.forEach((p: any) => {
+      const isThisMonth = (p.createdAt || p.created_at || '').startsWith(currentMonthStr);
+      const isSettled = p.status === 'paid' || p.status === 'SETTLED' || p.status === 'success';
+      if (isSettled && isThisMonth) {
+        thisMonthPaidTotal += Number(p.totalAmount || p.total_amount || p.amount || 0);
+      }
+    });
+  }
+
+  // Data sekolah terbaru persis dari database yang sebenarnya
+  const recentSchools = dbSchools.slice(0, 5).map((s: any, idx: number) => ({
+    id: s.id || s.school_id || `sc-${idx}`,
+    name: s.name || 'Sekolah Terdaftar',
+    tenant: 'Kawacanaan',
+    status: s.status === 'inactive' ? 'Nonaktif' : 'Aktif',
+    registeredAt: s.created_at
+      ? new Date(s.created_at).toLocaleDateString('id-ID', {
+          day: '2-digit',
+          month: 'short',
+          year: 'numeric',
+        })
+      : 'Baru saja',
+  }));
+
+  const lastUpdatedFormatted = lastUpdated.toLocaleTimeString('id-ID', {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
   });
-
-  // Data sekolah terbaru persis seperti di referensi dengan fallback dinamis
-  const defaultRecentSchools = [
-    {
-      id: 'sc-1',
-      name: 'SDN KAWUNG LUWUK',
-      tenant: 'Kawacanaan',
-      status: 'Aktif',
-      registeredAt: '23 Agu 2026',
-    },
-    {
-      id: 'sc-2',
-      name: 'SD Uji Keamanan 1789881806524',
-      tenant: 'Kawacanaan',
-      status: 'Aktif',
-      registeredAt: '22 Agu 2026',
-    },
-    {
-      id: 'sc-3',
-      name: 'SMPN 1',
-      tenant: 'Kawacanaan',
-      status: 'Aktif',
-      registeredAt: '18 Agu 2026',
-    },
-    {
-      id: 'sc-4',
-      name: 'SMA 1',
-      tenant: 'Kawacanaan',
-      status: 'Aktif',
-      registeredAt: '12 Agu 2026',
-    },
-    {
-      id: 'sc-5',
-      name: 'SDN Maju Bersama',
-      tenant: 'Kawacanaan',
-      status: 'Aktif',
-      registeredAt: '05 Agu 2026',
-    },
-  ];
-
-  // Gunakan sekolah dari database jika ada, atau fallback ke default list referensi
-  const recentSchools = dbSchools.length > 0
-    ? dbSchools.slice(0, 5).map((s: any, idx: number) => ({
-        id: s.id || s.school_id || `sc-${idx}`,
-        name: s.name || defaultRecentSchools[idx]?.name || 'Sekolah Terdaftar',
-        tenant: 'Kawacanaan',
-        status: s.status === 'inactive' ? 'Nonaktif' : 'Aktif',
-        registeredAt: s.created_at
-          ? new Date(s.created_at).toLocaleDateString('id-ID', {
-              day: '2-digit',
-              month: 'short',
-              year: 'numeric',
-            })
-          : defaultRecentSchools[idx]?.registeredAt || '20 Agu 2026',
-      }))
-    : defaultRecentSchools;
 
   return (
     <div className="space-y-3.5 sm:space-y-4 select-none">
@@ -137,8 +118,26 @@ export const OverviewSection: React.FC<OverviewSectionProps> = ({
       {/* 1. WELCOME HEADER & KAWACANAAN PRESENSI PROMO BANNER                      */}
       {/* ========================================================================= */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 sm:gap-4 items-stretch">
-        {/* Kiri: Welcome Greeting */}
+        {/* Kiri: Welcome Greeting & Real-time Live Badge */}
         <div className="lg:col-span-6 flex flex-col justify-center py-1">
+          <div className="flex items-center gap-2 mb-1">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 border border-emerald-200/60 text-emerald-700 text-[11px] font-bold">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span>Realtime Live</span>
+            </span>
+            <span className="text-[11px] text-slate-400 flex items-center gap-1 font-medium">
+              <Clock size={11} />
+              <span>Diperbarui {lastUpdatedFormatted}</span>
+            </span>
+            <button
+              onClick={() => load(false)}
+              disabled={loading || isRefreshing}
+              title="Segarkan data sekarang"
+              className="p-1 rounded-md text-slate-400 hover:text-blue-600 hover:bg-slate-100 transition cursor-pointer disabled:opacity-50"
+            >
+              <RefreshCw size={12} className={loading || isRefreshing ? 'animate-spin text-blue-600' : ''} />
+            </button>
+          </div>
           <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
             <span>Selamat Datang, Super Admin</span>
             <span className="inline-block animate-wave origin-[70%_70%]">👋</span>
@@ -178,7 +177,7 @@ export const OverviewSection: React.FC<OverviewSectionProps> = ({
       </div>
 
       {/* ========================================================================= */}
-      {/* 2. TOP 5 METRIC CARDS                                                     */}
+      {/* 2. TOP 5 METRIC CARDS (REALTIME DATA)                                    */}
       {/* ========================================================================= */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-3.5">
         {/* Card 1: Total Sekolah Terdaftar */}
@@ -197,14 +196,18 @@ export const OverviewSection: React.FC<OverviewSectionProps> = ({
 
           <div className="mt-2">
             <div className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-              {totals.schools || dbSchools.length || 49}
+              {totals.schools !== undefined ? totals.schools : dbSchools.length}
             </div>
           </div>
 
           <div className="mt-1 pt-1 flex items-end justify-between">
             <div className="text-[10.5px] font-bold text-emerald-600 flex items-center gap-0.5">
               <ArrowUp size={12} strokeWidth={2.5} />
-              <span>2 baru</span>
+              <span>
+                {totals.newSchoolsThisMonth !== undefined
+                  ? `${totals.newSchoolsThisMonth} baru bln ini`
+                  : `${totals.active ?? dbSchools.length} aktif`}
+              </span>
             </div>
             <MetricSparkline color="blue" className="w-14 h-6" />
           </div>
@@ -226,14 +229,18 @@ export const OverviewSection: React.FC<OverviewSectionProps> = ({
 
           <div className="mt-2">
             <div className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-              {totals.students ? totals.students.toLocaleString('id-ID') : '3.482'}
+              {(totals.students ?? 0).toLocaleString('id-ID')}
             </div>
           </div>
 
           <div className="mt-1 pt-1 flex items-end justify-between">
             <div className="text-[10.5px] font-bold text-emerald-600 flex items-center gap-0.5">
               <ArrowUp size={12} strokeWidth={2.5} />
-              <span>12 baru</span>
+              <span>
+                {totals.newStudentsThisMonth !== undefined
+                  ? `${totals.newStudentsThisMonth} baru bln ini`
+                  : 'Terdaftar di rombel'}
+              </span>
             </div>
             <MetricSparkline color="purple" className="w-14 h-6" />
           </div>
@@ -255,14 +262,18 @@ export const OverviewSection: React.FC<OverviewSectionProps> = ({
 
           <div className="mt-2">
             <div className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-              {totals.teachers ? totals.teachers.toLocaleString('id-ID') : '236'}
+              {(totals.teachers ?? 0).toLocaleString('id-ID')}
             </div>
           </div>
 
           <div className="mt-1 pt-1 flex items-end justify-between">
             <div className="text-[10.5px] font-bold text-emerald-600 flex items-center gap-0.5">
               <ArrowUp size={12} strokeWidth={2.5} />
-              <span>5 baru</span>
+              <span>
+                {totals.newTeachersThisMonth !== undefined
+                  ? `${totals.newTeachersThisMonth} baru bln ini`
+                  : 'Pendidik & Operator'}
+              </span>
             </div>
             <MetricSparkline color="emerald" className="w-14 h-6" />
           </div>
@@ -284,13 +295,15 @@ export const OverviewSection: React.FC<OverviewSectionProps> = ({
 
           <div className="mt-2">
             <div className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-              {dbSchools.length || 5}
+              {totals.active !== undefined ? totals.active : dbSchools.filter((s: any) => s.status === 'active').length}
             </div>
           </div>
 
           <div className="mt-1 pt-1 flex items-end justify-between">
             <div className="text-[10.5px] font-medium text-slate-400">
-              Instansi aktif
+              {totals.schools > 0
+                ? `${Math.round(((totals.active ?? 0) / totals.schools) * 100)}% rasio aktif`
+                : 'Instansi aktif'}
             </div>
             <MetricSparkline color="amber" className="w-14 h-6" />
           </div>
@@ -312,16 +325,18 @@ export const OverviewSection: React.FC<OverviewSectionProps> = ({
 
           <div className="mt-2">
             <div className="text-lg sm:text-xl font-black text-slate-900 tracking-tight truncate">
-              {thisMonthPaidTotal > 0
-                ? `Rp ${thisMonthPaidTotal.toLocaleString('id-ID')}`
-                : 'Rp 25.000'}
+              Rp {thisMonthPaidTotal.toLocaleString('id-ID')}
             </div>
           </div>
 
           <div className="mt-1 pt-1 flex items-end justify-between">
             <div className="text-[10.5px] font-bold text-emerald-600 flex items-center gap-0.5">
               <ArrowUp size={12} strokeWidth={2.5} />
-              <span>+18%</span>
+              <span>
+                {totals.settledCount !== undefined
+                  ? `${totals.settledCount} transaksi`
+                  : 'Riil bulan ini'}
+              </span>
             </div>
             <MetricSparkline color="rose" className="w-14 h-6" />
           </div>
@@ -332,9 +347,12 @@ export const OverviewSection: React.FC<OverviewSectionProps> = ({
       {/* 3. ROW 2: AKTIVITAS SISTEM 7 HARI & SEKOLAH TERBARU (BERDAMPINGAN)        */}
       {/* ========================================================================= */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3.5 sm:gap-4 items-stretch">
-        {/* Widget 1: Aktivitas Sistem 7 Hari Terakhir */}
+        {/* Widget 1: Aktivitas Sistem 7 Hari Terakhir (Realtime Chart) */}
         <div className="flex">
-          <ActivityChart className="w-full h-full" />
+          <ActivityChart
+            className="w-full h-full"
+            activityData={totals.activity7Days}
+          />
         </div>
 
         {/* Widget 2: Sekolah Terbaru */}
@@ -364,91 +382,104 @@ export const OverviewSection: React.FC<OverviewSectionProps> = ({
             </div>
 
             {/* List Sekolah Terbaru Berdampingan */}
-            <div className="divide-y divide-slate-50 mt-1">
-              {recentSchools.slice(0, 4).map((item) => (
-                <div
-                  key={item.id}
-                  onClick={() => onNavigate('sekolah', 'ringkasan', item.id)}
-                  className="py-2.5 px-2 flex items-center justify-between gap-3 hover:bg-slate-50/80 rounded-xl transition-colors group cursor-pointer relative"
-                >
-                  {/* Nama Sekolah & Tenant */}
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="w-8 h-8 rounded-xl bg-blue-50/80 text-blue-600 flex items-center justify-center shrink-0 border border-blue-100/60 font-bold group-hover:scale-105 transition-transform">
-                      <School size={15} />
-                    </div>
-                    <div className="min-w-0">
-                      <span className="font-bold text-slate-900 group-hover:text-blue-600 transition-colors text-xs truncate block">
-                        {item.name}
-                      </span>
-                      <div className="flex items-center gap-1.5 mt-0.5 text-[10.5px] text-slate-400">
-                        <span className="font-medium text-slate-500 truncate">{item.tenant}</span>
-                        <span>•</span>
-                        <span className="shrink-0">{item.registeredAt}</span>
+            {recentSchools.length > 0 ? (
+              <div className="divide-y divide-slate-50 mt-1">
+                {recentSchools.slice(0, 4).map((item) => (
+                  <div
+                    key={item.id}
+                    onClick={() => onNavigate('sekolah', 'ringkasan', item.id)}
+                    className="py-2.5 px-2 flex items-center justify-between gap-3 hover:bg-slate-50/80 rounded-xl transition-colors group cursor-pointer relative"
+                  >
+                    {/* Nama Sekolah & Tenant */}
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="w-8 h-8 rounded-xl bg-blue-50/80 text-blue-600 flex items-center justify-center shrink-0 border border-blue-100/60 font-bold group-hover:scale-105 transition-transform">
+                        <School size={15} />
+                      </div>
+                      <div className="min-w-0">
+                        <span className="font-bold text-slate-900 group-hover:text-blue-600 transition-colors text-xs truncate block">
+                          {item.name}
+                        </span>
+                        <div className="flex items-center gap-1.5 mt-0.5 text-[10.5px] text-slate-400">
+                          <span className="font-medium text-slate-500 truncate">{item.tenant}</span>
+                          <span>•</span>
+                          <span className="shrink-0">{item.registeredAt}</span>
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  {/* Status & Menu Aksi */}
-                  <div className="flex items-center gap-2 shrink-0">
-                    <span
-                      className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                        item.status === 'Aktif'
-                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/60'
-                          : 'bg-rose-50 text-rose-700 border border-rose-200/60'
-                      }`}
-                    >
-                      {item.status}
-                    </span>
-
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setActiveMenuSchoolId(activeMenuSchoolId === item.id ? null : item.id);
-                      }}
-                      className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition cursor-pointer"
-                    >
-                      <MoreVertical size={14} />
-                    </button>
-                  </div>
-
-                  {/* Dropdown Menu Ringkas */}
-                  {activeMenuSchoolId === item.id && (
-                    <div
-                      className="absolute right-2 top-9 bg-white border border-slate-200 shadow-xl rounded-xl py-1 w-36 z-30 text-left"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <button
-                        onClick={() => {
-                          setActiveMenuSchoolId(null);
-                          onNavigate('sekolah', 'ringkasan', item.id);
-                        }}
-                        className="w-full px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50 flex items-center gap-2 font-medium"
+                    {/* Status & Menu Aksi */}
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span
+                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                          item.status === 'Aktif'
+                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/60'
+                            : 'bg-rose-50 text-rose-700 border border-rose-200/60'
+                        }`}
                       >
-                        <Building2 size={13} />
-                        <span>Detail Sekolah</span>
-                      </button>
+                        {item.status}
+                      </span>
+
                       <button
-                        onClick={() => {
-                          setActiveMenuSchoolId(null);
-                          onNavigate('pembayaran', 'pembayaran');
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setActiveMenuSchoolId(activeMenuSchoolId === item.id ? null : item.id);
                         }}
-                        className="w-full px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50 flex items-center gap-2 font-medium"
+                        className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition cursor-pointer"
                       >
-                        <CreditCard size={13} />
-                        <span>Cek Tagihan</span>
+                        <MoreVertical size={14} />
                       </button>
                     </div>
-                  )}
-                </div>
-              ))}
-            </div>
+
+                    {/* Dropdown Menu Ringkas */}
+                    {activeMenuSchoolId === item.id && (
+                      <div
+                        className="absolute right-2 top-9 bg-white border border-slate-200 shadow-xl rounded-xl py-1 w-36 z-30 text-left"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <button
+                          onClick={() => {
+                            setActiveMenuSchoolId(null);
+                            onNavigate('sekolah', 'ringkasan', item.id);
+                          }}
+                          className="w-full px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50 flex items-center gap-2 font-medium cursor-pointer"
+                        >
+                          <Building2 size={13} />
+                          <span>Detail Sekolah</span>
+                        </button>
+                        <button
+                          onClick={() => {
+                            setActiveMenuSchoolId(null);
+                            onNavigate('pembayaran', 'pembayaran');
+                          }}
+                          className="w-full px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50 flex items-center gap-2 font-medium cursor-pointer"
+                        >
+                          <CreditCard size={13} />
+                          <span>Cek Tagihan</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="py-8 text-center text-slate-400 text-xs flex flex-col items-center justify-center gap-2">
+                <School size={24} className="text-slate-300" />
+                <span>Belum ada sekolah terdaftar di database.</span>
+                <button
+                  onClick={() => onNavigate('sekolah', 'tambah')}
+                  className="mt-1 px-3 py-1.5 rounded-lg bg-blue-50 text-blue-600 font-bold text-xs hover:bg-blue-100 transition cursor-pointer"
+                >
+                  + Tambah Sekolah
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Footer Card Ringkas */}
           <div className="pt-2 mt-1.5 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 font-medium">
             <span>
-              Total Instansi: <strong className="text-slate-800 font-bold">{totals.schools || dbSchools.length || 49}</strong>
+              Total Instansi: <strong className="text-slate-800 font-bold">{totals.schools !== undefined ? totals.schools : dbSchools.length}</strong>
             </span>
             <button
               onClick={() => onNavigate('sekolah', 'tambah')}

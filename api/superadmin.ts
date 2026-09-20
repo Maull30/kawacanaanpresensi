@@ -463,15 +463,33 @@ export default async function handler(req:any,res:any){
     }
 
     if(action==='dashboard'){
-      const [{data:schools},{data:students},{data:classes},{data:users},{data:schoolProfiles}]=await Promise.all([
-        admin.from('schools').select('id,name,npsn,code,plan,status,subscription_expires_at,max_teachers,max_students,max_classes,workspace_type,is_personal,created_at'),
-        admin.from('students').select('id, school_id'),
+      const nowDash = new Date();
+      const sevenDaysAgo = new Date(nowDash);
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
+      sevenDaysAgo.setHours(0, 0, 0, 0);
+      const sevenDaysAgoIso = sevenDaysAgo.toISOString();
+      const startOfMonth = new Date(nowDash.getFullYear(), nowDash.getMonth(), 1).toISOString();
+
+      const [
+        {data:schools},
+        {data:students},
+        {data:classes},
+        {data:users},
+        {data:schoolProfiles},
+        {data:payments},
+        {data:recentAuditLogs},
+        {data:recentAttendance}
+      ]=await Promise.all([
+        admin.from('schools').select('id,name,npsn,code,plan,status,subscription_expires_at,max_teachers,max_students,max_classes,workspace_type,is_personal,created_at').order('created_at', { ascending: false }),
+        admin.from('students').select('id, school_id, created_at'),
         admin.from('classes').select('id, school_id'),
-        admin.from('profiles').select('id, role, school_id').neq('role','SUPER_ADMIN'),
+        admin.from('profiles').select('id, role, school_id, created_at').neq('role','SUPER_ADMIN'),
         admin.from('school_profile').select('school_id, nama_sekolah, npsn'),
+        admin.from('payments').select('id, total_amount, amount, status, created_at, paid_at').order('created_at', { ascending: false }).limit(300),
+        admin.from('audit_logs').select('id, action, created_at').gte('created_at', sevenDaysAgoIso).limit(1000),
+        admin.from('attendance_records').select('id, date, created_at').gte('created_at', sevenDaysAgoIso).limit(1000)
       ]);
       const spMap = new Map((schoolProfiles || []).map((sp: any) => [sp.school_id, sp]));
-      const nowDash = new Date();
       const rows=(schools||[]).map((s:any)=>{
         const sp = spMap.get(s.id);
         const userFilledSchoolName = sp?.nama_sekolah && String(sp.nama_sekolah).trim() ? String(sp.nama_sekolah).trim() : null;
@@ -492,7 +510,6 @@ export default async function handler(req:any,res:any){
         guru_gratis: 0,
         guru_pro: 0,
         sekolah_pro: 0,
-        // Kompatibilitas baca untuk UI dashboard lama
         mulai: 0,
         teacher: 0,
         school: 0,
@@ -512,6 +529,55 @@ export default async function handler(req:any,res:any){
         }
       });
 
+      // Hitung metrik 7 Hari Terakhir sebenarnya (Login, Presensi, Transaksi)
+      const datesLabels: string[] = [];
+      const dateKeys: string[] = [];
+      const loginCounts: number[] = [];
+      const attendanceCounts: number[] = [];
+      const transactionCounts: number[] = [];
+
+      for (let i = 6; i >= 0; i--) {
+        const d = new Date(nowDash);
+        d.setDate(d.getDate() - i);
+        const yyyy = d.getFullYear();
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const dd = String(d.getDate()).padStart(2, '0');
+        const key = `${yyyy}-${mm}-${dd}`;
+        dateKeys.push(key);
+        datesLabels.push(d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' }));
+      }
+
+      dateKeys.forEach((k) => {
+        const lCount = (recentAuditLogs || []).filter((l: any) => (l.created_at || '').startsWith(k)).length;
+        const aCount = (recentAttendance || []).filter((a: any) => (a.date === k || (a.created_at || '').startsWith(k))).length;
+        const tCount = (payments || []).filter((p: any) => (p.created_at || '').startsWith(k)).length;
+        loginCounts.push(lCount);
+        attendanceCounts.push(aCount);
+        transactionCounts.push(tCount);
+      });
+
+      // Metrik pertumbuhan riil bulan ini
+      const newSchoolsThisMonth = rows.filter((s: any) => s.created_at && s.created_at >= startOfMonth).length;
+      const newStudentsThisMonth = (students || []).filter((st: any) => st.created_at && st.created_at >= startOfMonth).length;
+      const newTeachersThisMonth = (users || []).filter((u: any) => ['ADMIN','WALI KELAS','GURU MAPEL','KEPALA SEKOLAH'].includes(u.role) && u.created_at && u.created_at >= startOfMonth).length;
+
+      // Pendapatan riil
+      let thisMonthRevenue = 0;
+      let totalRevenue = 0;
+      let settledCount = 0;
+      (payments || []).forEach((p: any) => {
+        const isSettled = p.status === 'paid' || p.status === 'SETTLED' || p.status === 'success';
+        const amt = Number(p.total_amount || p.amount || 0);
+        if (isSettled) {
+          totalRevenue += amt;
+          settledCount++;
+          const pDate = p.paid_at || p.created_at || '';
+          if (pDate >= startOfMonth) {
+            thisMonthRevenue += amt;
+          }
+        }
+      });
+
       return json(res,200,{
         ok:true,
         schools:rows,
@@ -522,7 +588,168 @@ export default async function handler(req:any,res:any){
           students:students?.length||0,
           classes:classes?.length||0,
           users:users?.length||0,
+          newSchoolsThisMonth,
+          newStudentsThisMonth,
+          newTeachersThisMonth,
+          thisMonthRevenue,
+          totalRevenue,
+          settledCount,
           planBreakdown: planStats,
+          activity7Days: {
+            dates: datesLabels,
+            login: loginCounts,
+            attendance: attendanceCounts,
+            transaction: transactionCounts,
+          },
+        }
+      });
+    }
+
+    if(action==='school_users_recap'){
+      const [
+        {data:schools, error: schErr},
+        {data:profiles, error: profErr},
+        {data:students, error: stuErr},
+        {data:classes},
+        {data:schoolProfiles}
+      ] = await Promise.all([
+        admin.from('schools').select('id,name,npsn,code,plan,status,workspace_type,created_at').order('created_at', { ascending: false }),
+        admin.from('profiles').select('id,school_id,name,username,email,role,student_id,is_active,created_at').neq('role','SUPER_ADMIN'),
+        admin.from('students').select('id,school_id,nama,nisn,class_id,status,created_at'),
+        admin.from('classes').select('id,school_id,name,grade'),
+        admin.from('school_profile').select('school_id,nama_sekolah,npsn'),
+      ]);
+
+      if (schErr) throw schErr;
+      if (profErr) throw profErr;
+      if (stuErr) throw stuErr;
+
+      const spMap = new Map((schoolProfiles || []).map((sp: any) => [sp.school_id, sp]));
+      const classMap = new Map((classes || []).map((c: any) => [c.id, c.name]));
+
+      // Kelompokkan profil per sekolah
+      const profilesBySchool = new Map<string, any[]>();
+      (profiles || []).forEach((p: any) => {
+        const sid = p.school_id || 'unassigned';
+        if (!profilesBySchool.has(sid)) profilesBySchool.set(sid, []);
+        profilesBySchool.get(sid)!.push(p);
+      });
+
+      // Kelompokkan siswa per sekolah
+      const studentsBySchool = new Map<string, any[]>();
+      (students || []).forEach((st: any) => {
+        const sid = st.school_id || 'unassigned';
+        if (!studentsBySchool.has(sid)) studentsBySchool.set(sid, []);
+        studentsBySchool.get(sid)!.push({
+          ...st,
+          class_name: classMap.get(st.class_id) || null,
+        });
+      });
+
+      const recapRows = (schools || []).map((s: any) => {
+        const sp = spMap.get(s.id);
+        const schoolName = sp?.nama_sekolah && String(sp.nama_sekolah).trim() ? String(sp.nama_sekolah).trim() : (s.name || 'Sekolah');
+        const schProfiles = profilesBySchool.get(s.id) || [];
+        const schStudents = studentsBySchool.get(s.id) || [];
+
+        const admins = schProfiles.filter((p: any) => (p.role || '').toUpperCase() === 'ADMIN');
+        const headmasters = schProfiles.filter((p: any) => (p.role || '').toUpperCase() === 'KEPALA SEKOLAH');
+        const homerooms = schProfiles.filter((p: any) => (p.role || '').toUpperCase() === 'WALI KELAS');
+        const subjectTeachers = schProfiles.filter((p: any) => (p.role || '').toUpperCase() === 'GURU MAPEL');
+        const studentProfiles = schProfiles.filter((p: any) => (p.role || '').toUpperCase() === 'SISWA');
+
+        // Normalisasi list data siswa
+        const mergedStudents: any[] = [];
+        const seenStudentIds = new Set<string>();
+        const studentProfileMap = new Map(studentProfiles.map((item: any) => [item.student_id || item.username, item]));
+
+        schStudents.forEach((st: any) => {
+          seenStudentIds.add(st.id);
+          const matchedProfile = studentProfileMap.get(st.id) || studentProfileMap.get(st.nisn);
+          mergedStudents.push({
+            id: st.id,
+            profile_id: matchedProfile?.id || null,
+            name: st.nama,
+            username: matchedProfile?.username || st.nisn || '-',
+            email: matchedProfile?.email || null,
+            role: 'SISWA',
+            class_name: st.class_name || null,
+            nisn: st.nisn || null,
+            status: st.status || (matchedProfile?.is_active === false ? 'inactive' : 'active'),
+            is_active: matchedProfile?.is_active !== false,
+            created_at: st.created_at || matchedProfile?.created_at,
+            has_login: !!matchedProfile,
+          });
+        });
+
+        studentProfiles.forEach((item: any) => {
+          if (!item.student_id || !seenStudentIds.has(item.student_id)) {
+            mergedStudents.push({
+              id: item.student_id || item.id,
+              profile_id: item.id,
+              name: item.name,
+              username: item.username,
+              email: item.email,
+              role: 'SISWA',
+              class_name: null,
+              nisn: null,
+              status: item.is_active === false ? 'inactive' : 'active',
+              is_active: item.is_active !== false,
+              created_at: item.created_at,
+              has_login: true,
+            });
+          }
+        });
+
+        const adminCount = admins.length;
+        const headmasterCount = headmasters.length;
+        const homeroomCount = homerooms.length;
+        const subjectTeacherCount = subjectTeachers.length;
+        const studentCount = mergedStudents.length;
+        const totalUserCount = adminCount + headmasterCount + homeroomCount + subjectTeacherCount + studentCount;
+
+        return {
+          school_id: s.id,
+          school_name: schoolName,
+          npsn: sp?.npsn || s.npsn || null,
+          code: s.code ? String(s.code).replace(/^SCH-?/i, '').trim().toUpperCase() : null,
+          status: s.status || 'active',
+          plan: normalizePlan(s.plan),
+          created_at: s.created_at,
+          admin_count: adminCount,
+          headmaster_count: headmasterCount,
+          homeroom_count: homeroomCount,
+          subject_teacher_count: subjectTeacherCount,
+          student_count: studentCount,
+          total_users: totalUserCount,
+          users: {
+            admin: admins,
+            headmaster: headmasters,
+            homeroom: homerooms,
+            subject_teacher: subjectTeachers,
+            student: mergedStudents,
+            all: [
+              ...admins,
+              ...headmasters,
+              ...homerooms,
+              ...subjectTeachers,
+              ...mergedStudents,
+            ]
+          }
+        };
+      });
+
+      return json(res, 200, {
+        ok: true,
+        recap: recapRows,
+        summary: {
+          total_schools: recapRows.length,
+          total_admins: recapRows.reduce((acc, r) => acc + r.admin_count, 0),
+          total_headmasters: recapRows.reduce((acc, r) => acc + r.headmaster_count, 0),
+          total_homerooms: recapRows.reduce((acc, r) => acc + r.homeroom_count, 0),
+          total_subject_teachers: recapRows.reduce((acc, r) => acc + r.subject_teacher_count, 0),
+          total_students: recapRows.reduce((acc, r) => acc + r.student_count, 0),
+          total_users: recapRows.reduce((acc, r) => acc + r.total_users, 0),
         }
       });
     }

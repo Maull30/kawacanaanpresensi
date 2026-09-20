@@ -47,14 +47,22 @@ export const MetricSparkline: React.FC<{
  * 7-Day System Activity Multi-Line Smooth Chart
  * Responsive curve lines, axes and styling fitted for side-by-side dashboard view.
  */
+export interface SystemActivity7Days {
+  dates: string[];
+  login: number[];
+  attendance: number[];
+  transaction: number[];
+}
+
 export const ActivityChart: React.FC<{
   className?: string;
-}> = ({ className = '' }) => {
+  activityData?: SystemActivity7Days;
+}> = ({ className = '', activityData }) => {
   const [selectedFilter, setSelectedFilter] = useState<'all' | 'login' | 'attendance' | 'transaction'>('all');
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
 
-  // 7 Hari Terakhir (Dinamis berbasis kalender lokal)
-  const dates = React.useMemo(() => {
+  // 7 Hari Terakhir (Dinamis berbasis kalender lokal atau data API)
+  const defaultDates = React.useMemo(() => {
     const result: string[] = [];
     const now = new Date();
     for (let i = 6; i >= 0; i--) {
@@ -70,17 +78,41 @@ export const ActivityChart: React.FC<{
     return result;
   }, []);
 
-  // 7 points for smooth curves (Login, Presensi, Transaksi)
-  const loginData = [1380, 1420, 1620, 1350, 1480, 1390, 1550];
-  const attendanceData = [950, 1020, 1050, 850, 980, 920, 1080];
-  const transactionData = [410, 450, 480, 420, 520, 490, 540];
+  const dates = activityData?.dates && activityData.dates.length === 7 ? activityData.dates : defaultDates;
+  const loginData = activityData?.login && activityData.login.length === 7 ? activityData.login : [0, 0, 0, 0, 0, 0, 0];
+  const attendanceData = activityData?.attendance && activityData.attendance.length === 7 ? activityData.attendance : [0, 0, 0, 0, 0, 0, 0];
+  const transactionData = activityData?.transaction && activityData.transaction.length === 7 ? activityData.transaction : [0, 0, 0, 0, 0, 0, 0];
 
   // SVG coordinate transformation for compact side-by-side card
   const chartW = 460;
   const chartH = 135;
   const startX = 42;
   const startY = 12;
-  const maxVal = 2000;
+
+  // Hitung batas atas skala (maxVal) dinamis dari data riil
+  const rawMax = Math.max(
+    ...loginData,
+    ...attendanceData,
+    ...transactionData,
+    0
+  );
+  let maxVal = 10;
+  if (rawMax <= 10) maxVal = 10;
+  else if (rawMax <= 25) maxVal = 25;
+  else if (rawMax <= 50) maxVal = 50;
+  else if (rawMax <= 100) maxVal = 100;
+  else if (rawMax <= 250) maxVal = 250;
+  else if (rawMax <= 500) maxVal = 500;
+  else if (rawMax <= 1000) maxVal = 1000;
+  else maxVal = Math.ceil(rawMax / 500) * 500;
+
+  const yTicks = [
+    maxVal,
+    Math.round(maxVal * 0.75),
+    Math.round(maxVal * 0.5),
+    Math.round(maxVal * 0.25),
+    0,
+  ];
 
   const getX = (index: number) => startX + (index / (dates.length - 1)) * chartW;
   const getY = (val: number) => startY + chartH - (val / maxVal) * chartH;
@@ -105,8 +137,6 @@ export const ActivityChart: React.FC<{
   const transactionPath = buildPath(transactionData);
 
   const loginArea = `${loginPath} L ${getX(dates.length - 1)} ${startY + chartH} L ${getX(0)} ${startY + chartH} Z`;
-
-  const yTicks = [2000, 1500, 1000, 500, 0];
 
   return (
     <div className={`bg-white rounded-2xl border border-slate-100 shadow-xs p-4 sm:p-5 flex flex-col justify-between ${className}`}>

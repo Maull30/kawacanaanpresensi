@@ -21,6 +21,12 @@ import {
   User,
   School,
   Lock,
+  Award,
+  BookOpen,
+  GraduationCap,
+  ExternalLink,
+  Copy,
+  Check,
 } from 'lucide-react';
 
 export interface SchoolUsersTabProps {
@@ -30,20 +36,42 @@ export interface SchoolUsersTabProps {
   onNavigateToSchool?: (schoolId: string) => void;
 }
 
+type UserCategory = 'admin' | 'headmaster' | 'homeroom' | 'subject_teacher' | 'student' | 'all';
+
+interface PopupState {
+  schoolId: string;
+  schoolName: string;
+  npsn?: string | null;
+  category: UserCategory;
+  categoryLabel: string;
+  users: any[];
+}
+
 export const SchoolUsersTab: React.FC<SchoolUsersTabProps> = ({
   call,
   showToast,
   schools = [],
   onNavigateToSchool,
 }) => {
-  const [users, setUsers] = useState<any[]>([]);
+  const [recapData, setRecapData] = useState<any[]>([]);
+  const [summary, setSummary] = useState<any>({
+    total_schools: 0,
+    total_admins: 0,
+    total_headmasters: 0,
+    total_homerooms: 0,
+    total_subject_teachers: 0,
+    total_students: 0,
+    total_users: 0,
+  });
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [selectedRole, setSelectedRole] = useState<string>('all');
-  const [selectedSchool, setSelectedSchool] = useState<string>('all');
-  const [selectedStatus, setSelectedStatus] = useState<'all' | 'active' | 'inactive'>('all');
-  const [currentPage, setCurrentPage] = useState(1);
-  const pageSize = 12;
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
+
+  // Interactive Popup Modal state
+  const [popupState, setPopupState] = useState<PopupState | null>(null);
+  const [popupSearch, setPopupSearch] = useState('');
+  const [popupRoleTab, setPopupRoleTab] = useState<string>('all');
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   // Modal State Tambah Pengguna
   const [isAddUserOpen, setIsAddUserOpen] = useState(false);
@@ -64,155 +92,152 @@ export const SchoolUsersTab: React.FC<SchoolUsersTabProps> = ({
   const [showResetPassword, setShowResetPassword] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
 
-  // Modal State Hapus Pengguna
-  const [userToDelete, setUserToDelete] = useState<any | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
-
-  const loadUsers = async () => {
+  const loadRecap = async () => {
     setLoading(true);
     try {
-      const res = await call('list_users');
-      setUsers(res.users || []);
+      const res = await call('school_users_recap');
+      if (res.ok) {
+        setRecapData(res.recap || []);
+        if (res.summary) setSummary(res.summary);
+      }
     } catch (err: any) {
-      showToast(err.message || 'Gagal memuat daftar pengguna.', 'error');
+      showToast(err.message || 'Gagal memuat data rekapitulasi pengguna.', 'error');
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    loadUsers();
+    loadRecap();
   }, []);
 
-  // Metrik Statistik Pengguna
-  const stats = useMemo(() => {
-    let total = users.length;
-    let admins = 0;
-    let teachers = 0;
-    let headmasters = 0;
-    let students = 0;
-    let active = 0;
-    let inactive = 0;
-
-    users.forEach((u) => {
-      const r = (u.role || '').toUpperCase();
-      if (r === 'ADMIN') admins++;
-      else if (r === 'KEPALA SEKOLAH') headmasters++;
-      else if (r === 'WALI KELAS' || r === 'GURU MAPEL') teachers++;
-      else if (r === 'SISWA') students++;
-
-      if (u.is_active !== false) active++;
-      else inactive++;
-    });
-
-    return { total, admins, teachers, headmasters, students, active, inactive };
-  }, [users]);
-
-  // Filter Pengguna
-  const filteredUsers = useMemo(() => {
-    return users.filter((u) => {
+  // Filter Baris Tabel berdasarkan pencarian sekolah / NPSN / status
+  const filteredRecap = useMemo(() => {
+    return recapData.filter((item) => {
       const q = search.toLowerCase().trim();
+      const matchSearch =
+        !q ||
+        (item.school_name && item.school_name.toLowerCase().includes(q)) ||
+        (item.npsn && item.npsn.toLowerCase().includes(q)) ||
+        (item.code && item.code.toLowerCase().includes(q));
+
+      const matchStatus =
+        statusFilter === 'all' ||
+        (statusFilter === 'active' && item.status === 'active') ||
+        (statusFilter === 'inactive' && item.status === 'inactive');
+
+      return matchSearch && matchStatus;
+    });
+  }, [recapData, search, statusFilter]);
+
+  // Buka Popup Data Pengguna saat angka diklik
+  const handleCellClick = (
+    item: any,
+    category: UserCategory,
+    categoryLabel: string
+  ) => {
+    const list = item.users?.[category] || [];
+    setPopupSearch('');
+    setPopupRoleTab('all');
+    setPopupState({
+      schoolId: item.school_id,
+      schoolName: item.school_name,
+      npsn: item.npsn,
+      category,
+      categoryLabel,
+      users: list,
+    });
+  };
+
+  // Filter Pengguna di dalam Popup
+  const filteredPopupUsers = useMemo(() => {
+    if (!popupState) return [];
+    return popupState.users.filter((u) => {
+      const q = popupSearch.toLowerCase().trim();
       const matchSearch =
         !q ||
         (u.name && u.name.toLowerCase().includes(q)) ||
         (u.username && u.username.toLowerCase().includes(q)) ||
         (u.email && u.email.toLowerCase().includes(q)) ||
-        (u.school_name && u.school_name.toLowerCase().includes(q));
+        (u.nisn && u.nisn.toLowerCase().includes(q)) ||
+        (u.class_name && u.class_name.toLowerCase().includes(q));
 
-      const matchRole = selectedRole === 'all' || (u.role || '').toUpperCase() === selectedRole.toUpperCase();
-      const matchSchool = selectedSchool === 'all' || u.school_id === selectedSchool;
+      let matchRole = true;
+      if (popupState.category === 'all' && popupRoleTab !== 'all') {
+        matchRole = (u.role || '').toUpperCase() === popupRoleTab.toUpperCase();
+      }
 
-      let matchStatus = true;
-      if (selectedStatus === 'active') matchStatus = u.is_active !== false;
-      if (selectedStatus === 'inactive') matchStatus = u.is_active === false;
-
-      return matchSearch && matchRole && matchSchool && matchStatus;
+      return matchSearch && matchRole;
     });
-  }, [users, search, selectedRole, selectedSchool, selectedStatus]);
+  }, [popupState, popupSearch, popupRoleTab]);
 
-  // Pagination
-  const totalPages = Math.ceil(filteredUsers.length / pageSize) || 1;
-  const paginatedUsers = useMemo(() => {
-    const start = (currentPage - 1) * pageSize;
-    return filteredUsers.slice(start, start + pageSize);
-  }, [filteredUsers, currentPage]);
-
-  // Handle Toggle Aktif Pengguna
-  const handleToggleStatus = async (user: any) => {
-    const nextStatus = user.is_active === false ? true : false;
-    try {
-      await call('toggle_admin', { user_id: user.id, is_active: nextStatus });
-      showToast(
-        `Status akun "${user.name}" diubah menjadi ${nextStatus ? 'Aktif' : 'Nonaktif'}.`,
-        'success'
-      );
-      setUsers((prev) =>
-        prev.map((u) => (u.id === user.id ? { ...u, is_active: nextStatus } : u))
-      );
-    } catch (err: any) {
-      showToast(err.message || 'Gagal mengubah status pengguna.', 'error');
-    }
-  };
-
-  // Handle Simpan Tambah Pengguna
-  const handleAddUser = async (e: React.FormEvent) => {
+  // Handle Tambah Akun Pengguna Baru
+  const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!addForm.school_id || !addForm.name || !addForm.username || !addForm.password) {
-      showToast('Sekolah, Nama, Username, dan Password wajib diisi.', 'error');
+    if (!addForm.school_id) {
+      showToast('Pilih sekolah / ruang kerja terlebih dahulu.', 'error');
+      return;
+    }
+    if (!addForm.name.trim() || !addForm.username.trim() || !addForm.password.trim()) {
+      showToast('Nama, username, dan kata sandi wajib diisi.', 'error');
       return;
     }
     if (addForm.password.length < 8) {
-      showToast('Password minimal 8 karakter.', 'error');
+      showToast('Kata sandi minimal 8 karakter.', 'error');
       return;
     }
 
     setIsSubmittingAdd(true);
     try {
-      await call('create_admin', {
+      const res = await call('create_user', {
         school_id: addForm.school_id,
-        name: addForm.name,
-        username: addForm.username,
-        email: addForm.email,
+        name: addForm.name.trim(),
+        username: addForm.username.trim().toLowerCase(),
+        email: addForm.email.trim().toLowerCase() || null,
         password: addForm.password,
         role: addForm.role,
       });
 
-      showToast(`Pengguna "${addForm.name}" berhasil ditambahkan ke sistem!`, 'success');
-      setIsAddUserOpen(false);
-      setAddForm({
-        school_id: '',
-        name: '',
-        username: '',
-        email: '',
-        password: '',
-        role: 'ADMIN',
-      });
-      loadUsers();
+      if (res.ok) {
+        showToast(`Akun ${addForm.role} atas nama ${addForm.name} berhasil dibuat!`, 'success');
+        setIsAddUserOpen(false);
+        setAddForm({
+          school_id: '',
+          name: '',
+          username: '',
+          email: '',
+          password: '',
+          role: 'ADMIN',
+        });
+        loadRecap();
+      }
     } catch (err: any) {
-      showToast(err.message || 'Gagal menambahkan pengguna.', 'error');
+      showToast(err.message || 'Gagal membuat akun pengguna.', 'error');
     } finally {
       setIsSubmittingAdd(false);
     }
   };
 
-  // Handle Reset Sandi
+  // Handle Reset Sandi Pengguna
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!resetModalUser || !newPassword) return;
-    if (newPassword.length < 8) {
+    if (!resetModalUser || !newPassword || newPassword.length < 8) {
       showToast('Kata sandi baru minimal 8 karakter.', 'error');
       return;
     }
 
     setIsResetting(true);
     try {
-      await call('reset_admin_password', {
-        user_id: resetModalUser.id,
+      const res = await call('reset_admin_password', {
+        user_id: resetModalUser.id || resetModalUser.profile_id,
         password: newPassword,
       });
-      showToast(`Kata sandi untuk "${resetModalUser.name}" berhasil direset!`, 'success');
-      setResetModalUser(null);
-      setNewPassword('');
+
+      if (res.ok) {
+        showToast(`Kata sandi untuk ${resetModalUser.name} berhasil diperbarui.`, 'success');
+        setResetModalUser(null);
+        setNewPassword('');
+      }
     } catch (err: any) {
       showToast(err.message || 'Gagal mereset kata sandi.', 'error');
     } finally {
@@ -220,413 +245,625 @@ export const SchoolUsersTab: React.FC<SchoolUsersTabProps> = ({
     }
   };
 
-  // Handle Hapus Pengguna
-  const handleDeleteUser = async () => {
-    if (!userToDelete) return;
-
-    setIsDeleting(true);
-    try {
-      await call('delete_user', {
-        user_id: userToDelete.id,
-      });
-      showToast(`Akun pengguna "${userToDelete.name}" berhasil dihapus.`, 'success');
-      setUserToDelete(null);
-      loadUsers();
-    } catch (err: any) {
-      showToast(err.message || 'Gagal menghapus pengguna.', 'error');
-    } finally {
-      setIsDeleting(false);
-    }
+  // Handle Salin Info Akun
+  const handleCopyCredentials = (u: any) => {
+    const text = `Akun Kawacanaan:\nNama: ${u.name}\nUsername: ${u.username || u.nisn}\nRole: ${u.role}\nInstansi: ${popupState?.schoolName || '-'}`;
+    navigator.clipboard.writeText(text);
+    setCopiedId(u.id);
+    showToast('Info akun berhasil disalin ke clipboard!', 'info');
+    setTimeout(() => setCopiedId(null), 2000);
   };
 
-  // Export CSV
-  const handleExportCSV = () => {
-    if (filteredUsers.length === 0) {
-      showToast('Tidak ada data pengguna yang dapat diekspor.', 'info');
-      return;
+  const getCategoryIcon = (category: UserCategory) => {
+    switch (category) {
+      case 'admin':
+        return <Shield size={16} className="text-blue-600" />;
+      case 'headmaster':
+        return <Award size={16} className="text-purple-600" />;
+      case 'homeroom':
+        return <Users size={16} className="text-emerald-600" />;
+      case 'subject_teacher':
+        return <BookOpen size={16} className="text-amber-600" />;
+      case 'student':
+        return <GraduationCap size={16} className="text-sky-600" />;
+      default:
+        return <Building2 size={16} className="text-indigo-600" />;
     }
-    const headers = ['Nama Lengkap', 'Username', 'Email', 'Peran / Role', 'Asal Sekolah', 'Status Akun', 'Tanggal Daftar'];
-    const rows = filteredUsers.map((u) => [
-      `"${u.name || ''}"`,
-      `"${u.username || ''}"`,
-      `"${u.email || ''}"`,
-      `"${u.role || ''}"`,
-      `"${u.school_name || ''}"`,
-      `"${u.is_active !== false ? 'Aktif' : 'Nonaktif'}"`,
-      `"${u.created_at ? new Date(u.created_at).toLocaleDateString('id-ID') : '-'}"`,
-    ]);
-    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `pengguna_sekolah_${new Date().toISOString().slice(0, 10)}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    showToast('Data pengguna berhasil diekspor ke CSV!', 'success');
-  };
-
-  // Helper warna role badge
-  const getRoleBadge = (role: string) => {
-    const r = (role || '').toUpperCase();
-    if (r === 'ADMIN' || r === 'SUPER_ADMIN') {
-      return 'bg-indigo-50 text-indigo-700 border-indigo-200';
-    }
-    if (r === 'KEPALA SEKOLAH') {
-      return 'bg-purple-50 text-purple-700 border-purple-200';
-    }
-    if (r === 'WALI KELAS') {
-      return 'bg-emerald-50 text-emerald-700 border-emerald-200';
-    }
-    if (r === 'GURU MAPEL') {
-      return 'bg-blue-50 text-blue-700 border-blue-200';
-    }
-    return 'bg-slate-100 text-slate-700 border-slate-200';
   };
 
   return (
-    <div className="space-y-6">
-      {/* 1. HEADER SECTION */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-3.5">
-          <div className="w-11 h-11 rounded-2xl bg-teal-600 text-white flex items-center justify-center shadow-md shadow-teal-500/20 shrink-0">
-            <Users size={22} />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-                Pengguna Sekolah
-              </h1>
-              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-teal-50 text-teal-700 border border-teal-200">
-                Multi-Tenant Accounts
-              </span>
-            </div>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Direktori akun terintegrasi: Administrator tenant, Kepala Sekolah, Wali Kelas, Guru Mapel, dan Siswa.
-            </p>
-          </div>
+    <div className="space-y-4 select-none">
+      {/* ========================================================================= */}
+      {/* 1. HEADER & GLOBAL SUMMARY RECAPITULATION CARDS                           */}
+      {/* ========================================================================= */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-1 border-b border-slate-100">
+        <div>
+          <h2 className="text-lg font-black text-slate-900 tracking-tight flex items-center gap-2">
+            <span>Rekapitulasi Pengguna per Sekolah</span>
+            <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-100">
+              Multi-Tenant
+            </span>
+          </h2>
+          <p className="text-xs text-slate-500 mt-0.5">
+            Tabel rekapitulasi data Admin, Kepala Sekolah, Wali Kelas, Guru Mapel, dan Siswa. Klik angka pada tabel untuk melihat rincian pengguna.
+          </p>
         </div>
 
-        {/* Action Controls */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           <button
             type="button"
-            onClick={loadUsers}
+            onClick={loadRecap}
             disabled={loading}
-            className="p-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition cursor-pointer"
-            title="Muat Ulang Pengguna"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-slate-700 text-xs font-bold hover:bg-slate-50 transition shadow-2xs cursor-pointer disabled:opacity-50"
           >
-            <RefreshCw size={15} className={loading ? 'animate-spin text-teal-600' : ''} />
-          </button>
-
-          <button
-            type="button"
-            onClick={handleExportCSV}
-            className="px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold flex items-center gap-1.5 cursor-pointer transition shadow-xs"
-          >
-            <Download size={14} />
-            <span className="hidden sm:inline">Ekspor CSV</span>
+            <RefreshCw size={13} className={loading ? 'animate-spin text-blue-600' : ''} />
+            <span>Segarkan</span>
           </button>
 
           <button
             type="button"
             onClick={() => setIsAddUserOpen(true)}
-            className="px-4 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold shadow-xs flex items-center gap-1.5 cursor-pointer transition shrink-0"
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition shadow-xs cursor-pointer active:scale-95"
           >
-            <Plus size={15} />
-            <span>Tambah Pengguna</span>
+            <Plus size={14} />
+            <span>Tambah Akun Baru</span>
           </button>
         </div>
       </div>
 
-      {/* 2. STATS OVERVIEW CARDS */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
-        <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs">
-          <div className="flex items-center justify-between text-slate-500 mb-2">
-            <span className="text-[11px] font-bold uppercase tracking-wider">Total Pengguna</span>
-            <Users size={16} className="text-slate-400" />
+      {/* Grid Ringkasan Global */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2.5">
+        {/* Sekolah */}
+        <div className="bg-white rounded-2xl border border-slate-100 p-3 shadow-2xs flex flex-col justify-between">
+          <div className="flex items-center gap-1.5 text-[11px] font-bold text-slate-500">
+            <School size={13} className="text-slate-500" />
+            <span>Total Sekolah</span>
           </div>
-          <div className="text-2xl font-black text-slate-900">{stats.total}</div>
-          <p className="text-[10px] text-slate-400 mt-1">Akun seluruh instansi</p>
+          <div className="mt-1.5 text-xl font-black text-slate-900">
+            {summary.total_schools}
+          </div>
+          <div className="text-[10px] text-slate-400 font-medium mt-0.5">Instansi tenant</div>
         </div>
 
-        <div className="bg-white p-4 rounded-2xl border border-indigo-100 shadow-xs">
-          <div className="flex items-center justify-between text-indigo-600 mb-2">
-            <span className="text-[11px] font-bold uppercase tracking-wider">Admin Tenant</span>
-            <Shield size={16} className="text-indigo-500" />
+        {/* Admin */}
+        <div className="bg-white rounded-2xl border border-blue-100 p-3 shadow-2xs flex flex-col justify-between bg-blue-50/20">
+          <div className="flex items-center gap-1.5 text-[11px] font-bold text-blue-700">
+            <Shield size={13} className="text-blue-600" />
+            <span>Admin</span>
           </div>
-          <div className="text-2xl font-black text-indigo-700">{stats.admins}</div>
-          <p className="text-[10px] text-slate-400 mt-1">Pengelola sistem sekolah</p>
+          <div className="mt-1.5 text-xl font-black text-blue-950">
+            {summary.total_admins}
+          </div>
+          <div className="text-[10px] text-blue-600 font-medium mt-0.5">Operator sekolah</div>
         </div>
 
-        <div className="bg-white p-4 rounded-2xl border border-emerald-100 shadow-xs">
-          <div className="flex items-center justify-between text-emerald-600 mb-2">
-            <span className="text-[11px] font-bold uppercase tracking-wider">Guru & Pendidik</span>
-            <UserCheck size={16} className="text-emerald-500" />
+        {/* Kepala Sekolah */}
+        <div className="bg-white rounded-2xl border border-purple-100 p-3 shadow-2xs flex flex-col justify-between bg-purple-50/20">
+          <div className="flex items-center gap-1.5 text-[11px] font-bold text-purple-700">
+            <Award size={13} className="text-purple-600" />
+            <span>Kepala Sekolah</span>
           </div>
-          <div className="text-2xl font-black text-emerald-700">{stats.teachers}</div>
-          <p className="text-[10px] text-slate-400 mt-1">Wali kelas & guru mapel</p>
+          <div className="mt-1.5 text-xl font-black text-purple-950">
+            {summary.total_headmasters}
+          </div>
+          <div className="text-[10px] text-purple-600 font-medium mt-0.5">Pimpinan instansi</div>
         </div>
 
-        <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs">
-          <div className="flex items-center justify-between text-slate-500 mb-2">
-            <span className="text-[11px] font-bold uppercase tracking-wider">Status Akun</span>
-            <Building2 size={16} className="text-slate-400" />
+        {/* Wali Kelas */}
+        <div className="bg-white rounded-2xl border border-emerald-100 p-3 shadow-2xs flex flex-col justify-between bg-emerald-50/20">
+          <div className="flex items-center gap-1.5 text-[11px] font-bold text-emerald-700">
+            <Users size={13} className="text-emerald-600" />
+            <span>Wali Kelas</span>
           </div>
-          <div className="flex items-baseline gap-2">
-            <span className="text-2xl font-black text-emerald-600">{stats.active}</span>
-            <span className="text-xs text-slate-400 font-bold">/ {stats.inactive} nonaktif</span>
+          <div className="mt-1.5 text-xl font-black text-emerald-950">
+            {summary.total_homerooms}
           </div>
-          <p className="text-[10px] text-slate-400 mt-1">Status operasional login</p>
+          <div className="text-[10px] text-emerald-600 font-medium mt-0.5">Pembina rombel</div>
+        </div>
+
+        {/* Guru Mapel */}
+        <div className="bg-white rounded-2xl border border-amber-100 p-3 shadow-2xs flex flex-col justify-between bg-amber-50/20">
+          <div className="flex items-center gap-1.5 text-[11px] font-bold text-amber-700">
+            <BookOpen size={13} className="text-amber-600" />
+            <span>Guru Mapel</span>
+          </div>
+          <div className="mt-1.5 text-xl font-black text-amber-950">
+            {summary.total_subject_teachers}
+          </div>
+          <div className="text-[10px] text-amber-600 font-medium mt-0.5">Pengajar kurikulum</div>
+        </div>
+
+        {/* Siswa */}
+        <div className="bg-white rounded-2xl border border-sky-100 p-3 shadow-2xs flex flex-col justify-between bg-sky-50/20">
+          <div className="flex items-center gap-1.5 text-[11px] font-bold text-sky-700">
+            <GraduationCap size={13} className="text-sky-600" />
+            <span>Siswa</span>
+          </div>
+          <div className="mt-1.5 text-xl font-black text-sky-950">
+            {summary.total_students.toLocaleString('id-ID')}
+          </div>
+          <div className="text-[10px] text-sky-600 font-medium mt-0.5">Peserta didik</div>
+        </div>
+
+        {/* Total Pengguna */}
+        <div className="col-span-2 sm:col-span-1 bg-gradient-to-br from-indigo-600 to-blue-700 rounded-2xl p-3 shadow-md text-white flex flex-col justify-between">
+          <div className="flex items-center gap-1.5 text-[11px] font-bold text-indigo-100">
+            <UserCheck size={13} className="text-indigo-200" />
+            <span>Total Pengguna</span>
+          </div>
+          <div className="mt-1.5 text-xl font-black text-white tracking-tight">
+            {summary.total_users.toLocaleString('id-ID')}
+          </div>
+          <div className="text-[10px] text-indigo-200 font-medium mt-0.5">Semua entitas</div>
         </div>
       </div>
 
-      {/* 3. TOOLBAR FILTER */}
-      <div className="bg-white p-3.5 rounded-2xl border border-slate-100 shadow-xs flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
-        <div className="relative flex-1">
-          <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+      {/* ========================================================================= */}
+      {/* 2. SEARCH & FILTER TOOLBAR                                                */}
+      {/* ========================================================================= */}
+      <div className="bg-white rounded-2xl border border-slate-100 shadow-xs p-3 flex flex-col sm:flex-row items-center justify-between gap-2.5">
+        <div className="relative w-full sm:w-72">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
             type="text"
             value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              setCurrentPage(1);
-            }}
-            placeholder="Cari nama pengguna, username, email, atau instansi..."
-            className="w-full pl-9 pr-4 py-2 rounded-xl border border-slate-200 text-xs font-medium focus:outline-teal-600 placeholder:text-slate-400"
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Cari nama sekolah / NPSN..."
+            className="w-full pl-9 pr-3 py-1.5 rounded-xl border border-slate-200 text-xs font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
           />
+          {search && (
+            <button
+              onClick={() => setSearch('')}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+            >
+              <X size={12} />
+            </button>
+          )}
         </div>
 
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0">
-          {/* Filter Peran */}
-          <select
-            value={selectedRole}
-            onChange={(e) => {
-              setSelectedRole(e.target.value);
-              setCurrentPage(1);
-            }}
-            className="px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-700 focus:outline-teal-600"
-          >
-            <option value="all">Semua Peran</option>
-            <option value="ADMIN">Admin Sekolah</option>
-            <option value="KEPALA SEKOLAH">Kepala Sekolah</option>
-            <option value="WALI KELAS">Wali Kelas</option>
-            <option value="GURU MAPEL">Guru Mapel</option>
-            <option value="SISWA">Siswa</option>
-          </select>
-
-          {/* Filter Sekolah */}
-          {schools.length > 0 && (
+        <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+          <div className="flex items-center gap-1.5 text-xs text-slate-500">
+            <Filter size={13} className="text-slate-400" />
+            <span className="text-[11px] font-semibold">Status:</span>
             <select
-              value={selectedSchool}
-              onChange={(e) => {
-                setSelectedSchool(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-700 focus:outline-teal-600 max-w-[180px] truncate"
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as any)}
+              className="text-xs font-semibold px-2.5 py-1 rounded-xl border border-slate-200 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 cursor-pointer"
             >
-              <option value="all">Semua Sekolah</option>
-              {schools.map((s) => (
-                <option key={s.id || s.school_id} value={s.id || s.school_id}>
-                  {s.name}
-                </option>
-              ))}
+              <option value="all">Semua Status</option>
+              <option value="active">Sekolah Aktif</option>
+              <option value="inactive">Sekolah Nonaktif</option>
             </select>
-          )}
-
-          {/* Filter Status */}
-          <select
-            value={selectedStatus}
-            onChange={(e: any) => {
-              setSelectedStatus(e.target.value);
-              setCurrentPage(1);
-            }}
-            className="px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-700 focus:outline-teal-600"
-          >
-            <option value="all">Semua Status</option>
-            <option value="active">Aktif</option>
-            <option value="inactive">Nonaktif</option>
-          </select>
+          </div>
         </div>
       </div>
 
-      {/* 4. TABEL PENGGUNA TERINTEGRASI */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+      {/* ========================================================================= */}
+      {/* 3. TABEL REKAPITULASI PENGGUNA PER SEKOLAH (PERSIS SPESIFIKASI USER)      */}
+      {/* ========================================================================= */}
+      <div className="bg-white rounded-2xl border border-slate-100 shadow-xs overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
+          <table className="w-full text-left text-xs border-collapse">
             <thead>
-              <tr className="border-b border-slate-200 text-slate-500 font-bold bg-slate-50/80">
-                <th className="py-3 px-4">Pengguna</th>
-                <th className="py-3 px-4">Asal Instansi</th>
-                <th className="py-3 px-4">Peran (Role)</th>
-                <th className="py-3 px-4">Kontak & Email</th>
-                <th className="py-3 px-4">Status</th>
-                <th className="py-3 px-4 text-right">Aksi</th>
+              <tr className="bg-slate-50/90 text-slate-700 border-b border-slate-200/80 uppercase font-black text-[10.5px] tracking-wider">
+                <th className="py-3 px-4 min-w-[220px]">Sekolah (Nama Sekolah)</th>
+                <th className="py-3 px-3 text-center min-w-[85px]">Admin</th>
+                <th className="py-3 px-3 text-center min-w-[110px]">Kepala Sekolah</th>
+                <th className="py-3 px-3 text-center min-w-[95px]">Wali Kelas</th>
+                <th className="py-3 px-3 text-center min-w-[95px]">Guru Mapel</th>
+                <th className="py-3 px-3 text-center min-w-[85px]">Siswa</th>
+                <th className="py-3 px-4 text-center min-w-[125px] bg-slate-100/70">Jumlah Pengguna</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {loading ? (
                 <tr>
-                  <td colSpan={6} className="py-12 text-center text-slate-400">
-                    <RefreshCw size={20} className="animate-spin mx-auto text-teal-600 mb-2" />
-                    <span>Memuat data seluruh akun pengguna sekolah...</span>
+                  <td colSpan={7} className="py-12 text-center text-slate-400">
+                    <div className="flex flex-col items-center justify-center gap-2">
+                      <RefreshCw size={22} className="animate-spin text-blue-600" />
+                      <span className="text-xs font-medium">Memuat data rekapitulasi sekolah...</span>
+                    </div>
                   </td>
                 </tr>
-              ) : paginatedUsers.length === 0 ? (
+              ) : filteredRecap.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-12 text-center text-slate-400">
-                    Tidak ditemukan pengguna yang cocok dengan kriteria pencarian.
+                  <td colSpan={7} className="py-12 text-center text-slate-400">
+                    <div className="flex flex-col items-center justify-center gap-2">
+                      <School size={28} className="text-slate-300" />
+                      <span className="text-xs font-semibold text-slate-600">
+                        Tidak ada data sekolah yang sesuai dengan pencarian.
+                      </span>
+                    </div>
                   </td>
                 </tr>
               ) : (
-                paginatedUsers.map((u) => {
-                  const isActive = u.is_active !== false;
-                  const initials = (u.name || u.username || 'U')
-                    .slice(0, 2)
-                    .toUpperCase();
-
-                  return (
-                    <tr key={u.id} className="hover:bg-slate-50/80 transition">
-                      <td className="py-3.5 px-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-linear-to-br from-teal-500 to-indigo-600 text-white font-black text-[11px] flex items-center justify-center shrink-0 shadow-xs">
-                            {initials}
+                filteredRecap.map((item, idx) => (
+                  <tr
+                    key={item.school_id || idx}
+                    className="hover:bg-blue-50/30 transition-colors group"
+                  >
+                    {/* Kolom 1: Sekolah (Nama Sekolah) */}
+                    <td className="py-3 px-4">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-xs shrink-0 border border-blue-100">
+                          <School size={15} />
+                        </div>
+                        <div className="min-w-0">
+                          <div className="font-bold text-slate-900 group-hover:text-blue-600 transition-colors flex items-center gap-1.5">
+                            <span className="truncate">{item.school_name}</span>
+                            {item.status === 'active' ? (
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" title="Aktif" />
+                            ) : (
+                              <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0" title="Nonaktif" />
+                            )}
                           </div>
-                          <div>
-                            <div className="font-bold text-slate-900">{u.name}</div>
-                            <div className="text-[11px] text-slate-500 font-mono">@{u.username}</div>
+                          <div className="flex items-center gap-2 text-[10.5px] text-slate-400 mt-0.5">
+                            <span>NPSN: {item.npsn || '-'}</span>
+                            {item.code && (
+                              <>
+                                <span>•</span>
+                                <span className="font-mono text-slate-500">{item.code}</span>
+                              </>
+                            )}
                           </div>
                         </div>
-                      </td>
+                      </div>
+                    </td>
 
-                      <td className="py-3.5 px-4">
-                        <div className="font-semibold text-slate-800 flex items-center gap-1.5">
-                          <Building2 size={13} className="text-slate-400 shrink-0" />
-                          <span className="truncate max-w-[200px]">{u.school_name || '-'}</span>
-                        </div>
-                        {u.npsn && (
-                          <div className="text-[10px] text-slate-400 font-mono ml-4">
-                            NPSN: {u.npsn}
-                          </div>
-                        )}
-                      </td>
+                    {/* Kolom 2: Admin (Clickable Number) */}
+                    <td className="py-3 px-3 text-center">
+                      <button
+                        type="button"
+                        onClick={() => handleCellClick(item, 'admin', 'Admin')}
+                        className={`inline-flex items-center justify-center min-w-[34px] px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer active:scale-95 ${
+                          item.admin_count > 0
+                            ? 'bg-blue-50 text-blue-700 hover:bg-blue-600 hover:text-white border border-blue-200/60 shadow-2xs'
+                            : 'text-slate-400 hover:bg-slate-100 hover:text-slate-600'
+                        }`}
+                        title={`Klik untuk melihat detail ${item.admin_count} Admin`}
+                      >
+                        {item.admin_count}
+                      </button>
+                    </td>
 
-                      <td className="py-3.5 px-4">
-                        <span
-                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${getRoleBadge(
-                            u.role
-                          )}`}
-                        >
-                          {u.role || 'USER'}
-                        </span>
-                      </td>
+                    {/* Kolom 3: Kepala Sekolah (Clickable Number) */}
+                    <td className="py-3 px-3 text-center">
+                      <button
+                        type="button"
+                        onClick={() => handleCellClick(item, 'headmaster', 'Kepala Sekolah')}
+                        className={`inline-flex items-center justify-center min-w-[34px] px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer active:scale-95 ${
+                          item.headmaster_count > 0
+                            ? 'bg-purple-50 text-purple-700 hover:bg-purple-600 hover:text-white border border-purple-200/60 shadow-2xs'
+                            : 'text-slate-400 hover:bg-slate-100 hover:text-slate-600'
+                        }`}
+                        title={`Klik untuk melihat detail ${item.headmaster_count} Kepala Sekolah`}
+                      >
+                        {item.headmaster_count}
+                      </button>
+                    </td>
 
-                      <td className="py-3.5 px-4">
-                        <div className="text-slate-600 flex items-center gap-1.5 font-mono text-[11px]">
-                          <Mail size={12} className="text-slate-400 shrink-0" />
-                          <span className="truncate max-w-[180px]">{u.email || '-'}</span>
-                        </div>
-                      </td>
+                    {/* Kolom 4: Wali Kelas (Clickable Number) */}
+                    <td className="py-3 px-3 text-center">
+                      <button
+                        type="button"
+                        onClick={() => handleCellClick(item, 'homeroom', 'Wali Kelas')}
+                        className={`inline-flex items-center justify-center min-w-[34px] px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer active:scale-95 ${
+                          item.homeroom_count > 0
+                            ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white border border-emerald-200/60 shadow-2xs'
+                            : 'text-slate-400 hover:bg-slate-100 hover:text-slate-600'
+                        }`}
+                        title={`Klik untuk melihat detail ${item.homeroom_count} Wali Kelas`}
+                      >
+                        {item.homeroom_count}
+                      </button>
+                    </td>
 
-                      <td className="py-3.5 px-4">
-                        <button
-                          type="button"
-                          onClick={() => handleToggleStatus(u)}
-                          className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold cursor-pointer transition ${
-                            isActive
-                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100'
-                              : 'bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100'
-                          }`}
-                          title="Klik untuk ubah status aktif/nonaktif"
-                        >
-                          {isActive ? (
-                            <>
-                              <UserCheck size={11} />
-                              <span>Aktif</span>
-                            </>
-                          ) : (
-                            <>
-                              <UserX size={11} />
-                              <span>Nonaktif</span>
-                            </>
-                          )}
-                        </button>
-                      </td>
+                    {/* Kolom 5: Guru Mapel (Clickable Number) */}
+                    <td className="py-3 px-3 text-center">
+                      <button
+                        type="button"
+                        onClick={() => handleCellClick(item, 'subject_teacher', 'Guru Mapel')}
+                        className={`inline-flex items-center justify-center min-w-[34px] px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer active:scale-95 ${
+                          item.subject_teacher_count > 0
+                            ? 'bg-amber-50 text-amber-700 hover:bg-amber-600 hover:text-white border border-amber-200/60 shadow-2xs'
+                            : 'text-slate-400 hover:bg-slate-100 hover:text-slate-600'
+                        }`}
+                        title={`Klik untuk melihat detail ${item.subject_teacher_count} Guru Mapel`}
+                      >
+                        {item.subject_teacher_count}
+                      </button>
+                    </td>
 
-                      <td className="py-3.5 px-4 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setResetModalUser(u);
-                              setNewPassword('');
-                            }}
-                            className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-700 transition cursor-pointer"
-                            title="Reset Kata Sandi"
-                          >
-                            <KeyRound size={13} />
-                          </button>
+                    {/* Kolom 6: Siswa (Clickable Number) */}
+                    <td className="py-3 px-3 text-center">
+                      <button
+                        type="button"
+                        onClick={() => handleCellClick(item, 'student', 'Siswa')}
+                        className={`inline-flex items-center justify-center min-w-[34px] px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer active:scale-95 ${
+                          item.student_count > 0
+                            ? 'bg-sky-50 text-sky-700 hover:bg-sky-600 hover:text-white border border-sky-200/60 shadow-2xs'
+                            : 'text-slate-400 hover:bg-slate-100 hover:text-slate-600'
+                        }`}
+                        title={`Klik untuk melihat detail ${item.student_count} Siswa`}
+                      >
+                        {item.student_count.toLocaleString('id-ID')}
+                      </button>
+                    </td>
 
-                          <button
-                            type="button"
-                            onClick={() => setUserToDelete(u)}
-                            className="p-1.5 rounded-lg border border-rose-200 hover:bg-rose-50 text-rose-600 transition cursor-pointer"
-                            title="Hapus Akun Pengguna"
-                          >
-                            <Trash2 size={13} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
+                    {/* Kolom 7: Jumlah Pengguna (Clickable Number - Highlighted) */}
+                    <td className="py-3 px-4 text-center bg-slate-50/50">
+                      <button
+                        type="button"
+                        onClick={() => handleCellClick(item, 'all', 'Semua Pengguna')}
+                        className={`inline-flex items-center justify-center min-w-[42px] px-3 py-1 rounded-xl text-xs font-black transition-all cursor-pointer active:scale-95 ${
+                          item.total_users > 0
+                            ? 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-xs'
+                            : 'text-slate-400 hover:bg-slate-200'
+                        }`}
+                        title={`Klik untuk melihat total ${item.total_users} Pengguna di ${item.school_name}`}
+                      >
+                        {item.total_users.toLocaleString('id-ID')}
+                      </button>
+                    </td>
+                  </tr>
+                ))
               )}
             </tbody>
+
+            {/* Total Row di Bawah Tabel */}
+            {filteredRecap.length > 0 && (
+              <tfoot>
+                <tr className="bg-slate-100/80 font-black text-slate-800 border-t-2 border-slate-200">
+                  <td className="py-3 px-4">
+                    <span className="text-xs font-black">TOTAL KESELURUHAN ({filteredRecap.length} SEKOLAH)</span>
+                  </td>
+                  <td className="py-3 px-3 text-center text-blue-700">
+                    {filteredRecap.reduce((acc, r) => acc + r.admin_count, 0)}
+                  </td>
+                  <td className="py-3 px-3 text-center text-purple-700">
+                    {filteredRecap.reduce((acc, r) => acc + r.headmaster_count, 0)}
+                  </td>
+                  <td className="py-3 px-3 text-center text-emerald-700">
+                    {filteredRecap.reduce((acc, r) => acc + r.homeroom_count, 0)}
+                  </td>
+                  <td className="py-3 px-3 text-center text-amber-700">
+                    {filteredRecap.reduce((acc, r) => acc + r.subject_teacher_count, 0)}
+                  </td>
+                  <td className="py-3 px-3 text-center text-sky-700">
+                    {filteredRecap.reduce((acc, r) => acc + r.student_count, 0).toLocaleString('id-ID')}
+                  </td>
+                  <td className="py-3 px-4 text-center text-indigo-900 bg-slate-200/60 font-black">
+                    {filteredRecap.reduce((acc, r) => acc + r.total_users, 0).toLocaleString('id-ID')}
+                  </td>
+                </tr>
+              </tfoot>
+            )}
           </table>
         </div>
+      </div>
 
-        {/* Pagination Footer */}
-        {filteredUsers.length > pageSize && (
-          <div className="p-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-            <div>
-              Menampilkan {(currentPage - 1) * pageSize + 1} -{' '}
-              {Math.min(currentPage * pageSize, filteredUsers.length)} dari {filteredUsers.length} pengguna
-            </div>
-            <div className="flex items-center gap-1.5">
+      {/* ========================================================================= */}
+      {/* 4. POPUP MODAL DATA PENGGUNA (MUNCUL KETIKA ANGKA DIKLIK)                 */}
+      {/* ========================================================================= */}
+      {popupState && (
+        <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
+          <div className="bg-white rounded-3xl max-w-4xl w-full shadow-2xl border border-slate-100 flex flex-col max-h-[85vh] animate-in fade-in zoom-in-95 duration-200 overflow-hidden">
+            {/* Modal Header */}
+            <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between gap-3 shrink-0 bg-slate-50/60">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-white shadow-xs border border-slate-200 flex items-center justify-center shrink-0">
+                  {getCategoryIcon(popupState.category)}
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-base font-black text-slate-900">
+                      Rincian {popupState.categoryLabel}
+                    </h3>
+                    <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-100 text-blue-800">
+                      {popupState.users.length} pengguna
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1.5">
+                    <span className="font-semibold text-slate-700">{popupState.schoolName}</span>
+                    {popupState.npsn && <span>• NPSN: {popupState.npsn}</span>}
+                  </p>
+                </div>
+              </div>
+
               <button
                 type="button"
-                disabled={currentPage === 1}
-                onClick={() => setCurrentPage((p) => p - 1)}
-                className="px-2.5 py-1 rounded-lg border border-slate-200 disabled:opacity-40 cursor-pointer"
+                onClick={() => setPopupState(null)}
+                className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition cursor-pointer"
               >
-                Sebelumnya
+                <X size={18} />
               </button>
-              <span className="font-bold px-2">
-                {currentPage} / {totalPages}
+            </div>
+
+            {/* Toolbar Filter di dalam Modal */}
+            <div className="px-5 py-3 border-b border-slate-100 bg-white flex flex-col sm:flex-row items-center justify-between gap-2.5 shrink-0">
+              <div className="relative w-full sm:w-80">
+                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  value={popupSearch}
+                  onChange={(e) => setPopupSearch(e.target.value)}
+                  placeholder="Cari nama, username, email, NISN, atau kelas..."
+                  className="w-full pl-9 pr-3 py-1.5 rounded-xl border border-slate-200 text-xs font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                />
+                {popupSearch && (
+                  <button
+                    onClick={() => setPopupSearch('')}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                  >
+                    <X size={12} />
+                  </button>
+                )}
+              </div>
+
+              {/* Tab filter per role jika sedang melihat 'Semua Pengguna' */}
+              {popupState.category === 'all' && (
+                <div className="flex items-center gap-1 overflow-x-auto max-w-full pb-1 sm:pb-0">
+                  {['all', 'ADMIN', 'KEPALA SEKOLAH', 'WALI KELAS', 'GURU MAPEL', 'SISWA'].map((r) => (
+                    <button
+                      key={r}
+                      onClick={() => setPopupRoleTab(r)}
+                      className={`px-2.5 py-1 rounded-lg text-[11px] font-bold shrink-0 transition-all cursor-pointer ${
+                        popupRoleTab === r
+                          ? 'bg-blue-600 text-white shadow-2xs'
+                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                      }`}
+                    >
+                      {r === 'all' ? 'Semua Role' : r}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* List Tabel Pengguna */}
+            <div className="flex-1 overflow-y-auto p-5">
+              {filteredPopupUsers.length === 0 ? (
+                <div className="py-12 text-center text-slate-400 flex flex-col items-center justify-center gap-2">
+                  <User size={32} className="text-slate-300" />
+                  <span className="text-xs font-bold text-slate-600">
+                    {popupSearch
+                      ? 'Tidak ada pengguna yang cocok dengan pencarian.'
+                      : `Belum ada data ${popupState.categoryLabel.toLowerCase()} terdaftar di sekolah ini.`}
+                  </span>
+                </div>
+              ) : (
+                <div className="border border-slate-100 rounded-2xl overflow-hidden shadow-2xs">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="bg-slate-50 text-slate-600 border-b border-slate-200/80 font-black text-[10.5px] uppercase tracking-wider">
+                        <th className="py-2.5 px-3 w-10 text-center">No</th>
+                        <th className="py-2.5 px-3">Nama Lengkap</th>
+                        <th className="py-2.5 px-3">Username / NISN</th>
+                        <th className="py-2.5 px-3">Role / Jabatan</th>
+                        <th className="py-2.5 px-3">Email / Kontak</th>
+                        <th className="py-2.5 px-3 text-center">Status</th>
+                        <th className="py-2.5 px-3 text-right">Aksi</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {filteredPopupUsers.map((u, i) => {
+                        const roleUpper = (u.role || '').toUpperCase();
+                        let roleBadgeClass = 'bg-slate-100 text-slate-700';
+                        if (roleUpper === 'ADMIN') roleBadgeClass = 'bg-blue-100 text-blue-800 border-blue-200';
+                        else if (roleUpper === 'KEPALA SEKOLAH') roleBadgeClass = 'bg-purple-100 text-purple-800 border-purple-200';
+                        else if (roleUpper === 'WALI KELAS') roleBadgeClass = 'bg-emerald-100 text-emerald-800 border-emerald-200';
+                        else if (roleUpper === 'GURU MAPEL') roleBadgeClass = 'bg-amber-100 text-amber-800 border-amber-200';
+                        else if (roleUpper === 'SISWA') roleBadgeClass = 'bg-sky-100 text-sky-800 border-sky-200';
+
+                        const isUserActive = u.is_active !== false && u.status !== 'inactive';
+
+                        return (
+                          <tr key={u.id || i} className="hover:bg-slate-50/70 transition-colors">
+                            <td className="py-2.5 px-3 text-center text-slate-400 font-medium">
+                              {i + 1}
+                            </td>
+                            <td className="py-2.5 px-3 font-bold text-slate-900">
+                              <div className="flex items-center gap-2">
+                                <div className="w-6 h-6 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center font-bold text-[10px] shrink-0">
+                                  {u.name ? u.name.charAt(0).toUpperCase() : '?'}
+                                </div>
+                                <span>{u.name}</span>
+                              </div>
+                            </td>
+                            <td className="py-2.5 px-3 font-mono text-slate-600">
+                              {u.username || u.nisn || '-'}
+                            </td>
+                            <td className="py-2.5 px-3">
+                              <span
+                                className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-black border ${roleBadgeClass}`}
+                              >
+                                {u.role}
+                              </span>
+                              {u.class_name && (
+                                <span className="ml-1 text-[10px] text-slate-500 font-medium">
+                                  ({u.class_name})
+                                </span>
+                              )}
+                            </td>
+                            <td className="py-2.5 px-3 text-slate-500">
+                              {u.email || '-'}
+                            </td>
+                            <td className="py-2.5 px-3 text-center">
+                              <span
+                                className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                  isUserActive
+                                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/60'
+                                    : 'bg-rose-50 text-rose-700 border border-rose-200/60'
+                                }`}
+                              >
+                                {isUserActive ? 'Aktif' : 'Nonaktif'}
+                              </span>
+                            </td>
+                            <td className="py-2.5 px-3 text-right">
+                              <div className="flex items-center justify-end gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => handleCopyCredentials(u)}
+                                  className="p-1 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition cursor-pointer"
+                                  title="Salin Info Pengguna"
+                                >
+                                  {copiedId === u.id ? (
+                                    <Check size={13} className="text-emerald-600" />
+                                  ) : (
+                                    <Copy size={13} />
+                                  )}
+                                </button>
+                                {u.profile_id && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setResetModalUser(u)}
+                                    className="p-1 rounded-lg text-slate-400 hover:text-amber-600 hover:bg-amber-50 transition cursor-pointer"
+                                    title="Reset Sandi"
+                                  >
+                                    <KeyRound size={13} />
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-5 py-3 border-t border-slate-100 bg-slate-50 flex items-center justify-between text-xs text-slate-500 shrink-0">
+              <span>
+                Menampilkan <strong className="text-slate-800">{filteredPopupUsers.length}</strong> dari{' '}
+                {popupState.users.length} data
               </span>
               <button
                 type="button"
-                disabled={currentPage >= totalPages}
-                onClick={() => setCurrentPage((p) => p + 1)}
-                className="px-2.5 py-1 rounded-lg border border-slate-200 disabled:opacity-40 cursor-pointer"
+                onClick={() => setPopupState(null)}
+                className="px-4 py-1.5 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-800 text-xs font-bold transition cursor-pointer"
               >
-                Selanjutnya
+                Tutup
               </button>
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
-      {/* 5. MODAL TAMBAH PENGGUNA BARU */}
+      {/* ========================================================================= */}
+      {/* 5. MODAL TAMBAH PENGGUNA BARU                                            */}
+      {/* ========================================================================= */}
       {isAddUserOpen && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4 border border-slate-100">
             <div className="flex items-center justify-between pb-2 border-b border-slate-100">
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-teal-50 text-teal-600 flex items-center justify-center font-bold">
+                <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
                   <Users size={16} />
                 </div>
-                <h3 className="text-sm font-black text-slate-900">Tambah Akun Pengguna Sekolah</h3>
+                <h3 className="text-sm font-black text-slate-900">Tambah Akun Pengguna Baru</h3>
               </div>
               <button
                 type="button"
@@ -637,35 +874,35 @@ export const SchoolUsersTab: React.FC<SchoolUsersTabProps> = ({
               </button>
             </div>
 
-            <form onSubmit={handleAddUser} className="space-y-3.5">
+            <form onSubmit={handleCreateUser} className="space-y-3.5">
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Sekolah / Instansi Target *</label>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Sekolah / Instansi *</label>
                 <select
                   required
                   value={addForm.school_id}
                   onChange={(e) => setAddForm({ ...addForm, school_id: e.target.value })}
-                  className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs font-medium focus:outline-teal-600 bg-white"
+                  className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs font-medium focus:outline-blue-600"
                 >
-                  <option value="">-- Pilih Sekolah --</option>
-                  {schools.map((s) => (
-                    <option key={s.id || s.school_id} value={s.id || s.school_id}>
-                      {s.name} {s.npsn ? `(${s.npsn})` : ''}
+                  <option value="">-- Pilih Sekolah / Instansi --</option>
+                  {recapData.map((s) => (
+                    <option key={s.school_id} value={s.school_id}>
+                      {s.school_name} {s.npsn ? `(${s.npsn})` : ''}
                     </option>
                   ))}
                 </select>
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Peran / Hak Akses *</label>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Role Akun *</label>
                 <select
                   value={addForm.role}
                   onChange={(e) => setAddForm({ ...addForm, role: e.target.value })}
-                  className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs font-medium focus:outline-teal-600 bg-white"
+                  className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs font-medium focus:outline-blue-600"
                 >
-                  <option value="ADMIN">ADMIN (Operator & Pengelola)</option>
-                  <option value="KEPALA SEKOLAH">KEPALA SEKOLAH (Eksekutif & Laporan)</option>
-                  <option value="WALI KELAS">WALI KELAS (Presensi & Kelas)</option>
-                  <option value="GURU MAPEL">GURU MAPEL (Presensi Mapel)</option>
+                  <option value="ADMIN">Admin Sekolah</option>
+                  <option value="KEPALA SEKOLAH">Kepala Sekolah</option>
+                  <option value="WALI KELAS">Wali Kelas</option>
+                  <option value="GURU MAPEL">Guru Mata Pelajaran</option>
                 </select>
               </div>
 
@@ -676,21 +913,21 @@ export const SchoolUsersTab: React.FC<SchoolUsersTabProps> = ({
                   required
                   value={addForm.name}
                   onChange={(e) => setAddForm({ ...addForm, name: e.target.value })}
-                  className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs font-medium focus:outline-teal-600"
-                  placeholder="Contoh: Budi Santoso, S.Pd"
+                  placeholder="cth. Budi Santoso, S.Pd."
+                  className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs font-medium focus:outline-blue-600"
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Username Login *</label>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Username *</label>
                   <input
                     type="text"
                     required
                     value={addForm.username}
-                    onChange={(e) => setAddForm({ ...addForm, username: e.target.value.toLowerCase().trim() })}
-                    className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs font-mono font-medium focus:outline-teal-600"
-                    placeholder="budisantoso"
+                    onChange={(e) => setAddForm({ ...addForm, username: e.target.value })}
+                    placeholder="cth. budi_admin"
+                    className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs font-medium focus:outline-blue-600"
                   />
                 </div>
 
@@ -700,14 +937,14 @@ export const SchoolUsersTab: React.FC<SchoolUsersTabProps> = ({
                     type="email"
                     value={addForm.email}
                     onChange={(e) => setAddForm({ ...addForm, email: e.target.value })}
-                    className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs font-medium focus:outline-teal-600"
                     placeholder="budi@sekolah.sch.id"
+                    className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs font-medium focus:outline-blue-600"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Kata Sandi Default *</label>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Kata Sandi *</label>
                 <div className="relative">
                   <input
                     type={showAddPassword ? 'text' : 'password'}
@@ -715,8 +952,8 @@ export const SchoolUsersTab: React.FC<SchoolUsersTabProps> = ({
                     minLength={8}
                     value={addForm.password}
                     onChange={(e) => setAddForm({ ...addForm, password: e.target.value })}
-                    className="w-full px-3.5 py-2 pr-10 rounded-xl border border-slate-200 text-xs font-medium focus:outline-teal-600"
                     placeholder="Minimal 8 karakter"
+                    className="w-full px-3.5 py-2 pr-10 rounded-xl border border-slate-200 text-xs font-medium focus:outline-blue-600"
                   />
                   <button
                     type="button"
@@ -728,7 +965,7 @@ export const SchoolUsersTab: React.FC<SchoolUsersTabProps> = ({
                 </div>
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
                 <button
                   type="button"
                   onClick={() => setIsAddUserOpen(false)}
@@ -739,9 +976,9 @@ export const SchoolUsersTab: React.FC<SchoolUsersTabProps> = ({
                 <button
                   type="submit"
                   disabled={isSubmittingAdd}
-                  className="px-5 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold cursor-pointer disabled:opacity-50 shadow-xs"
+                  className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold cursor-pointer disabled:opacity-50 shadow-xs"
                 >
-                  {isSubmittingAdd ? 'Menyimpan...' : 'Buat Pengguna'}
+                  {isSubmittingAdd ? 'Menyimpan...' : 'Buat Akun'}
                 </button>
               </div>
             </form>
@@ -749,7 +986,9 @@ export const SchoolUsersTab: React.FC<SchoolUsersTabProps> = ({
         </div>
       )}
 
-      {/* 6. MODAL RESET PASSWORD */}
+      {/* ========================================================================= */}
+      {/* 6. MODAL RESET PASSWORD                                                  */}
+      {/* ========================================================================= */}
       {resetModalUser && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl space-y-4 border border-slate-100">
@@ -813,42 +1052,6 @@ export const SchoolUsersTab: React.FC<SchoolUsersTabProps> = ({
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
-
-      {/* 7. MODAL KONFIRMASI HAPUS PENGGUNA */}
-      {userToDelete && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl space-y-4 border border-rose-100">
-            <div className="w-10 h-10 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center mx-auto">
-              <Trash2 size={20} />
-            </div>
-
-            <div className="text-center space-y-1">
-              <h3 className="text-sm font-black text-slate-900">Hapus Akun Pengguna?</h3>
-              <p className="text-xs text-slate-500">
-                Apakah Anda yakin ingin menghapus akun <strong className="text-slate-900">{userToDelete.name}</strong> (@{userToDelete.username}) secara permanen?
-              </p>
-            </div>
-
-            <div className="flex items-center justify-center gap-2 pt-2">
-              <button
-                type="button"
-                onClick={() => setUserToDelete(null)}
-                className="px-4 py-2 rounded-xl bg-slate-100 text-slate-700 text-xs font-bold hover:bg-slate-200 cursor-pointer"
-              >
-                Batal
-              </button>
-              <button
-                type="button"
-                disabled={isDeleting}
-                onClick={handleDeleteUser}
-                className="px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold cursor-pointer disabled:opacity-50 shadow-xs"
-              >
-                {isDeleting ? 'Menghapus...' : 'Ya, Hapus Akun'}
-              </button>
-            </div>
           </div>
         </div>
       )}

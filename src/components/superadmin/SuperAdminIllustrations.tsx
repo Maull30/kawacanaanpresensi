@@ -340,3 +340,139 @@ export const SchoolBuildingIllustration: React.FC<{ className?: string }> = ({ c
     </div>
   );
 };
+
+/**
+ * 3D Isometric / Angled Payment Card & Floating Receipt Illustration
+ * Matching the exact visual style in the uploaded reference image for Pembayaran.
+ */
+export const PaymentCardIllustration: React.FC<{ className?: string }> = ({ className = "w-44 h-24" }) => {
+  return (
+    <div className={`relative flex items-center justify-center select-none pointer-events-none ${className}`}>
+      <svg
+        viewBox="0 0 240 140"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+        className="w-full h-full drop-shadow-md overflow-visible"
+      >
+        <defs>
+          {/* Gradients */}
+          <linearGradient id="cardGradFront" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#2563EB" />
+            <stop offset="60%" stopColor="#1D4ED8" />
+            <stop offset="100%" stopColor="#1E3A8A" />
+          </linearGradient>
+
+          <linearGradient id="cardGradBack" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#60A5FA" />
+            <stop offset="100%" stopColor="#3B82F6" />
+          </linearGradient>
+
+          <linearGradient id="receiptGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stopColor="#FFFFFF" />
+            <stop offset="100%" stopColor="#F1F5F9" />
+          </linearGradient>
+
+          <linearGradient id="chipGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#FCD34D" />
+            <stop offset="100%" stopColor="#F59E0B" />
+          </linearGradient>
+
+          <filter id="softGlowPay" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur stdDeviation="5" result="blur" />
+            <feComposite in="SourceGraphic" in2="blur" operator="over" />
+          </filter>
+        </defs>
+
+        {/* Floating background ambient glow */}
+        <ellipse cx="140" cy="85" rx="80" ry="24" fill="#3B82F6" opacity="0.18" filter="url(#softGlowPay)" />
+
+        {/* Ambient floating elements / sparkles */}
+        <circle cx="50" cy="30" r="4" fill="#60A5FA" opacity="0.4" />
+        <circle cx="215" cy="40" r="3" fill="#A855F7" opacity="0.5" />
+        <circle cx="65" cy="85" r="3" fill="#F59E0B" opacity="0.6" />
+        
+        {/* Floating Receipt / Paper Bill in the background */}
+        <g transform="rotate(-12 110 50)">
+          <path
+            d="M 85 15 L 140 15 L 140 90 L 135 86 L 130 90 L 125 86 L 120 90 L 115 86 L 110 90 L 105 86 L 100 90 L 95 86 L 90 90 L 85 86 Z"
+            fill="url(#receiptGrad)"
+            stroke="#CBD5E1"
+            strokeWidth="1"
+            filter="drop-shadow(0 4px 6px rgba(0,0,0,0.06))"
+          />
+          {/* Header of receipt */}
+          <rect x="92" y="24" width="22" height="4" rx="2" fill="#94A3B8" />
+          <circle cx="128" cy="26" r="3" fill="#3B82F6" opacity="0.8" />
+          {/* Receipt text lines */}
+          <rect x="92" y="34" width="40" height="2" rx="1" fill="#CBD5E1" />
+          <rect x="92" y="40" width="35" height="2" rx="1" fill="#E2E8F0" />
+          <rect x="92" y="46" width="38" height="2" rx="1" fill="#E2E8F0" />
+          <rect x="92" y="52" width="28" height="2" rx="1" fill="#E2E8F0" />
+          {/* Divider & Total */}
+          <line x1="92" y1="60" x2="132" y2="60" stroke="#94A3B8" strokeWidth="0.8" strokeDasharray="2 2" />
+          <rect x="92" y="66" width="18" height="3" rx="1.5" fill="#3B82F6" />
+          <rect x="116" y="66" width="16" height="3" rx="1.5" fill="#1E40AF" />
+        </g>
+
+        {/* Back Credit Card (Cyan/Sky) */}
+        <g transform="rotate(8 135 60)">
+          <rect
+            x="95"
+            y="25"
+            width="82"
+            height="50"
+            rx="7"
+            fill="url(#cardGradBack)"
+            opacity="0.85"
+            stroke="#93C5FD"
+            strokeWidth="1"
+          />
+          {/* Card magnetic stripe */}
+          <rect x="95" y="35" width="82" height="8" fill="#1E3A8A" opacity="0.6" />
+        </g>
+
+        {/* Front Main Credit Card (Deep Blue 3D angle) */}
+        <g transform="rotate(-6 160 70)">
+          <rect
+            x="120"
+            y="35"
+            width="96"
+            height="60"
+            rx="8"
+            fill="url(#cardGradFront)"
+            stroke="#60A5FA"
+            strokeWidth="1.2"
+            filter="drop-shadow(0 10px 15px rgba(30, 58, 138, 0.35))"
+          />
+          {/* Card Chip */}
+          <rect x="132" y="50" width="14" height="11" rx="2" fill="url(#chipGrad)" stroke="#B45309" strokeWidth="0.5" />
+          <line x1="132" y1="55.5" x2="146" y2="55.5" stroke="#78350F" strokeWidth="0.4" />
+          <line x1="139" y1="50" x2="139" y2="61" stroke="#78350F" strokeWidth="0.4" />
+
+          {/* Contactless waves symbol */}
+          <path d="M 152 52 A 4 4 0 0 1 152 59" stroke="#93C5FD" strokeWidth="1" strokeLinecap="round" fill="none" />
+          <path d="M 155 50 A 7 7 0 0 1 155 61" stroke="#BFDBFE" strokeWidth="1" strokeLinecap="round" fill="none" />
+
+          {/* Card Number dots */}
+          <circle cx="134" cy="74" r="1.5" fill="#BFDBFE" />
+          <circle cx="138" cy="74" r="1.5" fill="#BFDBFE" />
+          <circle cx="142" cy="74" r="1.5" fill="#BFDBFE" />
+          <circle cx="146" cy="74" r="1.5" fill="#BFDBFE" />
+
+          <circle cx="154" cy="74" r="1.5" fill="#BFDBFE" />
+          <circle cx="158" cy="74" r="1.5" fill="#BFDBFE" />
+          <circle cx="162" cy="74" r="1.5" fill="#BFDBFE" />
+          <circle cx="166" cy="74" r="1.5" fill="#BFDBFE" />
+
+          <rect x="174" y="72.5" width="16" height="3" rx="1.5" fill="#FFFFFF" />
+
+          {/* Cardholder name & Visa-like logo circles */}
+          <rect x="133" y="82" width="28" height="3" rx="1.5" fill="#93C5FD" />
+          <circle cx="198" cy="83" r="5.5" fill="#EF4444" opacity="0.9" />
+          <circle cx="204" cy="83" r="5.5" fill="#F59E0B" opacity="0.9" />
+        </g>
+      </svg>
+    </div>
+  );
+};
+

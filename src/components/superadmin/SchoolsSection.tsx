@@ -6,6 +6,7 @@ import {
   RefreshCw,
   Users,
   ExternalLink,
+  LogIn,
   ShieldCheck,
   Calendar,
   AlertTriangle,
@@ -1807,117 +1808,45 @@ export const SchoolsSection: React.FC<{
                             )}
                           </td>
 
-                          {/* 9. Aksi */}
+                          {/* 9. Aksi: Ikon Aksi Langsung (Masuk Sesi, Bekukan/Aktifkan, Hapus) */}
                           <td className="py-3 px-3.5 text-right" onClick={(e) => e.stopPropagation()}>
-                            <div className="relative inline-block text-left">
+                            <div className="flex items-center justify-end gap-1.5">
+                              {/* Aksi 1: Masuk Sesi Sekolah */}
                               <button
                                 type="button"
-                                onClick={() =>
-                                  setActiveMenuSchoolId(isMenuOpen ? null : (s.id || s.school_id))
-                                }
-                                className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700 cursor-pointer transition"
-                                title="Menu Aksi"
+                                onClick={() => handleImpersonate(s)}
+                                className="p-1.5 rounded-lg border border-slate-200 hover:border-blue-300 hover:bg-blue-50 text-slate-500 hover:text-blue-600 transition cursor-pointer shadow-2xs"
+                                title="Masuk Sesi Sekolah"
                               >
-                                <MoreHorizontal size={16} />
+                                <LogIn size={14} />
                               </button>
 
-                              {/* Dropdown Menu Tindakan */}
-                              {isMenuOpen && (
-                                <>
-                                  <div
-                                    className="fixed inset-0 z-20"
-                                    onClick={() => setActiveMenuSchoolId(null)}
-                                  />
-                                  <div className="absolute right-0 mt-1 w-48 bg-white rounded-2xl shadow-xl border border-slate-100 py-1.5 z-30 text-left">
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        setActiveMenuSchoolId(null);
-                                        handleSelectSchool(s);
-                                      }}
-                                      className="w-full px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:text-blue-600 flex items-center gap-2 cursor-pointer"
-                                    >
-                                      <Building2 size={13} />
-                                      <span>Kelola Profil &amp; Lisensi</span>
-                                    </button>
+                              {/* Aksi 2: Bekukan (kebalikan dari aktifkan) Sekolah */}
+                              <button
+                                type="button"
+                                onClick={() => handleToggleSchoolStatus(s)}
+                                className={`p-1.5 rounded-lg border transition cursor-pointer shadow-2xs ${
+                                  !isSuspended
+                                    ? 'border-slate-200 hover:border-amber-300 hover:bg-amber-50 text-slate-500 hover:text-amber-600'
+                                    : 'border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-700'
+                                }`}
+                                title={!isSuspended ? 'Bekukan Sekolah' : 'Aktifkan Sekolah'}
+                              >
+                                {!isSuspended ? <Ban size={14} /> : <CheckCircle2 size={14} />}
+                              </button>
 
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        setActiveMenuSchoolId(null);
-                                        handleImpersonate(s);
-                                      }}
-                                      className="w-full px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:text-blue-600 flex items-center gap-2 cursor-pointer"
-                                    >
-                                      <ExternalLink size={13} />
-                                      <span>Masuk Sesi Sekolah</span>
-                                    </button>
-
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        setActiveMenuSchoolId(null);
-                                        handleExtendSubscription(30, s);
-                                      }}
-                                      className="w-full px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:text-emerald-600 flex items-center gap-2 cursor-pointer"
-                                    >
-                                      <Clock size={13} />
-                                      <span>Perpanjang +30 Hari</span>
-                                    </button>
-
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        setActiveMenuSchoolId(null);
-                                        handleExtendSubscription(365, s);
-                                      }}
-                                      className="w-full px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:text-emerald-600 flex items-center gap-2 cursor-pointer"
-                                    >
-                                      <Calendar size={13} />
-                                      <span>Perpanjang +1 Tahun</span>
-                                    </button>
-
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        setActiveMenuSchoolId(null);
-                                        handleToggleSchoolStatus(s);
-                                      }}
-                                      className="w-full px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2 cursor-pointer"
-                                    >
-                                      <Power size={13} />
-                                      <span>{!isSuspended ? 'Bekukan Sekolah' : 'Aktifkan Sekolah'}</span>
-                                    </button>
-
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        setActiveMenuSchoolId(null);
-                                        handleCopyCode(cleanCode, s.id);
-                                      }}
-                                      className="w-full px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2 cursor-pointer"
-                                    >
-                                      <Copy size={13} />
-                                      <span>Salin Kode Akses</span>
-                                    </button>
-
-                                    <div className="my-1 border-t border-slate-100" />
-
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        setActiveMenuSchoolId(null);
-                                        setSchoolToDelete(s);
-                                        setDeleteConfirmInput('');
-                                      }}
-                                      className="w-full px-3.5 py-2 text-xs font-bold text-rose-600 hover:bg-rose-50 flex items-center gap-2 cursor-pointer"
-                                    >
-                                      <Trash2 size={13} />
-                                      <span>Hapus Sekolah</span>
-                                    </button>
-                                  </div>
-                                </>
-                              )}
+                              {/* Aksi 3: Hapus Sekolah */}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSchoolToDelete(s);
+                                  setDeleteConfirmInput('');
+                                }}
+                                className="p-1.5 rounded-lg border border-slate-200 hover:border-rose-300 hover:bg-rose-50 text-slate-500 hover:text-rose-600 transition cursor-pointer shadow-2xs"
+                                title="Hapus Sekolah"
+                              >
+                                <Trash2 size={14} />
+                              </button>
                             </div>
                           </td>
                         </tr>

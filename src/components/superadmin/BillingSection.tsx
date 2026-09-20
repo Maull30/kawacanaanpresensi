@@ -37,6 +37,9 @@ import {
   ChevronRight,
   Download,
   Copy,
+  LayoutDashboard,
+  History,
+  FileSpreadsheet,
 } from 'lucide-react';
 import { getTenantLifecycleInfo } from '../../utils/tenantLifecycle';
 import { PackageFeatureMatrixTab } from './PackageFeatureMatrixTab';
@@ -53,13 +56,19 @@ import {
   PaymentSettingsModal,
   SupportModal,
 } from './BillingModals';
+import { BillingInvoiceTab } from './BillingInvoiceTab';
+import { BillingHistoryTab } from './BillingHistoryTab';
+import { BillingMethodsTab } from './BillingMethodsTab';
+import { BillingReportsTab } from './BillingReportsTab';
 
-export type BillingSubTab = 'transaksi' | 'lisensi' | 'matriks';
+export type BillingSubTab = 'dashboard' | 'invoice' | 'riwayat' | 'metode' | 'laporan';
 
 const subTabs: { id: BillingSubTab; label: string; icon: any; desc: string }[] = [
-  { id: 'transaksi', label: 'Dashboard Pembayaran', icon: Wallet, desc: 'Metrik keuangan, tren, & riwayat transaksi' },
-  { id: 'lisensi', label: 'Pemantauan Lisensi', icon: Sparkles, desc: 'Masa aktif, tenggang & pemulihan sekolah' },
-  { id: 'matriks', label: 'Konfigurasi Fitur & Paket', icon: SlidersHorizontal, desc: 'Matriks kontrol 24 hak akses fitur' },
+  { id: 'dashboard', label: 'Dashboard Pembayaran', icon: LayoutDashboard, desc: 'Metrik keuangan, tren, & ringkasan kas' },
+  { id: 'invoice', label: 'Tagihan & Invoice', icon: FileText, desc: 'Faktur lisensi, jatuh tempo, & pengingat WA' },
+  { id: 'riwayat', label: 'Riwayat Transaksi', icon: History, desc: 'Log rekonsiliasi gateway & bukti kuitansi' },
+  { id: 'metode', label: 'Metode Pembayaran', icon: SlidersHorizontal, desc: 'Kredensial Midtrans, QRIS, & Virtual Account' },
+  { id: 'laporan', label: 'Laporan Keuangan', icon: FileSpreadsheet, desc: 'Buku besar, MRR, ARR, & laba bersih platform' },
 ];
 
 export const BillingSection: React.FC<{
@@ -68,8 +77,8 @@ export const BillingSection: React.FC<{
   activeSubTab?: string;
   onSubTabChange?: (tab: string) => void;
   onNavigateToSchool?: (schoolId: string) => void;
-}> = ({ call, showToast, activeSubTab = 'transaksi', onSubTabChange, onNavigateToSchool }) => {
-  const [currentSubTab, setCurrentSubTab] = useState<BillingSubTab>('transaksi');
+}> = ({ call, showToast, activeSubTab = 'dashboard', onSubTabChange, onNavigateToSchool }) => {
+  const [currentSubTab, setCurrentSubTab] = useState<BillingSubTab>('dashboard');
   const [schools, setSchools] = useState<any[]>([]);
   const [payments, setPayments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -108,16 +117,18 @@ export const BillingSection: React.FC<{
   // Normalisasi tab awal & perubahan eksternal
   useEffect(() => {
     if (activeSubTab) {
-      if (['transaksi', 'pembayaran', 'payments', 'ringkasan'].includes(activeSubTab)) {
-        setCurrentSubTab('transaksi');
-      } else if (['lisensi', 'langganan', 'akan-habis', 'tidak-aktif', 'subscriptions', 'expiring', 'suspended'].includes(activeSubTab)) {
-        setCurrentSubTab('lisensi');
-        if (activeSubTab === 'akan-habis' || activeSubTab === 'expiring') setLicenseFilter('7');
-        if (activeSubTab === 'tidak-aktif' || activeSubTab === 'suspended') setLicenseFilter('expired');
-      } else if (['matriks', 'matriks-fitur', 'paket'].includes(activeSubTab)) {
-        setCurrentSubTab('matriks');
+      if (['dashboard', 'transaksi', 'pembayaran', 'payments', 'ringkasan'].includes(activeSubTab)) {
+        setCurrentSubTab('dashboard');
+      } else if (['invoice', 'tagihan', 'invoices', 'faktur'].includes(activeSubTab)) {
+        setCurrentSubTab('invoice');
+      } else if (['riwayat', 'transaksi-list', 'history', 'log'].includes(activeSubTab)) {
+        setCurrentSubTab('riwayat');
+      } else if (['metode', 'gateway', 'channels'].includes(activeSubTab)) {
+        setCurrentSubTab('metode');
+      } else if (['laporan', 'keuangan', 'reports', 'financial'].includes(activeSubTab)) {
+        setCurrentSubTab('laporan');
       } else {
-        setCurrentSubTab('transaksi');
+        setCurrentSubTab('dashboard');
       }
     }
   }, [activeSubTab]);
@@ -587,21 +598,23 @@ export const BillingSection: React.FC<{
           </div>
 
           {/* Sub Tab Switcher Pills */}
-          <div className="flex items-center gap-1.5 p-1 bg-slate-100/80 rounded-2xl border border-slate-200/60">
+          <div className="flex items-center gap-1.5 p-1.5 bg-slate-100/90 rounded-2xl border border-slate-200/70 overflow-x-auto max-w-full">
             {subTabs.map((st) => {
               const isActive = currentSubTab === st.id;
+              const TabIcon = st.icon;
               return (
                 <button
                   key={st.id}
                   type="button"
                   onClick={() => switchSubTab(st.id)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
                     isActive
-                      ? 'bg-white text-blue-600 shadow-xs'
-                      : 'text-slate-600 hover:text-slate-900'
+                      ? 'bg-white text-blue-600 shadow-xs ring-1 ring-blue-500/20'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
                   }`}
                 >
-                  {st.label}
+                  <TabIcon size={14} className={isActive ? 'text-blue-600' : 'text-slate-400'} />
+                  <span>{st.label}</span>
                 </button>
               );
             })}
@@ -612,96 +625,98 @@ export const BillingSection: React.FC<{
       {/* ========================================================================= */}
       {/* 2. KARTU RINGKASAN FINANSIAL (4 KPI STATS DENGAN SPARKLINE)               */}
       {/* ========================================================================= */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Kartu 1: Total Pembayaran (Bulan Ini) */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-100/90 shadow-xs flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
-              <Coins size={20} />
+      {currentSubTab === 'dashboard' && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* Kartu 1: Total Pembayaran (Bulan Ini) */}
+          <div className="bg-white p-5 rounded-2xl border border-slate-100/90 shadow-xs flex flex-col justify-between">
+            <div className="flex items-center justify-between">
+              <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
+                <Coins size={20} />
+              </div>
+            </div>
+            <div className="mt-3">
+              <span className="text-xs font-semibold text-slate-500 block">Total Pembayaran (Bulan Ini)</span>
+              <div className="mt-1 text-2xl font-black text-slate-900 tracking-tight">
+                Rp 257.800.000
+              </div>
+            </div>
+            <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between">
+              <span className="text-emerald-600 font-bold text-xs flex items-center gap-1">
+                <ArrowUpRight size={14} /> 12% dari bulan lalu
+              </span>
+              <MiniSparkline type="blue" />
             </div>
           </div>
-          <div className="mt-3">
-            <span className="text-xs font-semibold text-slate-500 block">Total Pembayaran (Bulan Ini)</span>
-            <div className="mt-1 text-2xl font-black text-slate-900 tracking-tight">
-              Rp 257.800.000
-            </div>
-          </div>
-          <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between">
-            <span className="text-emerald-600 font-bold text-xs flex items-center gap-1">
-              <ArrowUpRight size={14} /> 12% dari bulan lalu
-            </span>
-            <MiniSparkline type="blue" />
-          </div>
-        </div>
 
-        {/* Kartu 2: Jumlah Transaksi */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-100/90 shadow-xs flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
-              <Receipt size={20} />
+          {/* Kartu 2: Jumlah Transaksi */}
+          <div className="bg-white p-5 rounded-2xl border border-slate-100/90 shadow-xs flex flex-col justify-between">
+            <div className="flex items-center justify-between">
+              <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
+                <Receipt size={20} />
+              </div>
+            </div>
+            <div className="mt-3">
+              <span className="text-xs font-semibold text-slate-500 block">Jumlah Transaksi</span>
+              <div className="mt-1 text-2xl font-black text-slate-900 tracking-tight">
+                248
+              </div>
+            </div>
+            <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between">
+              <span className="text-emerald-600 font-bold text-xs flex items-center gap-1">
+                <ArrowUpRight size={14} /> 8% dari bulan lalu
+              </span>
+              <MiniSparkline type="green" />
             </div>
           </div>
-          <div className="mt-3">
-            <span className="text-xs font-semibold text-slate-500 block">Jumlah Transaksi</span>
-            <div className="mt-1 text-2xl font-black text-slate-900 tracking-tight">
-              248
-            </div>
-          </div>
-          <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between">
-            <span className="text-emerald-600 font-bold text-xs flex items-center gap-1">
-              <ArrowUpRight size={14} /> 8% dari bulan lalu
-            </span>
-            <MiniSparkline type="green" />
-          </div>
-        </div>
 
-        {/* Kartu 3: Tagihan Tertunggak */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-100/90 shadow-xs flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center font-bold">
-              <FileText size={20} />
+          {/* Kartu 3: Tagihan Tertunggak */}
+          <div className="bg-white p-5 rounded-2xl border border-slate-100/90 shadow-xs flex flex-col justify-between">
+            <div className="flex items-center justify-between">
+              <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center font-bold">
+                <FileText size={20} />
+              </div>
+            </div>
+            <div className="mt-3">
+              <span className="text-xs font-semibold text-slate-500 block">Tagihan Tertunggak</span>
+              <div className="mt-1 text-2xl font-black text-slate-900 tracking-tight">
+                Rp 48.750.000
+              </div>
+            </div>
+            <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between">
+              <span className="text-rose-500 font-bold text-xs flex items-center gap-1">
+                <ArrowUpRight size={14} /> 5% dari bulan lalu
+              </span>
+              <MiniSparkline type="red" />
             </div>
           </div>
-          <div className="mt-3">
-            <span className="text-xs font-semibold text-slate-500 block">Tagihan Tertunggak</span>
-            <div className="mt-1 text-2xl font-black text-slate-900 tracking-tight">
-              Rp 48.750.000
-            </div>
-          </div>
-          <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between">
-            <span className="text-rose-500 font-bold text-xs flex items-center gap-1">
-              <ArrowUpRight size={14} /> 5% dari bulan lalu
-            </span>
-            <MiniSparkline type="red" />
-          </div>
-        </div>
 
-        {/* Kartu 4: Total Siswa Aktif (Berbayar) */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-100/90 shadow-xs flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-500 flex items-center justify-center font-bold">
-              <Users size={20} />
+          {/* Kartu 4: Total Siswa Aktif (Berbayar) */}
+          <div className="bg-white p-5 rounded-2xl border border-slate-100/90 shadow-xs flex flex-col justify-between">
+            <div className="flex items-center justify-between">
+              <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-500 flex items-center justify-center font-bold">
+                <Users size={20} />
+              </div>
             </div>
-          </div>
-          <div className="mt-3">
-            <span className="text-xs font-semibold text-slate-500 block">Total Siswa Aktif (Berbayar)</span>
-            <div className="mt-1 text-2xl font-black text-slate-900 tracking-tight">
-              1.842
+            <div className="mt-3">
+              <span className="text-xs font-semibold text-slate-500 block">Total Siswa Aktif (Berbayar)</span>
+              <div className="mt-1 text-2xl font-black text-slate-900 tracking-tight">
+                1.842
+              </div>
             </div>
-          </div>
-          <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between">
-            <span className="text-emerald-600 font-bold text-xs flex items-center gap-1">
-              <ArrowUpRight size={14} /> 6% dari bulan lalu
-            </span>
-            <MiniSparkline type="teal" />
+            <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between">
+              <span className="text-emerald-600 font-bold text-xs flex items-center gap-1">
+                <ArrowUpRight size={14} /> 6% dari bulan lalu
+              </span>
+              <MiniSparkline type="teal" />
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* ========================================================================= */}
       {/* 3. BARIS TENGAH: GRAFIK TREN + DONUT METODE + AKSI CEPAT                 */}
       {/* ========================================================================= */}
-      {currentSubTab === 'transaksi' && (
+      {currentSubTab === 'dashboard' && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
           {/* Kolom 1: Tren Pendapatan 6 Bulan */}
           <div className="lg:col-span-5 h-full">
@@ -733,7 +748,7 @@ export const BillingSection: React.FC<{
       {/* ========================================================================= */}
       {/* 4. BARIS BAWAH: TABEL TRANSAKSI TERBARU (KIRI) & AKTIVITAS (KANAN)        */}
       {/* ========================================================================= */}
-      {currentSubTab === 'transaksi' && (
+      {currentSubTab === 'dashboard' && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
           {/* Kolom Kiri: Filter Bar & Tabel Transaksi */}
           <div className="lg:col-span-8 space-y-4">
@@ -1123,224 +1138,43 @@ export const BillingSection: React.FC<{
       )}
 
       {/* ========================================================================= */}
-      {/* 4. TAB 2: PEMANTAUAN LISENSI (PENGGABUNGAN LANGGANAN + AKAN HABIS + TIDAK AKTIF) */}
+      {/* SUBMENU 2: TAGIHAN & INVOICE                                              */}
       {/* ========================================================================= */}
-      {currentSubTab === 'lisensi' && (
-        <div className="space-y-4">
-          {/* Toolbar Filter Masa Tenggang */}
-          <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-            <div className="flex flex-wrap items-center gap-1.5">
-              {[
-                { id: 'all', label: 'Semua Sekolah' },
-                { id: '7', label: 'Akan Habis ≤ 7 Hari' },
-                { id: '30', label: 'Akan Habis ≤ 30 Hari' },
-                { id: 'expired', label: 'Sudah Kedaluwarsa / Nonaktif' },
-              ].map((f) => {
-                const isActive = licenseFilter === f.id;
-                return (
-                  <button
-                    key={f.id}
-                    type="button"
-                    onClick={() => setLicenseFilter(f.id as any)}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                      isActive
-                        ? 'bg-slate-900 text-white shadow-xs'
-                        : 'bg-slate-100 text-slate-600 hover:text-slate-900 hover:bg-slate-200/70'
-                    }`}
-                  >
-                    {f.label}
-                  </button>
-                );
-              })}
-            </div>
-
-            <div className="flex items-center gap-2">
-              <div className="relative flex-1 sm:w-64">
-                <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input
-                  type="text"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Cari sekolah atau NPSN..."
-                  className="w-full pl-9 pr-3 py-1.5 rounded-xl border border-slate-200 text-xs focus:outline-indigo-600"
-                />
-              </div>
-
-              <button
-                type="button"
-                onClick={loadData}
-                disabled={loading}
-                title="Muat ulang data lisensi"
-                className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition cursor-pointer disabled:opacity-50"
-              >
-                <RefreshCw size={15} className={loading ? 'animate-spin text-indigo-600' : ''} />
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleOpenDirectSubModal()}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-xs transition cursor-pointer whitespace-nowrap"
-              >
-                <PlusCircle size={14} />
-                <span>+ Direct Subscription</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Tabel Lisensi & Sisa Hari Aktif */}
-          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
-            {loading ? (
-              <div className="flex flex-col items-center justify-center py-20 text-slate-400">
-                <RefreshCw size={24} className="animate-spin text-indigo-600 mb-2" />
-                <span className="text-xs font-semibold">Memuat status lisensi sekolah...</span>
-              </div>
-            ) : filteredLicenses.length === 0 ? (
-              <div className="py-16 text-center text-xs text-slate-400">
-                Tidak ada sekolah yang sesuai dengan filter masa tenggang ini.
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead>
-                    <tr className="border-b border-slate-200 text-slate-500 font-bold bg-slate-50/80">
-                      <th className="py-3.5 px-4 font-bold">Instansi Sekolah</th>
-                      <th className="py-3.5 px-4 font-bold">NPSN</th>
-                      <th className="py-3.5 px-4 font-bold">Paket</th>
-                      <th className="py-3.5 px-4 font-bold">Status Lisensi</th>
-                      <th className="py-3.5 px-4 font-bold">Tanggal Berakhir</th>
-                      <th className="py-3.5 px-4 font-bold">Sisa Hari Aktif</th>
-                      <th className="py-3.5 px-4 text-right font-bold">Aksi Cepat Perpanjang / Pulihkan</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {filteredLicenses.map((s) => {
-                      const lf = s.lifecycle;
-                      const isInactive = s.status === 'inactive' || lf.isSuspended;
-                      const days = lf.daysRemaining;
-
-                      return (
-                        <tr key={s.id || s.school_id} className="hover:bg-slate-50/80 transition-colors">
-                          <td className="py-3.5 px-4">
-                            <div className="font-bold text-slate-900">{s.name}</div>
-                            {s.headmaster_name && (
-                              <div className="text-[10px] text-slate-400 mt-0.5">Kepsek: {s.headmaster_name}</div>
-                            )}
-                          </td>
-
-                          <td className="py-3.5 px-4 font-mono text-slate-600">
-                            {s.npsn || '-'}
-                          </td>
-
-                          <td className="py-3.5 px-4">
-                            <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-indigo-50 text-indigo-700 uppercase border border-indigo-100">
-                              {s.plan === 'teacher' ? 'Guru' : s.plan === 'school' || s.plan === 'sekolah' ? 'Sekolah' : 'Mulai'}
-                            </span>
-                          </td>
-
-                          <td className="py-3.5 px-4">
-                            <span
-                              className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
-                                !isInactive
-                                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                                  : 'bg-rose-50 text-rose-700 border border-rose-200'
-                              }`}
-                            >
-                              <span className={`w-1.5 h-1.5 rounded-full ${!isInactive ? 'bg-emerald-500' : 'bg-rose-500'}`} />
-                              {!isInactive ? 'Aktif Berlangganan' : 'Kedaluwarsa / Nonaktif'}
-                            </span>
-                          </td>
-
-                          <td className="py-3.5 px-4 font-medium text-slate-800">
-                            {s.subscription_expires_at || 'Seumur Hidup'}
-                          </td>
-
-                          <td className="py-3.5 px-4">
-                            {days === null ? (
-                              <span className="text-slate-500 font-semibold">Permanen</span>
-                            ) : isInactive ? (
-                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800">
-                                Sudah Habis
-                              </span>
-                            ) : days <= 7 ? (
-                              <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-rose-100 text-rose-800">
-                                {days} Hari Lagi (Mendesak)
-                              </span>
-                            ) : days <= 30 ? (
-                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900">
-                                {days} Hari Lagi
-                              </span>
-                            ) : (
-                              <span className="text-emerald-700 font-bold font-mono">{days} hari</span>
-                            )}
-                          </td>
-
-                          <td className="py-3.5 px-4 text-right">
-                            <div className="flex items-center justify-end gap-1.5">
-                              {/* Jika nonaktif/kedaluwarsa, sediakan tombol pulihkan */}
-                              {isInactive ? (
-                                <button
-                                  type="button"
-                                  onClick={() => handleReactivate(s)}
-                                  className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs cursor-pointer shadow-xs transition"
-                                >
-                                  Pulihkan (+30 Hari)
-                                </button>
-                              ) : (
-                                <>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleQuickExtend(s, 30)}
-                                    title="Tambah masa aktif 30 hari"
-                                    className="px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-[11px] cursor-pointer transition shadow-2xs"
-                                  >
-                                    +30 Hari
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleQuickExtend(s, 365)}
-                                    title="Tambah masa aktif 1 tahun"
-                                    className="px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold text-[11px] cursor-pointer transition shadow-2xs"
-                                  >
-                                    +1 Tahun
-                                  </button>
-                                </>
-                              )}
-
-                              <button
-                                type="button"
-                                onClick={() => handleOpenDirectSubModal(s.id || s.school_id)}
-                                title="Buat Direct Subscription untuk sekolah ini"
-                                className="px-2.5 py-1 rounded-lg bg-purple-50 hover:bg-purple-100 text-purple-700 font-bold text-[11px] cursor-pointer transition shadow-2xs"
-                              >
-                                Direct Sub
-                              </button>
-
-                              <button
-                                type="button"
-                                onClick={() => onNavigateToSchool?.(s.id || s.school_id)}
-                                title="Lihat detail instansi sekolah"
-                                className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[11px] cursor-pointer transition shadow-2xs"
-                              >
-                                Detail
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        </div>
+      {currentSubTab === 'invoice' && (
+        <BillingInvoiceTab
+          showToast={showToast}
+          onOpenDirectSub={() => setShowDirectSubModal(true)}
+          onSelectInvoice={setSelectedInvoice}
+        />
       )}
 
       {/* ========================================================================= */}
-      {/* 5. TAB 3: KONFIGURASI FITUR & PAKET (PACKAGE FEATURE MATRIX)               */}
+      {/* SUBMENU 3: RIWAYAT TRANSAKSI                                              */}
       {/* ========================================================================= */}
-      {currentSubTab === 'matriks' && (
-        <PackageFeatureMatrixTab showToast={showToast} />
+      {currentSubTab === 'riwayat' && (
+        <BillingHistoryTab
+          showToast={showToast}
+          onSelectInvoice={setSelectedInvoice}
+        />
+      )}
+
+      {/* ========================================================================= */}
+      {/* SUBMENU 4: METODE PEMBAYARAN                                              */}
+      {/* ========================================================================= */}
+      {currentSubTab === 'metode' && (
+        <BillingMethodsTab
+          showToast={showToast}
+        />
+      )}
+
+      {/* ========================================================================= */}
+      {/* SUBMENU 5: LAPORAN KEUANGAN                                               */}
+      {/* ========================================================================= */}
+      {currentSubTab === 'laporan' && (
+        <BillingReportsTab
+          showToast={showToast}
+          onOpenReportModal={() => setShowFinancialReportModal(true)}
+        />
       )}
 
       {/* ========================================================================= */}

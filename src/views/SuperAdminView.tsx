@@ -29,6 +29,10 @@ import {
   Settings,
   Users,
   Radio,
+  FileText,
+  Receipt,
+  Wallet,
+  TrendingUp,
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { supabase } from '../lib/supabase';
@@ -64,11 +68,8 @@ const clusters: ClusterConfig[] = [
     label: 'Beranda',
     sublabel: 'Metrik, KPI & Monitoring',
     icon: LayoutDashboard,
-    submenus: [
-      { id: 'ringkasan', label: 'Ringkasan Eksekutif', icon: BarChart3 },
-      { id: 'monitoring', label: 'Monitoring Real-Time', icon: Radio, badge: 'Live' },
-      { id: 'aktivitas', label: 'Log Aktivitas Sesi', icon: Shield },
-    ],
+    // Submenu di beranda dihapus sesuai instruksi user (hanya menu beranda dan isinya yang dipertahankan)
+    submenus: [],
   },
   {
     id: 'sekolah',
@@ -87,11 +88,14 @@ const clusters: ClusterConfig[] = [
     label: 'Pembayaran',
     sublabel: 'Transaksi & Lisensi Sekolah',
     icon: CreditCard,
+    // Urutan submenu pembayaran persis sesuai instruksi user:
+    // 1. Dashboard Pembayaran, 2. Tagihan & Invoice, 3. Riwayat Transaksi, 4. Metode Pembayaran, 5. Laporan Keuangan
     submenus: [
-      { id: 'transaksi', label: 'Dashboard Pembayaran', icon: CreditCard },
-      { id: 'lisensi', label: 'Pemantauan Lisensi', icon: Sparkles },
-      { id: 'matriks', label: 'Matriks Fitur & Paket', icon: SlidersHorizontal },
-      { id: 'gateway', label: 'Gateway Midtrans', icon: KeyRound },
+      { id: 'dashboard', label: 'Dashboard Pembayaran', icon: CreditCard },
+      { id: 'invoice', label: 'Tagihan & Invoice', icon: FileText },
+      { id: 'riwayat', label: 'Riwayat Transaksi', icon: Receipt },
+      { id: 'metode', label: 'Metode Pembayaran', icon: Wallet },
+      { id: 'laporan', label: 'Laporan Keuangan', icon: TrendingUp },
     ],
   },
   {
@@ -136,12 +140,43 @@ export const SuperAdminView: React.FC = () => {
   const [overviewSubTab, setOverviewSubTab] = useState<string>('ringkasan');
   const [schoolsSubTab, setSchoolsSubTab] = useState<string>('semua');
   const [selectedSchoolId, setSelectedSchoolId] = useState<string | null>(null);
-  const [billingSubTab, setBillingSubTab] = useState<string>('transaksi');
+  const [billingSubTab, setBillingSubTab] = useState<string>('dashboard');
   const [systemSubTab, setSystemSubTab] = useState<string>('keamanan');
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
+
+  // State accordion: daftar rumpun menu yang submenunya sedang terbuka kebawah (expanded)
+  const [expandedClusters, setExpandedClusters] = useState<SuperAdminCluster[]>(() => {
+    try {
+      const saved = localStorage.getItem('kawacanaan_superadmin_cluster');
+      if (saved === 'sekolah' || saved === 'billing' || saved === 'sistem') {
+        return [saved as SuperAdminCluster];
+      }
+    } catch (_) {}
+    return ['billing'];
+  });
+
+  // Handler klik menu utama di sidebar kiri:
+  // - Pada saat superadmin menekan menu, submenu muncul kebawah.
+  // - Jika superadmin menekan menu itu lagi, submenu tidak muncul (toggle tutup).
+  // - Isi konten submenu terlihat jika sudah dipilih oleh superadmin, selama belum memilih submenu, konten tidak berganti.
+  const handleClusterClick = (clusterId: SuperAdminCluster) => {
+    const cluster = clusters.find((c) => c.id === clusterId);
+    if (!cluster?.submenus || cluster.submenus.length === 0) {
+      setActiveCluster(clusterId);
+      setIsMobileSidebarOpen(false);
+      return;
+    }
+
+    // Toggle buka/tutup submenu kebawah
+    setExpandedClusters((prev) =>
+      prev.includes(clusterId)
+        ? prev.filter((id) => id !== clusterId)
+        : [...prev, clusterId]
+    );
+  };
 
   // Helper untuk cek status aktif submenu
   const getIsSubActive = (clusterId: SuperAdminCluster, subId: string) => {
@@ -153,9 +188,12 @@ export const SuperAdminView: React.FC = () => {
     return false;
   };
 
-  // Handler klik submenu terintegrasi
+  // Handler klik submenu terintegrasi:
+  // Konten baru akan dimuat/ditampilkan setelah superadmin memilih salah satu item submenu
   const handleSubMenuClick = (clusterId: SuperAdminCluster, subMenuId: string) => {
     setActiveCluster(clusterId);
+    setExpandedClusters((prev) => (prev.includes(clusterId) ? prev : [...prev, clusterId]));
+
     if (clusterId === 'dashboard') {
       setOverviewSubTab(subMenuId);
     } else if (clusterId === 'sekolah') {
@@ -193,16 +231,20 @@ export const SuperAdminView: React.FC = () => {
     const target = tab.toLowerCase();
     if (target === 'sekolah' || target === 'schools') {
       setActiveCluster('sekolah');
+      setExpandedClusters((prev) => (prev.includes('sekolah') ? prev : [...prev, 'sekolah']));
       if (extraId) setSelectedSchoolId(extraId);
       if (subTab) setSchoolsSubTab(subTab);
     } else if (target === 'pembayaran' || target === 'billing') {
       setActiveCluster('billing');
+      setExpandedClusters((prev) => (prev.includes('billing') ? prev : [...prev, 'billing']));
       if (subTab) setBillingSubTab(subTab);
     } else if (target === 'keamanan' || target === 'security' || target === 'audit') {
       setActiveCluster('sistem');
+      setExpandedClusters((prev) => (prev.includes('sistem') ? prev : [...prev, 'sistem']));
       setSystemSubTab('keamanan');
     } else if (target === 'pengaturan' || target === 'system' || target === 'sistem') {
       setActiveCluster('sistem');
+      setExpandedClusters((prev) => (prev.includes('sistem') ? prev : [...prev, 'sistem']));
       if (subTab) setSystemSubTab(subTab);
     } else {
       setActiveCluster('dashboard');
@@ -301,6 +343,8 @@ export const SuperAdminView: React.FC = () => {
           <nav className="space-y-2">
             {clusters.map((c) => {
               const isActive = activeCluster === c.id;
+              const hasSubmenus = Boolean(c.submenus && c.submenus.length > 0);
+              const isExpanded = expandedClusters.includes(c.id);
               const Icon = c.icon;
 
               return (
@@ -308,15 +352,12 @@ export const SuperAdminView: React.FC = () => {
                   {/* Tombol Menu Utama */}
                   <button
                     type="button"
-                    onClick={() => {
-                      if (!isActive) {
-                        setActiveCluster(c.id);
-                        if (c.id === 'sekolah') setSelectedSchoolId(null);
-                      }
-                    }}
+                    onClick={() => handleClusterClick(c.id)}
                     className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl text-left transition-all duration-150 cursor-pointer group select-none min-h-[44px] ${
                       isActive
                         ? 'bg-indigo-600 text-white font-bold shadow-md shadow-indigo-600/30 ring-1 ring-indigo-400/40'
+                        : isExpanded
+                        ? 'bg-slate-900/90 text-white font-semibold ring-1 ring-slate-800'
                         : 'text-slate-300 hover:text-white hover:bg-slate-900/80'
                     }`}
                   >
@@ -324,6 +365,8 @@ export const SuperAdminView: React.FC = () => {
                       className={`p-2 rounded-xl transition-colors shrink-0 ${
                         isActive
                           ? 'bg-white/20 text-white'
+                          : isExpanded
+                          ? 'bg-slate-800 text-indigo-400'
                           : 'bg-slate-900 text-slate-400 group-hover:text-white group-hover:bg-slate-800'
                       }`}
                     >
@@ -333,12 +376,18 @@ export const SuperAdminView: React.FC = () => {
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between">
                         <span className="text-sm font-black truncate">{c.label}</span>
-                        <ChevronDown
-                          size={15}
-                          className={`transition-transform duration-200 shrink-0 ${
-                            isActive ? 'text-indigo-200 rotate-180' : 'text-slate-500 group-hover:text-slate-300'
-                          }`}
-                        />
+                        {hasSubmenus && (
+                          <ChevronDown
+                            size={15}
+                            className={`transition-transform duration-200 shrink-0 ${
+                              isExpanded
+                                ? isActive
+                                  ? 'text-indigo-200 rotate-180'
+                                  : 'text-slate-300 rotate-180'
+                                : 'text-slate-500 group-hover:text-slate-300'
+                            }`}
+                          />
+                        )}
                       </div>
                       <p
                         className={`text-[10px] truncate mt-0.5 ${
@@ -350,8 +399,8 @@ export const SuperAdminView: React.FC = () => {
                     </div>
                   </button>
 
-                  {/* Submenu List - Muncul saat menu aktif */}
-                  {isActive && c.submenus && c.submenus.length > 0 && (
+                  {/* Submenu List - Muncul kebawah saat expanded */}
+                  {hasSubmenus && isExpanded && (
                     <div className="ml-5 pl-3 border-l-2 border-slate-800/90 space-y-1 py-1 animate-in fade-in slide-in-from-top-1 duration-150">
                       {c.submenus.map((sub) => {
                         const isSubActive = getIsSubActive(c.id, sub.id);

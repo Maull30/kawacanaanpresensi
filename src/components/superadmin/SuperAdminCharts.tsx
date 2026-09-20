@@ -44,8 +44,8 @@ export const MetricSparkline: React.FC<{
 };
 
 /**
- * 30-Day System Activity Multi-Line Smooth Chart
- * Exactly matching the reference image curve lines, axes and styling.
+ * 7-Day System Activity Multi-Line Smooth Chart
+ * Responsive curve lines, axes and styling fitted for side-by-side dashboard view.
  */
 export const ActivityChart: React.FC<{
   className?: string;
@@ -53,24 +53,33 @@ export const ActivityChart: React.FC<{
   const [selectedFilter, setSelectedFilter] = useState<'all' | 'login' | 'attendance' | 'transaction'>('all');
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
 
-  const dates = [
-    '21 Agu', '24 Agu', '27 Agu', '30 Agu',
-    '2 Sep', '5 Sep', '8 Sep', '11 Sep',
-    '14 Sep', '17 Sep', '20 Sep',
-  ];
+  // 7 Hari Terakhir (Dinamis berbasis kalender lokal)
+  const dates = React.useMemo(() => {
+    const result: string[] = [];
+    const now = new Date();
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(now);
+      d.setDate(d.getDate() - i);
+      result.push(
+        d.toLocaleDateString('id-ID', {
+          day: 'numeric',
+          month: 'short',
+        })
+      );
+    }
+    return result;
+  }, []);
 
-  // 11 points for smooth curves
-  const loginData = [1250, 1100, 1380, 1420, 1310, 1390, 1620, 1350, 1480, 1390, 1550];
-  const attendanceData = [850, 750, 950, 920, 1020, 890, 1050, 850, 980, 920, 1080];
-  const transactionData = [320, 240, 410, 380, 450, 400, 480, 420, 520, 490, 540];
+  // 7 points for smooth curves (Login, Presensi, Transaksi)
+  const loginData = [1380, 1420, 1620, 1350, 1480, 1390, 1550];
+  const attendanceData = [950, 1020, 1050, 850, 980, 920, 1080];
+  const transactionData = [410, 450, 480, 420, 520, 490, 540];
 
-  // SVG coordinate transformation:
-  // Width: 600, Height: 220
-  // Margins: Left: 45, Right: 20, Top: 15, Bottom: 35
-  const chartW = 535;
-  const chartH = 170;
-  const startX = 45;
-  const startY = 15;
+  // SVG coordinate transformation for compact side-by-side card
+  const chartW = 460;
+  const chartH = 135;
+  const startX = 42;
+  const startY = 12;
   const maxVal = 2000;
 
   const getX = (index: number) => startX + (index / (dates.length - 1)) * chartW;
@@ -100,53 +109,60 @@ export const ActivityChart: React.FC<{
   const yTicks = [2000, 1500, 1000, 500, 0];
 
   return (
-    <div className={`bg-white rounded-2xl border border-slate-100 shadow-xs p-5 flex flex-col justify-between ${className}`}>
+    <div className={`bg-white rounded-2xl border border-slate-100 shadow-xs p-4 sm:p-5 flex flex-col justify-between ${className}`}>
       {/* Header & Filter Controls */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <h3 className="text-sm font-black text-slate-900 tracking-tight">
-          Aktivitas Sistem 30 Hari Terakhir
-        </h3>
+      <div>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2.5 border-b border-slate-100">
+          <div>
+            <h3 className="text-sm font-black text-slate-900 tracking-tight">
+              Aktivitas Sistem 7 Hari Terakhir
+            </h3>
+            <p className="text-[11px] text-slate-400">
+              Monitoring login, presensi, &amp; transaksi
+            </p>
+          </div>
 
-        <div className="flex items-center gap-2">
-          <select
-            value={selectedFilter}
-            onChange={(e) => setSelectedFilter(e.target.value as any)}
-            className="text-xs font-semibold px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-slate-700 shadow-2xs hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20 cursor-pointer"
-          >
-            <option value="all">Semua Aktivitas</option>
-            <option value="login">Hanya Login</option>
-            <option value="attendance">Hanya Presensi</option>
-            <option value="transaction">Hanya Transaksi</option>
-          </select>
+          <div className="flex items-center gap-2 shrink-0">
+            <select
+              value={selectedFilter}
+              onChange={(e) => setSelectedFilter(e.target.value as any)}
+              className="text-[11px] font-semibold px-2.5 py-1 rounded-xl border border-slate-200 bg-white text-slate-700 shadow-2xs hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20 cursor-pointer"
+            >
+              <option value="all">Semua Aktivitas</option>
+              <option value="login">Hanya Login</option>
+              <option value="attendance">Hanya Presensi</option>
+              <option value="transaction">Hanya Transaksi</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Legend Indicators */}
+        <div className="flex items-center gap-3.5 mt-2.5 text-xs font-semibold text-slate-600">
+          {(selectedFilter === 'all' || selectedFilter === 'login') && (
+            <div className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-blue-500 shrink-0" />
+              <span className="text-[11px]">Login</span>
+            </div>
+          )}
+          {(selectedFilter === 'all' || selectedFilter === 'attendance') && (
+            <div className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
+              <span className="text-[11px]">Presensi</span>
+            </div>
+          )}
+          {(selectedFilter === 'all' || selectedFilter === 'transaction') && (
+            <div className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-purple-500 shrink-0" />
+              <span className="text-[11px]">Transaksi</span>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Legend Indicators */}
-      <div className="flex items-center gap-4 mt-3 text-xs font-semibold text-slate-600">
-        {(selectedFilter === 'all' || selectedFilter === 'login') && (
-          <div className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-blue-500" />
-            <span>Login</span>
-          </div>
-        )}
-        {(selectedFilter === 'all' || selectedFilter === 'attendance') && (
-          <div className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
-            <span>Presensi</span>
-          </div>
-        )}
-        {(selectedFilter === 'all' || selectedFilter === 'transaction') && (
-          <div className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-purple-500" />
-            <span>Transaksi</span>
-          </div>
-        )}
-      </div>
-
       {/* Interactive Chart Area */}
-      <div className="relative mt-4 w-full aspect-[21/9] min-h-[190px]">
+      <div className="relative mt-2.5 w-full h-[185px] sm:h-[195px]">
         <svg
-          viewBox="0 0 600 220"
+          viewBox="0 0 520 185"
           className="w-full h-full overflow-visible"
           onMouseLeave={() => setHoverIndex(null)}
         >
@@ -171,7 +187,7 @@ export const ActivityChart: React.FC<{
                   strokeWidth="1.2"
                 />
                 <text
-                  x={startX - 8}
+                  x={startX - 6}
                   y={y + 3.5}
                   textAnchor="end"
                   fontSize="9.5"
@@ -228,7 +244,7 @@ export const ActivityChart: React.FC<{
               <g key={date}>
                 <text
                   x={x}
-                  y={startY + chartH + 18}
+                  y={startY + chartH + 16}
                   textAnchor="middle"
                   fontSize="9.5"
                   fontWeight={isHovered ? '700' : '500'}
@@ -268,7 +284,7 @@ export const ActivityChart: React.FC<{
               <circle
                 cx={getX(hoverIndex)}
                 cy={getY(loginData[hoverIndex])}
-                r="4.5"
+                r="4"
                 fill="#3B82F6"
                 stroke="#FFFFFF"
                 strokeWidth="2"
@@ -279,7 +295,7 @@ export const ActivityChart: React.FC<{
               <circle
                 cx={getX(hoverIndex)}
                 cy={getY(attendanceData[hoverIndex])}
-                r="4.5"
+                r="4"
                 fill="#10B981"
                 stroke="#FFFFFF"
                 strokeWidth="2"
@@ -290,7 +306,7 @@ export const ActivityChart: React.FC<{
               <circle
                 cx={getX(hoverIndex)}
                 cy={getY(transactionData[hoverIndex])}
-                r="4.5"
+                r="4"
                 fill="#A855F7"
                 stroke="#FFFFFF"
                 strokeWidth="2"
@@ -305,7 +321,7 @@ export const ActivityChart: React.FC<{
           <div
             className="absolute -top-3 pointer-events-none bg-slate-900/90 backdrop-blur-xs text-white text-[10px] px-2.5 py-1.5 rounded-lg shadow-lg z-20 transition-all font-mono"
             style={{
-              left: `${(getX(hoverIndex) / 600) * 100}%`,
+              left: `${(getX(hoverIndex) / 520) * 100}%`,
               transform: 'translateX(-50%)',
             }}
           >

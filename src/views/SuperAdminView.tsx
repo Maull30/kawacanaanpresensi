@@ -613,7 +613,7 @@ export const SuperAdminView: React.FC = () => {
         </header>
 
         {/* Konten Utama Workspace Berdasarkan Rumpun Terpilih */}
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl 2xl:max-w-[1600px] w-full mx-auto space-y-6">
+        <main className="flex-1 p-3.5 sm:p-5 lg:p-6 max-w-7xl 2xl:max-w-[1600px] w-full mx-auto space-y-4 sm:space-y-5">
           {/* 1. Rumpun Dashboard */}
           {activeCluster === 'dashboard' && (
             <OverviewSection

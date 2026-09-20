@@ -18,7 +18,10 @@ import {
   KeyRound,
   Shield,
   Layers,
-  ArrowUpRight
+  ArrowUpRight,
+  Search,
+  Bell,
+  ChevronDown
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { supabase } from '../lib/supabase';
@@ -96,6 +99,8 @@ export const SuperAdminView: React.FC = () => {
   const [systemSubTab, setSystemSubTab] = useState<string>('siaran');
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
 
   const token = async () => {
     const { data } = await supabase.auth.getSession();
@@ -345,72 +350,130 @@ export const SuperAdminView: React.FC = () => {
       {/* 2. AREA UTAMA (TOPBAR RAMPING + KONTEN WORKSPACE)                         */}
       {/* ========================================================================= */}
       <div className="flex-1 flex flex-col min-w-0 min-h-screen">
-        {/* Universal Topbar Minimalis Super Admin */}
-        <header className="sticky top-0 z-30 bg-white/90 backdrop-blur-md border-b border-slate-200 px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between gap-4 shadow-2xs">
-          {/* Sisi Kiri: Hamburger Mobile + Breadcrumb */}
-          <div className="flex items-center gap-3 min-w-0">
+        {/* Universal Topbar Super Admin */}
+        <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-slate-200/80 px-4 sm:px-6 lg:px-8 py-2.5 flex items-center justify-between gap-4 shadow-2xs">
+          {/* Sisi Kiri: Hamburger Mobile + Search Input (Persis Referensi Gambar) */}
+          <div className="flex items-center gap-3 flex-1 max-w-xl">
             <button
               onClick={() => setIsMobileSidebarOpen(true)}
-              className="md:hidden p-2 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 transition cursor-pointer"
+              className="md:hidden p-2 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 transition cursor-pointer shrink-0"
             >
               <Menu size={18} />
             </button>
 
-            <div className="flex items-center gap-2 text-xs font-bold text-slate-500 select-none">
-              <span className="hover:text-indigo-600 transition">Super Admin</span>
-              <ChevronRight size={13} className="text-slate-400" />
-              <span className="text-slate-900 font-black text-sm">{currentClusterConfig.label}</span>
+            {/* Input Pencarian Universal */}
+            <div className="relative w-full max-w-md">
+              <Search
+                size={16}
+                className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+              />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && searchQuery.trim()) {
+                    setActiveCluster('sekolah');
+                    setSchoolsSubTab('semua');
+                  }
+                }}
+                placeholder="Cari sekolah, tenant, pengguna, atau menu..."
+                className="w-full pl-9 pr-4 py-2 bg-slate-100/80 hover:bg-slate-100 focus:bg-white text-xs font-medium text-slate-800 placeholder-slate-400 rounded-xl border border-transparent focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/15 transition-all outline-none"
+              />
             </div>
           </div>
 
-          {/* Sisi Kanan: Aksi Cepat, Tanggal, & Refresh */}
+          {/* Sisi Kanan: Lonceng Notif, Tanggal, dan Profil Super Admin */}
           <div className="flex items-center gap-2.5 sm:gap-3 shrink-0">
-            {/* Tanggal Hari Ini */}
-            <div className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-slate-200 bg-slate-50 text-slate-700 text-xs font-semibold select-none shadow-2xs">
-              <Calendar size={13} className="text-slate-400" />
-              <span>{getFormattedDate()}</span>
-            </div>
-
-            {/* Tombol Siaran Pengumuman Cepat */}
+            {/* Lonceng Notifikasi dengan Red Dot */}
             <button
               type="button"
               onClick={() => {
                 setActiveCluster('sistem');
                 setSystemSubTab('siaran');
               }}
-              title="Kelola Siaran Pengumuman Global"
-              className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-indigo-200 bg-indigo-50 text-indigo-700 text-xs font-bold hover:bg-indigo-100 transition shadow-2xs cursor-pointer"
+              title="Notifikasi Sistem"
+              className="relative p-2 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-600 transition cursor-pointer"
             >
-              <Megaphone size={13} className="text-indigo-600" />
-              <span>Siaran Pengumuman</span>
-              {globalAnnouncement?.active && (
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <Bell size={18} />
+              <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-rose-500 ring-2 ring-white" />
+            </button>
+
+            {/* Tanggal Hari Ini (Persis Box di Gambar: Rabu, 20 September 2026) */}
+            <div className="hidden lg:flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl border border-slate-200 bg-slate-50/80 text-slate-700 text-xs font-semibold select-none">
+              <Calendar size={13} className="text-slate-400" />
+              <span>{getFormattedDate()}</span>
+            </div>
+
+            {/* Profil Super Admin (SA / Super Admin / Administrator ∨) */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setIsProfileDropdownOpen(!isProfileDropdownOpen)}
+                className="flex items-center gap-2.5 p-1 sm:px-2 sm:py-1 rounded-xl hover:bg-slate-100 transition cursor-pointer select-none"
+              >
+                <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-black text-xs shadow-xs shrink-0">
+                  SA
+                </div>
+                <div className="hidden sm:block text-left">
+                  <div className="text-xs font-black text-slate-900 leading-tight">
+                    Super Admin
+                  </div>
+                  <div className="text-[10px] text-slate-400 font-medium">
+                    Administrator
+                  </div>
+                </div>
+                <ChevronDown size={14} className="text-slate-400 hidden sm:block" />
+              </button>
+
+              {/* Profile Dropdown */}
+              {isProfileDropdownOpen && (
+                <div className="absolute right-0 top-11 bg-white border border-slate-200 shadow-xl rounded-2xl py-2 w-48 z-40 text-left">
+                  <div className="px-3.5 py-2 border-b border-slate-100">
+                    <p className="text-xs font-bold text-slate-900 truncate">
+                      {currentUser?.name || 'Super Administrator'}
+                    </p>
+                    <p className="text-[10px] text-slate-400 font-mono truncate">
+                      @{currentUser?.username || 'superadmin'}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setIsProfileDropdownOpen(false);
+                      setActiveCluster('sistem');
+                    }}
+                    className="w-full px-3.5 py-2 text-xs text-slate-700 hover:bg-slate-50 flex items-center gap-2 font-medium"
+                  >
+                    <ShieldCheck size={14} className="text-indigo-600" />
+                    <span>Pengaturan Sistem</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setIsProfileDropdownOpen(false);
+                      handleManualRefresh();
+                    }}
+                    className="w-full px-3.5 py-2 text-xs text-slate-700 hover:bg-slate-50 flex items-center gap-2 font-medium"
+                  >
+                    <RefreshCw size={14} className="text-emerald-600" />
+                    <span>Segarkan Data</span>
+                  </button>
+                  <div className="border-t border-slate-100 mt-1 pt-1">
+                    <button
+                      onClick={() => {
+                        setIsProfileDropdownOpen(false);
+                        if (window.confirm('Keluar dari sesi Super Administrator?')) {
+                          void logout();
+                        }
+                      }}
+                      className="w-full px-3.5 py-2 text-xs text-rose-600 hover:bg-rose-50 flex items-center gap-2 font-bold"
+                    >
+                      <LogOut size={14} />
+                      <span>Keluar</span>
+                    </button>
+                  </div>
+                </div>
               )}
-            </button>
-
-            {/* Tombol Tambah Sekolah Cepat */}
-            <button
-              type="button"
-              onClick={() => {
-                setActiveCluster('sekolah');
-                setSchoolsSubTab('tambah');
-                setSelectedSchoolId(null);
-              }}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition shadow-xs cursor-pointer active:scale-95"
-            >
-              <Plus size={14} />
-              <span className="hidden sm:inline">Tambah Sekolah</span>
-            </button>
-
-            {/* Tombol Refresh Data */}
-            <button
-              type="button"
-              onClick={handleManualRefresh}
-              title="Segarkan Data"
-              className="p-2 rounded-xl border border-slate-200 bg-white text-slate-600 hover:text-indigo-600 hover:bg-slate-50 transition shadow-2xs cursor-pointer"
-            >
-              <RefreshCw size={14} className={isRefreshing ? 'animate-spin text-indigo-600' : ''} />
-            </button>
+            </div>
           </div>
         </header>
 

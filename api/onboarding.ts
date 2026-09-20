@@ -637,26 +637,27 @@ export default async function handler(req: any, res: any) {
 
         const isPersonal =
           school?.workspace_type === 'personal' ||
-          (school as any)?.is_personal === true ||
-          (sId === profile?.school_id && isPersonalProfile) ||
-          school?.plan === 'mulai' ||
-          school?.plan === 'teacher' ||
-          school?.plan === 'guru';
+          school?.workspace_type === 'individu' ||
+          (school as any)?.is_personal === true;
 
-        // ISOLASI DATA KETAT:
-        // Jika sekolah adalah institusi (bukan ruang kerja individu),
-        // pastikan user memiliki hak akses resmi yang sah ke sekolah tersebut:
-        // - Pemilik sekolah (owner_id)
-        // - Atau profile.school_id sesuai DAN bukan mode personal
-        // - Atau akun memiliki record guru resmi (allTeacherRecords) di sekolah tersebut
-        if (!isPersonal) {
+        if (isPersonal) {
+          // ISOLASI KETAT RUANG KERJA INDIVIDU:
+          // Ruang kerja individu HANYA boleh diakses dan dilihat oleh pemilik sahnya (owner_id === userId)
+          if (school.owner_id !== userId) {
+            continue;
+          }
+        } else {
+          // ISOLASI DATA SEKOLAH INSTITUSI:
+          // Pastikan user memiliki hak akses resmi yang sah ke sekolah tersebut:
+          // - Pemilik sekolah (owner_id)
+          // - Atau profile.school_id sesuai DAN bukan mode personal
+          // - Atau akun memiliki record guru resmi (allTeacherRecords) di sekolah tersebut
           const isLegitimateSchoolMember =
             school.owner_id === userId ||
             (sId === profile?.school_id && !isPersonalProfile) ||
             allTeacherRecords.some((t: any) => t.school_id === sId);
 
           if (!isLegitimateSchoolMember) {
-            // Tolak sekolah yang tidak memiliki relasi resmi dengan user!
             continue;
           }
         }
@@ -980,10 +981,8 @@ export default async function handler(req: any, res: any) {
 
       const isPersonal =
         targetSchool.workspace_type === 'personal' ||
-        targetSchool.is_personal === true ||
-        targetSchool.plan === 'teacher' ||
-        targetSchool.plan === 'mulai' ||
-        targetSchool.owner_id === userId;
+        targetSchool.workspace_type === 'individu' ||
+        targetSchool.is_personal === true;
 
       const { data: currentProfile } = await db
         .from('profiles')
@@ -1075,7 +1074,7 @@ export default async function handler(req: any, res: any) {
       }
 
       // Akses hanya sah jika pengguna adalah pemilik, sudah terdaftar di sekolah, guru, siswa, atau Super Admin
-      const isAuthorizedMember = isPersonal ? isOwner : (isCallerSuperAdmin || isOwner || isAlreadyInSchool || isTeacherInSchool || isStudentInSchool);
+      const isAuthorizedMember = isPersonal ? (isOwner || isCallerSuperAdmin) : (isCallerSuperAdmin || isOwner || isAlreadyInSchool || isTeacherInSchool || isStudentInSchool);
       if (!isAuthorizedMember) {
         return json(res, 403, { error: 'Akses ditolak: Anda belum terdaftar sebagai anggota yang sah di sekolah ini.' });
       }
@@ -1245,6 +1244,15 @@ export default async function handler(req: any, res: any) {
 
       await checkAndDowngradeExpiredSchool(db, targetSchool);
 
+      const isPersonalWorkspace =
+        targetSchool.workspace_type === 'personal' ||
+        targetSchool.workspace_type === 'individu' ||
+        targetSchool.is_personal === true;
+
+      if (isPersonalWorkspace) {
+        return json(res, 400, { error: 'Kode ini merupakan Ruang Kerja Individu dan tidak dapat menerima anggota guru lain.' });
+      }
+
       const schoolId = targetSchool.id;
 
       if (!['WALI KELAS', 'GURU MAPEL'].includes(role)) {
@@ -1367,19 +1375,27 @@ export default async function handler(req: any, res: any) {
         return json(res, 400, { error: 'ID ruang kerja/sekolah wajib disertakan.' });
       }
 
-      // Verifikasi hak akses: SUPER_ADMIN, atau Admin/Kepala Sekolah/Guru dari sekolah terkait, atau pemilik sekolah
+      // Verifikasi hak akses secara ketat:
       const isSuper = callerProf?.role === 'SUPER_ADMIN';
-      const isSameSchool = callerProf?.school_id === schoolId;
-      let isOwner = false;
-      if (!isSuper && !isSameSchool) {
-        const { data: sch } = await db.from('schools').select('owner_id, workspace_type, is_personal').eq('id', schoolId).maybeSingle();
-        if (sch && (sch.owner_id === callerUserId || sch.is_personal === true || sch.workspace_type === 'personal')) {
-          isOwner = true;
-        }
+      const { data: sch } = await db.from('schools').select('owner_id, workspace_type, is_personal').eq('id', schoolId).maybeSingle();
+      if (!sch) {
+        return json(res, 404, { error: 'Ruang kerja atau sekolah tidak ditemukan.' });
       }
 
-      if (!isSuper && !isSameSchool && !isOwner) {
-        return json(res, 403, { error: 'Anda tidak memiliki hak akses untuk memperbarui profil sekolah ini.' });
+      const isPersonal = sch.workspace_type === 'personal' || sch.workspace_type === 'individu' || sch.is_personal === true;
+      const isOwner = sch.owner_id === callerUserId;
+
+      if (isPersonal) {
+        // RUANG KERJA INDIVIDU: HANYA pemilik sah yang dapat mengubah profil
+        if (!isSuper && !isOwner) {
+          return json(res, 403, { error: 'Akses ditolak: Hanya pemilik yang dapat memperbarui profil Ruang Kerja Individu ini.' });
+        }
+      } else {
+        // RUANG KERJA SEKOLAH: Admin Sekolah, Kepala Sekolah, atau Pemilik sekolah
+        const isSameSchoolAdmin = callerProf?.school_id === schoolId && ['ADMIN', 'KEPALA SEKOLAH'].includes(callerProf?.role);
+        if (!isSuper && !isOwner && !isSameSchoolAdmin) {
+          return json(res, 403, { error: 'Akses ditolak: Hanya Administrator atau Pemilik yang dapat memperbarui profil sekolah ini.' });
+        }
       }
 
       const namaSekolah = String(body.namaSekolah || body.nama_sekolah || '').trim();
@@ -1514,7 +1530,7 @@ export default async function handler(req: any, res: any) {
         { data: eventsList },
       ] = await Promise.all([
         db.from('school_profile').select('*').eq('school_id', schoolId).maybeSingle(),
-        db.from('schools').select('id, name, npsn, code, plan, status, workspace_type, is_personal').eq('id', schoolId).maybeSingle(),
+        db.from('schools').select('id, name, npsn, code, plan, status, workspace_type, is_personal, owner_id').eq('id', schoolId).maybeSingle(),
         db.from('teachers').select('*').eq('school_id', schoolId).order('nama'),
         db.from('classes').select('*, wali:wali_kelas_teacher_id(id,nama)').eq('school_id', schoolId).order('grade').order('name'),
         db.from('students').select('*, classes:class_id(id,name,grade,academic_year)').eq('school_id', schoolId).order('nama'),
@@ -1538,6 +1554,29 @@ export default async function handler(req: any, res: any) {
       if (userId) {
         const { data: prof } = await db.from('profiles').select('*').eq('id', userId).maybeSingle();
         callerProfile = prof;
+      }
+
+      // Validasi otorisasi akses master data
+      if (!sch) {
+        return json(res, 404, { error: 'Sekolah atau ruang kerja tidak ditemukan.' });
+      }
+      const isTargetPersonal = sch.workspace_type === 'personal' || sch.workspace_type === 'individu' || sch.is_personal === true;
+      const isTargetOwner = sch.owner_id === userId;
+      const isCallerSuperAdmin = callerProfile?.role === 'SUPER_ADMIN';
+
+      if (isTargetPersonal) {
+        if (!isTargetOwner && !isCallerSuperAdmin) {
+          return json(res, 403, { error: 'Akses ditolak: Hanya pemilik yang dapat mengakses data Ruang Kerja Individu ini.' });
+        }
+      } else {
+        const isLegitimateMember =
+          isCallerSuperAdmin ||
+          isTargetOwner ||
+          callerProfile?.school_id === schoolId ||
+          allTeachers.some((t: any) => t.id === callerProfile?.teacher_id);
+        if (!isLegitimateMember) {
+          return json(res, 403, { error: 'Akses ditolak: Anda tidak memiliki wewenang mengakses data sekolah ini.' });
+        }
       }
 
       if (callerProfile) {
@@ -2437,17 +2476,24 @@ export default async function handler(req: any, res: any) {
         schoolId = callerProf?.school_id || null;
       }
 
-      const isSameSchoolAdmin = schoolId && callerProf?.school_id === schoolId && ['ADMIN', 'KEPALA SEKOLAH'].includes(callerProf?.role);
-      let isOwner = false;
-      if (!isSuper && !isSameSchoolAdmin && schoolId) {
-        const { data: sch } = await db.from('schools').select('owner_id, workspace_type, is_personal').eq('id', schoolId).maybeSingle();
-        if (sch && (sch.owner_id === callerUserId || sch.workspace_type === 'personal' || sch.is_personal === true)) {
-          isOwner = true;
-        }
+      let targetSch: any = null;
+      if (schoolId) {
+        const { data: sData } = await db.from('schools').select('owner_id, workspace_type, is_personal').eq('id', schoolId).maybeSingle();
+        targetSch = sData;
       }
 
-      if (!isSuper && !isSameSchoolAdmin && !isOwner) {
-        return json(res, 403, { error: 'Akses ditolak: Hanya Administrator atau Kepala Sekolah yang dapat menghapus data guru.' });
+      const isPersonal = targetSch ? (targetSch.workspace_type === 'personal' || targetSch.workspace_type === 'individu' || targetSch.is_personal === true) : false;
+      const isOwner = Boolean(targetSch && targetSch.owner_id === callerUserId);
+
+      if (isPersonal) {
+        if (!isSuper && !isOwner) {
+          return json(res, 403, { error: 'Akses ditolak: Hanya pemilik yang dapat mengelola data guru di ruang kerja individu ini.' });
+        }
+      } else {
+        const isSameSchoolAdmin = schoolId && callerProf?.school_id === schoolId && ['ADMIN', 'KEPALA SEKOLAH'].includes(callerProf?.role);
+        if (!isSuper && !isSameSchoolAdmin && !isOwner) {
+          return json(res, 403, { error: 'Akses ditolak: Hanya Administrator atau Kepala Sekolah yang dapat menghapus data guru.' });
+        }
       }
 
       // 1. Hapus dari tabel teachers
@@ -2514,17 +2560,24 @@ export default async function handler(req: any, res: any) {
         schoolId = callerProf?.school_id || null;
       }
 
-      const isSameSchoolAdmin = schoolId && callerProf?.school_id === schoolId && ['ADMIN', 'KEPALA SEKOLAH', 'WALI KELAS'].includes(callerProf?.role);
-      let isOwner = false;
-      if (!isSuper && !isSameSchoolAdmin && schoolId) {
-        const { data: sch } = await db.from('schools').select('owner_id, workspace_type, is_personal').eq('id', schoolId).maybeSingle();
-        if (sch && (sch.owner_id === callerUserId || sch.workspace_type === 'personal' || sch.is_personal === true)) {
-          isOwner = true;
-        }
+      let targetSch: any = null;
+      if (schoolId) {
+        const { data: sData } = await db.from('schools').select('owner_id, workspace_type, is_personal').eq('id', schoolId).maybeSingle();
+        targetSch = sData;
       }
 
-      if (!isSuper && !isSameSchoolAdmin && !isOwner) {
-        return json(res, 403, { error: 'Akses ditolak: Anda tidak memiliki hak akses untuk mengelola data guru di sekolah ini.' });
+      const isPersonal = targetSch ? (targetSch.workspace_type === 'personal' || targetSch.workspace_type === 'individu' || targetSch.is_personal === true) : false;
+      const isOwner = Boolean(targetSch && targetSch.owner_id === callerUserId);
+
+      if (isPersonal) {
+        if (!isSuper && !isOwner) {
+          return json(res, 403, { error: 'Akses ditolak: Hanya pemilik yang dapat mengelola data guru di ruang kerja individu ini.' });
+        }
+      } else {
+        const isSameSchoolAdmin = schoolId && callerProf?.school_id === schoolId && ['ADMIN', 'KEPALA SEKOLAH', 'WALI KELAS'].includes(callerProf?.role);
+        if (!isSuper && !isSameSchoolAdmin && !isOwner) {
+          return json(res, 403, { error: 'Akses ditolak: Anda tidak memiliki hak akses untuk mengelola data guru di sekolah ini.' });
+        }
       }
 
       if (teacherId) {
@@ -2621,17 +2674,24 @@ export default async function handler(req: any, res: any) {
         return json(res, 400, { error: 'ID sekolah / ruang kerja wajib disertakan.' });
       }
 
-      const isSameSchoolUser = callerProf?.school_id === schoolId;
-      let isOwner = false;
-      if (!isSuper && !isSameSchoolUser) {
-        const { data: sch } = await db.from('schools').select('owner_id, workspace_type, is_personal').eq('id', schoolId).maybeSingle();
-        if (sch && (sch.owner_id === callerUserId || sch.workspace_type === 'personal' || sch.is_personal === true)) {
-          isOwner = true;
-        }
+      let targetSch: any = null;
+      if (schoolId) {
+        const { data: sData } = await db.from('schools').select('owner_id, workspace_type, is_personal').eq('id', schoolId).maybeSingle();
+        targetSch = sData;
       }
 
-      if (!isSuper && !isSameSchoolUser && !isOwner) {
-        return json(res, 403, { error: 'Akses ditolak: Anda tidak memiliki hak akses untuk mengelola data siswa di sekolah ini.' });
+      const isPersonal = targetSch ? (targetSch.workspace_type === 'personal' || targetSch.workspace_type === 'individu' || targetSch.is_personal === true) : false;
+      const isOwner = Boolean(targetSch && targetSch.owner_id === callerUserId);
+
+      if (isPersonal) {
+        if (!isSuper && !isOwner) {
+          return json(res, 403, { error: 'Akses ditolak: Hanya pemilik yang dapat mengelola data siswa di ruang kerja individu ini.' });
+        }
+      } else {
+        const isSameSchoolUser = callerProf?.school_id === schoolId;
+        if (!isSuper && !isSameSchoolUser && !isOwner) {
+          return json(res, 403, { error: 'Akses ditolak: Anda tidak memiliki hak akses untuk mengelola data siswa di sekolah ini.' });
+        }
       }
 
       let classId = body.classId || body.class_id || null;
@@ -2748,17 +2808,24 @@ export default async function handler(req: any, res: any) {
         return json(res, 400, { error: 'ID ruang kerja / sekolah wajib disertakan.' });
       }
 
-      const isSameSchoolAdmin = callerProf?.school_id === schoolId && ['ADMIN', 'KEPALA SEKOLAH'].includes(callerProf?.role);
-      let isOwner = false;
-      if (!isSuper && !isSameSchoolAdmin) {
-        const { data: sch } = await db.from('schools').select('owner_id, workspace_type, is_personal').eq('id', schoolId).maybeSingle();
-        if (sch && (sch.owner_id === callerUserId || sch.workspace_type === 'personal' || sch.is_personal === true)) {
-          isOwner = true;
-        }
+      let targetSch: any = null;
+      if (schoolId) {
+        const { data: sData } = await db.from('schools').select('owner_id, workspace_type, is_personal').eq('id', schoolId).maybeSingle();
+        targetSch = sData;
       }
 
-      if (!isSuper && !isSameSchoolAdmin && !isOwner) {
-        return json(res, 403, { error: 'Akses ditolak: Hanya Administrator Sekolah atau Pemilik yang dapat mengubah pengaturan sistem.' });
+      const isPersonal = targetSch ? (targetSch.workspace_type === 'personal' || targetSch.workspace_type === 'individu' || targetSch.is_personal === true) : false;
+      const isOwner = Boolean(targetSch && targetSch.owner_id === callerUserId);
+
+      if (isPersonal) {
+        if (!isSuper && !isOwner) {
+          return json(res, 403, { error: 'Akses ditolak: Hanya pemilik yang dapat mengubah pengaturan ruang kerja individu ini.' });
+        }
+      } else {
+        const isSameSchoolAdmin = callerProf?.school_id === schoolId && ['ADMIN', 'KEPALA SEKOLAH'].includes(callerProf?.role);
+        if (!isSuper && !isSameSchoolAdmin && !isOwner) {
+          return json(res, 403, { error: 'Akses ditolak: Hanya Administrator Sekolah atau Pemilik yang dapat mengubah pengaturan sistem.' });
+        }
       }
 
       const payload: any = {
@@ -2839,17 +2906,24 @@ export default async function handler(req: any, res: any) {
         return json(res, 400, { error: 'Nama rombel kelas wajib diisi.' });
       }
 
-      const isSameSchoolAuth = callerProf?.school_id === schoolId && ['ADMIN', 'KEPALA SEKOLAH', 'WALI KELAS', 'GURU MAPEL'].includes(callerProf?.role);
-      let isOwner = false;
-      if (!isSuper && !isSameSchoolAuth) {
-        const { data: sch } = await db.from('schools').select('owner_id, workspace_type, is_personal').eq('id', schoolId).maybeSingle();
-        if (sch && (sch.owner_id === callerUserId || sch.workspace_type === 'personal' || sch.is_personal === true)) {
-          isOwner = true;
-        }
+      let targetSch: any = null;
+      if (schoolId) {
+        const { data: sData } = await db.from('schools').select('owner_id, workspace_type, is_personal').eq('id', schoolId).maybeSingle();
+        targetSch = sData;
       }
 
-      if (!isSuper && !isSameSchoolAuth && !isOwner) {
-        return json(res, 403, { error: 'Akses ditolak: Anda tidak memiliki wewenang untuk mengelola rombel kelas di sekolah ini.' });
+      const isPersonal = targetSch ? (targetSch.workspace_type === 'personal' || targetSch.workspace_type === 'individu' || targetSch.is_personal === true) : false;
+      const isOwner = Boolean(targetSch && targetSch.owner_id === callerUserId);
+
+      if (isPersonal) {
+        if (!isSuper && !isOwner) {
+          return json(res, 403, { error: 'Akses ditolak: Hanya pemilik yang dapat mengelola rombel kelas di ruang kerja individu ini.' });
+        }
+      } else {
+        const isSameSchoolAuth = callerProf?.school_id === schoolId && ['ADMIN', 'KEPALA SEKOLAH', 'WALI KELAS', 'GURU MAPEL'].includes(callerProf?.role);
+        if (!isSuper && !isSameSchoolAuth && !isOwner) {
+          return json(res, 403, { error: 'Akses ditolak: Anda tidak memiliki wewenang untuk mengelola rombel kelas di sekolah ini.' });
+        }
       }
 
       // Validasi batas kapasitas kelas berdasarkan ruang kerja & peran
@@ -2994,17 +3068,24 @@ export default async function handler(req: any, res: any) {
         schoolId = cls?.school_id || callerProf?.school_id || '';
       }
 
-      const isSameSchoolAdmin = schoolId && callerProf?.school_id === schoolId && ['ADMIN', 'KEPALA SEKOLAH'].includes(callerProf?.role);
-      let isOwner = false;
-      if (!isSuper && !isSameSchoolAdmin && schoolId) {
-        const { data: sch } = await db.from('schools').select('owner_id, workspace_type, is_personal').eq('id', schoolId).maybeSingle();
-        if (sch && (sch.owner_id === callerUserId || sch.workspace_type === 'personal' || sch.is_personal === true)) {
-          isOwner = true;
-        }
+      let targetSch: any = null;
+      if (schoolId) {
+        const { data: sData } = await db.from('schools').select('owner_id, workspace_type, is_personal').eq('id', schoolId).maybeSingle();
+        targetSch = sData;
       }
 
-      if (!isSuper && !isSameSchoolAdmin && !isOwner) {
-        return json(res, 403, { error: 'Akses ditolak: Hanya Administrator atau Kepala Sekolah yang dapat menghapus rombel kelas.' });
+      const isPersonal = targetSch ? (targetSch.workspace_type === 'personal' || targetSch.workspace_type === 'individu' || targetSch.is_personal === true) : false;
+      const isOwner = Boolean(targetSch && targetSch.owner_id === callerUserId);
+
+      if (isPersonal) {
+        if (!isSuper && !isOwner) {
+          return json(res, 403, { error: 'Akses ditolak: Hanya pemilik yang dapat menghapus rombel kelas di ruang kerja individu ini.' });
+        }
+      } else {
+        const isSameSchoolAdmin = schoolId && callerProf?.school_id === schoolId && ['ADMIN', 'KEPALA SEKOLAH'].includes(callerProf?.role);
+        if (!isSuper && !isSameSchoolAdmin && !isOwner) {
+          return json(res, 403, { error: 'Akses ditolak: Hanya Administrator atau Kepala Sekolah yang dapat menghapus rombel kelas.' });
+        }
       }
 
       const { data: stus } = await db.from('students').select('id').eq('class_id', classId).limit(1);

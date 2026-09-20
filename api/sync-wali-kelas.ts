@@ -30,6 +30,13 @@ export default async function handler(req: any, res: any) {
   if (!profile) return json(res, 404, { error: 'Profil pengguna tidak ditemukan.' });
   if (!profile.school_id) return json(res, 400, { error: 'Akun belum memiliki sekolah aktif.' });
 
+  const { data: sch } = await admin.from('schools').select('id, owner_id, workspace_type, is_personal').eq('id', profile.school_id).maybeSingle();
+  if (sch && (sch.workspace_type === 'personal' || sch.workspace_type === 'individu' || sch.is_personal === true)) {
+    if (sch.owner_id !== userId && profile.role !== 'SUPER_ADMIN') {
+      return json(res, 403, { error: 'Akses ditolak: Anda bukan pemilik ruang kerja individu ini.' });
+    }
+  }
+
   const targetClassId = req.body?.classId || (Array.isArray(profile.class_ids) && profile.class_ids.length > 0 ? profile.class_ids[0] : null);
 
   let teacher: any = null;

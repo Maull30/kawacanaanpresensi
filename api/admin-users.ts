@@ -126,24 +126,35 @@ export default async function handler(req: any, res: any) {
   const action = body.action;
   const role = body.role as Role | undefined;
   const callerSchoolId = profile?.school_id || caller.user.user_metadata?.school_workspace_id || caller.user.user_metadata?.school_id || null;
-  const schoolId = callerRole === 'SUPER_ADMIN' ? (body.schoolId || body.school_id || callerSchoolId) : (callerSchoolId || body.schoolId || body.school_id);
+  const requestedSchoolId = callerRole === 'SUPER_ADMIN'
+    ? (body.schoolId || body.school_id || callerSchoolId)
+    : (callerSchoolId || body.schoolId || body.school_id);
+  const schoolId = requestedSchoolId;
 
-  // Cek apakah workspace ini adalah ruang kerja personal atau pengguna adalah pemilik (owner)
-  let isPersonalOwner = false;
-  const checkSchoolId = schoolId || callerSchoolId || body.schoolId || body.school_id;
-  if (checkSchoolId) {
+  // Verifikasi data workspace target
+  let targetSchoolData: any = null;
+  if (schoolId) {
     const { data: sch } = await admin
       .from('schools')
       .select('id, owner_id, is_personal, workspace_type')
-      .eq('id', checkSchoolId)
+      .eq('id', schoolId)
       .maybeSingle();
-    if (sch && (sch.owner_id === caller.user.id || sch.is_personal === true || sch.workspace_type === 'personal' || sch.workspace_type === 'individu')) {
-      isPersonalOwner = true;
-    }
+    targetSchoolData = sch;
   }
 
-  if (caller.user.user_metadata?.workspace_type === 'personal' || caller.user.user_metadata?.workspace_type === 'individu') {
-    isPersonalOwner = true;
+  const isPersonalWorkspace = targetSchoolData
+    ? (targetSchoolData.workspace_type === 'personal' ||
+       targetSchoolData.workspace_type === 'individu' ||
+       targetSchoolData.is_personal === true)
+    : false;
+
+  // Ruang kerja individu HANYA dimiliki oleh user yang sama dengan owner_id
+  const isOwner = Boolean(targetSchoolData && targetSchoolData.owner_id === caller.user.id);
+  const isPersonalOwner = isPersonalWorkspace && isOwner;
+
+  // Proteksi mutlak Ruang Kerja Individu: jika target adalah personal, HANYA pemilik sah atau SUPER_ADMIN yang boleh mengakses
+  if (isPersonalWorkspace && !isOwner && callerRole !== 'SUPER_ADMIN') {
+    return json(res, 403, { error: 'Akses ditolak: Hanya pemilik yang dapat mengelola Ruang Kerja Individu ini.' });
   }
 
   const studentAndClassActions = [
@@ -157,11 +168,15 @@ export default async function handler(req: any, res: any) {
   ];
   const isStudentOrClassAction = studentAndClassActions.includes(action);
   const isTeacherOrWali = ['WALI KELAS', 'GURU MAPEL', 'KEPALA SEKOLAH'].includes(callerRole);
+  const isSchoolAdmin = ['ADMIN', 'SUPER_ADMIN', 'ADMIN SEKOLAH'].includes(callerRole);
+  const isSameSchoolUser = Boolean(callerSchoolId && schoolId && callerSchoolId === schoolId);
 
   const isAuthorizedAdmin =
-    ['ADMIN', 'SUPER_ADMIN', 'ADMIN SEKOLAH'].includes(callerRole) ||
+    callerRole === 'SUPER_ADMIN' ||
     isPersonalOwner ||
-    (isStudentOrClassAction && (isTeacherOrWali || isPersonalOwner));
+    (isOwner && !isPersonalWorkspace) ||
+    (isSameSchoolUser && isSchoolAdmin) ||
+    (isStudentOrClassAction && isSameSchoolUser && isTeacherOrWali);
 
   if (!isAuthorizedAdmin) {
     return json(res, 403, { error: 'Hanya ADMIN sekolah atau SUPER ADMIN yang dapat mengelola akun.' });
@@ -180,10 +195,35 @@ export default async function handler(req: any, res: any) {
 
   const ensureSameSchool = async (targetId: string, allowSuperAdmin = true) => {
     if (callerRole === 'SUPER_ADMIN' && allowSuperAdmin) return true;
-    const { data: targetProfile } = await admin.from('profiles').select('school_id').eq('id', targetId).maybeSingle();
-    if (!targetProfile) return true;
-    if (!callerSchoolId || !targetProfile.school_id) return true;
-    return targetProfile.school_id === callerSchoolId;
+    const { data: targetProfile } = await admin.from('profiles').select('id, school_id').eq('id', targetId).maybeSingle();
+    if (!targetProfile || !targetProfile.school_id) return false;
+
+    const targetSchoolId = targetProfile.school_id;
+
+    const { data: targetSch } = await admin
+      .from('schools')
+      .select('id, owner_id, workspace_type, is_personal')
+      .eq('id', targetSchoolId)
+      .maybeSingle();
+
+    if (!targetSch) return false;
+
+    const isPersonal =
+      targetSch.workspace_type === 'personal' ||
+      targetSch.workspace_type === 'individu' ||
+      targetSch.is_personal === true;
+
+    if (isPersonal) {
+      // Ruang kerja individu HANYA boleh dikelola oleh pemilik sahnya
+      return targetSch.owner_id === caller.user.id;
+    }
+
+    // Sekolah institusi:
+    if (targetSch.owner_id === caller.user.id) return true;
+    if (callerSchoolId && targetSchoolId === callerSchoolId) {
+      return ['ADMIN', 'KEPALA SEKOLAH', 'ADMIN SEKOLAH'].includes(callerRole);
+    }
+    return false;
   };
 
   try {
@@ -403,7 +443,18 @@ export default async function handler(req: any, res: any) {
 
     if (action === 'list' || action === 'list_users' || action === 'list_admins') {
       const requestedSchool = body.schoolId || body.school_id || profile.school_id;
-      if (profile.role !== 'SUPER_ADMIN' && requestedSchool !== profile.school_id) return json(res, 403, { error: 'Akses sekolah tidak sesuai.' });
+      if (!requestedSchool) return json(res, 400, { error: 'ID sekolah wajib disertakan.' });
+
+      if (profile.role !== 'SUPER_ADMIN') {
+        if (targetSchoolData && isPersonalWorkspace) {
+          if (!isOwner) {
+            return json(res, 403, { error: 'Akses ditolak: Hanya pemilik yang dapat mengakses data ruang kerja individu ini.' });
+          }
+        } else if (requestedSchool !== profile.school_id && !isOwner) {
+          return json(res, 403, { error: 'Akses sekolah tidak sesuai.' });
+        }
+      }
+
       let query = admin.from('profiles').select('id,school_id,name,username,email,role,student_id,is_active,must_change_password,created_at').eq('school_id', requestedSchool);
       if (action === 'list_admins') query = query.in('role', ['ADMIN','KEPALA SEKOLAH','GURU MAPEL','WALI KELAS']);
       if (body.role) query = query.eq('role', body.role);

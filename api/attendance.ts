@@ -37,8 +37,8 @@ export default async function handler(req: any, res: any) {
   const targetSchoolId = body.schoolId || profile.school_id;
   const userRole = String(profile.role || '').toUpperCase().trim();
 
-  // Verifikasi otorisasi sekolah: izinkan jika super admin, atau jika school_id cocok dan valid
-  let isAuthorizedForSchool = userRole === 'SUPER_ADMIN' || Boolean(targetSchoolId && profile.school_id === targetSchoolId);
+  // Verifikasi otorisasi sekolah secara ketat
+  let isAuthorizedForSchool = userRole === 'SUPER_ADMIN';
 
   if (!isAuthorizedForSchool && targetSchoolId) {
     try {
@@ -48,30 +48,44 @@ export default async function handler(req: any, res: any) {
         .eq('id', targetSchoolId)
         .maybeSingle();
 
-      if (
-        targetSchool &&
-        (targetSchool.owner_id === userId ||
+      if (targetSchool) {
+        const isPersonalWorkspace =
           targetSchool.workspace_type === 'personal' ||
           targetSchool.workspace_type === 'individu' ||
-          targetSchool.is_personal === true)
-      ) {
-        isAuthorizedForSchool = true;
-      } else {
-        // Cek apakah guru terdaftar di sekolah target
-        const { data: teacherRow } = await admin
-          .from('teachers')
-          .select('id')
-          .eq('school_id', targetSchoolId)
-          .eq('id', profile.teacher_id || '')
-          .maybeSingle();
-        if (teacherRow) {
-          isAuthorizedForSchool = true;
-        }
-      }
+          targetSchool.is_personal === true;
 
-      // Sinkronkan school_id pada profil jika terverifikasi memiliki akses
-      if (isAuthorizedForSchool && profile.school_id !== targetSchoolId) {
-        await admin.from('profiles').update({ school_id: targetSchoolId }).eq('id', userId);
+        if (isPersonalWorkspace) {
+          // RUANG KERJA INDIVIDU: HANYA pemilik sah (owner_id === userId) yang boleh mengakses & mencatat absensi
+          if (targetSchool.owner_id === userId) {
+            isAuthorizedForSchool = true;
+          }
+        } else {
+          // RUANG KERJA SEKOLAH / INSTANSI:
+          // Boleh diakses jika:
+          // 1. Pemilik sekolah (owner_id === userId)
+          // 2. Atau pengguna aktif terdaftar di sekolah ini (profile.school_id === targetSchoolId)
+          // 3. Atau guru yang terdaftar resmi di tabel teachers untuk sekolah ini
+          if (targetSchool.owner_id === userId) {
+            isAuthorizedForSchool = true;
+          } else if (profile.school_id === targetSchoolId) {
+            isAuthorizedForSchool = true;
+          } else if (profile.teacher_id) {
+            const { data: teacherRow } = await admin
+              .from('teachers')
+              .select('id')
+              .eq('school_id', targetSchoolId)
+              .eq('id', profile.teacher_id)
+              .maybeSingle();
+            if (teacherRow) {
+              isAuthorizedForSchool = true;
+            }
+          }
+        }
+
+        // Sinkronkan school_id pada profil HANYA jika terverifikasi sah
+        if (isAuthorizedForSchool && profile.school_id !== targetSchoolId) {
+          await admin.from('profiles').update({ school_id: targetSchoolId }).eq('id', userId);
+        }
       }
     } catch (authCheckErr: any) {
       console.warn('[attendance API] auth check warning:', authCheckErr?.message);

@@ -295,9 +295,9 @@ const emptyUser = (p: any): UserAccount => {
     classIds: p.class_ids || [],
     classNames: p.class_names || [],
     assignedClassIds: p.assigned_class_ids || p.assignedClassIds || [],
-    subscriptionPlan: p.subscription_plan || null,
-    subscriptionStatus: p.subscription_status || null,
-    subscriptionExpiresAt: p.subscription_expires_at || null,
+    subscriptionPlan: null,
+    subscriptionStatus: null,
+    subscriptionExpiresAt: null,
     maxTeachers: p.max_teachers,
     maxStudents: p.max_students,
     maxClasses: p.max_classes,
@@ -1388,7 +1388,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       school_id: schoolId,
       school_code: authoritativeSchoolCode || null,
       role: targetRole,
-      subscription_plan: tenantSchool?.plan || "teacher",
+      subscription_plan: normalizePlan(tenantSchool?.plan),
       subscription_status: tenantSchool?.status || "active",
       subscription_expires_at: tenantSchool?.subscription_expires_at,
       max_teachers: tenantSchool?.max_teachers,
@@ -2759,7 +2759,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
         (baseProfile as any).registration_mode === "personal" ||
         schoolRow?.workspace_type === "personal" ||
         (schoolRow as any)?.is_personal === true ||
-        schoolRow?.plan === "mulai";
 
       memberships.push({
         id: "ws-mem-" + baseProfile.id,
@@ -2772,8 +2771,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
           (isPersonal ? "Ruang Kerja Individu" : "Ruang Kerja Sekolah"),
         workspaceType: isPersonal ? "personal" : "school",
         npsn: schoolRow?.npsn || null,
-        subscriptionPlan: (schoolRow?.plan ||
-          (isPersonal ? "mulai" : "sekolah")) as any,
+        subscriptionPlan: normalizePlan(schoolRow?.plan || "free"),
         joinedAt: baseProfile.created_at || new Date().toISOString(),
       });
     }

@@ -458,9 +458,9 @@ export function resolveWorkspaceSubscription(
     tanggalMulai: startedAtStr,
     tanggalKedaluwarsa: expiresAtStr,
     sisaHari: isExpired ? 0 : sisaHari,
-    maksSiswa: workspace?.max_students || paketDef.kapasitasSiswa,
-    maksGuru: workspace?.max_teachers || paketDef.kapasitasGuru,
-    maksKelas: workspace?.max_classes || paketDef.kapasitasKelas,
+    maksSiswa: paketDef.kapasitasSiswa,
+    maksGuru: paketDef.kapasitasGuru,
+    maksKelas: paketDef.kapasitasKelas,
     fiturAktif: paketDef.fitur,
   };
 }

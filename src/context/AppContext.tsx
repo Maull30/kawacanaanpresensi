@@ -975,7 +975,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
                     plan: 'guru_gratis',
                     status: 'active',
                     maxClasses: 1,
-                    maxStudents: 32,
+                    maxStudents: 50,
                     expiresAt: null,
                   } as any,
                 }

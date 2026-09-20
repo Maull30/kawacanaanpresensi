@@ -77,10 +77,10 @@ const clusters: ClusterConfig[] = [
     sublabel: 'Direktori & Pengguna Tenant',
     icon: Building2,
     submenus: [
-      { id: 'semua', label: 'Direktori Sekolah', icon: Building2 },
-      { id: 'tambah', label: 'Tambah Sekolah Baru', icon: Plus },
-      { id: 'paket', label: 'Paket & Kuota Lisensi', icon: Layers },
-      { id: 'pengguna', label: 'Akun Admin Tenant', icon: Users },
+      { id: 'manajemen', label: 'Manajemen Sekolah', icon: Building2 },
+      { id: 'paket-lisensi', label: 'Paket & Lisensi', icon: Layers },
+      { id: 'pengguna', label: 'Pengguna', icon: Users },
+      { id: 'riwayat', label: 'Riwayat', icon: Activity },
     ],
   },
   {
@@ -138,7 +138,7 @@ export const SuperAdminView: React.FC = () => {
 
   // State untuk navigasi spesifik antar sub-fitur
   const [overviewSubTab, setOverviewSubTab] = useState<string>('ringkasan');
-  const [schoolsSubTab, setSchoolsSubTab] = useState<string>('semua');
+  const [schoolsSubTab, setSchoolsSubTab] = useState<string>('manajemen');
   const [selectedSchoolId, setSelectedSchoolId] = useState<string | null>(null);
   const [billingSubTab, setBillingSubTab] = useState<string>('dashboard');
   const [systemSubTab, setSystemSubTab] = useState<string>('keamanan');

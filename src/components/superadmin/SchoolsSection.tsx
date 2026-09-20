@@ -49,6 +49,8 @@ import { SchoolOnboardingModal } from '../SchoolOnboardingModal';
 import { SchoolBuildingIllustration } from './SuperAdminIllustrations';
 import { ServiceSummaryDonutChart, PackageDistributionBarChart } from './SuperAdminCharts';
 import { SchoolActivitiesView } from './SchoolActivitiesView';
+import { SchoolPackagesTab } from './SchoolPackagesTab';
+import { SchoolUsersTab } from './SchoolUsersTab';
 
 export type SchoolDetailTab = 'profil-lisensi' | 'pengguna-akses' | 'riwayat-audit';
 
@@ -165,7 +167,13 @@ export const SchoolsSection: React.FC<{
   useEffect(() => {
     if (activeSubTab === 'tambah') {
       setIsCreateOpen(true);
-    } else if (activeSubTab === 'aktivitas') {
+    } else if (
+      activeSubTab === 'paket-lisensi' ||
+      activeSubTab === 'paket' ||
+      activeSubTab === 'pengguna' ||
+      activeSubTab === 'riwayat' ||
+      activeSubTab === 'aktivitas'
+    ) {
       setSelectedSchoolId(null);
     } else if (activeSubTab === 'manajemen' || activeSubTab === 'semua') {
       setSelectedSchoolId(null);
@@ -690,9 +698,38 @@ export const SchoolsSection: React.FC<{
   };
 
   // =========================================================================
-  // SUBMENU AKTIVITAS SEKOLAH (AUDIT LOG & LINIMASA AKTIVITAS MULTI-TENANT)
+  // SUBMENU 2: PAKET & LISENSI
   // =========================================================================
-  if (activeSubTab === 'aktivitas' && !selectedSchoolId) {
+  if ((activeSubTab === 'paket-lisensi' || activeSubTab === 'paket') && !selectedSchoolId) {
+    return (
+      <SchoolPackagesTab
+        call={call}
+        showToast={showToast}
+        schools={schools}
+        onReloadSchools={loadSchools}
+        onNavigateToSchool={handleSelectSchool}
+      />
+    );
+  }
+
+  // =========================================================================
+  // SUBMENU 3: PENGGUNA (AKUN TENANT, ADMIN, GURU & OPERATOR)
+  // =========================================================================
+  if (activeSubTab === 'pengguna' && !selectedSchoolId) {
+    return (
+      <SchoolUsersTab
+        call={call}
+        showToast={showToast}
+        schools={schools}
+        onNavigateToSchool={handleSelectSchool}
+      />
+    );
+  }
+
+  // =========================================================================
+  // SUBMENU 4: RIWAYAT (AUDIT LOG & LINIMASA AKTIVITAS MULTI-TENANT)
+  // =========================================================================
+  if ((activeSubTab === 'riwayat' || activeSubTab === 'aktivitas') && !selectedSchoolId) {
     return (
       <SchoolActivitiesView
         call={call}

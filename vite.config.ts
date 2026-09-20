@@ -31,6 +31,22 @@ function apiDevMiddleware(): Plugin {
       server.middlewares.use(async (req, res, next) => {
         const url = req.url || '';
         if (url.startsWith('/api/')) {
+          // Immediately attach listeners to buffer incoming body stream before any await
+          const bodyPromise = new Promise<string>((resolve, reject) => {
+            if (req.method === 'GET' || req.method === 'HEAD') {
+              return resolve('');
+            }
+            if (req.body !== undefined && typeof req.body === 'object' && Object.keys(req.body).length > 0) {
+              return resolve(JSON.stringify(req.body));
+            }
+            let bodyStr = '';
+            req.on('data', (chunk: Buffer) => {
+              bodyStr += chunk;
+            });
+            req.on('end', () => resolve(bodyStr));
+            req.on('error', (err: any) => reject(err));
+          });
+
           try {
             const pathname = (url.split('?')[0] || '').replace(/^\/api\//, '').replace(/\/+$/, '');
             const safeRoutes: Record<string, string> = {
@@ -63,68 +79,55 @@ function apiDevMiddleware(): Plugin {
             }
             const handler = handlerModule?.default || handlerModule;
 
-            const processRequest = async (bodyStr: string) => {
-              try {
-                (req as any).body = bodyStr ? JSON.parse(bodyStr) : {};
-              } catch {
-                (req as any).body = {};
-              }
-              // Parse URL query params
-              try {
-                const parsedUrl = new URL(req.url || '', 'http://localhost:3000');
-                const queryObj: Record<string, string> = {};
-                parsedUrl.searchParams.forEach((val, key) => {
-                  queryObj[key] = val;
-                });
-                (req as any).query = queryObj;
-              } catch {
-                (req as any).query = {};
-              }
+            const bodyStr = await bodyPromise;
+            try {
+              (req as any).body = bodyStr ? JSON.parse(bodyStr) : {};
+            } catch {
+              (req as any).body = {};
+            }
+            // Parse URL query params
+            try {
+              const parsedUrl = new URL(req.url || '', 'http://localhost:3000');
+              const queryObj: Record<string, string> = {};
+              parsedUrl.searchParams.forEach((val, key) => {
+                queryObj[key] = val;
+              });
+              (req as any).query = queryObj;
+            } catch {
+              (req as any).query = {};
+            }
 
-              (res as any).status = (code: number) => {
-                res.statusCode = code;
-                return res;
-              };
-              (res as any).json = (data: any) => {
-                if (!res.headersSent) {
+            (res as any).status = (code: number) => {
+              res.statusCode = code;
+              return res;
+            };
+            (res as any).json = (data: any) => {
+              if (!res.headersSent) {
+                res.setHeader('Content-Type', 'application/json');
+              }
+              res.end(JSON.stringify(data));
+              return res;
+            };
+            (res as any).send = (data: any) => {
+              if (!res.headersSent) {
+                if (typeof data === 'object') {
                   res.setHeader('Content-Type', 'application/json');
-                }
-                res.end(JSON.stringify(data));
-                return res;
-              };
-              (res as any).send = (data: any) => {
-                if (!res.headersSent) {
-                  if (typeof data === 'object') {
-                    res.setHeader('Content-Type', 'application/json');
-                    res.end(JSON.stringify(data));
-                  } else {
-                    res.end(String(data));
-                  }
-                }
-                return res;
-              };
-
-              try {
-                await handler(req, res);
-              } catch (err: any) {
-                if (!res.writableEnded) {
-                  res.statusCode = 500;
-                  res.setHeader('Content-Type', 'application/json');
-                  res.end(JSON.stringify({ error: err?.message || 'Server error' }));
+                  res.end(JSON.stringify(data));
+                } else {
+                  res.end(String(data));
                 }
               }
+              return res;
             };
 
-            if (req.method === 'GET' || req.method === 'HEAD') {
-              await processRequest('');
-            } else {
-              let bodyStr = '';
-              req.on('data', (chunk: Buffer) => {
-                bodyStr += chunk;
-              });
-              req.on('end', async () => {
-                await processRequest(bodyStr);
-              });
+            try {
+              await handler(req, res);
+            } catch (err: any) {
+              if (!res.writableEnded) {
+                res.statusCode = 500;
+                res.setHeader('Content-Type', 'application/json');
+                res.end(JSON.stringify({ error: err?.message || 'Server error' }));
+              }
             }
             return;
           } catch (err: any) {
@@ -189,6 +192,10 @@ export default defineConfig(() => {
       hmr: process.env.DISABLE_HMR !== 'true',
       // Disable file watching when DISABLE_HMR is true to save CPU during agent edits.
       watch: process.env.DISABLE_HMR === 'true' ? null : {},
+    },
+    preview: {
+      host: '0.0.0.0',
+      port: 3000,
     },
   };
 });

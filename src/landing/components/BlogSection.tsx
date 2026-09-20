@@ -1,203 +1,256 @@
 import React from 'react';
-import { Calendar, Clock, ArrowRight, BookOpen } from 'lucide-react';
+import { Calendar, Clock, BookOpen, ArrowRight } from 'lucide-react';
 
 interface BlogSectionProps {
   lang: 'ID' | 'EN';
 }
 
 export const BlogSection: React.FC<BlogSectionProps> = ({ lang }) => {
-  const categories = lang === 'ID' ? [
-    {
-      name: 'DIGITALISASI SEKOLAH',
-      desc: 'Membahas perkembangan teknologi untuk mendukung administrasi dan pembelajaran.'
-    },
-    {
-      name: 'MANAJEMEN KEHADIRAN',
-      desc: 'Tips mengelola data kehadiran siswa dengan lebih efektif.'
-    },
-    {
-      name: 'ADMINISTRASI SEKOLAH',
-      desc: 'Informasi dan solusi untuk membantu pekerjaan administrasi sekolah.'
-    }
-  ] : [
-    {
-      name: 'SCHOOL DIGITALIZATION',
-      desc: 'Discussing technological advancements that support administration and learning workflows.'
-    },
-    {
-      name: 'ATTENDANCE MANAGEMENT',
-      desc: 'Actionable tips for managing student attendance data with precision and ease.'
-    },
-    {
-      name: 'SCHOOL ADMINISTRATION',
-      desc: 'Insights and streamlined solutions to assist school administrative staff and educators.'
-    }
-  ];
+  const isId = lang === 'ID';
 
-  const posts = lang === 'ID' ? [
+  const posts = isId ? [
     {
       id: '1',
       title: 'Mengapa Sekolah Perlu Beralih ke Sistem Presensi Digital?',
-      category: 'DIGITALISASI SEKOLAH',
+      category: 'Digitalisasi Sekolah',
       readTime: '4 menit baca',
       date: '18 Agu 2026',
-      snippet: 'Membahas perkembangan teknologi untuk mendukung administrasi presensi dan pembelajaran yang lebih terstruktur di era modern.',
+      snippet: 'Membahas efisiensi teknologi presensi digital dalam merapikan administrasi rombel dan meningkatkan akurasi data kehadiran di sekolah dasar.',
       image: '/images/blog/330-ribu-sekolah-akan-dibekali-layar-digital-pintar-tahun-ini-1758534297510_169.jpeg',
     },
     {
       id: '2',
       title: 'Cara Mengelola Rekap Kehadiran Siswa dengan Lebih Efisien',
-      category: 'MANAJEMEN KEHADIRAN',
+      category: 'Manajemen Kehadiran',
       readTime: '5 menit baca',
       date: '12 Agu 2026',
-      snippet: 'Tips praktis menyusun dan menganalisis rekapitulasi presensi harian, mingguan, hingga semester tanpa kesalahan manual.',
+      snippet: 'Langkah praktis menyusun rekapitulasi kehadiran bulanan dan semester tanpa risiko kesalahan, menggunakan sistem presensi terpadu.',
       image: '/images/blog/batas-usia-masuk-sd-diperbarui-anak-di-bawah-7-tahun-bisa-sekolah-dengan-syarat-ini-154159.webp',
     },
     {
       id: '3',
       title: 'Digitalisasi Administrasi Sekolah: Dari Data hingga Laporan',
-      category: 'ADMINISTRASI SEKOLAH',
+      category: 'Administrasi Sekolah',
       readTime: '6 menit baca',
       date: '05 Agu 2026',
-      snippet: 'Informasi dan solusi terintegrasi untuk menyederhanakan alur pekerjaan tata usaha dan dewan guru di lingkungan sekolah.',
+      snippet: 'Panduan menyederhanakan alur kerja tata usaha dan dewan guru SD dalam pembuatan laporan dengan sistem digital yang terintegrasi.',
       image: '/images/blog/IFP_Elementary_School-_4259-scaled.jpg',
     }
   ] : [
     {
       id: '1',
       title: 'Why Should Schools Transition to Digital Attendance Systems?',
-      category: 'SCHOOL DIGITALIZATION',
+      category: 'School Digitalization',
       readTime: '4 min read',
       date: 'Aug 18, 2026',
-      snippet: 'Exploring how technology modernizes attendance administration and structured school learning in the digital era.',
+      snippet: 'Exploring how modern attendance tools streamline primary school administration and improve attendance accuracy.',
       image: '/images/blog/330-ribu-sekolah-akan-dibekali-layar-digital-pintar-tahun-ini-1758534297510_169.jpeg',
     },
     {
       id: '2',
       title: 'How to Manage Student Attendance Summaries Efficiently',
-      category: 'ATTENDANCE MANAGEMENT',
+      category: 'Attendance Management',
       readTime: '5 min read',
       date: 'Aug 12, 2026',
-      snippet: 'Practical tips to compile and analyze daily, weekly, and semester-long attendance recaps without manual human errors.',
+      snippet: 'Practical steps to compile monthly and term attendance records without spreadsheet errors using integrated attendance.',
       image: '/images/blog/batas-usia-masuk-sd-diperbarui-anak-di-bawah-7-tahun-bisa-sekolah-dengan-syarat-ini-154159.webp',
     },
     {
       id: '3',
       title: 'School Administration Digitization: From Data to Reporting',
-      category: 'SCHOOL ADMINISTRATION',
+      category: 'School Administration',
       readTime: '6 min read',
       date: 'Aug 05, 2026',
-      snippet: 'Integrated insights and workflow solutions to simplify administrative tasks for school staff and teachers.',
+      snippet: 'Comprehensive insights into simplifying primary school workflows into integrated, digital-ready institutional formats.',
       image: '/images/blog/IFP_Elementary_School-_4259-scaled.jpg',
     }
   ];
 
   return (
-    <section id="blog" className="py-16 sm:py-20 lg:py-24 bg-slate-50 text-slate-900 relative border-b border-blue-100">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        
-        {/* Header - Educational Style */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between mb-12 sm:mb-16 gap-6">
-          <div className="space-y-4">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md bg-blue-50 border border-blue-200 text-blue-800 text-[10px] font-bold uppercase tracking-wider">
-              <span>{lang === 'ID' ? 'BLOG & INFORMASI' : 'BLOG & INSIGHTS'}</span>
-            </div>
-            <h2 className="text-2xl sm:text-4xl lg:text-5xl font-black text-[#0B2F64] tracking-tight uppercase leading-[1.05]">
-              {lang === 'ID' ? (
-                <>
-                  TIPS &<br />
-                  <span className="text-blue-600">DIGITALISASI SEKOLAH</span>
-                </>
-              ) : (
-                <>
-                  TIPS &<br />
-                  <span className="text-blue-600">SCHOOL DIGITALIZATION</span>
-                </>
-              )}
-            </h2>
-            <p className="text-slate-600 text-xs sm:text-base lg:text-lg max-w-2xl border-l-4 border-blue-600 pl-3 sm:pl-4 font-normal">
-              {lang === 'ID'
-                ? 'Edukasi, wawasan, dan panduan praktis pengelolaan presensi dan administrasi sekolah.'
-                : 'Education, insights, and practical guides for school attendance and administrative management.'}
-            </p>
-          </div>
+    <section 
+      id="blog" 
+      className="scroll-mt-16 sm:scroll-mt-20 pt-16 sm:pt-20 pb-16 sm:pb-24 bg-gradient-to-b from-[#F3F8FF] via-[#E9F3FE] to-[#DCEBFE] text-slate-900 relative antialiased overflow-hidden"
+    >
+      {/* Background Soft Glows & Ambient Orbs */}
+      <div className="absolute top-10 left-10 w-96 h-96 bg-blue-200/30 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute bottom-10 right-10 w-96 h-96 bg-indigo-200/30 rounded-full blur-3xl pointer-events-none" />
 
-          <a 
-            href="#blog" 
-            className="text-blue-700 hover:text-blue-900 font-bold text-xs uppercase tracking-wider flex items-center gap-2 self-start md:self-auto py-2 border-b-2 border-blue-700"
-          >
-            <span>{lang === 'ID' ? 'Lihat Semua Artikel' : 'View All Articles'}</span>
-            <ArrowRight className="w-4 h-4" />
-          </a>
-        </div>
-
-        {/* Categories Overview */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-12">
-          {categories.map((cat, idx) => (
-            <div key={idx} className="p-4 bg-white border border-slate-200 rounded-xl shadow-xs">
-              <span className="text-[10px] font-black uppercase tracking-wider text-blue-700 block mb-1">
-                {cat.name}
-              </span>
-              <p className="text-xs text-slate-600 font-normal">
-                {cat.desc}
-              </p>
-            </div>
+      {/* Decorative Dot Matrix Patterns on Left & Right Margins (as in screenshot) */}
+      <div className="hidden 2xl:block absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none opacity-30 select-none">
+        <div className="grid grid-cols-4 gap-2.5">
+          {[...Array(24)].map((_, i) => (
+            <div key={i} className="w-1.5 h-1.5 rounded-full bg-blue-400" />
           ))}
         </div>
+      </div>
+      <div className="hidden 2xl:block absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none opacity-30 select-none">
+        <div className="grid grid-cols-4 gap-2.5">
+          {[...Array(24)].map((_, i) => (
+            <div key={i} className="w-1.5 h-1.5 rounded-full bg-blue-400" />
+          ))}
+        </div>
+      </div>
 
-        {/* Blog Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8">
+      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
+        
+        {/* ========================================================================= */}
+        {/* SECTION HEADER: Pill Badge, Main Title, Subtitle, Doodle & 3D Idea Laptop */}
+        {/* ========================================================================= */}
+        <div className="relative text-center mb-12 sm:mb-16">
+          
+          {/* Top-Left Playful Handwritten Doodle Note (as in screenshot) */}
+          <div className="hidden lg:block absolute -top-2 left-6 xl:left-14 pointer-events-none select-none text-left">
+            <div className="relative">
+              {/* Doodle Spark Lines */}
+              <div className="absolute -top-3.5 right-6 flex gap-1 rotate-12">
+                <div className="w-1 h-3 bg-blue-500 rounded-full -rotate-15" />
+                <div className="w-1 h-3.5 bg-blue-500 rounded-full" />
+                <div className="w-1 h-3 bg-blue-500 rounded-full rotate-15" />
+              </div>
+              
+              {/* Handwritten Blue Note */}
+              <p className="font-sans font-bold text-base xl:text-lg text-blue-600 -rotate-8 leading-snug tracking-tight">
+                {isId ? 'Wawasan Baru' : 'New Insights'}
+                <br />
+                <span className="text-blue-500 font-medium">
+                  {isId ? 'untuk Sekolah' : 'for Progressive'}
+                </span>
+                <br />
+                <span className="font-extrabold text-blue-700">
+                  {isId ? 'Lebih Maju' : 'Schools'}
+                </span>
+              </p>
+
+              {/* Curved Underline Arrow */}
+              <svg className="w-20 h-5 text-blue-400 mt-1 -rotate-6" viewBox="0 0 100 24" fill="none">
+                <path d="M5 12 Q 50 24 95 6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+              </svg>
+            </div>
+          </div>
+
+          {/* Top-Right 3D Stylized Laptop, Glowing Bulb & Books Illustration */}
+          <div className="hidden lg:block absolute -top-12 right-4 xl:right-10 pointer-events-none select-none w-48 xl:w-56">
+            <img 
+              src="/images/blog_3d_idea_laptop.jpg" 
+              alt="Digital School 3D Illustration with Light Bulb and Laptop" 
+              className="w-full h-auto object-contain drop-shadow-lg rounded-2xl"
+              loading="lazy"
+            />
+          </div>
+
+          {/* Center Pill Badge with BookOpen Icon */}
+          <div className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-blue-100/90 border border-blue-200 text-blue-800 text-xs font-bold tracking-wide shadow-2xs mb-3.5">
+            <BookOpen className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+            <span>{isId ? 'Blog & Informasi Sekolah' : 'Blog & School Insights'}</span>
+          </div>
+
+          {/* High-Contrast Main Title */}
+          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-slate-900 tracking-tight leading-tight max-w-3xl mx-auto">
+            <span>{isId ? 'Tips & Digitalisasi' : 'Tips & Digitalization'}</span>
+            <span className="block text-blue-600 mt-1">{isId ? 'Sekolah Dasar' : 'for Primary Schools'}</span>
+          </h2>
+
+          {/* Subtitle Description */}
+          <p className="mt-3 text-slate-600 text-xs sm:text-sm md:text-base leading-relaxed max-w-xl mx-auto font-normal">
+            {isId
+              ? 'Edukasi dan panduan praktis pengelolaan presensi serta administrasi sekolah dasar.'
+              : 'Actionable guidance and practical insights for primary school attendance administration.'}
+          </p>
+
+          {/* Small Center Capsule Indicator (as in screenshot under subtitle) */}
+          <div className="flex items-center justify-center gap-1.5 mt-5">
+            <div className="w-8 h-1.5 bg-blue-600 rounded-full" />
+            <div className="w-1.5 h-1.5 bg-blue-300 rounded-full" />
+            <div className="w-1.5 h-1.5 bg-blue-200 rounded-full" />
+          </div>
+        </div>
+
+        {/* ========================================================================= */}
+        {/* 3 BLOG POST CARDS: 3 Columns Grid                                         */}
+        {/* ========================================================================= */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-7">
           {posts.map((post) => (
             <article
               key={post.id}
               id={`blog-card-${post.id}`}
-              className="bg-white border border-slate-200 rounded-xl overflow-hidden hover:border-blue-500 hover:shadow-md transition-all group flex flex-col justify-between shadow-xs"
+              className="bg-white rounded-3xl overflow-hidden shadow-[0_8px_24px_-8px_rgba(37,99,235,0.08)] border border-blue-100/80 hover:border-blue-300 hover:shadow-xl hover:shadow-blue-500/10 transition-all duration-300 group flex flex-col justify-between"
             >
               <div>
-                {/* Thumbnail image */}
-                <div className="relative aspect-16/10 overflow-hidden bg-slate-100 block">
+                {/* Thumbnail Image with Category Badge */}
+                <div className="relative h-48 sm:h-52 overflow-hidden bg-slate-100 block">
                   <img 
                     src={post.image} 
                     alt={post.title} 
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                     referrerPolicy="no-referrer"
+                    loading="lazy"
                   />
-                  <span className="absolute top-3 left-3 bg-[#0B2F64] text-white px-2.5 py-1 rounded text-[9px] font-bold uppercase tracking-wider shadow-xs">
+                  {/* Category Pill Tag */}
+                  <span className="absolute top-4 left-4 bg-[#144CB3]/90 backdrop-blur-xs text-white px-3.5 py-1 rounded-lg text-xs font-bold tracking-wide shadow-sm">
                     {post.category}
                   </span>
                 </div>
 
-                <div className="p-5 sm:p-6 lg:p-7 space-y-3">
-                  <div className="flex items-center gap-3 text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                    <span className="flex items-center gap-1">
-                      <Calendar className="w-3.5 h-3.5" /> {post.date}
+                {/* Card Content */}
+                <div className="p-6 pb-2 space-y-3">
+                  {/* Date & Read Time */}
+                  <div className="flex items-center gap-3 text-xs font-semibold text-slate-500">
+                    <span className="flex items-center gap-1.5">
+                      <Calendar className="w-3.5 h-3.5 text-slate-400" /> {post.date}
                     </span>
                     <span>•</span>
-                    <span className="flex items-center gap-1">
-                      <Clock className="w-3.5 h-3.5" /> {post.readTime}
+                    <span className="flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5 text-slate-400" /> {post.readTime}
                     </span>
                   </div>
 
-                  <h3 className="text-base sm:text-lg font-black text-[#0B2F64] group-hover:text-blue-600 transition-colors leading-snug uppercase">
+                  {/* Title */}
+                  <h3 className="text-base sm:text-lg font-black text-slate-900 group-hover:text-blue-600 transition-colors leading-snug">
                     {post.title}
                   </h3>
 
-                  <p className="text-xs sm:text-sm text-slate-600 leading-relaxed font-normal">
+                  {/* Snippet */}
+                  <p className="text-xs sm:text-[13px] text-slate-600 leading-relaxed font-normal">
                     {post.snippet}
                   </p>
                 </div>
               </div>
 
-              <div className="p-6 sm:p-7 pt-0">
-                <span className="text-xs font-bold uppercase tracking-wider text-blue-700 group-hover:text-blue-900 flex items-center gap-1">
-                  {lang === 'ID' ? 'Baca Selengkapnya →' : 'Read Full Article →'}
+              {/* Read More Link */}
+              <div className="p-6 pt-3">
+                <span className="text-xs sm:text-sm font-bold uppercase tracking-wider text-blue-600 group-hover:text-blue-700 inline-flex items-center gap-1.5 transition-colors cursor-pointer">
+                  {isId ? 'BACA SELENGKAPNYA →' : 'READ MORE →'}
                 </span>
               </div>
             </article>
           ))}
         </div>
 
+        {/* Bottom CTA Button: "Lihat Semua Artikel →" */}
+        <div className="text-center mt-12 sm:mt-14">
+          <button
+            type="button"
+            className="inline-flex items-center gap-2.5 px-6 py-3.5 rounded-full bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold shadow-lg shadow-blue-600/25 hover:shadow-blue-600/35 transition-all duration-200 cursor-pointer"
+          >
+            <BookOpen className="w-4 h-4 text-white" />
+            <span>{isId ? 'Lihat Semua Artikel' : 'View All Articles'}</span>
+            <ArrowRight className="w-4 h-4" />
+          </button>
+        </div>
+
+      </div>
+
+      {/* Subtle Bottom Wave Curve to Match Flow */}
+      <div className="absolute bottom-0 left-0 right-0 w-full overflow-hidden leading-none pointer-events-none">
+        <svg 
+          className="relative block w-full h-8 sm:h-12 text-white fill-current" 
+          viewBox="0 0 1200 120" 
+          preserveAspectRatio="none"
+        >
+          <path d="M0,0 C150,90 350,-40 500,45 C650,130 900,10 1200,50 L1200,120 L0,120 Z" />
+        </svg>
       </div>
     </section>
   );
 };
+

@@ -9,8 +9,6 @@ import {
    BarChart3, 
    FileSpreadsheet, 
    ShieldCheck, 
-   Smartphone, 
-   Laptop, 
    BookOpen, 
    School, 
    FileCheck 
@@ -392,17 +390,6 @@ export const DeviceMockup: React.FC<DeviceMockupProps> = ({ lang = 'ID' }) => {
           </div>
         </div>
 
-      </div>
-
-      {/* Educational Bottom Badge Indicator */}
-      <div className="mt-4 sm:mt-8 flex flex-wrap items-center justify-center gap-1.5 sm:gap-3 text-xs text-slate-600 text-center">
-        <span className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1 bg-blue-50 border border-blue-200 text-blue-900 text-[10px] font-bold uppercase tracking-wider rounded-md">
-          <Laptop className="w-3 h-3 text-blue-700 shrink-0" /> {lang === 'ID' ? 'Web Admin & Wali Kelas SD' : 'Web Admin & Primary Teacher'}
-        </span>
-        <span className="text-blue-300 hidden sm:inline">•</span>
-        <span className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1 bg-blue-50 border border-blue-200 text-blue-900 text-[10px] font-bold uppercase tracking-wider rounded-md">
-          <Smartphone className="w-3 h-3 text-blue-700 shrink-0" /> {lang === 'ID' ? 'Portal Siswa & Orang Tua SD' : 'Primary Student & Parent Portal'}
-        </span>
       </div>
     </div>
   );

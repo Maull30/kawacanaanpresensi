@@ -11,6 +11,7 @@ import {
   ShieldCheck
 } from 'lucide-react';
 import { KawacanaanEmblem } from '../../components/KawacanaanEmblem';
+import kawacanaanLogo from '../../assets/images/kawacanaan_logo_1787055634013.jpg';
 
 interface WhatsAppQrModalProps {
   isOpen: boolean;
@@ -95,18 +96,24 @@ export const WhatsAppQrModal: React.FC<WhatsAppQrModalProps> = ({
         <div className="bg-white text-slate-900 rounded-2xl p-5 sm:p-6 shadow-xl relative text-center">
           
           {/* Top Emblem Badge */}
-          <div className="flex justify-center -mt-9 mb-2">
-            <div className="p-1 rounded-full bg-white shadow-md">
-              <KawacanaanEmblem size={52} className="ring-2 ring-emerald-500/20" />
+          <div className="flex justify-center -mt-9 sm:-mt-10 mb-2.5">
+            <div className="p-1 rounded-full bg-white shadow-md ring-2 ring-slate-100">
+              <div className="w-13 h-13 rounded-full overflow-hidden flex items-center justify-center bg-[#071F42]">
+                <img 
+                  src={kawacanaanLogo} 
+                  alt="Kawacanaan Logo" 
+                  className="w-full h-full object-cover" 
+                />
+              </div>
             </div>
           </div>
 
           {/* Group Title */}
-          <h4 className="text-base sm:text-lg font-black text-[#0B2F64] tracking-tight">
+          <h4 className="text-base sm:text-lg font-black text-slate-900 tracking-tight leading-snug">
             Kawacanaan Presensi
           </h4>
           <p className="text-xs text-slate-500 font-semibold mb-3">
-            Grup Komunitas WhatsApp
+            Grup WhatsApp
           </p>
 
           {/* QR Code Canvas / Image with WhatsApp Center Badge */}

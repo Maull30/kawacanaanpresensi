@@ -102,7 +102,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             </a>
 
             {/* Desktop Navigation Links */}
-            <nav className="hidden lg:flex items-center gap-5 xl:gap-7 text-[11px] font-bold uppercase tracking-wider text-slate-700">
+            <nav className="hidden lg:flex items-center gap-5 xl:gap-7 text-[12px] font-bold uppercase tracking-wider text-slate-700">
               {navItems.map((item) => (
                 <a
                   key={item.name}
@@ -112,15 +112,15 @@ export const Navbar: React.FC<NavbarProps> = ({
                     e.preventDefault();
                     handleNavClick(item.href);
                   }}
-                  className={`transition-colors relative py-1.5 px-1 ${
+                  className={`transition-colors relative py-1 px-1 ${
                     item.active 
-                      ? 'text-blue-700 font-extrabold' 
-                      : 'hover:text-blue-600'
+                      ? 'text-[#0066FF] font-black' 
+                      : 'hover:text-[#0066FF]'
                   }`}
                 >
                   {item.name}
                   {item.active && (
-                    <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-700 rounded-full" />
+                    <span className="absolute -bottom-1 left-0 right-0 h-[2.5px] bg-[#0066FF] rounded-full" />
                   )}
                 </a>
               ))}
@@ -131,16 +131,16 @@ export const Navbar: React.FC<NavbarProps> = ({
               {/* Language Switcher Capsule */}
               <div 
                 id="lang-switcher-capsule"
-                className="flex items-center bg-blue-50/80 border border-blue-200 rounded-lg p-0.5 text-[11px] font-bold uppercase tracking-wider"
+                className="flex items-center bg-blue-50/90 border border-blue-200/80 rounded-xl p-0.5 text-[11px] font-extrabold uppercase tracking-wider"
               >
                 <button
                   type="button"
                   id="btn-lang-id"
                   onClick={() => setLang('ID')}
-                  className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${
+                  className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
                     lang === 'ID' 
-                      ? 'bg-blue-700 text-white shadow-xs' 
-                      : 'text-blue-900/70 hover:text-blue-950'
+                      ? 'bg-[#0066FF] text-white shadow-xs' 
+                      : 'text-blue-900/75 hover:text-blue-950'
                   }`}
                 >
                   ID
@@ -149,24 +149,24 @@ export const Navbar: React.FC<NavbarProps> = ({
                   type="button"
                   id="btn-lang-en"
                   onClick={() => setLang('EN')}
-                  className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${
+                  className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
                     lang === 'EN' 
-                      ? 'bg-blue-700 text-white shadow-xs' 
-                      : 'text-blue-900/70 hover:text-blue-950'
+                      ? 'bg-[#0066FF] text-white shadow-xs' 
+                      : 'text-blue-900/75 hover:text-blue-950'
                   }`}
                 >
                   EN
                 </button>
               </div>
 
-              {/* Login Button - Authoritative Blue Theme */}
+              {/* Login Button - Pill Shape Solid Blue #0066FF */}
               <button
                 type="button"
                 id="btn-navbar-login"
                 onClick={onOpenLogin}
-                className="px-5 py-2.5 bg-blue-700 hover:bg-blue-800 active:scale-95 text-white text-xs font-bold uppercase tracking-widest transition-all cursor-pointer shadow-md shadow-blue-700/20 rounded-lg flex items-center gap-1.5"
+                className="px-6 py-2.5 bg-[#0066FF] hover:bg-blue-600 active:scale-95 text-white text-xs font-black uppercase tracking-wider transition-all cursor-pointer shadow-md shadow-blue-500/25 rounded-xl flex items-center gap-1.5 select-none"
               >
-                <span>{lang === 'ID' ? 'Masuk ke Sistem' : 'Sign In'}</span>
+                <span>{lang === 'ID' ? 'MASUK KE SISTEM' : 'SIGN IN'}</span>
               </button>
             </div>
 

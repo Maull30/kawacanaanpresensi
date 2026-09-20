@@ -1,10 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Mail, 
-  MapPin, 
   MessageSquare, 
   Users, 
-  School, 
   ExternalLink, 
   Sparkles, 
   CheckCircle2, 
@@ -14,9 +11,8 @@ import {
   Copy, 
   Check, 
   Maximize2, 
-  Smartphone, 
-  Clock, 
-  ChevronRight
+  ChevronRight,
+  Share2
 } from 'lucide-react';
 import QRCode from 'qrcode';
 import { KawacanaanEmblem } from '../../components/KawacanaanEmblem';
@@ -28,21 +24,22 @@ interface ContactSectionProps {
   onOpenRegister?: () => void;
 }
 
-export const ContactSection: React.FC<ContactSectionProps> = ({ lang, onOpenRegister }) => {
-  const whatsappCommunityLink = 'https://chat.whatsapp.com/DfK5WYAavgLJVuHAGFetha?s=cl&p=a&mlu=4&ilr=4';
+export const ContactSection: React.FC<ContactSectionProps> = ({ lang }) => {
+  // Official WhatsApp Group Community Link (Updated as requested)
+  const whatsappCommunityLink = 'https://chat.whatsapp.com/Fjs8tXlNzkN44wolTS9zBC?s=cl&p=a&mlu=4&ilr=4';
   const [qrDataUrl, setQrDataUrl] = useState<string>('');
   const [copied, setCopied] = useState<boolean>(false);
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   const [isDownloading, setIsDownloading] = useState<boolean>(false);
 
-  // Generate high-resolution scannable QR Code
+  // Generate high-resolution scannable QR Code matching the group link
   useEffect(() => {
     QRCode.toDataURL(whatsappCommunityLink, {
-      width: 440,
+      width: 500,
       margin: 2,
       errorCorrectionLevel: 'H',
       color: {
-        dark: '#071F42', // Deep navy for high-contrast scanning
+        dark: '#071F42', // Deep navy for crisp optical scanner contrast
         light: '#FFFFFF',
       },
     })
@@ -76,15 +73,15 @@ export const ContactSection: React.FC<ContactSectionProps> = ({ lang, onOpenRegi
     }
   };
 
-  // Generate downloadable flyer image (canvas export)
+  // Generate downloadable flyer image (canvas export matching the uploaded poster exactly)
   const handleDownloadFlyer = () => {
     if (!qrDataUrl) return;
     setIsDownloading(true);
 
     try {
       const canvas = document.createElement('canvas');
-      canvas.width = 640;
-      canvas.height = 920;
+      canvas.width = 720;
+      canvas.height = 1280; // 9:16 vertical poster ratio matching official WhatsApp invite
       const ctx = canvas.getContext('2d');
 
       if (!ctx) {
@@ -92,35 +89,29 @@ export const ContactSection: React.FC<ContactSectionProps> = ({ lang, onOpenRegi
         return;
       }
 
-      // Background
-      ctx.fillStyle = '#128C7E'; // WhatsApp green header background
+      // WhatsApp Brand Green Background (#20C659 / #25D366)
+      ctx.fillStyle = '#20C659';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-      // Card container
-      const cardX = 40;
-      const cardY = 120;
-      const cardW = 560;
+      // White invitation card container
+      const cardW = 580;
       const cardH = 680;
-      const cardRadius = 32;
+      const cardX = (canvas.width - cardW) / 2;
+      const cardY = 260;
+      const cardRadius = 28;
 
       ctx.fillStyle = '#FFFFFF';
       ctx.beginPath();
       ctx.roundRect(cardX, cardY, cardW, cardH, cardRadius);
       ctx.fill();
 
-      // Top title text
-      ctx.fillStyle = '#FFFFFF';
-      ctx.font = 'bold 24px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText(lang === 'ID' ? 'KOMUNITAS RESMI' : 'OFFICIAL COMMUNITY', canvas.width / 2, 75);
-
-      // QR Image load and draw
+      // Load QR Image & Emblem
       const qrImg = new Image();
       qrImg.onload = () => {
-        // Draw Emblem inside white circular pill on top of card
         const emblemImg = new Image();
         emblemImg.onload = () => {
-          const emblemSize = 90;
+          // Circular emblem on top edge of white card
+          const emblemSize = 100;
           const emblemX = (canvas.width - emblemSize) / 2;
           const emblemY = cardY - (emblemSize / 2);
 
@@ -132,7 +123,7 @@ export const ContactSection: React.FC<ContactSectionProps> = ({ lang, onOpenRegi
           ctx.fill();
           ctx.restore();
 
-          // Clip circle for emblem
+          // Clip and draw emblem
           ctx.save();
           ctx.beginPath();
           ctx.arc(canvas.width / 2, cardY, emblemSize / 2, 0, Math.PI * 2);
@@ -141,23 +132,23 @@ export const ContactSection: React.FC<ContactSectionProps> = ({ lang, onOpenRegi
           ctx.restore();
 
           // Card Titles
-          ctx.fillStyle = '#0B2F64';
-          ctx.font = 'bold 30px sans-serif';
+          ctx.fillStyle = '#111827';
+          ctx.font = 'bold 36px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
           ctx.textAlign = 'center';
-          ctx.fillText('Kawacanaan Presensi', canvas.width / 2, cardY + 80);
+          ctx.fillText('Kawacanaan Presensi', canvas.width / 2, cardY + 95);
 
-          ctx.fillStyle = '#64748B';
-          ctx.font = '600 18px sans-serif';
-          ctx.fillText('Grup WhatsApp', canvas.width / 2, cardY + 110);
+          ctx.fillStyle = '#4B5563';
+          ctx.font = '500 24px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+          ctx.fillText('Grup WhatsApp', canvas.width / 2, cardY + 138);
 
           // Draw QR Code
-          const qrSize = 360;
+          const qrSize = 420;
           const qrX = (canvas.width - qrSize) / 2;
-          const qrY = cardY + 140;
+          const qrY = cardY + 180;
           ctx.drawImage(qrImg, qrX, qrY, qrSize, qrSize);
 
-          // WhatsApp Center Pin on QR
-          const pinSize = 54;
+          // Center WhatsApp badge on QR
+          const pinSize = 64;
           const pinX = (canvas.width - pinSize) / 2;
           const pinY = qrY + (qrSize - pinSize) / 2;
 
@@ -173,26 +164,17 @@ export const ContactSection: React.FC<ContactSectionProps> = ({ lang, onOpenRegi
           ctx.fill();
           ctx.restore();
 
-          // Footer instruction on card
-          ctx.fillStyle = '#334155';
-          ctx.font = '600 15px sans-serif';
+          // Bottom caption on green background (matching the uploaded image text)
+          ctx.fillStyle = '#FFFFFF';
+          ctx.font = '500 24px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
           ctx.textAlign = 'center';
-          ctx.fillText('Pindai kode QR ini menggunakan kamera WhatsApp', canvas.width / 2, cardY + 540);
-          ctx.fillText('untuk bergabung ke grup ini', canvas.width / 2, cardY + 565);
-
-          // Sub footer tag
-          ctx.fillStyle = '#059669';
-          ctx.font = 'bold 12px sans-serif';
-          ctx.fillText('TERVERIFIKASI RESMI • KAWACANAAN PRESENSI', canvas.width / 2, cardY + 620);
-
-          // Bottom card note
-          ctx.fillStyle = '#E2E8F0';
-          ctx.font = '13px sans-serif';
-          ctx.fillText('https://kawacanaan.sch.id', canvas.width / 2, 855);
+          ctx.fillText('Pindai kode QR ini menggunakan', canvas.width / 2, cardY + cardH + 90);
+          ctx.fillText('kamera WhatsApp untuk bergabung', canvas.width / 2, cardY + cardH + 128);
+          ctx.fillText('ke grup ini', canvas.width / 2, cardY + cardH + 166);
 
           // Trigger download
           const link = document.createElement('a');
-          link.download = 'Barcode-QR-WhatsApp-Kawacanaan-Presensi.png';
+          link.download = 'Barcode-WhatsApp-Kawacanaan-Presensi.png';
           link.href = canvas.toDataURL('image/png');
           document.body.appendChild(link);
           link.click();
@@ -203,425 +185,358 @@ export const ContactSection: React.FC<ContactSectionProps> = ({ lang, onOpenRegi
       };
       qrImg.src = qrDataUrl;
     } catch (err) {
-      console.error('Gagal mengunduh gambar barcode:', err);
+      console.error('Gagal mengunduh flyer barcode:', err);
       setIsDownloading(false);
     }
   };
 
   return (
-    <section id="kontak" className="py-14 sm:py-20 lg:py-24 bg-white text-slate-900 relative border-b border-blue-100">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        
-        {/* Header - Educational Style */}
-        <div className="text-left max-w-3xl space-y-3 sm:space-y-4 mb-10 sm:mb-14">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md bg-blue-50 border border-blue-200 text-blue-800 text-[10px] font-bold uppercase tracking-wider font-mono">
-            <span>{lang === 'ID' ? 'HUBUNGI KAMI & KOMUNITAS' : 'CONTACT & COMMUNITY'}</span>
-          </div>
-          <h2 className="text-xl sm:text-3xl lg:text-5xl font-black text-[#0B2F64] tracking-tight uppercase leading-[1.08]">
-            {lang === 'ID' ? (
-              <>
-                KONSULTASI & ADOPSI<br />
-                <span className="text-blue-600 whitespace-nowrap">PRESENSI SEKOLAH DASAR</span>
-              </>
-            ) : (
-              <>
-                CONSULTATION & ADOPTION<br />
-                <span className="text-blue-600 whitespace-nowrap">PRIMARY ATTENDANCE</span>
-              </>
-            )}
-          </h2>
-          <p className="text-slate-600 text-xs sm:text-base lg:text-lg leading-relaxed border-l-4 border-blue-600 pl-3 sm:pl-4 font-normal">
-            {lang === 'ID'
-              ? 'Konsultasikan kebutuhan presensi rombel kelas 1-6 dan format administrasi Kedinasan untuk sekolah Anda, atau bergabung langsung dengan komunitas pendidik kami.'
-              : 'Consult attendance requirements for Grade 1-6 cohorts and official Kedinasan reporting formats, or join our educator community directly.'}
-          </p>
+    <section 
+      id="kontak" 
+      className="scroll-mt-16 sm:scroll-mt-20 pt-16 sm:pt-20 pb-16 sm:pb-24 bg-gradient-to-b from-[#F3F8FF] via-[#E9F3FE] to-[#DCEBFE] text-slate-900 relative antialiased overflow-hidden"
+    >
+      {/* Background Soft Glows & Ambient Orbs */}
+      <div className="absolute top-10 left-10 w-96 h-96 bg-blue-200/30 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute bottom-10 right-10 w-96 h-96 bg-emerald-100/30 rounded-full blur-3xl pointer-events-none" />
 
-          <div className="pt-2 flex flex-wrap items-center gap-3 sm:gap-4">
-            <a
-              href="#komunitas-wa"
-              className="px-5 py-3 sm:px-6 sm:py-3.5 bg-blue-700 hover:bg-blue-800 text-white font-bold text-xs uppercase tracking-wider transition-all rounded-lg shadow-sm inline-flex items-center gap-2 cursor-pointer"
-            >
-              <Users className="w-4 h-4" />
-              <span>{lang === 'ID' ? 'GABUNG KOMUNITAS' : 'JOIN COMMUNITY'}</span>
-            </a>
-            <button
-              type="button"
-              onClick={onOpenRegister}
-              className="px-5 py-3 sm:px-6 sm:py-3.5 bg-white border border-blue-200 hover:border-blue-700 text-blue-900 font-bold text-xs uppercase tracking-wider transition-all rounded-lg shadow-xs inline-flex items-center gap-2 cursor-pointer"
-            >
-              <School className="w-4 h-4 text-blue-700" />
-              <span>{lang === 'ID' ? 'DAFTARKAN SEKOLAH' : 'REGISTER SCHOOL'}</span>
-            </button>
+      {/* Decorative Dot Matrix Patterns on Left & Right Margins (as in uploaded screenshot) */}
+      <div className="hidden 2xl:block absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none opacity-30 select-none">
+        <div className="grid grid-cols-4 gap-2.5">
+          {[...Array(24)].map((_, i) => (
+            <div key={i} className="w-1.5 h-1.5 rounded-full bg-blue-400" />
+          ))}
+        </div>
+      </div>
+      <div className="hidden 2xl:block absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none opacity-30 select-none">
+        <div className="grid grid-cols-4 gap-2.5">
+          {[...Array(24)].map((_, i) => (
+            <div key={i} className="w-1.5 h-1.5 rounded-full bg-blue-400" />
+          ))}
+        </div>
+      </div>
+
+      <div className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+        
+        {/* ================= SECTION HEADER: Fluid 3-Column / No Overlap Layout ================= */}
+        <div className="relative mb-10 sm:mb-14">
+          
+          <div className="flex flex-col lg:flex-row items-center justify-between gap-6 lg:gap-4">
+            
+            {/* Left Decorative Doodle (Cleanly separated on wide viewports, no text collision) */}
+            <div className="hidden xl:flex flex-col items-start w-48 pointer-events-none select-none shrink-0 pl-2">
+              <div className="relative">
+                {/* Doodle Spark Lines */}
+                <div className="absolute -top-3.5 right-4 flex gap-1 rotate-12">
+                  <div className="w-1 h-3 bg-blue-500 rounded-full -rotate-15" />
+                  <div className="w-1 h-3.5 bg-blue-500 rounded-full" />
+                  <div className="w-1 h-3 bg-blue-500 rounded-full rotate-15" />
+                </div>
+                
+                {/* Handwritten Blue Note */}
+                <p className="font-sans font-bold text-base text-blue-600 -rotate-6 leading-snug tracking-tight">
+                  {lang === 'ID' ? 'Jangan ragu' : 'Do not hesitate'}
+                  <br />
+                  <span className="text-blue-500 font-medium">
+                    {lang === 'ID' ? 'untuk menghubungi' : 'to contact'}
+                  </span>
+                  <br />
+                  <span className="font-extrabold text-blue-700">
+                    {lang === 'ID' ? 'kami!' : 'our team!'}
+                  </span>
+                </p>
+
+                {/* Curved Underline Arrow pointing toward the contact container */}
+                <svg className="w-20 h-6 text-blue-400 mt-1 -rotate-6" viewBox="0 0 100 24" fill="none">
+                  <path d="M5 12 Q 50 24 95 6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+                </svg>
+              </div>
+            </div>
+
+            {/* Center Content: Pill, Title, Subtitle, Indicator */}
+            <div className="text-center flex-1 max-w-2xl mx-auto">
+              {/* Center Pill Badge */}
+              <div className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-blue-100/90 border border-blue-200 text-blue-800 text-xs font-bold tracking-wide shadow-2xs mb-3.5">
+                <MessageSquare className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                <span>{lang === 'ID' ? 'Hubungi Kami' : 'Contact Us'}</span>
+              </div>
+              
+              {/* Main Heading */}
+              <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-slate-900 tracking-tight leading-tight">
+                <span>{lang === 'ID' ? 'Kontak Kami' : 'Contact Us'}</span>
+                <span className="block text-blue-600 mt-1">Kawacanaan Presensi</span>
+              </h2>
+              
+              {/* Subtitle Description */}
+              <p className="mt-3 text-slate-600 text-xs sm:text-sm md:text-base leading-relaxed font-normal max-w-xl mx-auto">
+                {lang === 'ID'
+                  ? 'Kami siap membantu Anda. Silakan hubungi kami melalui komunitas resmi, konsultasi langsung, atau pindai barcode WhatsApp di bawah ini.'
+                  : 'We are ready to assist you. Reach out through our official educator community, direct consultation, or scan the WhatsApp barcode below.'}
+              </p>
+
+              {/* Small Center Capsule Indicator */}
+              <div className="flex items-center justify-center gap-1.5 mt-5">
+                <div className="w-8 h-1.5 bg-blue-600 rounded-full" />
+                <div className="w-1.5 h-1.5 bg-blue-300 rounded-full" />
+                <div className="w-1.5 h-1.5 bg-blue-200 rounded-full" />
+              </div>
+            </div>
+
+            {/* Right 3D Stylized Envelope, Phone & Message Illustration */}
+            <div className="hidden xl:flex justify-end w-48 pointer-events-none select-none shrink-0 pr-2">
+              <div className="w-40 xl:w-44">
+                <img 
+                  src="/images/contact_envelope_clean.jpg" 
+                  alt="3D Contact Message Envelope Illustration" 
+                  className="w-full h-auto object-contain drop-shadow-xl rounded-2xl"
+                  loading="lazy"
+                />
+              </div>
+            </div>
+
           </div>
+
         </div>
 
-        {/* 2-Column Grid: Left (Official Channels) & Right (WhatsApp Community + QR Barcode) */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-8 items-start">
-          
-          {/* ==================== LEFT: CONTACT INFO (4 Columns) ==================== */}
-          <div className="lg:col-span-4 space-y-4 sm:space-y-6">
-            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 sm:p-7 space-y-6 shadow-xs">
-              <div>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-blue-700 font-mono">
-                  {lang === 'ID' ? 'Informasi Kontak' : 'Contact Information'}
-                </span>
-                <h3 className="text-lg sm:text-xl font-black uppercase tracking-tight text-[#0B2F64]">
-                  {lang === 'ID' ? 'Saluran Bantuan Resmi' : 'Official Support Channel'}
-                </h3>
-                <p className="text-xs text-slate-500 mt-1">
-                  {lang === 'ID'
-                    ? 'Layanan pendampingan teknis dan konsultasi implementasi presensi sekolah.'
-                    : 'Technical support and school attendance implementation consultation.'}
-                </p>
-              </div>
+        {/* ================= MAIN CONTAINER: 2 BALANCED COLUMNS (PRESERVED CONTENT) ================= */}
+        <div className="max-w-5xl mx-auto">
+          <div className="bg-white border border-blue-100 rounded-3xl shadow-[0_8px_30px_-10px_rgba(37,99,235,0.08)] overflow-hidden grid grid-cols-1 lg:grid-cols-12 gap-0 items-stretch">
+            
+            {/* ================= LEFT COLUMN: INFORMASI & NILAI KOMUNITAS (7 COLS) ================= */}
+            <div className="lg:col-span-7 p-6 sm:p-8 lg:p-10 flex flex-col justify-between space-y-6 sm:space-y-8 border-b lg:border-b-0 lg:border-r border-slate-100">
               
-              <div className="space-y-4 text-sm text-slate-700">
-                {/* WhatsApp Support Item */}
-                <div className="flex items-start gap-3.5 p-3 rounded-xl bg-white border border-slate-200/80 shadow-2xs">
-                  <div className="w-10 h-10 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 flex items-center justify-center shrink-0 mt-0.5">
-                    <MessageSquare className="w-5 h-5" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="text-[9px] font-bold uppercase tracking-wider text-slate-400">
-                      {lang === 'ID' ? 'WhatsApp Helpdesk' : 'WhatsApp Helpdesk'}
-                    </div>
-                    <div className="font-black text-slate-900 text-base sm:text-lg">0813-1249-8919</div>
-                    <div className="text-[10px] font-medium text-emerald-700 flex items-center gap-1 mt-0.5">
-                      <Clock className="w-3 h-3 shrink-0" />
-                      <span>{lang === 'ID' ? 'Senin - Sabtu: 07.00 - 17.00 WIB' : 'Mon - Sat: 07:00 - 17:00 WIB'}</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Email Item */}
-                <div className="flex items-start gap-3.5 p-3 rounded-xl bg-white border border-slate-200/80 shadow-2xs">
-                  <div className="w-10 h-10 rounded-lg bg-blue-50 border border-blue-200 text-blue-700 flex items-center justify-center shrink-0 mt-0.5">
-                    <Mail className="w-5 h-5" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="text-[9px] font-bold uppercase tracking-wider text-slate-400">
-                      {lang === 'ID' ? 'Email Resmi' : 'Official Email'}
-                    </div>
-                    <div className="font-bold text-slate-900 text-xs sm:text-sm break-all">
-                      maulanayusuf05@guru.sd.belajar.id
-                    </div>
-                    <div className="text-[10px] text-slate-500 mt-0.5">
-                      {lang === 'ID' ? 'Balasan dalam 1x24 jam kerja' : 'Response within 1x24 business hours'}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Office Location Item */}
-                <div className="flex items-start gap-3.5 p-3 rounded-xl bg-white border border-slate-200/80 shadow-2xs">
-                  <div className="w-10 h-10 rounded-lg bg-slate-200/60 border border-slate-300 text-slate-700 flex items-center justify-center shrink-0 mt-0.5">
-                    <MapPin className="w-5 h-5" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="text-[9px] font-bold uppercase tracking-wider text-slate-400">
-                      {lang === 'ID' ? 'Kantor Layanan' : 'Service Office'}
-                    </div>
-                    <div className="font-medium text-slate-800 text-xs leading-relaxed mt-0.5">
-                      Jl. Pendidikan No. 123, Kel. Merdeka, Kec. Nusantara, Kota Jakarta Pusat, DKI Jakarta 10110
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Direct WhatsApp Action Button */}
-              <a
-                href="https://wa.me/6281312498919?text=Halo%20Tim%20Kawacanaan,%20kami%20ingin%20berkonsultasi%20mengenai%20sistem%20presensi%20digital%20Sekolah%20Dasar."
-                target="_blank"
-                rel="noreferrer"
-                id="btn-consult-whatsapp"
-                className="w-full py-3.5 px-4 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xs active:scale-98 rounded-xl"
-              >
-                <MessageSquare className="w-4 h-4" />
-                <span>{lang === 'ID' ? 'Konsultasi via WhatsApp' : 'Consult via WhatsApp'}</span>
-                <ChevronRight className="w-3.5 h-3.5 opacity-80" />
-              </a>
-
-              {/* Trust badges */}
-              <div className="pt-2 border-t border-slate-200/80 flex items-center justify-between text-[10px] text-slate-500 font-medium">
-                <span className="flex items-center gap-1">
-                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>Respon Cepat</span>
-                </span>
-                <span>•</span>
-                <span>Standar Kedinasan</span>
-              </div>
-            </div>
-          </div>
-
-          {/* ==================== RIGHT: KOMUNITAS WHATSAPP + BARCODE QR (8 Columns) ==================== */}
-          <div 
-            id="komunitas-wa" 
-            className="lg:col-span-8 bg-white border border-slate-200 rounded-2xl p-5 sm:p-8 shadow-xs relative overflow-hidden text-left"
-          >
-            {/* Alias anchor for any existing links targeting #form-kontak */}
-            <span id="form-kontak" className="sr-only" aria-hidden="true" />
-
-            {/* Decorative subtle ambient glows */}
-            <div className="absolute -top-24 -right-24 w-72 h-72 bg-emerald-50 rounded-full blur-3xl opacity-80 pointer-events-none" />
-            <div className="absolute -bottom-24 -left-24 w-72 h-72 bg-blue-50 rounded-full blur-3xl opacity-80 pointer-events-none" />
-
-            <div className="relative z-10 space-y-6">
-              
-              {/* Top Banner: Badge & Intro */}
-              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4">
-                <div className="flex items-center gap-2">
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-[10px] sm:text-[11px] font-bold uppercase tracking-wider font-mono">
-                    <Users className="w-3.5 h-3.5 text-emerald-700" />
-                    <span>{lang === 'ID' ? 'Komunitas Resmi Pengguna' : 'Official User Community'}</span>
+              <div className="space-y-5">
+                {/* Header Sub-badge */}
+                <div className="flex items-center justify-between gap-2">
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-[11px] font-bold uppercase tracking-wider font-mono">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                    <span>WhatsApp Community SD</span>
                   </span>
-                  <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-800 border border-blue-200 text-[10px] font-bold uppercase">
-                    WhatsApp Group
-                  </span>
-                </div>
-                
-                <span className="text-[11px] font-bold text-slate-500 flex items-center gap-1">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>{lang === 'ID' ? 'Terbuka & Gratis' : 'Free & Open'}</span>
-                </span>
-              </div>
-
-              {/* Title & Description */}
-              <div className="space-y-2">
-                <h3 className="text-xl sm:text-2xl lg:text-3xl font-black uppercase tracking-tight text-[#0B2F64]">
-                  {lang === 'ID' ? 'Komunitas KawaCanaan Presensi' : 'KawaCanaan Presensi Community'}
-                </h3>
-                <p className="text-xs sm:text-sm text-slate-600 leading-relaxed font-normal">
-                  {lang === 'ID' 
-                    ? 'Bergabung bersama guru, wali kelas, operator, dan kepala sekolah dasar seluruh Indonesia. Berbagi pengalaman, berdiskusi mengenai administrasi presensi kurikulum, dan dapatkan berita rilis fitur terbaru.'
-                    : 'Join teachers, homeroom educators, school operators, and primary principals across Indonesia. Share best practices, discuss curriculum attendance filings, and receive direct updates.'}
-                </p>
-              </div>
-
-              {/* 4 Compact Value Proposition Pills */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
-                <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/80">
-                  <div className="flex items-center gap-1.5 text-slate-900 font-bold text-[11px]">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                    <span className="truncate">{lang === 'ID' ? 'Praktik Baik' : 'Best Practice'}</span>
-                  </div>
-                  <p className="text-[10px] text-slate-500 mt-1 leading-tight">
-                    {lang === 'ID' ? 'Diskusi rombel 1-6' : 'Cohorts discussion'}
-                  </p>
-                </div>
-
-                <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/80">
-                  <div className="flex items-center gap-1.5 text-slate-900 font-bold text-[11px]">
-                    <Sparkles className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                    <span className="truncate">{lang === 'ID' ? 'Update Rilis' : 'App Updates'}</span>
-                  </div>
-                  <p className="text-[10px] text-slate-500 mt-1 leading-tight">
-                    {lang === 'ID' ? 'Fitur & format kedinasan' : 'Features & formats'}
-                  </p>
-                </div>
-
-                <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/80">
-                  <div className="flex items-center gap-1.5 text-slate-900 font-bold text-[11px]">
-                    <MessageSquare className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                    <span className="truncate">{lang === 'ID' ? 'Tanya Jawab' : 'Fast Q&A'}</span>
-                  </div>
-                  <p className="text-[10px] text-slate-500 mt-1 leading-tight">
-                    {lang === 'ID' ? 'Solusi kendala teknis' : 'Technical guidance'}
-                  </p>
-                </div>
-
-                <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/80">
-                  <div className="flex items-center gap-1.5 text-slate-900 font-bold text-[11px]">
-                    <ShieldCheck className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                    <span className="truncate">{lang === 'ID' ? 'Grup Resmi' : 'Verified'}</span>
-                  </div>
-                  <p className="text-[10px] text-slate-500 mt-1 leading-tight">
-                    {lang === 'ID' ? 'Bebas biaya selamanya' : 'Free forever'}
-                  </p>
-                </div>
-              </div>
-
-              {/* ================= DUAL-ACTION CONTAINER: TAUTAN & BARCODE QR ================= */}
-              <div className="mt-4 p-4 sm:p-5 rounded-2xl bg-gradient-to-b from-slate-50/90 to-slate-100/60 border border-slate-200/90 space-y-4">
-                
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                    <span className="text-xs font-black uppercase tracking-wider text-slate-800 font-mono">
-                      {lang === 'ID' ? 'DUA CARA BERGABUNG MUDAH' : 'TWO EASY WAYS TO JOIN'}
-                    </span>
-                  </div>
-                  <span className="text-[11px] text-slate-500 font-medium">
-                    {lang === 'ID' ? 'Tautan Langsung & Barcode QR' : 'Direct Link & Barcode QR'}
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-12 gap-5 items-stretch">
                   
-                  {/* METODE 1: GABUNG VIA TAUTAN (MD:COL-SPAN-7) */}
-                  <div className="md:col-span-7 flex flex-col justify-between p-4 sm:p-5 bg-white rounded-xl border border-slate-200/80 shadow-2xs space-y-4">
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2">
-                        <span className="w-6 h-6 rounded-md bg-blue-100 text-blue-800 font-black text-xs flex items-center justify-center">
-                          1
-                        </span>
-                        <h4 className="font-black text-slate-900 text-sm uppercase tracking-tight">
-                          {lang === 'ID' ? 'Gabung via Tautan Langsung' : 'Join via Direct Link'}
-                        </h4>
+                  <span className="inline-flex items-center gap-1 text-xs font-bold text-slate-500">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                    <span>{lang === 'ID' ? 'Terbuka & Gratis' : 'Free & Open'}</span>
+                  </span>
+                </div>
+
+                {/* Subtitle & Value Proposition */}
+                <div className="space-y-2">
+                  <h3 className="text-lg sm:text-xl lg:text-2xl font-black text-[#0B2F64] tracking-tight uppercase">
+                    {lang === 'ID' ? 'Mari Berjejaring & Maju Bersama' : 'Network & Grow Together'}
+                  </h3>
+                  <p className="text-xs sm:text-sm text-slate-600 leading-relaxed font-normal">
+                    {lang === 'ID'
+                      ? 'Dapatkan bimbingan teknis langsung, template administrasi kehadiran siap cetak, dan pertukaran informasi seputar pengelolaan kelas sekolah dasar secara cepat melalui WhatsApp.'
+                      : 'Get direct technical guidance, print-ready attendance administration templates, and rapid information sharing on primary school management.'}
+                  </p>
+                </div>
+
+                {/* 4 Feature Highlights in 2x2 Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                  <div className="p-3.5 rounded-2xl bg-slate-50/80 border border-slate-200/80 hover:border-blue-200 transition-colors">
+                    <div className="flex items-center gap-2 font-bold text-xs text-slate-900">
+                      <div className="w-7 h-7 rounded-lg bg-blue-100/70 text-blue-700 flex items-center justify-center shrink-0">
+                        <Users className="w-3.5 h-3.5" />
                       </div>
-                      <p className="text-xs text-slate-600 leading-relaxed">
-                        {lang === 'ID'
-                          ? 'Gunakan opsi ini jika Anda sedang mengakses website dari browser ponsel pintar (smartphone) untuk langsung membuka aplikasi WhatsApp.'
-                          : 'Ideal if you are visiting via mobile browser to open WhatsApp automatically.'}
-                      </p>
+                      <span className="truncate">{lang === 'ID' ? 'Praktik Baik Guru & Wali' : 'Teacher Best Practices'}</span>
                     </div>
+                    <p className="text-[11px] text-slate-500 mt-1.5 leading-relaxed">
+                      {lang === 'ID' ? 'Diskusi pengelolaan presensi harian dan mapel kelas 1 sampai 6.' : 'Daily and subject attendance management for grades 1-6.'}
+                    </p>
+                  </div>
 
-                    <div className="space-y-2.5 pt-1">
-                      {/* Primary Green Action Button */}
-                      <a
-                        href={whatsappCommunityLink}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        id="btn-join-whatsapp-community"
-                        className="w-full py-3.5 px-4 bg-[#25D366] hover:bg-[#20bd5a] active:scale-[0.98] text-slate-950 font-black text-xs sm:text-sm uppercase tracking-wider transition-all rounded-xl shadow-sm shadow-emerald-500/20 flex items-center justify-center gap-2 cursor-pointer"
-                      >
-                        {/* WhatsApp Icon */}
-                        <svg className="w-4 h-4 fill-current shrink-0" viewBox="0 0 24 24">
-                          <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z" />
-                        </svg>
-                        <span>{lang === 'ID' ? 'Gabung Komunitas WhatsApp' : 'Join WhatsApp Community'}</span>
-                        <ExternalLink className="w-4 h-4 ml-0.5 shrink-0" />
-                      </a>
-
-                      {/* Secondary Action: Copy Link */}
-                      <button
-                        type="button"
-                        onClick={handleCopyLink}
-                        id="btn-copy-whatsapp-link"
-                        className={`w-full py-2.5 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer border ${
-                          copied
-                            ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
-                            : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
-                        }`}
-                      >
-                        {copied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5 text-slate-500" />}
-                        <span>
-                          {copied
-                            ? (lang === 'ID' ? '✓ Tautan Berhasil Disalin!' : '✓ Link Copied!')
-                            : (lang === 'ID' ? 'Salin Tautan Undangan' : 'Copy Invitation Link')}
-                        </span>
-                      </button>
+                  <div className="p-3.5 rounded-2xl bg-slate-50/80 border border-slate-200/80 hover:border-emerald-200 transition-colors">
+                    <div className="flex items-center gap-2 font-bold text-xs text-slate-900">
+                      <div className="w-7 h-7 rounded-lg bg-emerald-100/70 text-emerald-700 flex items-center justify-center shrink-0">
+                        <Sparkles className="w-3.5 h-3.5" />
+                      </div>
+                      <span className="truncate">{lang === 'ID' ? 'Update Rilis & Kedinasan' : 'Official Updates'}</span>
                     </div>
+                    <p className="text-[11px] text-slate-500 mt-1.5 leading-relaxed">
+                      {lang === 'ID' ? 'Info format cetak standar kedinasan dan pembaruan fitur baru.' : 'Official educational printing standards and feature release updates.'}
+                    </p>
+                  </div>
 
-                    <div className="pt-2 border-t border-slate-100 flex items-center gap-1.5 text-[10px] text-slate-400">
-                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                      <span>Tautan resmi grup WhatsApp Kawacanaan Presensi</span>
+                  <div className="p-3.5 rounded-2xl bg-slate-50/80 border border-slate-200/80 hover:border-amber-200 transition-colors">
+                    <div className="flex items-center gap-2 font-bold text-xs text-slate-900">
+                      <div className="w-7 h-7 rounded-lg bg-amber-100/70 text-amber-800 flex items-center justify-center shrink-0">
+                        <MessageSquare className="w-3.5 h-3.5" />
+                      </div>
+                      <span className="truncate">{lang === 'ID' ? 'Diskusi & Tanya Jawab' : 'Q&A Discussions'}</span>
+                    </div>
+                    <p className="text-[11px] text-slate-500 mt-1.5 leading-relaxed">
+                      {lang === 'ID' ? 'Saling berbagi solusi kendala operasional presensi di lapangan.' : 'Rapid peer solutions for daily school operational attendance.'}
+                    </p>
+                  </div>
+
+                  <div className="p-3.5 rounded-2xl bg-slate-50/80 border border-slate-200/80 hover:border-purple-200 transition-colors">
+                    <div className="flex items-center gap-2 font-bold text-xs text-slate-900">
+                      <div className="w-7 h-7 rounded-lg bg-purple-100/70 text-purple-700 flex items-center justify-center shrink-0">
+                        <ShieldCheck className="w-3.5 h-3.5" />
+                      </div>
+                      <span className="truncate">{lang === 'ID' ? '100% Akses Terbuka' : '100% Free Access'}</span>
+                    </div>
+                    <p className="text-[11px] text-slate-500 mt-1.5 leading-relaxed">
+                      {lang === 'ID' ? 'Terbuka bagi guru, operator, dan kepala sekolah di Indonesia.' : 'Open to all teachers, operators, and principals nationwide.'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Area: Direct Join & Copy Link */}
+              <div className="space-y-3 pt-2">
+                {/* Primary CTA: Direct Join WhatsApp Community */}
+                <a
+                  href={whatsappCommunityLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  id="btn-join-whatsapp-direct"
+                  className="w-full py-3.5 sm:py-4 px-5 bg-[#25D366] hover:bg-[#20bd5a] active:scale-[0.99] text-slate-950 font-black text-xs sm:text-sm uppercase tracking-wider transition-all rounded-2xl shadow-sm flex items-center justify-center gap-2.5 cursor-pointer"
+                >
+                  <svg className="w-5 h-5 fill-current shrink-0" viewBox="0 0 24 24">
+                    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z" />
+                  </svg>
+                  <span>{lang === 'ID' ? 'Gabung Komunitas WhatsApp' : 'Join WhatsApp Community'}</span>
+                  <ExternalLink className="w-4 h-4 ml-1 shrink-0" />
+                </a>
+
+                {/* Secondary Action: Copy Link */}
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleCopyLink}
+                    id="btn-copy-community-link"
+                    className={`flex-1 py-2.5 sm:py-3 px-4 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer border ${
+                      copied
+                        ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                        : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
+                    }`}
+                  >
+                    {copied ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4 text-slate-500" />}
+                    <span>
+                      {copied
+                        ? (lang === 'ID' ? '✓ Tautan Berhasil Disalin!' : '✓ Link Copied to Clipboard!')
+                        : (lang === 'ID' ? 'Salin Tautan Undangan' : 'Copy Invitation Link')}
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setIsModalOpen(true)}
+                    id="btn-enlarge-qr"
+                    className="py-2.5 sm:py-3 px-3.5 rounded-xl text-xs font-bold bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                    title={lang === 'ID' ? 'Perbesar Barcode QR' : 'Enlarge Barcode QR'}
+                  >
+                    <Maximize2 className="w-4 h-4 text-slate-500" />
+                    <span className="hidden sm:inline">{lang === 'ID' ? 'Perbesar' : 'Enlarge'}</span>
+                  </button>
+                </div>
+
+                <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400">
+                  <div className="flex items-center gap-1.5">
+                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                    <span>{lang === 'ID' ? 'Tautan Resmi Terverifikasi' : 'Official Verified Link'}</span>
+                  </div>
+                  <span className="font-mono text-[10px] text-slate-400 hidden sm:inline">chat.whatsapp.com</span>
+                </div>
+              </div>
+
+            </div>
+
+            {/* ================= RIGHT COLUMN: WHATSAPP BARCODE FLYER (5 COLS) ================= */}
+            {/* Styled faithfully to match the uploaded WhatsApp flyer card */}
+            <div className="lg:col-span-5 bg-gradient-to-b from-[#20C659] via-[#1EB852] to-[#128C7E] p-6 sm:p-8 flex flex-col items-center justify-center text-center relative">
+              
+              {/* Subtle ambient light behind white card */}
+              <div className="absolute inset-0 bg-white/5 pointer-events-none" />
+
+              {/* The WhatsApp White Card */}
+              <div className="relative w-full max-w-[280px] sm:max-w-[310px] bg-white rounded-3xl p-5 sm:p-6 shadow-xl border border-white/40 my-2">
+                
+                {/* Circular Emblem at top of card */}
+                <div className="flex justify-center -mt-10 sm:-mt-11 mb-2.5">
+                  <div className="p-1 rounded-full bg-white shadow-md ring-2 ring-slate-100">
+                    <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full overflow-hidden flex items-center justify-center bg-[#071F42]">
+                      <img 
+                        src={kawacanaanLogo} 
+                        alt="Kawacanaan Logo" 
+                        className="w-full h-full object-cover" 
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Card Titles */}
+                <h4 className="text-base sm:text-lg font-black text-slate-900 tracking-tight leading-snug">
+                  Kawacanaan Presensi
+                </h4>
+                <p className="text-xs text-slate-500 font-semibold mb-3">
+                  Grup WhatsApp
+                </p>
+
+                {/* QR Code Container with WhatsApp Pin */}
+                <div 
+                  className="relative mx-auto p-2 bg-white rounded-2xl border border-slate-200/90 shadow-2xs cursor-pointer group"
+                  onClick={() => setIsModalOpen(true)}
+                  title="Klik untuk memperbesar Barcode QR"
+                >
+                  {qrDataUrl ? (
+                    <img
+                      src={qrDataUrl}
+                      alt="Barcode QR WhatsApp Kawacanaan Presensi"
+                      className="w-44 h-44 sm:w-48 sm:h-48 object-contain rounded-lg mx-auto transition-transform duration-200 group-hover:scale-[1.02]"
+                    />
+                  ) : (
+                    <div className="w-44 h-44 sm:w-48 sm:h-48 bg-slate-100 rounded-lg flex items-center justify-center text-slate-400">
+                      <QrCode className="w-12 h-12 animate-pulse text-slate-300" />
+                    </div>
+                  )}
+
+                  {/* Centered WhatsApp Telephone Badge */}
+                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white p-0.5 shadow-md border border-slate-100 flex items-center justify-center pointer-events-none">
+                    <div className="w-full h-full rounded-full bg-[#25D366] flex items-center justify-center text-white">
+                      <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
+                        <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z" />
+                      </svg>
                     </div>
                   </div>
 
-                  {/* METODE 2: PINDAI BARCODE QR (MD:COL-SPAN-5) */}
-                  <div className="md:col-span-5 flex flex-col justify-between p-4 sm:p-5 bg-white rounded-xl border-2 border-emerald-500/30 shadow-xs relative">
-                    
-                    <div className="text-center space-y-2">
-                      <div className="flex items-center justify-center gap-1.5">
-                        <span className="w-6 h-6 rounded-md bg-emerald-100 text-emerald-800 font-black text-xs flex items-center justify-center">
-                          2
-                        </span>
-                        <h4 className="font-black text-slate-900 text-sm uppercase tracking-tight">
-                          {lang === 'ID' ? 'Pindai Barcode QR' : 'Scan Barcode QR'}
-                        </h4>
-                      </div>
-
-                      <p className="text-[11px] text-slate-500 leading-tight">
-                        {lang === 'ID' 
-                          ? 'Gunakan kamera WhatsApp ponsel untuk scan kode ini'
-                          : 'Use WhatsApp camera to scan this barcode'}
-                      </p>
-                    </div>
-
-                    {/* QR Code Card Frame (Modeled after official WhatsApp QR invitation) */}
-                    <div className="my-2 p-3 bg-slate-50 border border-slate-200 rounded-xl text-center relative group">
-                      
-                      {/* Top mini emblem & title */}
-                      <div className="flex items-center justify-center gap-1.5 mb-2">
-                        <KawacanaanEmblem size={24} className="ring-1 ring-slate-200" />
-                        <span className="font-black text-[11px] text-[#0B2F64] uppercase tracking-tight">
-                          Kawacanaan Presensi
-                        </span>
-                      </div>
-
-                      {/* Scannable QR Code Canvas */}
-                      <div 
-                        className="relative inline-block mx-auto cursor-pointer"
-                        onClick={() => setIsModalOpen(true)}
-                        title="Klik untuk memperbesar QR Code"
-                      >
-                        {qrDataUrl ? (
-                          <img
-                            src={qrDataUrl}
-                            alt="Barcode QR WhatsApp Komunitas Kawacanaan"
-                            className="w-36 h-36 sm:w-40 sm:h-40 object-contain rounded-lg border border-slate-200 bg-white p-1 mx-auto transition-transform duration-200 group-hover:scale-[1.02]"
-                          />
-                        ) : (
-                          <div className="w-36 h-36 sm:w-40 sm:h-40 bg-slate-200 rounded-lg flex items-center justify-center text-slate-400">
-                            <QrCode className="w-10 h-10 animate-pulse" />
-                          </div>
-                        )}
-
-                        {/* WhatsApp Center Badge */}
-                        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-white p-0.5 shadow-md border border-slate-100 flex items-center justify-center pointer-events-none">
-                          <div className="w-full h-full rounded-full bg-[#25D366] flex items-center justify-center text-white">
-                            <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
-                              <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z" />
-                            </svg>
-                          </div>
-                        </div>
-
-                        {/* Hover Overlay */}
-                        <div className="absolute inset-0 bg-slate-900/50 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-[10px] font-bold gap-1 backdrop-blur-2xs">
-                          <Maximize2 className="w-3.5 h-3.5" />
-                          <span>Perbesar</span>
-                        </div>
-                      </div>
-
-                      <div className="text-[10px] text-slate-500 font-medium mt-2">
-                        {lang === 'ID' 
-                          ? 'Pindai menggunakan kamera WhatsApp' 
-                          : 'Scan with WhatsApp camera'}
-                      </div>
-                    </div>
-
-                    {/* QR Action Buttons: Download & Enlarge */}
-                    <div className="grid grid-cols-2 gap-2 pt-1">
-                      <button
-                        type="button"
-                        onClick={handleDownloadFlyer}
-                        disabled={isDownloading}
-                        className="py-2 px-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-lg text-[11px] font-bold flex items-center justify-center gap-1 transition-all cursor-pointer disabled:opacity-50"
-                        title="Unduh flyer barcode format cetak/bagikan"
-                      >
-                        <Download className="w-3.5 h-3.5 text-emerald-700" />
-                        <span className="truncate">{isDownloading ? 'Menyiapkan...' : (lang === 'ID' ? 'Unduh Barcode' : 'Download QR')}</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => setIsModalOpen(true)}
-                        className="py-2 px-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 rounded-lg text-[11px] font-bold flex items-center justify-center gap-1 transition-all cursor-pointer"
-                        title="Tampilkan layar penuh"
-                      >
-                        <Maximize2 className="w-3.5 h-3.5 text-slate-600" />
-                        <span>{lang === 'ID' ? 'Perbesar' : 'Enlarge'}</span>
-                      </button>
-                    </div>
-
+                  {/* Hover Overlay */}
+                  <div className="absolute inset-0 bg-slate-900/60 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-bold gap-1.5 backdrop-blur-2xs">
+                    <Maximize2 className="w-4 h-4" />
+                    <span>{lang === 'ID' ? 'Perbesar' : 'Enlarge'}</span>
                   </div>
-
                 </div>
 
               </div>
 
-            </div>
-          </div>
+              {/* Caption text below white card (matches the uploaded image) */}
+              <p className="text-white text-xs sm:text-[13px] font-medium leading-relaxed max-w-[260px] sm:max-w-[280px] mt-3.5 opacity-95">
+                {lang === 'ID'
+                  ? 'Pindai kode QR ini menggunakan kamera WhatsApp untuk bergabung ke grup ini'
+                  : 'Scan this QR code using your WhatsApp camera to join this group'}
+              </p>
 
+              {/* Download Flyer Button */}
+              <div className="w-full max-w-[280px] sm:max-w-[310px] mt-4">
+                <button
+                  type="button"
+                  onClick={handleDownloadFlyer}
+                  disabled={isDownloading}
+                  className="w-full py-2.5 px-4 bg-white/20 hover:bg-white/30 text-white border border-white/30 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50 active:scale-98 shadow-sm"
+                  title={lang === 'ID' ? 'Unduh Barcode Format Siap Cetak & Bagikan' : 'Download Barcode Ready to Print/Share'}
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>
+                    {isDownloading 
+                      ? (lang === 'ID' ? 'Menyiapkan Gambar...' : 'Preparing Image...') 
+                      : (lang === 'ID' ? 'Unduh Barcode (PNG)' : 'Download Barcode (PNG)')}
+                  </span>
+                </button>
+              </div>
+
+            </div>
+
+          </div>
         </div>
 
       </div>
@@ -635,7 +550,17 @@ export const ContactSection: React.FC<ContactSectionProps> = ({ lang, onOpenRegi
         lang={lang}
         onDownloadQr={handleDownloadFlyer}
       />
+
+      {/* Subtle Bottom Wave Curve to Match Flow */}
+      <div className="absolute bottom-0 left-0 right-0 w-full overflow-hidden leading-none pointer-events-none">
+        <svg 
+          className="relative block w-full h-8 sm:h-12 text-white fill-current" 
+          viewBox="0 0 1200 120" 
+          preserveAspectRatio="none"
+        >
+          <path d="M0,0 C150,90 350,-40 500,45 C650,130 900,10 1200,50 L1200,120 L0,120 Z" />
+        </svg>
+      </div>
     </section>
   );
 };
-

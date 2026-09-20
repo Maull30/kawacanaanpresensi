@@ -149,6 +149,7 @@ interface RegistrationSuccessData {
   plan: string;
   billingCycle: 'monthly' | 'yearly';
   expiryDays: number;
+  workspaceType?: 'school' | 'personal';
 }
 
 export const RegisterModal: React.FC<RegisterModalProps> = ({
@@ -176,11 +177,30 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>(initialBillingCycle);
 
-  // Khusus Superadmin: opsi layanan ruang kerja & masa berlaku
+  // Khusus Superadmin: opsi layanan ruang kerja & masa berlaku Direct Subscription
   const [workspaceService, setWorkspaceService] = useState<'school_integrated' | 'teacher_independent'>('school_integrated');
+  const [durationPreset, setDurationPreset] = useState<'monthly' | 'yearly' | 'permanent'>('yearly');
   const [subscriptionExpiresAt, setSubscriptionExpiresAt] = useState('');
   const [adminNotes, setAdminNotes] = useState('');
   const [npsn, setNpsn] = useState('');
+
+  const handleSelectDuration = (preset: 'monthly' | 'yearly' | 'permanent') => {
+    setDurationPreset(preset);
+    if (preset === 'monthly') {
+      const d = new Date();
+      d.setDate(d.getDate() + 30);
+      setSubscriptionExpiresAt(d.toISOString().slice(0, 10));
+      setBillingCycle('monthly');
+    } else if (preset === 'yearly') {
+      const d = new Date();
+      d.setFullYear(d.getFullYear() + 1);
+      setSubscriptionExpiresAt(d.toISOString().slice(0, 10));
+      setBillingCycle('yearly');
+    } else {
+      setSubscriptionExpiresAt('');
+      setBillingCycle('yearly');
+    }
+  };
 
   // 2. SUBMISSION & ERROR STATE
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -233,11 +253,14 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
       setPaymentCheckMessage(null);
       setPaymentSession(null);
       setRegistrationSuccessData(null);
-      setSubscriptionExpiresAt('');
       setAdminNotes('');
       setNpsn('');
       setWorkspaceService('school_integrated');
-      setBillingCycle(initialBillingCycle || 'monthly');
+      setDurationPreset('yearly');
+      const defaultExp = new Date();
+      defaultExp.setFullYear(defaultExp.getFullYear() + 1);
+      setSubscriptionExpiresAt(defaultExp.toISOString().slice(0, 10));
+      setBillingCycle(initialBillingCycle || 'yearly');
       setCopiedCredentials(false);
       setCopiedSchoolCode(false);
       setCopiedInvoice(false);
@@ -486,7 +509,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
         const createdSchool = regData.school;
         const createdAdmin = regData.admin;
 
-        // Bypass Midtrans payment completely! Jumps directly to success activation screen
+        // Direct Subscription: bypass Midtrans payment completely, jumps directly to success activation screen
         const successData: RegistrationSuccessData = {
           schoolName: createdSchool?.name || cleanSchoolName,
           schoolCode: createdSchool?.code || createdSchool?.schoolCode || 'SCH-' + Math.floor(100000 + Math.random() * 900000),
@@ -495,12 +518,13 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
           adminName: createdAdmin?.name || cleanAdminName,
           password: password,
           email: cleanEmail || undefined,
-          invoiceNo: 'SUPERADMIN-BYPASS',
-          plan: isPersonal ? 'Paket Guru Mandiri' : 'Paket Sekolah Terpadu',
-          billingCycle: 'yearly',
+          invoiceNo: 'DIRECT-SUBSCRIPTION',
+          plan: isPersonal ? 'Ruang Kerja Individu (Guru Mandiri)' : 'Ruang Kerja Sekolah (Sekolah Terpadu)',
+          billingCycle: durationPreset === 'monthly' ? 'monthly' : 'yearly',
           expiryDays: subscriptionExpiresAt
             ? Math.max(1, Math.round((new Date(subscriptionExpiresAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
             : 9999,
+          workspaceType: isPersonal ? 'personal' : 'school',
         };
 
         setRegistrationSuccessData(successData);
@@ -598,15 +622,17 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
   const handleCopyCredentials = () => {
     if (!registrationSuccessData) return;
     const text = `KREDENSIAL ADMINISTRATOR KAWACANAAN SD
-Nama Sekolah: ${registrationSuccessData.schoolName}
+Nama Satuan Pendidikan: ${registrationSuccessData.schoolName}
+Tipe Ruang Kerja: ${registrationSuccessData.workspaceType === 'personal' ? 'Ruang Kerja Individu (Guru Mandiri)' : 'Ruang Kerja Sekolah (Sekolah Terpadu)'}
 Kode Undangan Sekolah: ${registrationSuccessData.schoolCode}
 ${registrationSuccessData.npsn ? `NPSN: ${registrationSuccessData.npsn}\n` : ''}Nama Admin: ${registrationSuccessData.adminName}
 Username: ${registrationSuccessData.username}
 Kata Sandi: ${registrationSuccessData.password}
 Email: ${registrationSuccessData.email || '-'}
 Paket: ${registrationSuccessData.plan}
-Status: AKTIF / LUNAS
-${isSuperadmin ? 'Didaftarkan Oleh: SUPER ADMIN' : `Invoice: ${registrationSuccessData.invoiceNo || '-'}`}`;
+Status: ${isSuperadmin ? 'AKTIF (DIRECT SUBSCRIPTION)' : 'AKTIF / LUNAS'}
+Masa Aktif: ${registrationSuccessData.expiryDays >= 9000 ? 'Permanen (Seumur Hidup)' : `${registrationSuccessData.expiryDays} Hari`}
+${isSuperadmin ? 'Metode: Direct Subscription (Super Admin)' : `Invoice: ${registrationSuccessData.invoiceNo || '-'}`}`;
 
     navigator.clipboard.writeText(text);
     setCopiedCredentials(true);
@@ -665,12 +691,12 @@ ${isSuperadmin ? 'Didaftarkan Oleh: SUPER ADMIN' : `Invoice: ${registrationSucce
               <div>
                 <div className="flex items-center gap-1.5 flex-wrap">
                   <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-slate-500">
-                    {isSuperadmin ? 'SUPER ADMIN' : 'KAWACANAAN SD'}
+                    {isSuperadmin ? 'KAWACANAAN SD • SUPER ADMIN' : 'KAWACANAAN SD'}
                   </span>
                   {isSuperadmin && (
-                    <span className="inline-flex items-center gap-1 text-[9px] sm:text-[10px] bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-full font-bold text-blue-700">
-                      <ShieldCheck className="w-2.5 h-2.5 text-blue-600" />
-                      Aktivasi Instan
+                    <span className="inline-flex items-center gap-1 text-[9px] sm:text-[10px] bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full font-bold text-amber-800">
+                      <Zap className="w-2.5 h-2.5 text-amber-600" />
+                      Direct Subscription
                     </span>
                   )}
                 </div>
@@ -682,7 +708,7 @@ ${isSuperadmin ? 'Didaftarkan Oleh: SUPER ADMIN' : `Invoice: ${registrationSucce
                     : paymentSession
                     ? 'Gateway Pembayaran Midtrans'
                     : isSuperadmin
-                    ? 'Pendaftaran Satuan Pendidikan'
+                    ? 'Pendaftaran Satuan Pendidikan (Direct Subscription)'
                     : 'Pendaftaran Sekolah SD'}
                 </h2>
               </div>
@@ -690,28 +716,44 @@ ${isSuperadmin ? 'Didaftarkan Oleh: SUPER ADMIN' : `Invoice: ${registrationSucce
 
             {/* Step Indicator Minimalist */}
             {isSuperadmin ? (
-              /* Step Indicator Khusus Superadmin: 2 Langkah Langsung Aktif */
-              <div className="flex items-center gap-1.5 text-[10px] sm:text-[11px] font-semibold shrink-0">
+              /* Step Indicator Khusus Superadmin: 2 Langkah Direct Subscription */
+              <div className="flex items-center gap-1 sm:gap-1.5 text-[10px] sm:text-xs font-semibold shrink-0">
                 <div
                   className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full ${
                     !registrationSuccessData
-                      ? 'bg-blue-600 text-white font-bold shadow-xs'
+                      ? 'bg-blue-50 text-blue-700 font-bold border border-blue-200'
                       : 'bg-slate-100 text-slate-500'
                   }`}
                 >
-                  <span className="w-3.5 h-3.5 rounded-full bg-white/20 flex items-center justify-center text-[9px] font-bold">1</span>
-                  <span>Pendaftaran</span>
+                  <span
+                    className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold ${
+                      !registrationSuccessData ? 'bg-blue-600 text-white' : 'bg-slate-300 text-slate-700'
+                    }`}
+                  >
+                    1
+                  </span>
+                  <span className={!registrationSuccessData ? 'text-blue-700' : 'text-slate-500'}>
+                    Pendaftaran
+                  </span>
                 </div>
-                <div className="h-0.5 w-2 sm:w-3 bg-slate-200" />
+                <span className="text-slate-300 select-none">—</span>
                 <div
                   className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full ${
                     registrationSuccessData
-                      ? 'bg-emerald-600 text-white font-bold shadow-xs'
-                      : 'bg-slate-100 text-slate-500'
+                      ? 'bg-emerald-50 text-emerald-700 font-bold border border-emerald-200'
+                      : 'bg-slate-50 text-slate-400'
                   }`}
                 >
-                  <span className="w-3.5 h-3.5 rounded-full bg-white/20 flex items-center justify-center text-[9px] font-bold">2</span>
-                  <span>Aktif Langsung</span>
+                  <span
+                    className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold ${
+                      registrationSuccessData ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-500'
+                    }`}
+                  >
+                    2
+                  </span>
+                  <span className={registrationSuccessData ? 'text-emerald-700' : 'text-slate-400'}>
+                    Direct Subscription
+                  </span>
                 </div>
               </div>
             ) : (
@@ -845,7 +887,7 @@ ${isSuperadmin ? 'Didaftarkan Oleh: SUPER ADMIN' : `Invoice: ${registrationSucce
                     </span>
                     <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 px-2.5 py-0.5 rounded-full border border-emerald-300">
                       {isSuperadmin
-                        ? 'Aktivasi Superadmin • Langsung Aktif'
+                        ? 'Direct Subscription • Aktif Langsung'
                         : `Lunas (${registrationSuccessData.expiryDays} Hari Aktif)`}
                     </span>
                   </div>
@@ -854,6 +896,13 @@ ${isSuperadmin ? 'Didaftarkan Oleh: SUPER ADMIN' : `Invoice: ${registrationSucce
                     <div>
                       <div className="text-slate-500 text-[10px] font-semibold">Satuan Pendidikan</div>
                       <div className="font-bold text-slate-900 truncate mt-0.5">{registrationSuccessData.schoolName}</div>
+                    </div>
+
+                    <div>
+                      <div className="text-slate-500 text-[10px] font-semibold">Tipe Ruang Kerja</div>
+                      <div className="font-bold text-blue-700 truncate mt-0.5">
+                        {registrationSuccessData.workspaceType === 'personal' ? 'Ruang Kerja Individu' : 'Ruang Kerja Sekolah'}
+                      </div>
                     </div>
 
                     <div>
@@ -872,6 +921,13 @@ ${isSuperadmin ? 'Didaftarkan Oleh: SUPER ADMIN' : `Invoice: ${registrationSucce
                       <div className="text-slate-500 text-[10px] font-semibold">Kata Sandi (Password)</div>
                       <div className="font-mono font-bold text-slate-900 bg-white border border-slate-300 px-2 py-1 rounded-lg mt-0.5 inline-block text-xs">
                         {registrationSuccessData.password}
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="text-slate-500 text-[10px] font-semibold">Masa Aktif Lisensi</div>
+                      <div className="font-semibold text-slate-800 mt-0.5">
+                        {registrationSuccessData.expiryDays >= 9000 ? 'Permanen (Seumur Hidup)' : `${registrationSuccessData.expiryDays} Hari`}
                       </div>
                     </div>
 
@@ -910,7 +966,7 @@ ${isSuperadmin ? 'Didaftarkan Oleh: SUPER ADMIN' : `Invoice: ${registrationSucce
                       id="btn-finish-superadmin-onboarding"
                       type="button"
                       onClick={handleFinishSuperadmin}
-                      className="flex-1 inline-flex items-center justify-center gap-1.5 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white font-bold text-xs uppercase tracking-wider shadow-sm transition-all cursor-pointer min-h-[42px]"
+                      className="flex-1 inline-flex items-center justify-center gap-1.5 px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-bold text-xs uppercase tracking-wider shadow-sm transition-all cursor-pointer min-h-[42px]"
                     >
                       <span>Selesai & Kelola Sekolah</span>
                       <ArrowRight className="w-4 h-4" />
@@ -1089,142 +1145,223 @@ ${isSuperadmin ? 'Didaftarkan Oleh: SUPER ADMIN' : `Invoice: ${registrationSucce
             <div className="lg:grid lg:grid-cols-12 lg:gap-4 items-stretch">
               {/* KOLOM KIRI: Superadmin Panel vs Landing Commercial Card */}
               {isSuperadmin ? (
-                /* Card Khusus Superadmin: Pilihan Ruang Kerja, Masa Aktif & Fasilitas Lengkap */
-                <div className="lg:col-span-5 bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 text-white rounded-2xl p-4 sm:p-5 flex flex-col justify-between space-y-3.5 shadow-inner border border-indigo-800/60">
+                /* Card Khusus Superadmin: Tampilan Persis Daftar Sekolah dengan Direct Subscription & Pilihan Ruang Kerja */
+                <div className="lg:col-span-5 bg-gradient-to-b from-[#1D4ED8] via-[#1E40AF] to-[#1E3A8A] text-white rounded-2xl p-4 sm:p-5 flex flex-col justify-between shadow-lg relative overflow-hidden space-y-3">
                   <div className="space-y-3">
+                    {/* Header Card: Direct Subscription Badge */}
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <div className="w-7 h-7 rounded-lg bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-xs">
-                          <Building2 className="w-4 h-4" />
-                        </div>
-                        <div>
-                          <div className="text-xs font-bold uppercase tracking-wider text-amber-300">
-                            Aktivasi Super Admin
-                          </div>
-                          <div className="text-[10px] text-indigo-200">
-                            Penambahan Sekolah Baru
-                          </div>
-                        </div>
-                      </div>
-                      <span className="text-[9px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-2 py-0.5 rounded-full font-bold">
-                        Bypass Bayar
-                      </span>
-                    </div>
-
-                    {/* Switcher Ruang Kerja */}
-                    <div>
-                      <label className="text-[10px] font-bold text-slate-300 uppercase tracking-wider block mb-1.5">
-                        Tipe Ruang Kerja:
-                      </label>
-                      <div className="grid grid-cols-2 gap-1.5 bg-slate-950/60 p-1 rounded-xl border border-white/10 text-xs font-semibold">
-                        <button
-                          type="button"
-                          onClick={() => setWorkspaceService('school_integrated')}
-                          className={`py-1.5 px-2 rounded-lg transition-all text-center cursor-pointer text-xs ${
-                            workspaceService === 'school_integrated'
-                              ? 'bg-indigo-600 text-white shadow-xs font-bold'
-                              : 'text-slate-300 hover:text-white'
-                          }`}
-                        >
-                          Sekolah Terpadu
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setWorkspaceService('teacher_independent')}
-                          className={`py-1.5 px-2 rounded-lg transition-all text-center cursor-pointer text-xs ${
-                            workspaceService === 'teacher_independent'
-                              ? 'bg-indigo-600 text-white shadow-xs font-bold'
-                              : 'text-slate-300 hover:text-white'
-                          }`}
-                        >
-                          Guru Mandiri
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Preset Masa Aktif */}
-                    <div>
-                      <div className="flex items-center justify-between mb-1">
-                        <label className="text-[10px] font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1">
-                          <Calendar className="w-3 h-3 text-amber-300" />
-                          <span>Masa Aktif Lisensi:</span>
-                        </label>
-                        <span className="text-[10px] font-mono font-bold text-amber-300">
-                          {subscriptionExpiresAt || 'Permanen (Seumur Hidup)'}
+                      <div className="flex items-center gap-1.5">
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-white/20 text-white border border-white/30 backdrop-blur-xs flex items-center gap-1">
+                          <Zap className="w-3 h-3 text-amber-300" />
+                          Direct Subscription
+                        </span>
+                        <span className="text-[10px] bg-amber-400 text-slate-950 font-black px-2 py-0.5 rounded-full">
+                          Super Admin
                         </span>
                       </div>
-                      <div className="grid grid-cols-3 gap-1 text-[11px] font-bold">
+                      <span className="text-[10px] text-blue-100 font-medium">Bypass Bayar</span>
+                    </div>
+
+                    {/* 1. PILIHAN MENENTUKAN RUANG KERJA */}
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between text-[11px] font-bold text-blue-100">
+                        <span className="flex items-center gap-1">
+                          <Building2 className="w-3.5 h-3.5 text-amber-300" />
+                          Pilihan Ruang Kerja:
+                        </span>
+                        <span className="text-[10px] text-amber-300 font-bold">
+                          {workspaceService === 'school_integrated' ? 'Institusi Sekolah' : 'Pendidik Mandiri'}
+                        </span>
+                      </div>
+                      <div className="bg-black/25 p-1 rounded-xl border border-white/20 grid grid-cols-2 gap-1">
                         <button
                           type="button"
-                          onClick={() => setSubscriptionExpiresAt('')}
-                          className={`py-1 rounded-lg border transition-all cursor-pointer ${
-                            !subscriptionExpiresAt
-                              ? 'bg-amber-400 text-slate-950 border-amber-300 font-black'
-                              : 'bg-white/5 border-white/10 text-slate-300 hover:bg-white/10'
+                          id="btn-workspace-school"
+                          onClick={() => setWorkspaceService('school_integrated')}
+                          className={`py-1.5 px-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                            workspaceService === 'school_integrated'
+                              ? 'bg-white text-blue-900 shadow-sm font-black'
+                              : 'text-blue-100 hover:text-white hover:bg-white/10'
+                          }`}
+                        >
+                          <Building2 className="w-3.5 h-3.5" />
+                          <span>Ruang Kerja Sekolah</span>
+                        </button>
+                        <button
+                          type="button"
+                          id="btn-workspace-teacher"
+                          onClick={() => setWorkspaceService('teacher_independent')}
+                          className={`py-1.5 px-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                            workspaceService === 'teacher_independent'
+                              ? 'bg-white text-blue-900 shadow-sm font-black'
+                              : 'text-blue-100 hover:text-white hover:bg-white/10'
+                          }`}
+                        >
+                          <User className="w-3.5 h-3.5" />
+                          <span>Ruang Kerja Individu</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* 2. PILIHAN MASA AKTIF DIRECT SUBSCRIPTION */}
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between text-[11px] font-semibold text-blue-100">
+                        <span className="flex items-center gap-1">
+                          <Calendar className="w-3.5 h-3.5 text-amber-300" />
+                          Masa Aktif Lisensi:
+                        </span>
+                        <span className="text-[10px] text-amber-300 font-mono font-bold">
+                          {durationPreset === 'permanent'
+                            ? 'Permanen'
+                            : durationPreset === 'yearly'
+                            ? '1 Tahun (365 Hari)'
+                            : '1 Bulan (30 Hari)'}
+                        </span>
+                      </div>
+                      <div className="bg-black/25 p-1 rounded-xl border border-white/20 grid grid-cols-3 gap-1">
+                        <button
+                          type="button"
+                          id="btn-duration-monthly"
+                          onClick={() => handleSelectDuration('monthly')}
+                          className={`py-1 px-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center cursor-pointer ${
+                            durationPreset === 'monthly'
+                              ? 'bg-white text-blue-900 shadow-sm'
+                              : 'text-blue-100 hover:text-white hover:bg-white/10'
+                          }`}
+                        >
+                          Bulanan
+                        </button>
+                        <button
+                          type="button"
+                          id="btn-duration-yearly"
+                          onClick={() => handleSelectDuration('yearly')}
+                          className={`py-1 px-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center cursor-pointer ${
+                            durationPreset === 'yearly'
+                              ? 'bg-amber-400 text-slate-950 shadow-sm font-black'
+                              : 'text-blue-100 hover:text-white hover:bg-white/10'
+                          }`}
+                        >
+                          Tahunan
+                        </button>
+                        <button
+                          type="button"
+                          id="btn-duration-permanent"
+                          onClick={() => handleSelectDuration('permanent')}
+                          className={`py-1 px-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center cursor-pointer ${
+                            durationPreset === 'permanent'
+                              ? 'bg-emerald-400 text-slate-950 shadow-sm font-black'
+                              : 'text-blue-100 hover:text-white hover:bg-white/10'
                           }`}
                         >
                           Permanen
                         </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const d = new Date();
-                            d.setFullYear(d.getFullYear() + 1);
-                            setSubscriptionExpiresAt(d.toISOString().slice(0, 10));
-                          }}
-                          className={`py-1 rounded-lg border transition-all cursor-pointer ${
-                            subscriptionExpiresAt && subscriptionExpiresAt.startsWith(`${new Date().getFullYear() + 1}`)
-                              ? 'bg-amber-400 text-slate-950 border-amber-300 font-black'
-                              : 'bg-white/5 border-white/10 text-slate-300 hover:bg-white/10'
-                          }`}
-                        >
-                          +1 Tahun
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const d = new Date();
-                            d.setDate(d.getDate() + 30);
-                            setSubscriptionExpiresAt(d.toISOString().slice(0, 10));
-                          }}
-                          className={`py-1 rounded-lg border transition-all cursor-pointer ${
-                            subscriptionExpiresAt && !subscriptionExpiresAt.startsWith(`${new Date().getFullYear() + 1}`)
-                              ? 'bg-amber-400 text-slate-950 border-amber-300 font-black'
-                              : 'bg-white/5 border-white/10 text-slate-300 hover:bg-white/10'
-                          }`}
-                        >
-                          +30 Hari
-                        </button>
                       </div>
                     </div>
 
-                    {/* Feature Highlights Superadmin */}
-                    <div className="pt-2 border-t border-white/10 space-y-1.5 text-xs text-slate-200">
-                      <div className="flex items-center gap-2">
-                        <div className="w-4 h-4 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
-                          <Check className="w-3 h-3" />
+                    {/* Title & Description Dinamis */}
+                    <div>
+                      <h3 className="text-lg sm:text-xl font-extrabold text-white tracking-tight leading-snug">
+                        {workspaceService === 'school_integrated'
+                          ? 'Presensi Terpadu untuk Seluruh Kelas'
+                          : 'Presensi Mandiri untuk Ruang Guru'}
+                      </h3>
+                      <p className="mt-1 text-xs text-blue-100/85 leading-relaxed font-normal">
+                        {workspaceService === 'school_integrated'
+                          ? 'Solusi lengkap untuk mengelola presensi siswa di seluruh kelas dengan mudah, aman dan efisien.'
+                          : 'Kelola rombel binaan, jurnal mengajar dan kehadiran siswa secara mandiri dan fleksibel.'}
+                      </p>
+                    </div>
+
+                    {/* School Graphic & Direct Subscription Status */}
+                    <div className="flex items-center gap-3 py-1 bg-white/5 rounded-xl p-2.5 border border-white/10">
+                      <SchoolIllustration className="w-14 h-14 sm:w-16 sm:h-16 shrink-0 drop-shadow-md" />
+                      <div>
+                        <span className="text-[10px] sm:text-[11px] text-blue-200 font-medium block">
+                          Metode Pendaftaran
+                        </span>
+                        <div className="text-base sm:text-lg font-black text-white tracking-tight flex items-baseline gap-1">
+                          <span>Direct Subscription</span>
                         </div>
-                        <span>Kapasitas Siswa & Guru Unlimited</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <div className="w-4 h-4 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
-                          <Check className="w-3 h-3" />
+                        <div className="text-[10px] text-emerald-300 font-bold flex items-center gap-1 mt-0.5">
+                          <Check className="w-3 h-3 stroke-[3]" />
+                          <span>
+                            {durationPreset === 'permanent'
+                              ? 'Aktif Permanen (Seumur Hidup)'
+                              : durationPreset === 'yearly'
+                              ? 'Aktif 1 Tahun (365 Hari)'
+                              : 'Aktif 1 Bulan (30 Hari)'}
+                          </span>
                         </div>
-                        <span>Multi-Kelas Paralel Terbit Otomatis (1A–6B)</span>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <div className="w-4 h-4 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
-                          <Check className="w-3 h-3" />
-                        </div>
-                        <span>Akun Administrator Langsung Aktif</span>
-                      </div>
+                    </div>
+
+                    {/* Feature Checklist (Dinamis sesuai Ruang Kerja) */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-2 pt-0.5">
+                      {workspaceService === 'school_integrated' ? (
+                        <>
+                          <div className="flex items-center gap-2 text-xs text-white/95 font-medium">
+                            <div className="w-4.5 h-4.5 rounded-full bg-blue-500/70 text-white flex items-center justify-center shrink-0 border border-blue-300/40 shadow-xs">
+                              <Check className="w-3 h-3 stroke-[3]" />
+                            </div>
+                            <span>12 Rombel Lengkap (1A–6B)</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-xs text-white/95 font-medium">
+                            <div className="w-4.5 h-4.5 rounded-full bg-blue-500/70 text-white flex items-center justify-center shrink-0 border border-blue-300/40 shadow-xs">
+                              <Check className="w-3 h-3 stroke-[3]" />
+                            </div>
+                            <span>Maks. 50 Siswa per Rombel</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-xs text-white/95 font-medium">
+                            <div className="w-4.5 h-4.5 rounded-full bg-blue-500/70 text-white flex items-center justify-center shrink-0 border border-blue-300/40 shadow-xs">
+                              <Check className="w-3 h-3 stroke-[3]" />
+                            </div>
+                            <span>Multi-Akun Guru &amp; Wali Kelas</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-xs text-white/95 font-medium">
+                            <div className="w-4.5 h-4.5 rounded-full bg-blue-500/70 text-white flex items-center justify-center shrink-0 border border-blue-300/40 shadow-xs">
+                              <Check className="w-3 h-3 stroke-[3]" />
+                            </div>
+                            <span>Rekap Format Kedinasan Resmi</span>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div className="flex items-center gap-2 text-xs text-white/95 font-medium">
+                            <div className="w-4.5 h-4.5 rounded-full bg-blue-500/70 text-white flex items-center justify-center shrink-0 border border-blue-300/40 shadow-xs">
+                              <Check className="w-3 h-3 stroke-[3]" />
+                            </div>
+                            <span>Ruang Kerja Mandiri Pendidik</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-xs text-white/95 font-medium">
+                            <div className="w-4.5 h-4.5 rounded-full bg-blue-500/70 text-white flex items-center justify-center shrink-0 border border-blue-300/40 shadow-xs">
+                              <Check className="w-3 h-3 stroke-[3]" />
+                            </div>
+                            <span>Rombel Binaan Kelas (s.d. 50 Siswa)</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-xs text-white/95 font-medium">
+                            <div className="w-4.5 h-4.5 rounded-full bg-blue-500/70 text-white flex items-center justify-center shrink-0 border border-blue-300/40 shadow-xs">
+                              <Check className="w-3 h-3 stroke-[3]" />
+                            </div>
+                            <span>Akun Guru &amp; Jurnal Mengajar</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-xs text-white/95 font-medium">
+                            <div className="w-4.5 h-4.5 rounded-full bg-blue-500/70 text-white flex items-center justify-center shrink-0 border border-blue-300/40 shadow-xs">
+                              <Check className="w-3 h-3 stroke-[3]" />
+                            </div>
+                            <span>Rekap Format Kedinasan Resmi</span>
+                          </div>
+                        </>
+                      )}
                     </div>
                   </div>
 
-                  <div className="text-[10px] text-indigo-200/90 bg-white/5 p-2.5 rounded-xl border border-white/10 flex items-start gap-2">
-                    <ShieldCheck className="w-4 h-4 text-amber-300 shrink-0 mt-0.5" />
-                    <span>
-                      <strong>Mode Super Admin:</strong> Sekolah dan akun admin langsung aktif ke database pusat tanpa proses pembayaran.
+                  {/* Bottom Info Pill */}
+                  <div className="p-2 sm:p-2.5 rounded-xl bg-blue-950/50 border border-white/10 flex items-center gap-2 text-xs text-blue-100">
+                    <div className="w-5 h-5 rounded-lg bg-blue-500/30 flex items-center justify-center shrink-0 border border-blue-400/30">
+                      <ShieldCheck className="w-3.5 h-3.5 text-blue-200" />
+                    </div>
+                    <span className="text-[10px] sm:text-[11px] font-medium leading-tight">
+                      Direct Subscription: Sekolah &amp; Akun Admin langsung tersimpan &amp; aktif di Panel Super Admin.
                     </span>
                   </div>
                 </div>
@@ -1586,7 +1723,7 @@ ${isSuperadmin ? 'Didaftarkan Oleh: SUPER ADMIN' : `Invoice: ${registrationSucce
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1 border-t border-slate-100">
                       <div>
                         <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block mb-1 flex items-center gap-1.5">
-                          <FileText className="w-3.5 h-3.5 text-indigo-700" />
+                          <FileText className="w-3.5 h-3.5 text-blue-600" />
                           <span>NPSN Sekolah (Opsional)</span>
                         </label>
                         <input
@@ -1595,13 +1732,13 @@ ${isSuperadmin ? 'Didaftarkan Oleh: SUPER ADMIN' : `Invoice: ${registrationSucce
                           value={npsn}
                           onChange={(e) => setNpsn(e.target.value)}
                           placeholder="Nomor Pokok Sekolah Nasional"
-                          className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs sm:text-sm font-medium text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-indigo-600/20 focus:border-indigo-600 transition-all bg-white shadow-2xs h-9.5 sm:h-10"
+                          className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs sm:text-sm font-medium text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition-all bg-white shadow-2xs h-9.5 sm:h-10"
                         />
                       </div>
 
                       <div>
                         <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block mb-1 flex items-center gap-1.5">
-                          <Layers className="w-3.5 h-3.5 text-indigo-700" />
+                          <Layers className="w-3.5 h-3.5 text-blue-600" />
                           <span>Catatan Super Admin (Opsional)</span>
                         </label>
                         <input
@@ -1610,7 +1747,7 @@ ${isSuperadmin ? 'Didaftarkan Oleh: SUPER ADMIN' : `Invoice: ${registrationSucce
                           value={adminNotes}
                           onChange={(e) => setAdminNotes(e.target.value)}
                           placeholder="Contoh: Sekolah binaan dinas, aktivasi mandiri"
-                          className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs sm:text-sm font-medium text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-indigo-600/20 focus:border-indigo-600 transition-all bg-white shadow-2xs h-9.5 sm:h-10"
+                          className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs sm:text-sm font-medium text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition-all bg-white shadow-2xs h-9.5 sm:h-10"
                         />
                       </div>
                     </div>
@@ -1625,7 +1762,7 @@ ${isSuperadmin ? 'Didaftarkan Oleh: SUPER ADMIN' : `Invoice: ${registrationSucce
                     disabled={isSubmitting}
                     className={`w-full py-2.5 sm:py-3 px-5 rounded-xl font-black text-xs sm:text-sm uppercase tracking-wider text-white shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 min-h-[44px] active:scale-[0.99] ${
                       isSuperadmin
-                        ? 'bg-gradient-to-r from-indigo-600 via-indigo-700 to-indigo-800 hover:from-indigo-700 hover:to-indigo-900 shadow-indigo-600/25'
+                        ? 'bg-blue-600 hover:bg-blue-700 shadow-blue-600/25'
                         : 'bg-blue-600 hover:bg-blue-700 shadow-blue-600/25'
                     }`}
                   >
@@ -1637,11 +1774,11 @@ ${isSuperadmin ? 'Didaftarkan Oleh: SUPER ADMIN' : `Invoice: ${registrationSucce
                     ) : isSuperadmin ? (
                       <>
                         <Check className="w-4 h-4 stroke-[3]" />
-                        <span>Daftar & Aktifkan Sekolah Sekarang</span>
+                        <span>DAFTAR &amp; AKTIFKAN LANGSUNG (DIRECT SUBSCRIPTION)</span>
                       </>
                     ) : (
                       <>
-                        <span>DAFTAR & LANJUT BAYAR ({formatRupiah(activeAmount).toUpperCase()})</span>
+                        <span>DAFTAR &amp; LANJUT BAYAR ({formatRupiah(activeAmount).toUpperCase()})</span>
                         <ArrowRight className="w-4 h-4 stroke-[3]" />
                       </>
                     )}
@@ -1651,7 +1788,7 @@ ${isSuperadmin ? 'Didaftarkan Oleh: SUPER ADMIN' : `Invoice: ${registrationSucce
                     <Lock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                     <span>
                       {isSuperadmin
-                        ? 'Sekolah dan admin langsung tersimpan & aktif di panel Super Admin.'
+                        ? 'Metode Direct Subscription • Terintegrasi otomatis ke database pusat & Panel Super Admin.'
                         : 'Pembayaran aman via Midtrans • Aktivasi otomatis ke database pusat.'}
                     </span>
                   </div>

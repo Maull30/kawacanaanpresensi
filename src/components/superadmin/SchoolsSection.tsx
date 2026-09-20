@@ -164,6 +164,15 @@ export const SchoolsSection: React.FC<{
   useEffect(() => {
     if (activeSubTab === 'tambah') {
       setIsCreateOpen(true);
+    } else if (activeSubTab === 'paket') {
+      setSelectedSchoolId(null);
+      setIsAdvancedFilterOpen(true);
+    } else if (activeSubTab === 'pengguna') {
+      setSelectedSchoolId(null);
+    } else if (activeSubTab === 'semua') {
+      setSelectedSchoolId(null);
+      setStatusFilter('all');
+      setPlanFilter('all');
     }
   }, [activeSubTab]);
 

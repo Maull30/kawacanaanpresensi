@@ -21,7 +21,14 @@ import {
   ArrowUpRight,
   Search,
   Bell,
-  ChevronDown
+  ChevronDown,
+  BarChart3,
+  Database,
+  SlidersHorizontal,
+  Lock,
+  Settings,
+  Users,
+  Radio,
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { supabase } from '../lib/supabase';
@@ -35,38 +42,71 @@ import { SystemSection } from '../components/superadmin/SystemSection';
 
 export type SuperAdminCluster = 'dashboard' | 'sekolah' | 'billing' | 'sistem';
 
-interface ClusterConfig {
+export interface SubMenuItem {
+  id: string;
+  label: string;
+  icon?: any;
+  badge?: string;
+}
+
+export interface ClusterConfig {
   id: SuperAdminCluster;
   label: string;
   sublabel: string;
   icon: any;
   badge?: string;
+  submenus: SubMenuItem[];
 }
 
 const clusters: ClusterConfig[] = [
   {
     id: 'dashboard',
     label: 'Beranda',
-    sublabel: 'Metrik, KPI & Tren Platform',
+    sublabel: 'Metrik, KPI & Monitoring',
     icon: LayoutDashboard,
+    submenus: [
+      { id: 'ringkasan', label: 'Ringkasan Eksekutif', icon: BarChart3 },
+      { id: 'monitoring', label: 'Monitoring Real-Time', icon: Radio, badge: 'Live' },
+      { id: 'aktivitas', label: 'Log Aktivitas Sesi', icon: Shield },
+    ],
   },
   {
     id: 'sekolah',
     label: 'Sekolah',
     sublabel: 'Direktori & Pengguna Tenant',
     icon: Building2,
+    submenus: [
+      { id: 'semua', label: 'Direktori Sekolah', icon: Building2 },
+      { id: 'tambah', label: 'Tambah Sekolah Baru', icon: Plus },
+      { id: 'paket', label: 'Paket & Kuota Lisensi', icon: Layers },
+      { id: 'pengguna', label: 'Akun Admin Tenant', icon: Users },
+    ],
   },
   {
     id: 'billing',
     label: 'Pembayaran',
     sublabel: 'Transaksi & Lisensi Sekolah',
     icon: CreditCard,
+    submenus: [
+      { id: 'transaksi', label: 'Dashboard Pembayaran', icon: CreditCard },
+      { id: 'lisensi', label: 'Pemantauan Lisensi', icon: Sparkles },
+      { id: 'matriks', label: 'Matriks Fitur & Paket', icon: SlidersHorizontal },
+      { id: 'gateway', label: 'Gateway Midtrans', icon: KeyRound },
+    ],
   },
   {
     id: 'sistem',
     label: 'Sistem',
     sublabel: 'Audit, Siaran & Cadangan',
     icon: ShieldCheck,
+    submenus: [
+      { id: 'keamanan', label: 'Pusat Keamanan & Audit', icon: Shield },
+      { id: 'gateway', label: 'Gateway Pembayaran', icon: CreditCard },
+      { id: 'backup', label: 'Cadangan & Pemulihan', icon: Database },
+      { id: 'siaran', label: 'Siaran Pengumuman', icon: Megaphone },
+      { id: 'role', label: 'Kelola Role & Hak Akses', icon: Lock },
+      { id: 'konfigurasi', label: 'Pengaturan & Identitas', icon: Settings },
+    ],
   },
 ];
 
@@ -93,14 +133,41 @@ export const SuperAdminView: React.FC = () => {
   };
 
   // State untuk navigasi spesifik antar sub-fitur
+  const [overviewSubTab, setOverviewSubTab] = useState<string>('ringkasan');
   const [schoolsSubTab, setSchoolsSubTab] = useState<string>('semua');
   const [selectedSchoolId, setSelectedSchoolId] = useState<string | null>(null);
   const [billingSubTab, setBillingSubTab] = useState<string>('transaksi');
-  const [systemSubTab, setSystemSubTab] = useState<string>('siaran');
+  const [systemSubTab, setSystemSubTab] = useState<string>('keamanan');
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
+
+  // Helper untuk cek status aktif submenu
+  const getIsSubActive = (clusterId: SuperAdminCluster, subId: string) => {
+    if (activeCluster !== clusterId) return false;
+    if (clusterId === 'dashboard') return overviewSubTab === subId;
+    if (clusterId === 'sekolah') return schoolsSubTab === subId;
+    if (clusterId === 'billing') return billingSubTab === subId;
+    if (clusterId === 'sistem') return systemSubTab === subId;
+    return false;
+  };
+
+  // Handler klik submenu terintegrasi
+  const handleSubMenuClick = (clusterId: SuperAdminCluster, subMenuId: string) => {
+    setActiveCluster(clusterId);
+    if (clusterId === 'dashboard') {
+      setOverviewSubTab(subMenuId);
+    } else if (clusterId === 'sekolah') {
+      setSchoolsSubTab(subMenuId);
+      setSelectedSchoolId(null);
+    } else if (clusterId === 'billing') {
+      setBillingSubTab(subMenuId);
+    } else if (clusterId === 'sistem') {
+      setSystemSubTab(subMenuId);
+    }
+    setIsMobileSidebarOpen(false);
+  };
 
   const token = async () => {
     const { data } = await supabase.auth.getSession();
@@ -139,6 +206,7 @@ export const SuperAdminView: React.FC = () => {
       if (subTab) setSystemSubTab(subTab);
     } else {
       setActiveCluster('dashboard');
+      if (subTab) setOverviewSubTab(subTab);
     }
   };
 
@@ -179,26 +247,26 @@ export const SuperAdminView: React.FC = () => {
 
       {/* Sidebar Component */}
       <aside
-        className={`fixed md:sticky top-0 h-screen w-72 bg-slate-900 text-slate-100 flex flex-col justify-between z-50 transition-transform duration-300 ease-in-out border-r border-slate-800 shadow-xl ${
+        className={`fixed md:sticky top-0 h-screen w-72 bg-slate-950 text-slate-100 flex flex-col justify-between z-50 transition-transform duration-300 ease-in-out border-r border-slate-800/80 shadow-2xl ${
           isMobileSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
         }`}
       >
         {/* Atas Sidebar: Logo & Identitas Super Admin */}
-        <div className="p-5 border-b border-slate-800/80">
+        <div className="p-4 sm:p-5 border-b border-slate-800/80 bg-slate-950/70">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3 select-none">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 via-indigo-600 to-purple-600 flex items-center justify-center shadow-md shadow-indigo-500/20 text-white font-black">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 via-indigo-600 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-600/25 text-white font-black shrink-0">
                 <SchoolLogo size={24} className="brightness-200" />
               </div>
-              <div>
+              <div className="min-w-0">
                 <div className="flex items-center gap-2">
-                  <span className="font-black text-white text-base tracking-tight">KAWACANAAN</span>
-                  <span className="px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-amber-500 text-slate-950 shadow-2xs">
-                    SUPER ADMIN
+                  <span className="font-black text-white text-base tracking-tight truncate">KAWACANAAN</span>
+                  <span className="px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 shrink-0">
+                    SaaS
                   </span>
                 </div>
-                <p className="text-[10px] font-bold tracking-wider text-slate-400 uppercase mt-0.5">
-                  KONTROL MULTI-TENANT
+                <p className="text-[10px] font-bold tracking-wider text-slate-400 uppercase mt-0.5 truncate">
+                  SUPER ADMIN CONSOLE
                 </p>
               </div>
             </div>
@@ -206,60 +274,71 @@ export const SuperAdminView: React.FC = () => {
             {/* Tombol Tutup pada Layar Mobile */}
             <button
               onClick={() => setIsMobileSidebarOpen(false)}
-              className="md:hidden p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer"
+              className="md:hidden p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/80 cursor-pointer"
             >
               <X size={20} />
             </button>
           </div>
 
           {/* Status Koneksi Platform Ringkas */}
-          <div className="mt-4 p-2.5 rounded-xl bg-slate-800/60 border border-slate-700/50 flex items-center justify-between text-xs">
+          <div className="mt-3.5 px-3 py-2 rounded-xl bg-slate-900/90 border border-slate-800 flex items-center justify-between text-xs">
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span className="text-[11px] font-semibold text-slate-300">Supabase & API Normal</span>
+              <span className="text-[11px] font-semibold text-slate-300">Supabase Multi-Tenant</span>
             </div>
-            <span className="text-[10px] font-bold text-slate-400 font-mono">Port 3000</span>
+            <span className="text-[10px] font-bold text-emerald-400 bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-800/50">
+              Online
+            </span>
           </div>
         </div>
 
-        {/* Tengah Sidebar: 4 Rumpun Menu Utama & Tombol Cepat */}
-        <div className="flex-1 overflow-y-auto px-3.5 py-5 space-y-6">
-          <div>
-            <div className="px-3 pb-2 text-[10px] font-black tracking-widest text-slate-400 uppercase">
-              RUMPUN UTAMA PLATFORM
-            </div>
+        {/* Tengah Sidebar: Menu Utama & Submenu Terpadu (Commercial SaaS Layout) */}
+        <div className="flex-1 overflow-y-auto px-3.5 py-4 space-y-4">
+          <div className="px-3 pb-1 text-[10px] font-black tracking-widest text-slate-500 uppercase">
+            NAVIGASI MULTI-TENANT
+          </div>
 
-            <nav className="space-y-1.5">
-              {clusters.map((c) => {
-                const isActive = activeCluster === c.id;
-                const Icon = c.icon;
-                return (
+          <nav className="space-y-2">
+            {clusters.map((c) => {
+              const isActive = activeCluster === c.id;
+              const Icon = c.icon;
+
+              return (
+                <div key={c.id} className="space-y-1">
+                  {/* Tombol Menu Utama */}
                   <button
-                    key={c.id}
+                    type="button"
                     onClick={() => {
-                      setActiveCluster(c.id);
-                      if (c.id === 'sekolah') setSelectedSchoolId(null);
+                      if (!isActive) {
+                        setActiveCluster(c.id);
+                        if (c.id === 'sekolah') setSelectedSchoolId(null);
+                      }
                     }}
-                    className={`w-full flex items-center gap-3.5 px-3.5 py-3 rounded-2xl text-left transition-all duration-150 cursor-pointer group select-none ${
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl text-left transition-all duration-150 cursor-pointer group select-none min-h-[44px] ${
                       isActive
                         ? 'bg-indigo-600 text-white font-bold shadow-md shadow-indigo-600/30 ring-1 ring-indigo-400/40'
-                        : 'text-slate-300 hover:text-white hover:bg-slate-800/80'
+                        : 'text-slate-300 hover:text-white hover:bg-slate-900/80'
                     }`}
                   >
                     <div
-                      className={`p-2 rounded-xl transition-colors ${
+                      className={`p-2 rounded-xl transition-colors shrink-0 ${
                         isActive
                           ? 'bg-white/20 text-white'
-                          : 'bg-slate-800 text-slate-400 group-hover:text-white group-hover:bg-slate-700'
+                          : 'bg-slate-900 text-slate-400 group-hover:text-white group-hover:bg-slate-800'
                       }`}
                     >
-                      <Icon size={18} />
+                      <Icon size={17} />
                     </div>
 
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between">
                         <span className="text-sm font-black truncate">{c.label}</span>
-                        {isActive && <ChevronRight size={14} className="text-indigo-200 shrink-0" />}
+                        <ChevronDown
+                          size={15}
+                          className={`transition-transform duration-200 shrink-0 ${
+                            isActive ? 'text-indigo-200 rotate-180' : 'text-slate-500 group-hover:text-slate-300'
+                          }`}
+                        />
                       </div>
                       <p
                         className={`text-[10px] truncate mt-0.5 ${
@@ -270,55 +349,62 @@ export const SuperAdminView: React.FC = () => {
                       </p>
                     </div>
                   </button>
-                );
-              })}
-            </nav>
-          </div>
 
-          {/* Pintasan Aksi Cepat */}
-          <div className="pt-2 border-t border-slate-800/80">
-            <div className="px-3 pb-2 text-[10px] font-black tracking-widest text-slate-400 uppercase">
-              AKSI CEPAT OPERASIONAL
-            </div>
+                  {/* Submenu List - Muncul saat menu aktif */}
+                  {isActive && c.submenus && c.submenus.length > 0 && (
+                    <div className="ml-5 pl-3 border-l-2 border-slate-800/90 space-y-1 py-1 animate-in fade-in slide-in-from-top-1 duration-150">
+                      {c.submenus.map((sub) => {
+                        const isSubActive = getIsSubActive(c.id, sub.id);
+                        const SubIcon = sub.icon;
 
-            <div className="space-y-1.5">
-              <button
-                type="button"
-                onClick={() => {
-                  setActiveCluster('sekolah');
-                  setSchoolsSubTab('tambah');
-                  setSelectedSchoolId(null);
-                }}
-                className="w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs font-bold text-slate-300 hover:text-white hover:bg-slate-800/60 transition cursor-pointer"
-              >
-                <div className="p-1.5 rounded-lg bg-emerald-500/20 text-emerald-400">
-                  <Plus size={14} />
+                        return (
+                          <button
+                            key={sub.id}
+                            type="button"
+                            onClick={() => handleSubMenuClick(c.id, sub.id)}
+                            className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs transition-all duration-150 cursor-pointer min-h-[38px] ${
+                              isSubActive
+                                ? 'bg-indigo-600/25 text-indigo-300 font-bold border border-indigo-500/40 shadow-xs'
+                                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/60'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2.5 truncate">
+                              {SubIcon ? (
+                                <SubIcon
+                                  size={14}
+                                  className={`shrink-0 ${isSubActive ? 'text-indigo-400' : 'text-slate-500'}`}
+                                />
+                              ) : (
+                                <span
+                                  className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                                    isSubActive ? 'bg-indigo-400' : 'bg-slate-600'
+                                  }`}
+                                />
+                              )}
+                              <span className="truncate">{sub.label}</span>
+                            </div>
+
+                            {sub.badge && (
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wide bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 shrink-0">
+                                {sub.badge}
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
-                <span>Tambah Sekolah Baru</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setActiveCluster('sistem');
-                  setSystemSubTab('siaran');
-                }}
-                className="w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs font-bold text-slate-300 hover:text-white hover:bg-slate-800/60 transition cursor-pointer"
-              >
-                <div className="p-1.5 rounded-lg bg-amber-500/20 text-amber-400">
-                  <Megaphone size={14} />
-                </div>
-                <span>Siaran Pengumuman Global</span>
-              </button>
-            </div>
-          </div>
+              );
+            })}
+          </nav>
         </div>
 
         {/* Bawah Sidebar: Profil Pengguna & Tombol Keluar */}
-        <div className="p-4 border-t border-slate-800/80 bg-slate-950/50">
+        <div className="p-3.5 sm:p-4 border-t border-slate-800/80 bg-slate-950/90">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-3 min-w-0">
-              <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center font-black text-white text-base shadow-inner shrink-0">
+              <div className="w-10 h-10 rounded-xl bg-indigo-600/90 flex items-center justify-center font-black text-white text-base shadow-inner shrink-0">
                 {currentUser?.name?.charAt(0) || 'S'}
               </div>
               <div className="min-w-0">
@@ -484,6 +570,8 @@ export const SuperAdminView: React.FC = () => {
             <OverviewSection
               call={call}
               showToast={showToast}
+              activeSubTab={overviewSubTab}
+              onSubTabChange={setOverviewSubTab}
               onNavigate={handleNavigate}
             />
           )}

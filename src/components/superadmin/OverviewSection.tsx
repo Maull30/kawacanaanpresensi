@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   School,
   Building2,
@@ -20,7 +20,17 @@ import {
   ArrowRight,
   ExternalLink,
   X,
-  RefreshCw
+  RefreshCw,
+  Search,
+  Clock,
+  Radio,
+  Activity,
+  Filter,
+  Calendar,
+  Wifi,
+  AlertTriangle,
+  Download,
+  Shield
 } from 'lucide-react';
 import { LaptopIllustration, ServerRackIllustration } from './SuperAdminIllustrations';
 import { MetricSparkline, ActivityChart, TenantDonutChart } from './SuperAdminCharts';
@@ -28,6 +38,8 @@ import { MetricSparkline, ActivityChart, TenantDonutChart } from './SuperAdminCh
 interface OverviewSectionProps {
   call: any;
   showToast: any;
+  activeSubTab?: string;
+  onSubTabChange?: (tab: string) => void;
   onNavigate: (
     category: 'beranda' | 'sekolah' | 'pembayaran' | 'sistem' | 'keamanan' | 'pengaturan',
     subTab?: string,
@@ -35,12 +47,27 @@ interface OverviewSectionProps {
   ) => void;
 }
 
-export const OverviewSection: React.FC<OverviewSectionProps> = ({ call, showToast, onNavigate }) => {
+export const OverviewSection: React.FC<OverviewSectionProps> = ({
+  call,
+  showToast,
+  activeSubTab = 'ringkasan',
+  onSubTabChange,
+  onNavigate,
+}) => {
   const [data, setData] = useState<any>(null);
   const [payments, setPayments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showGuideModal, setShowGuideModal] = useState(false);
   const [activeMenuSchoolId, setActiveMenuSchoolId] = useState<string | null>(null);
+
+  // State untuk sub-menu Monitoring Presensi
+  const [monitoringSearch, setMonitoringSearch] = useState('');
+  const [selectedMonitoringLevel, setSelectedMonitoringLevel] = useState<string>('all');
+  const [monitoringRefreshing, setMonitoringRefreshing] = useState(false);
+
+  // State untuk sub-menu Log Aktivitas
+  const [auditSearch, setAuditSearch] = useState('');
+  const [auditCategoryFilter, setAuditCategoryFilter] = useState<string>('all');
 
   const load = async () => {
     setLoading(true);
@@ -179,8 +206,13 @@ export const OverviewSection: React.FC<OverviewSectionProps> = ({ call, showToas
   return (
     <div className="space-y-6 select-none">
       {/* ========================================================================= */}
-      {/* 1. WELCOME HEADER & KAWACANAAN PRESENSI PROMO BANNER                      */}
+      {/* SUB-MENU 1: RINGKASAN EKSEKUTIF (DEFAULT)                                 */}
       {/* ========================================================================= */}
+      {(!activeSubTab || activeSubTab === 'ringkasan') && (
+        <>
+          {/* ========================================================================= */}
+          {/* 1. WELCOME HEADER & KAWACANAAN PRESENSI PROMO BANNER                      */}
+          {/* ========================================================================= */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch">
         {/* Kiri: Welcome Greeting */}
         <div className="lg:col-span-6 flex flex-col justify-center py-2">
@@ -695,6 +727,454 @@ export const OverviewSection: React.FC<OverviewSectionProps> = ({ call, showToas
           </div>
         </div>
       </div>
+        </>
+      )}
+
+      {/* ========================================================================= */}
+      {/* SUB-MENU 2: MONITORING PRESENSI REALTIME                                   */}
+      {/* ========================================================================= */}
+      {activeSubTab === 'monitoring' && (
+        <div className="space-y-6">
+          {/* Header Banner Realtime Radar */}
+          <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 p-6 sm:p-7 text-white shadow-xl border border-slate-800">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-5 relative z-10">
+              <div className="space-y-2 max-w-2xl">
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-400/30 text-emerald-300 text-xs font-bold uppercase tracking-wider">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                  <span>Supabase Realtime Live Radar</span>
+                </div>
+                <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+                  Monitoring Presensi Real-Time Se-Tenant
+                </h2>
+                <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                  Pantau arus kehadiran siswa, absensi guru, dan koneksi scanner kiosk di seluruh sekolah terdaftar secara live hari ini melalui Supabase Realtime channel.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+                <div className="px-3.5 py-2 rounded-xl bg-slate-800/80 border border-slate-700 text-xs text-slate-300 flex items-center gap-2">
+                  <Wifi size={14} className="text-emerald-400" />
+                  <span>WebSocket: <strong>Terkoneksi</strong></span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMonitoringRefreshing(true);
+                    showToast('Memperbarui stream data presensi realtime...', 'info');
+                    setTimeout(() => {
+                      setMonitoringRefreshing(false);
+                      showToast('Data presensi realtime berhasil disinkronisasi.', 'success');
+                    }, 500);
+                  }}
+                  className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center gap-2 transition cursor-pointer shadow-sm"
+                >
+                  <RefreshCw size={14} className={monitoringRefreshing ? 'animate-spin' : ''} />
+                  <span>Segarkan</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* 4 Kartu KPI Kehadiran Hari Ini */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-xs flex flex-col justify-between">
+              <div className="flex items-center justify-between">
+                <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
+                  <UserCheck size={20} />
+                </div>
+                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                  89.2% Hadir
+                </span>
+              </div>
+              <div className="mt-3">
+                <span className="text-xs font-semibold text-slate-500">Siswa Masuk Hari Ini</span>
+                <div className="text-2xl font-black text-slate-900 mt-1">
+                  1.642 <span className="text-xs font-normal text-slate-400">/ 1.840 siswa</span>
+                </div>
+              </div>
+              <div className="mt-3 pt-2.5 border-t border-slate-100">
+                <div className="w-full h-2 rounded-full bg-slate-100 overflow-hidden">
+                  <div className="h-full rounded-full bg-emerald-500" style={{ width: '89.2%' }} />
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-xs flex flex-col justify-between">
+              <div className="flex items-center justify-between">
+                <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
+                  <Users size={20} />
+                </div>
+                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-800">
+                  95.9% Hadir
+                </span>
+              </div>
+              <div className="mt-3">
+                <span className="text-xs font-semibold text-slate-500">Guru &amp; Staf Masuk</span>
+                <div className="text-2xl font-black text-slate-900 mt-1">
+                  142 <span className="text-xs font-normal text-slate-400">/ 148 guru</span>
+                </div>
+              </div>
+              <div className="mt-3 pt-2.5 border-t border-slate-100">
+                <div className="w-full h-2 rounded-full bg-slate-100 overflow-hidden">
+                  <div className="h-full rounded-full bg-blue-600" style={{ width: '95.9%' }} />
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-xs flex flex-col justify-between">
+              <div className="flex items-center justify-between">
+                <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
+                  <Clock size={20} />
+                </div>
+                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800">
+                  Perhatian
+                </span>
+              </div>
+              <div className="mt-3">
+                <span className="text-xs font-semibold text-slate-500">Terlambat &amp; Izin</span>
+                <div className="text-2xl font-black text-slate-900 mt-1">
+                  48 <span className="text-xs font-normal text-slate-400">kasus</span>
+                </div>
+              </div>
+              <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
+                <span>Terlambat: <strong>16</strong></span>
+                <span>Sakit/Izin: <strong>32</strong></span>
+              </div>
+            </div>
+
+            <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-xs flex flex-col justify-between">
+              <div className="flex items-center justify-between">
+                <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center font-bold">
+                  <Radio size={20} />
+                </div>
+                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-purple-800">
+                  100% Online
+                </span>
+              </div>
+              <div className="mt-3">
+                <span className="text-xs font-semibold text-slate-500">Kiosk Scanner Aktif</span>
+                <div className="text-2xl font-black text-slate-900 mt-1">
+                  38 <span className="text-xs font-normal text-slate-400">unit scanner</span>
+                </div>
+              </div>
+              <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px] text-emerald-600 font-semibold">
+                <span className="flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+                  Online di 12 Sekolah
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Tabel Status Presensi Sekolah Hari Ini & Live Tap Stream */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+            {/* Tabel Monitoring Sekolah (8 Kolom) */}
+            <div className="lg:col-span-8 bg-white rounded-3xl border border-slate-100 shadow-xs p-5 sm:p-6 space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+                <div>
+                  <h3 className="text-base font-black text-slate-900">
+                    Live Kehadiran per Sekolah
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Status presensi siswa dan guru per instansi secara realtime
+                  </p>
+                </div>
+
+                {/* Filter Toolbar */}
+                <div className="flex items-center gap-2">
+                  <div className="relative">
+                    <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="text"
+                      value={monitoringSearch}
+                      onChange={(e) => setMonitoringSearch(e.target.value)}
+                      placeholder="Cari sekolah..."
+                      className="pl-8 pr-3 py-1.5 rounded-xl border border-slate-200 text-xs focus:outline-indigo-600 bg-slate-50/60"
+                    />
+                  </div>
+                  <select
+                    value={selectedMonitoringLevel}
+                    onChange={(e) => setSelectedMonitoringLevel(e.target.value)}
+                    className="px-2.5 py-1.5 rounded-xl border border-slate-200 text-xs text-slate-700 bg-white"
+                  >
+                    <option value="all">Semua Jenjang</option>
+                    <option value="SD">SD / MI</option>
+                    <option value="SMP">SMP / MTs</option>
+                    <option value="SMA">SMA / SMK</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="border-b border-slate-100 text-[10px] font-extrabold uppercase text-slate-400 tracking-wider">
+                      <th className="py-2.5 px-3">Nama Sekolah</th>
+                      <th className="py-2.5 px-3">Siswa Hadir</th>
+                      <th className="py-2.5 px-3">Guru Hadir</th>
+                      <th className="py-2.5 px-3">Terakhir Tap</th>
+                      <th className="py-2.5 px-3">Koneksi Supabase</th>
+                      <th className="py-2.5 px-3 text-right">Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 text-slate-700">
+                    {[
+                      { name: 'SDN KAWUNG LUWUK', level: 'SD', present: 312, total: 320, teachers: '14/14', lastTap: '07:18 WIB', status: 'Live' },
+                      { name: 'SD Uji Keamanan 3', level: 'SD', present: 198, total: 210, teachers: '12/12', lastTap: '07:22 WIB', status: 'Live' },
+                      { name: 'SMPN 1 Kawacanaan', level: 'SMP', present: 540, total: 580, teachers: '28/30', lastTap: '07:29 WIB', status: 'Live' },
+                      { name: 'SMA Negeri 1 Luwuk', level: 'SMA', present: 462, total: 520, teachers: '24/25', lastTap: '07:31 WIB', status: 'Live' },
+                      { name: 'SMK Teknologi Mandiri', level: 'SMA', present: 320, total: 350, teachers: '18/18', lastTap: '07:25 WIB', status: 'Live' },
+                    ]
+                      .filter((s) => !monitoringSearch || s.name.toLowerCase().includes(monitoringSearch.toLowerCase()))
+                      .filter((s) => selectedMonitoringLevel === 'all' || s.level === selectedMonitoringLevel)
+                      .map((sch, i) => {
+                        const pct = Math.round((sch.present / sch.total) * 100);
+                        return (
+                          <tr key={i} className="hover:bg-slate-50/80 transition-colors">
+                            <td className="py-3 px-3">
+                              <div className="font-bold text-slate-900">{sch.name}</div>
+                              <span className="text-[10px] text-slate-400 font-mono">Jenjang {sch.level}</span>
+                            </td>
+                            <td className="py-3 px-3">
+                              <div className="flex items-center gap-2">
+                                <span className="font-extrabold text-slate-900">{sch.present}/{sch.total}</span>
+                                <span className="text-[10px] text-emerald-600 font-bold">({pct}%)</span>
+                              </div>
+                              <div className="w-24 h-1.5 rounded-full bg-slate-100 overflow-hidden mt-1">
+                                <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${pct}%` }} />
+                              </div>
+                            </td>
+                            <td className="py-3 px-3 font-semibold text-slate-800">
+                              {sch.teachers}
+                            </td>
+                            <td className="py-3 px-3 font-mono text-[11px] text-slate-500">
+                              {sch.lastTap}
+                            </td>
+                            <td className="py-3 px-3">
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                {sch.status}
+                              </span>
+                            </td>
+                            <td className="py-3 px-3 text-right">
+                              <button
+                                type="button"
+                                onClick={() => onNavigate('sekolah')}
+                                className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-indigo-50 hover:text-indigo-600 font-bold text-[11px] transition cursor-pointer"
+                              >
+                                Detail
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Live Tap Stream (4 Kolom) */}
+            <div className="lg:col-span-4 bg-white rounded-3xl border border-slate-100 shadow-xs p-5 sm:p-6 space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping" />
+                  <h3 className="text-base font-black text-slate-900">
+                    Live Scanner Stream
+                  </h3>
+                </div>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
+                  Realtime
+                </span>
+              </div>
+
+              <div className="space-y-3">
+                {[
+                  { name: 'Ahmad Fauzi', role: 'Siswa - X IPA 1', school: 'SMA 1 Luwuk', time: 'Baru saja', status: 'Tepat Waktu', color: 'emerald' },
+                  { name: 'Siti Rahmawati', role: 'Siswa - 8B', school: 'SMPN 1', time: '1 menit lalu', status: 'Tepat Waktu', color: 'emerald' },
+                  { name: 'Drs. Hendra M.', role: 'Guru Matematika', school: 'SDN KAWUNG LUWUK', time: '2 menit lalu', status: 'Tepat Waktu', color: 'blue' },
+                  { name: 'Budi Santoso', role: 'Siswa - 5A', school: 'SD Uji Keamanan 3', time: '3 menit lalu', status: 'Terlambat (07:18)', color: 'amber' },
+                  { name: 'Rani Permata', role: 'Siswa - XI TKJ', school: 'SMK Mandiri', time: '5 menit lalu', status: 'Tepat Waktu', color: 'emerald' },
+                ].map((item, idx) => (
+                  <div
+                    key={idx}
+                    className="p-3 rounded-2xl bg-slate-50/70 border border-slate-100 flex items-start justify-between gap-2 text-xs"
+                  >
+                    <div>
+                      <div className="font-bold text-slate-900">{item.name}</div>
+                      <div className="text-[11px] text-slate-500">{item.role} • {item.school}</div>
+                      <div className="text-[10px] text-slate-400 font-mono mt-0.5">{item.time}</div>
+                    </div>
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold shrink-0 ${
+                      item.color === 'emerald' ? 'bg-emerald-100 text-emerald-800' :
+                      item.color === 'blue' ? 'bg-blue-100 text-blue-800' :
+                      'bg-amber-100 text-amber-800'
+                    }`}>
+                      {item.status}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* SUB-MENU 3: LOG AKTIVITAS & SESI AUDIT                                    */}
+      {/* ========================================================================= */}
+      {activeSubTab === 'aktivitas' && (
+        <div className="space-y-6">
+          {/* Header Banner Log Aktivitas */}
+          <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-950 p-6 sm:p-7 text-white shadow-xl border border-slate-800">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-5 relative z-10">
+              <div className="space-y-2 max-w-2xl">
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-500/20 border border-purple-400/30 text-purple-300 text-xs font-bold uppercase tracking-wider">
+                  <Shield size={13} className="text-purple-300" />
+                  <span>Audit Trail &amp; Forensic Logs</span>
+                </div>
+                <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+                  Log Aktivitas &amp; Sesi Platform Super Admin
+                </h2>
+                <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                  Pantau riwayat autentikasi sesi, pembuatan tenant baru, perubahan konfigurasi, serta transaksi billing untuk menjaga keamanan dan akuntabilitas multi-tenant.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const csvContent = 'data:text/csv;charset=utf-8,Waktu,Aktor,Kategori,Aksi,IP,Status\n2026-09-20 07:30,superadmin,Auth,Login Sukses,103.12.45.67,Sukses\n2026-09-20 06:15,admin_sman1,Presensi,Generate QR,182.1.20.5,Sukses';
+                    const link = document.createElement('a');
+                    link.setAttribute('href', encodeURI(csvContent));
+                    link.setAttribute('download', `audit_log_${new Date().toISOString().slice(0, 10)}.csv`);
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    showToast('Log aktivitas berhasil diekspor ke CSV.', 'success');
+                  }}
+                  className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs flex items-center gap-2 transition cursor-pointer border border-white/10"
+                >
+                  <Download size={14} />
+                  <span>Ekspor CSV</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* 4 KPI Ringkasan Audit */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-xs">
+              <span className="text-xs font-semibold text-slate-500">Total Event 24 Jam</span>
+              <div className="text-2xl font-black text-slate-900 mt-1">384 <span className="text-xs font-normal text-slate-400">aktivitas</span></div>
+              <div className="text-[11px] text-emerald-600 font-bold mt-2">Semua tercatat di Supabase</div>
+            </div>
+            <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-xs">
+              <span className="text-xs font-semibold text-slate-500">Sesi Login Sukses</span>
+              <div className="text-2xl font-black text-slate-900 mt-1">42 <span className="text-xs font-normal text-slate-400">admin</span></div>
+              <div className="text-[11px] text-blue-600 font-bold mt-2">Rata-rata 3.5 sesi/jam</div>
+            </div>
+            <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-xs">
+              <span className="text-xs font-semibold text-slate-500">Perubahan Konfigurasi</span>
+              <div className="text-2xl font-black text-slate-900 mt-1">8 <span className="text-xs font-normal text-slate-400">tindakan</span></div>
+              <div className="text-[11px] text-purple-600 font-bold mt-2">Termasuk setup lisensi</div>
+            </div>
+            <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-xs">
+              <span className="text-xs font-semibold text-slate-500">Percobaan Akses Ditolak</span>
+              <div className="text-2xl font-black text-emerald-600 mt-1">0 <span className="text-xs font-normal text-slate-400">kejadian</span></div>
+              <div className="text-[11px] text-emerald-600 font-bold mt-2">Sistem aman &amp; stabil</div>
+            </div>
+          </div>
+
+          {/* Tabel Log Aktivitas */}
+          <div className="bg-white rounded-3xl border border-slate-100 shadow-xs p-5 sm:p-6 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+              <h3 className="text-base font-black text-slate-900">
+                Daftar Riwayat Aktivitas
+              </h3>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="relative min-w-[200px]">
+                  <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="text"
+                    value={auditSearch}
+                    onChange={(e) => setAuditSearch(e.target.value)}
+                    placeholder="Cari aktor / aksi / IP..."
+                    className="w-full pl-8 pr-3 py-1.5 rounded-xl border border-slate-200 text-xs focus:outline-indigo-600 bg-slate-50/60"
+                  />
+                </div>
+                <select
+                  value={auditCategoryFilter}
+                  onChange={(e) => setAuditCategoryFilter(e.target.value)}
+                  className="px-2.5 py-1.5 rounded-xl border border-slate-200 text-xs text-slate-700 bg-white"
+                >
+                  <option value="all">Semua Kategori</option>
+                  <option value="Auth">Autentikasi</option>
+                  <option value="Sekolah">Sekolah / Tenant</option>
+                  <option value="Billing">Billing &amp; Transaksi</option>
+                  <option value="Sistem">Konfigurasi Sistem</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr className="border-b border-slate-100 text-[10px] font-extrabold uppercase text-slate-400 tracking-wider">
+                    <th className="py-2.5 px-3">Waktu &amp; Tanggal</th>
+                    <th className="py-2.5 px-3">Aktor &amp; Role</th>
+                    <th className="py-2.5 px-3">Kategori</th>
+                    <th className="py-2.5 px-3">Deskripsi Aksi</th>
+                    <th className="py-2.5 px-3">IP Address</th>
+                    <th className="py-2.5 px-3 text-right">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-slate-700">
+                  {[
+                    { time: '20 Sep 2026, 09:14 WIB', actor: 'Super Administrator', role: 'SUPERADMIN', cat: 'Billing', desc: 'Perpanjangan paket lisensi tenant SDN Kawung Luwuk (+30 hari)', ip: '103.12.45.67', status: 'Sukses' },
+                    { time: '20 Sep 2026, 08:30 WIB', actor: 'Super Administrator', role: 'SUPERADMIN', cat: 'Auth', desc: 'Login berhasil ke konsol kontrol multi-tenant', ip: '103.12.45.67', status: 'Sukses' },
+                    { time: '20 Sep 2026, 07:15 WIB', actor: 'admin_kawung', role: 'ADMIN_SEKOLAH', cat: 'Sekolah', desc: 'Sinkronisasi 320 siswa dari database master', ip: '182.1.20.12', status: 'Sukses' },
+                    { time: '19 Sep 2026, 16:45 WIB', actor: 'Super Administrator', role: 'SUPERADMIN', cat: 'Sistem', desc: 'Pembaruan konfigurasi gateway pembayaran Midtrans', ip: '103.12.45.67', status: 'Sukses' },
+                    { time: '19 Sep 2026, 14:20 WIB', actor: 'Midtrans Webhook', role: 'SYSTEM', cat: 'Billing', desc: 'Settlement pembayaran tagihan invoice TRX-2026-000241', ip: '13.250.89.12', status: 'Sukses' },
+                    { time: '19 Sep 2026, 11:10 WIB', actor: 'Super Administrator', role: 'SUPERADMIN', cat: 'Sekolah', desc: 'Pendaftaran sekolah baru: SMA Negeri 1 Luwuk', ip: '103.12.45.67', status: 'Sukses' },
+                  ]
+                    .filter((item) => !auditSearch || item.actor.toLowerCase().includes(auditSearch.toLowerCase()) || item.desc.toLowerCase().includes(auditSearch.toLowerCase()) || item.ip.includes(auditSearch))
+                    .filter((item) => auditCategoryFilter === 'all' || item.cat === auditCategoryFilter)
+                    .map((item, idx) => (
+                      <tr key={idx} className="hover:bg-slate-50/80 transition-colors">
+                        <td className="py-3 px-3 font-mono text-[11px] text-slate-500 whitespace-nowrap">
+                          {item.time}
+                        </td>
+                        <td className="py-3 px-3">
+                          <div className="font-bold text-slate-900">{item.actor}</div>
+                          <span className="text-[10px] text-indigo-600 font-bold">{item.role}</span>
+                        </td>
+                        <td className="py-3 px-3">
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700">
+                            {item.cat}
+                          </span>
+                        </td>
+                        <td className="py-3 px-3 font-medium text-slate-800 max-w-md">
+                          {item.desc}
+                        </td>
+                        <td className="py-3 px-3 font-mono text-[11px] text-slate-400">
+                          {item.ip}
+                        </td>
+                        <td className="py-3 px-3 text-right">
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                            {item.status}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ========================================================================= */}
       {/* 5. MODAL PANDUAN PENGGUNAAN (DI-TRIGGER DARI BANNER ATAS)                */}

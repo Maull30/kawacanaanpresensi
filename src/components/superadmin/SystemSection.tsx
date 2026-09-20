@@ -192,17 +192,31 @@ export const SystemSection: React.FC<{
     { id: 'biometric_kiosk', name: 'Mode Kiosk Tablet Sekolah', desc: 'Tampilan tablet scanner di gerbang sekolah', enabled: true },
   ]);
 
+  // Helper closeModal
+  const closeModal = () => {
+    setActiveModal(null);
+    onSubTabChange?.('informasi');
+  };
+
   // Handle external subTab if triggered
   useEffect(() => {
     if (activeSubTab) {
       if (['keamanan', 'audit', 'log'].includes(activeSubTab)) {
         setActiveModal('log-aktivitas');
-      } else if (['gateway', 'midtrans'].includes(activeSubTab)) {
+      } else if (['gateway', 'midtrans', 'integrasi'].includes(activeSubTab)) {
         setActiveModal('integrasi');
-      } else if (['ekspor', 'backup'].includes(activeSubTab)) {
+      } else if (['ekspor', 'backup', 'restore'].includes(activeSubTab)) {
         setActiveModal('backup-restore');
-      } else if (['siaran', 'broadcast'].includes(activeSubTab)) {
+      } else if (['siaran', 'broadcast', 'notifikasi'].includes(activeSubTab)) {
         setActiveModal('notifikasi');
+      } else if (['role', 'kelola-role', 'rbac'].includes(activeSubTab)) {
+        setActiveModal('kelola-role');
+      } else if (['akses_menu', 'akses-menu', 'fitur'].includes(activeSubTab)) {
+        setActiveModal('akses-menu');
+      } else if (['konfigurasi', 'identitas', 'pengaturan'].includes(activeSubTab)) {
+        setActiveModal('identitas');
+      } else if (['informasi', 'server', 'info'].includes(activeSubTab)) {
+        setActiveModal(null);
       }
     }
   }, [activeSubTab]);

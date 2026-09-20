@@ -1896,10 +1896,11 @@ export default async function handler(req: any, res: any) {
         wsName = isPersonal ? 'Ruang Kerja Individu' : String(body.workspaceName || `Ruang Kerja ${fullName}`).trim();
         const trial = calculateGuruProTrialPeriod();
         const inviteCode = generateSchoolInviteCode();
-        const isTeacherPro = body.plan === 'teacher' || body.plan === 'guru_pro';
-        const initialPlan = isTeacherPro ? 'guru_pro' : trial.plan;
-        const initialMaxClasses = isTeacherPro ? 5 : trial.maxClasses;
-        const initialMaxStudents = isTeacherPro ? 150 : trial.maxStudents;
+        // Seluruh pendaftaran akun baru mandiri dimulai dari Paket Guru Gratis (guru_gratis).
+        // Peningkatan ke guru_pro resmi hanya terjadi setelah pembayaran Midtrans berstatus SETTLED.
+        const initialPlan = trial.plan || 'guru_gratis';
+        const initialMaxClasses = trial.maxClasses || 1;
+        const initialMaxStudents = trial.maxStudents || 32;
         const { data: newSchool, error: schoolErr } = await db.from('schools').insert({
           name: wsName,
           code: inviteCode,
@@ -1909,8 +1910,8 @@ export default async function handler(req: any, res: any) {
           is_personal: true,
           owner_id: newUserId,
           subscription_started_at: trial.startedAt,
-          subscription_expires_at: trial.expiresAt,
-          max_teachers: trial.maxTeachers,
+          subscription_expires_at: null,
+          max_teachers: 1,
           max_students: initialMaxStudents,
           max_classes: initialMaxClasses,
         }).select('id, code, name').single();
@@ -2113,25 +2114,24 @@ export default async function handler(req: any, res: any) {
       let linkedTeacher: any = null;
 
       if (mode === 'personal' || !targetSchoolId) {
-        const isPersonal = mode === 'personal';
-        const wsName = isPersonal
-          ? 'Ruang Kerja Individu'
-          : String(body.workspaceName || `Ruang Kerja Sekolah ${teacherName}`).trim();
+        // Guru mandiri yang onboard tanpa sekolah selalu diarahkan ke Ruang Kerja Individu (guru_gratis)
+        const isPersonal = true;
+        const wsName = 'Ruang Kerja Individu';
         const trial = calculateGuruProTrialPeriod();
         const inviteCode = generateSchoolInviteCode();
         const { data: newSchool, error: schoolErr } = await db.from('schools').insert({
           name: wsName,
           code: inviteCode,
-          plan: isPersonal ? trial.plan : 'sekolah_pro',
+          plan: trial.plan || 'guru_gratis',
           status: 'active',
-          workspace_type: isPersonal ? 'personal' : 'school',
-          is_personal: isPersonal,
+          workspace_type: 'personal',
+          is_personal: true,
           owner_id: callerUser.id,
           subscription_started_at: trial.startedAt,
-          subscription_expires_at: trial.expiresAt,
-          max_teachers: isPersonal ? trial.maxTeachers : 100,
-          max_students: isPersonal ? trial.maxStudents : 1000,
-          max_classes: isPersonal ? trial.maxClasses : 50,
+          subscription_expires_at: null,
+          max_teachers: 1,
+          max_students: trial.maxStudents || 32,
+          max_classes: trial.maxClasses || 1,
         }).select('id').single();
 
         if (schoolErr) throw schoolErr;
@@ -2259,25 +2259,24 @@ export default async function handler(req: any, res: any) {
       let linkedTeacher: any = null;
 
       if (mode === 'personal' || !targetSchoolId) {
-        const isPersonal = mode === 'personal';
-        const wsName = isPersonal
-          ? 'Ruang Kerja Individu'
-          : String(body.workspaceName || `Ruang Kerja Sekolah ${teacherName}`).trim();
+        // Guru mapel yang onboard tanpa sekolah selalu diarahkan ke Ruang Kerja Individu (guru_gratis)
+        const isPersonal = true;
+        const wsName = 'Ruang Kerja Individu';
         const trial = calculateGuruProTrialPeriod();
         const inviteCode = generateSchoolInviteCode();
         const { data: newSchool, error: schoolErr } = await db.from('schools').insert({
           name: wsName,
           code: inviteCode,
-          plan: isPersonal ? trial.plan : 'sekolah_pro',
+          plan: trial.plan || 'guru_gratis',
           status: 'active',
-          workspace_type: isPersonal ? 'personal' : 'school',
-          is_personal: isPersonal,
+          workspace_type: 'personal',
+          is_personal: true,
           owner_id: callerUser.id,
           subscription_started_at: trial.startedAt,
-          subscription_expires_at: trial.expiresAt,
-          max_teachers: isPersonal ? trial.maxTeachers : 100,
-          max_students: isPersonal ? trial.maxStudents : 1000,
-          max_classes: isPersonal ? trial.maxClasses : 50,
+          subscription_expires_at: null,
+          max_teachers: 1,
+          max_students: trial.maxStudents || 32,
+          max_classes: trial.maxClasses || 1,
         }).select('id').single();
 
         if (schoolErr) throw schoolErr;

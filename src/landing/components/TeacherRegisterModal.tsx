@@ -276,7 +276,7 @@ export const TeacherRegisterModal: React.FC<TeacherRegisterModalProps> = ({
           password: password,
           role: payloadRole,
           mode: 'personal',
-          plan: 'guru_pro',
+          plan: 'guru_gratis',
           nip: '-',
           gender: 'L',
           grade: 1,
@@ -397,25 +397,6 @@ export const TeacherRegisterModal: React.FC<TeacherRegisterModalProps> = ({
       }
     } catch (e: any) {
       setPaymentCheckMessage(e.message || 'Gagal menghubungi server Midtrans.');
-    } finally {
-      setIsCheckingPayment(false);
-    }
-  };
-
-  // Simulate Instant Settlement (Sandbox)
-  const handleSimulatePayment = async (orderId: string) => {
-    setIsCheckingPayment(true);
-    try {
-      const res = await fetch('/api/midtrans', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'simulate_settlement', order_id: orderId }),
-      });
-      const body = await res.json();
-      if (!res.ok || !body.ok) throw new Error(body.error || 'Gagal simulasi pembayaran.');
-      handleCompleteActivation(paymentSession);
-    } catch (e: any) {
-      setPaymentCheckMessage(e.message || 'Gagal simulasi pembayaran.');
     } finally {
       setIsCheckingPayment(false);
     }
@@ -1183,22 +1164,10 @@ export const TeacherRegisterModal: React.FC<TeacherRegisterModalProps> = ({
                   )}
                   <span>Cek Status Pembayaran</span>
                 </button>
-
-                {/* 3. Tombol Simulasi Pembayaran Instan (Sandbox / Preview Demo) */}
-                <button
-                  type="button"
-                  id="btn-teacher-simulate-settlement"
-                  disabled={isCheckingPayment}
-                  onClick={() => handleSimulatePayment(paymentSession.orderId)}
-                  className="w-full py-2 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-800 active:scale-[0.99] text-xs font-bold uppercase tracking-wider rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-60"
-                >
-                  <Zap className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>Verifikasi Instan (Simulasi Sandbox)</span>
-                </button>
               </div>
 
               <div className="text-center text-[10px] text-slate-400">
-                Gunakan tombol <strong>Verifikasi Instan</strong> untuk aktivasi instan pada pengujian demo.
+                Terhubung langsung ke sistem verifikasi pembayaran Midtrans resmi.
               </div>
             </div>
           )}

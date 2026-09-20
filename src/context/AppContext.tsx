@@ -7845,16 +7845,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       'active'
     ).toLowerCase().trim();
 
-    if (status === 'suspended' || status === 'inactive') return false;
+    if (status !== 'active') return false;
 
     const expiresAt =
       activeWorkspace?.subscription?.expiresAt ||
       currentUser?.subscriptionExpiresAt ||
       null;
 
-    if (!expiresAt) return true;
+    if (!expiresAt) return false;
     const expiryDate = new Date(expiresAt);
-    if (isNaN(expiryDate.getTime())) return true;
+    if (isNaN(expiryDate.getTime())) return false;
     return new Date() <= expiryDate;
   }, [isSchoolPro, currentUser, activeWorkspace]);
 
@@ -8016,14 +8016,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
 
       // Catatan: Pembaruan data tabel schools dan profiles dijalankan oleh backend/webhook Midtrans secara aman,
       // frontend fokus pada pembaruan state lokal & cache in-memory.
-      try {
-        if (orderId) {
-          await supabase
-            .from('payments')
-            .update({ status: 'SETTLEMENT' })
-            .eq('invoice_no', orderId);
-        }
-      } catch (_) {}
 
       showToast(
         'Pembayaran berhasil! Paket Guru Pro resmi aktif di Ruang Kerja Anda.',
@@ -8114,14 +8106,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       setUserWorkspaces((prev) => [newSchoolWs, ...prev]);
       await selectWorkspace(newSchoolWs);
 
-      try {
-        if (orderId) {
-          await supabase
-            .from('payments')
-            .update({ status: 'SETTLEMENT' })
-            .eq('invoice_no', orderId);
-        }
-      } catch (_) {}
+      // Catatan: Pembaruan status pembayaran di database dijalankan oleh backend/webhook Midtrans secara aman.
 
       showToast(
         `Pembayaran berhasil! Ruang Kerja Sekolah "${schoolData.schoolName}" resmi aktif!`,

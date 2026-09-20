@@ -91,6 +91,27 @@ export function getTenantLifecycleInfo(
   const rawStatus = (school.status || '').toLowerCase().trim();
   const expiresAtStr = school.subscription_expires_at || school.subscriptionExpiresAt || null;
 
+  // Jika transaksi belum dibayar (pending payment)
+  if (rawStatus === 'pending_payment' || rawStatus === 'pending') {
+    return {
+      status: 'SUSPENDED',
+      label: 'Menunggu Pembayaran',
+      badgeClass: 'bg-amber-50 text-amber-700 border-amber-200',
+      dotClass: 'bg-amber-500',
+      borderClass: 'border-amber-300',
+      description: 'Layanan belum aktif karena tagihan pendaftaran belum diselesaikan.',
+      daysRemaining: 0,
+      graceDaysRemaining: 0,
+      isExpiringSoon: false,
+      isGracePeriod: false,
+      isSuspended: true,
+      isActive: false,
+      canAccessApp: false,
+      alertSeverity: 'warning',
+      alertMilestone: 'EXPIRED',
+    };
+  }
+
   // Jika manual suspended/inactive oleh Super Admin (Override Kasus Khusus)
   if (rawStatus === 'inactive' || rawStatus === 'suspended') {
     return {
@@ -265,30 +286,18 @@ export function getTenantLifecycleInfo(
  * - Workspace TIDAK berubah ketika paket habis.
  */
 export function isUserInActiveSchoolPlan(
-  user?: {
-    subscriptionPlan?: string | null;
-    subscription_plan?: string | null;
-    subscriptionExpiresAt?: string | null;
-    subscription_expires_at?: string | null;
-    subscriptionStatus?: string | null;
-    subscription_status?: string | null;
-    schoolId?: string | null;
-    school_id?: string | null;
-  } | null,
-  workspace?: {
-    subscriptionPlan?: string | null;
-    subscription?: {
-      plan?: string | null;
-      status?: string | null;
-      expiresAt?: string | null;
-    } | null;
-  } | null
+  user?: any,
+  workspace?: any
 ): boolean {
   if (!user && !workspace) return false;
 
   const rawPlan =
+    workspace?.plan ||
     workspace?.subscriptionPlan ||
     workspace?.subscription?.plan ||
+    workspace?.schoolPlan ||
+    user?.schoolPlan ||
+    user?.school_plan ||
     user?.subscriptionPlan ||
     user?.subscription_plan ||
     '';
@@ -297,33 +306,40 @@ export function isUserInActiveSchoolPlan(
   if (normalizedPlan !== 'sekolah_pro') return false;
 
   const status = (
+    workspace?.status ||
+    workspace?.subscription?.status ||
+    user?.schoolStatus ||
+    user?.school_status ||
     user?.subscriptionStatus ||
     user?.subscription_status ||
-    workspace?.subscription?.status ||
     'active'
   ).toLowerCase().trim();
 
-  // Jika ditangguhkan secara manual oleh Superadmin
-  if (status === 'suspended' || status === 'inactive') {
+  // Hanya status 'active' yang dianggap aktif (menolak pending_payment, suspended, inactive, expired)
+  if (status !== 'active') {
     return false;
   }
 
   const expiresAt =
+    workspace?.subscriptionExpiresAt ||
+    workspace?.subscription_expires_at ||
     workspace?.subscription?.expiresAt ||
+    user?.schoolSubscriptionExpiresAt ||
+    user?.school_subscription_expires_at ||
     user?.subscriptionExpiresAt ||
     user?.subscription_expires_at ||
     null;
 
-  // Jika tanpa batas waktu (lifetime license), dianggap selalu aktif
+  // Paket Sekolah Pro berbayar wajib memiliki batas masa aktif yang valid
   if (!expiresAt) {
-    return true;
+    return false;
   }
 
   const expiryDate = new Date(expiresAt);
   if (isNaN(expiryDate.getTime())) {
-    return true;
+    return false;
   }
 
-  // Jika masa aktif sudah terlewat, status kembali ke Paket Gratis (guru_gratis)
+  // Jika masa aktif sudah terlewat, status tidak lagi aktif
   return new Date() <= expiryDate;
 }

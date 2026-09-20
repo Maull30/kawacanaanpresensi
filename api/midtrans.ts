@@ -361,13 +361,24 @@ export default async function handler(req: any, res: any) {
             ? 'guru_pro'
             : 'sekolah_pro';
 
+          const updatePayload: any = {
+            status: 'active',
+            plan: targetPlan,
+            subscription_expires_at: newExpiry.toISOString(),
+          };
+          if (targetPlan === 'sekolah_pro') {
+            updatePayload.max_teachers = 50;
+            updatePayload.max_students = 600;
+            updatePayload.max_classes = 12;
+          } else if (targetPlan === 'guru_pro') {
+            updatePayload.max_teachers = 1;
+            updatePayload.max_students = 150;
+            updatePayload.max_classes = 5;
+          }
+
           await db
             .from('schools')
-            .update({
-              status: 'active',
-              plan: targetPlan,
-              subscription_expires_at: newExpiry.toISOString(),
-            })
+            .update(updatePayload)
             .eq('id', school.id);
 
           // Catat audit log
@@ -808,13 +819,24 @@ export default async function handler(req: any, res: any) {
               ? 'guru_pro'
               : 'sekolah_pro';
 
+            const updatePayload: any = {
+              status: 'active',
+              plan: targetPlan,
+              subscription_expires_at: newExpiry.toISOString(),
+            };
+            if (targetPlan === 'sekolah_pro') {
+              updatePayload.max_teachers = 50;
+              updatePayload.max_students = 600;
+              updatePayload.max_classes = 12;
+            } else if (targetPlan === 'guru_pro') {
+              updatePayload.max_teachers = 1;
+              updatePayload.max_students = 150;
+              updatePayload.max_classes = 5;
+            }
+
             await db
               .from('schools')
-              .update({
-                status: 'active',
-                plan: targetPlan,
-                subscription_expires_at: newExpiry.toISOString(),
-              })
+              .update(updatePayload)
               .eq('id', school.id);
 
             await db.from('audit_logs').insert({
@@ -845,9 +867,36 @@ export default async function handler(req: any, res: any) {
   }
 
   // --------------------------------------------------------------------------
-  // 5. SIMULATE SETTLEMENT (Untuk Sandbox & Onboarding Test)
+  // 5. SIMULATE SETTLEMENT (Khusus Pengujian Internal Super Admin - Sandbox Only)
   // --------------------------------------------------------------------------
   if (action === 'simulate_settlement') {
+    // 1. Blokir mutlak di mode produksi
+    if (process.env.NODE_ENV === 'production' || midtrans.is_production) {
+      return json(res, 403, { error: 'Simulasi pembayaran dinonaktifkan pada lingkungan produksi demi keamanan.' });
+    }
+
+    // 2. Wajib otorisasi role SUPER_ADMIN (mencegah bypass publik)
+    const authHeader = req.headers.authorization || '';
+    const token = authHeader.replace(/^Bearer\s+/i, '').trim();
+    if (!token) {
+      return json(res, 401, { error: 'Otorisasi diperlukan. Simulasi pembayaran hanya dapat dilakukan oleh Super Admin.' });
+    }
+
+    const { data: callerUser, error: authErr } = await db.auth.getUser(token);
+    if (authErr || !callerUser?.user) {
+      return json(res, 401, { error: 'Sesi autentikasi tidak valid atau telah berakhir.' });
+    }
+
+    const { data: callerProfile } = await db
+      .from('profiles')
+      .select('role, name, email')
+      .eq('id', callerUser.user.id)
+      .maybeSingle();
+
+    if (callerProfile?.role !== 'SUPER_ADMIN') {
+      return json(res, 403, { error: 'Hanya akun dengan peran SUPER_ADMIN yang berwenang menjalankan simulasi transaksi.' });
+    }
+
     const orderId = b.order_id || q.order_id;
     if (!orderId) return json(res, 400, { error: 'order_id wajib diisi' });
 
@@ -904,21 +953,32 @@ export default async function handler(req: any, res: any) {
         ? 'guru_pro'
         : 'sekolah_pro';
 
+      const updatePayload: any = {
+        status: 'active',
+        plan: targetPlan,
+        subscription_expires_at: newExpiry.toISOString(),
+      };
+      if (targetPlan === 'sekolah_pro') {
+        updatePayload.max_teachers = 50;
+        updatePayload.max_students = 600;
+        updatePayload.max_classes = 12;
+      } else if (targetPlan === 'guru_pro') {
+        updatePayload.max_teachers = 1;
+        updatePayload.max_students = 150;
+        updatePayload.max_classes = 5;
+      }
+
       await db
         .from('schools')
-        .update({
-          status: 'active',
-          plan: targetPlan,
-          subscription_expires_at: newExpiry.toISOString(),
-        })
+        .update(updatePayload)
         .eq('id', targetSchoolId);
 
       // Catat audit log
       try {
         await db.from('audit_logs').insert({
           school_id: targetSchoolId,
-          actor_name: 'Midtrans Sandbox Simulator',
-          actor_role: 'SYSTEM',
+          actor_name: `SuperAdmin (${callerProfile?.name || callerUser.user.email || 'Admin'})`,
+          actor_role: 'SUPER_ADMIN',
           action: 'MIDTRANS_SIMULATED_SETTLEMENT',
           details: {
             order_id: orderId,
@@ -933,7 +993,7 @@ export default async function handler(req: any, res: any) {
       ok: true,
       status: 'settlement',
       is_settled: true,
-      message: 'Simulasi pembayaran Midtrans berhasil diselesaikan (SETTLED).',
+      message: 'Simulasi pembayaran Midtrans berhasil diselesaikan (SETTLED) oleh Super Admin.',
     });
   }
 

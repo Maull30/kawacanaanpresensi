@@ -26,6 +26,7 @@ import {
   FileText,
 } from 'lucide-react';
 import { KawacanaanEmblem } from '../../components/KawacanaanEmblem';
+import { supabase } from '../../lib/supabase';
 
 // Friendly school building illustration matching reference design
 const SchoolIllustration: React.FC<{ className?: string }> = ({ className = "w-20 h-20" }) => (
@@ -381,25 +382,6 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
     }
   };
 
-  // Simulate Instant Settlement (Sandbox)
-  const handleSimulatePayment = async (orderId: string) => {
-    setIsCheckingPayment(true);
-    try {
-      const res = await fetch('/api/midtrans', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'simulate_settlement', order_id: orderId }),
-      });
-      const body = await res.json();
-      if (!res.ok || !body.ok) throw new Error(body.error || 'Gagal simulasi pembayaran.');
-      handleCompleteActivation(paymentSession);
-    } catch (e: any) {
-      setPaymentCheckMessage(e.message || 'Gagal melakukan simulasi pembayaran.');
-    } finally {
-      setIsCheckingPayment(false);
-    }
-  };
-
   // Selesaikan Aktivasi & Terbitkan Kredensial (Landing Page)
   const handleCompleteActivation = (session: PaymentSessionData | null) => {
     if (!session) return;
@@ -483,9 +465,16 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
           mode: 'superadmin',
         };
 
+        const { data: authSession } = await supabase.auth.getSession();
+        const token = authSession?.session?.access_token;
+        const regHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
+        if (token) {
+          regHeaders['Authorization'] = `Bearer ${token}`;
+        }
+
         const regRes = await fetch('/api/register-school', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: regHeaders,
           body: JSON.stringify(regPayload),
         });
 
@@ -1056,7 +1045,7 @@ ${isSuperadmin ? 'Didaftarkan Oleh: SUPER ADMIN' : `Invoice: ${registrationSucce
                       type="button"
                       disabled={isCheckingPayment}
                       onClick={() => handleCheckStatus(paymentSession.orderId)}
-                      className="flex-1 inline-flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl border border-blue-300 text-blue-800 font-bold text-xs hover:bg-blue-50 disabled:opacity-60 transition-colors cursor-pointer min-h-[40px]"
+                      className="w-full inline-flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-blue-50 hover:bg-blue-100 border border-blue-300 text-blue-800 font-bold text-xs disabled:opacity-60 transition-colors cursor-pointer min-h-[40px]"
                     >
                       {isCheckingPayment ? (
                         <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
@@ -1064,18 +1053,6 @@ ${isSuperadmin ? 'Didaftarkan Oleh: SUPER ADMIN' : `Invoice: ${registrationSucce
                         <RefreshCw className="w-4 h-4" />
                       )}
                       <span>Cek Status Pembayaran</span>
-                    </button>
-
-                    <button
-                      id="btn-simulate-settlement"
-                      type="button"
-                      disabled={isCheckingPayment}
-                      onClick={() => handleSimulatePayment(paymentSession.orderId)}
-                      className="inline-flex items-center justify-center gap-1.5 py-2.5 px-4 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-800 font-bold text-xs transition-colors cursor-pointer min-h-[40px]"
-                      title="Gunakan simulasi ini untuk verifikasi instan sandbox"
-                    >
-                      <Zap className="w-4 h-4 text-emerald-600" />
-                      <span>Simulasi Bayar (Sandbox)</span>
                     </button>
                   </div>
                 </div>

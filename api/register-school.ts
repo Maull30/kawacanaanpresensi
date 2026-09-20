@@ -226,27 +226,71 @@ export default async function handler(req: any, res: any) {
       }
     }
 
-    // 3. Hitung Masa Aktif & Limit Paket (Hapus sistem trial lama dari alur baru)
+    // 3. Verifikasi Keaslian Hak Akses Super Admin
+    const requestedSuperadmin = Boolean(body.isSuperadmin || body.mode === 'superadmin');
+    let isCallerSuperadmin = false;
+    const authHeader = req.headers.authorization || '';
+    const token = authHeader.replace(/^Bearer\s+/i, '').trim();
+
+    if (token) {
+      try {
+        const { data: callerUser } = await admin.auth.getUser(token);
+        if (callerUser?.user) {
+          const { data: callerProfile } = await admin
+            .from('profiles')
+            .select('role')
+            .eq('id', callerUser.user.id)
+            .maybeSingle();
+          if (callerProfile?.role === 'SUPER_ADMIN') {
+            isCallerSuperadmin = true;
+          }
+        }
+      } catch (_) {}
+    }
+
+    if (requestedSuperadmin && !isCallerSuperadmin) {
+      return json(res, 403, {
+        error: 'Akses ditolak: Pendaftaran mode Super Admin memerlukan otorisasi SUPER_ADMIN yang sah.',
+      });
+    }
+
+    // 4. Hitung Masa Aktif & Limit Paket
     const planLimits = getPlanLimits(plan, teacherType);
     const startDate = new Date();
     let expiryDateStr: string | null = null;
-    if (plan === 'guru_gratis') {
-      // Guru Gratis: Aktif tanpa batas waktu kedaluwarsa (Seumur Hidup)
-      expiryDateStr = null;
-    } else if (body.subscription_expires_at !== undefined) {
-      expiryDateStr = body.subscription_expires_at ? String(body.subscription_expires_at).trim() : null;
-    } else if (planLimits.days && planLimits.days > 0) {
-      const expiryDate = new Date();
-      expiryDate.setDate(startDate.getDate() + planLimits.days);
-      expiryDateStr = expiryDate.toISOString().slice(0, 10);
+    let initialStatus: 'active' | 'pending_payment' = 'active';
+
+    if (isCallerSuperadmin) {
+      // Super Admin berhak menentukan status, masa aktif, dan kuota khusus secara manual
+      if (plan === 'guru_gratis') {
+        expiryDateStr = null;
+      } else if (body.subscription_expires_at !== undefined) {
+        expiryDateStr = body.subscription_expires_at ? String(body.subscription_expires_at).trim() : null;
+      } else if (planLimits.days && planLimits.days > 0) {
+        const expiryDate = new Date();
+        expiryDate.setDate(startDate.getDate() + planLimits.days);
+        expiryDateStr = expiryDate.toISOString().slice(0, 10);
+      }
+      initialStatus = 'active';
+    } else {
+      // Pendaftaran Publik mandiri:
+      if (plan === 'guru_gratis') {
+        initialStatus = 'active';
+        expiryDateStr = null;
+      } else {
+        // Paket berbayar (sekolah_pro atau guru_pro) yang belum dibayar:
+        // Status awal WAJIB 'pending_payment' dengan subscription_expires_at = null!
+        // Akun dan sekolah baru akan diaktifkan secara otomatis setelah pembayaran Midtrans berstatus SETTLED.
+        initialStatus = 'pending_payment';
+        expiryDateStr = null;
+      }
     }
 
-    // 4. Buat Tenant Sekolah / Guru (Sekolah formal = Ruang Kerja Sekolah, Guru Mandiri = Ruang Kerja Individu)
-    const isSuperadmin = Boolean(body.isSuperadmin || body.mode === 'superadmin');
+    // 5. Buat Tenant Sekolah / Guru (Sekolah formal = Ruang Kerja Sekolah, Guru Mandiri = Ruang Kerja Individu)
     const workspaceType = body.workspace_type || (body.workspace_service === 'teacher_independent' ? 'personal' : (isTeacherPlan ? 'personal' : 'school'));
-    const maxTeachers = isSuperadmin ? 999999 : (body.max_teachers !== undefined ? Number(body.max_teachers) : planLimits.max_teachers);
-    const maxStudents = isSuperadmin ? 999999 : (body.max_students !== undefined ? Number(body.max_students) : planLimits.max_students);
-    const maxClasses = isSuperadmin ? 999999 : (body.max_classes !== undefined ? Number(body.max_classes) : planLimits.max_classes);
+    const maxTeachers = isCallerSuperadmin ? (body.max_teachers !== undefined ? Number(body.max_teachers) : 999999) : planLimits.max_teachers;
+    const maxStudents = isCallerSuperadmin ? (body.max_students !== undefined ? Number(body.max_students) : 999999) : planLimits.max_students;
+    const maxClasses = isCallerSuperadmin ? (body.max_classes !== undefined ? Number(body.max_classes) : 999999) : planLimits.max_classes;
 
     const { data: school, error: schoolErr } = await admin
       .from('schools')
@@ -256,7 +300,7 @@ export default async function handler(req: any, res: any) {
         code: schoolCode,
         plan,
         workspace_type: workspaceType,
-        status: 'active',
+        status: initialStatus,
         subscription_started_at: startDate.toISOString().slice(0, 10),
         subscription_expires_at: expiryDateStr,
         max_teachers: maxTeachers,
@@ -466,7 +510,7 @@ export default async function handler(req: any, res: any) {
         code: schoolCode,
         schoolCode,
         plan,
-        status: 'active',
+        status: school.status || initialStatus,
         subscription_expires_at: expiryDateStr,
       },
       admin: {

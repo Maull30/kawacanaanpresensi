@@ -2758,7 +2758,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
         (baseProfile as any).workspace_type === "personal" ||
         (baseProfile as any).registration_mode === "personal" ||
         schoolRow?.workspace_type === "personal" ||
-        (schoolRow as any)?.is_personal === true ||
+        (schoolRow as any)?.is_personal === true;
 
       memberships.push({
         id: "ws-mem-" + baseProfile.id,

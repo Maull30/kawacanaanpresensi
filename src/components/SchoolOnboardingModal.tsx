@@ -28,6 +28,8 @@ import {
   DollarSign,
   CreditCard,
   Hash,
+  ExternalLink,
+  Image as ImageIcon,
 } from 'lucide-react';
 import QRCode from 'qrcode';
 import html2canvas from 'html2canvas';
@@ -126,8 +128,12 @@ export const SchoolOnboardingModal: React.FC<SchoolOnboardingModalProps> = ({
   const [formError, setFormError] = useState<string>('');
   const [createdData, setCreatedData] = useState<CreatedSchoolData | null>(null);
   const [qrCodeUrl, setQrCodeUrl] = useState<string>('');
+  const [active3dBase64, setActive3dBase64] = useState<string>('');
   const [isDownloadingJpeg, setIsDownloadingJpeg] = useState<boolean>(false);
   const [copiedCredentials, setCopiedCredentials] = useState<boolean>(false);
+  const [copiedImage, setCopiedImage] = useState<boolean>(false);
+  const [isCopyingImage, setIsCopyingImage] = useState<boolean>(false);
+  const [fallbackImageUrl, setFallbackImageUrl] = useState<string>('');
   const [copiedCode, setCopiedCode] = useState<boolean>(false);
 
   const credentialCardRef = useRef<HTMLDivElement>(null);
@@ -162,12 +168,12 @@ export const SchoolOnboardingModal: React.FC<SchoolOnboardingModalProps> = ({
     }
   }, [workspaceType, durationPreset]);
 
-  // Generate QR Code on Step 'selesai'
+  // Generate QR Code & Pre-convert 3D image on Step 'selesai'
   useEffect(() => {
     if (currentStep === 'selesai' && createdData) {
       const loginUrl = `${window.location.origin}/login`;
       QRCode.toDataURL(loginUrl, {
-        width: 220,
+        width: 240,
         margin: 1,
         color: {
           dark: '#0f172a',
@@ -176,6 +182,38 @@ export const SchoolOnboardingModal: React.FC<SchoolOnboardingModalProps> = ({
       })
         .then((url) => setQrCodeUrl(url))
         .catch((err) => console.warn('Gagal render QRCode login:', err));
+
+      const rawSrc =
+        createdData.workspaceType === 'school'
+          ? school3dImg
+          : createdData.teacherRole === 'WALI KELAS'
+          ? waliKelasWanitaImg
+          : guruMapelPriaImg;
+
+      // Konversi gambar visual 3D ke format Base64 Data URL
+      // Ini mencegah html2canvas memicu 'Tainted canvases may not be exported' / SecurityError
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        try {
+          const tempCanvas = document.createElement('canvas');
+          tempCanvas.width = img.naturalWidth || 400;
+          tempCanvas.height = img.naturalHeight || 400;
+          const ctx = tempCanvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(img, 0, 0);
+            const dataUrl = tempCanvas.toDataURL('image/jpeg', 0.95);
+            setActive3dBase64(dataUrl);
+          }
+        } catch (e) {
+          console.warn('Canvas conversion for 3d image failed, using rawSrc:', e);
+          setActive3dBase64(rawSrc);
+        }
+      };
+      img.onerror = () => {
+        setActive3dBase64(rawSrc);
+      };
+      img.src = rawSrc;
     }
   }, [currentStep, createdData]);
 
@@ -205,7 +243,10 @@ export const SchoolOnboardingModal: React.FC<SchoolOnboardingModalProps> = ({
     setFormError('');
     setCreatedData(null);
     setQrCodeUrl('');
+    setActive3dBase64('');
+    setFallbackImageUrl('');
     setCopiedCredentials(false);
+    setCopiedImage(false);
     setCopiedCode(false);
     onClose();
   };
@@ -376,36 +417,390 @@ export const SchoolOnboardingModal: React.FC<SchoolOnboardingModalProps> = ({
     }
   };
 
+  // Helper to safely draw rounded rectangles in Canvas2D
+  const drawRoundRect = (
+    ctx: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    r: number
+  ) => {
+    if (typeof (ctx as any).roundRect === 'function') {
+      (ctx as any).roundRect(x, y, w, h, r);
+    } else {
+      ctx.moveTo(x + r, y);
+      ctx.lineTo(x + w - r, y);
+      ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+      ctx.lineTo(x + w, y + h - r);
+      ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+      ctx.lineTo(x + r, y + h);
+      ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+      ctx.lineTo(x, y + r);
+      ctx.quadraticCurveTo(x, y, x + r, y);
+    }
+  };
+
+  // Fallback high-DPI Canvas 2D card generator
+  const generateDirectCanvasBlob = async (
+    data: CreatedSchoolData,
+    qrUrl: string,
+    img3dUrl: string,
+    mimeType: 'image/jpeg' | 'image/png' = 'image/jpeg'
+  ): Promise<Blob | null> => {
+    try {
+      const canvas = document.createElement('canvas');
+      canvas.width = 1200;
+      canvas.height = 700;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return null;
+
+      // Background Gradient (Dark Navy / Indigo)
+      const grad = ctx.createLinearGradient(0, 0, 1200, 700);
+      grad.addColorStop(0, '#020617');
+      grad.addColorStop(0.5, '#0f172a');
+      grad.addColorStop(1, '#1e1b4b');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, 1200, 700);
+
+      // Card Outer Border
+      ctx.strokeStyle = '#334155';
+      ctx.lineWidth = 3;
+      ctx.strokeRect(8, 8, 1184, 684);
+
+      // Header Logo Icon
+      ctx.fillStyle = '#2563eb';
+      ctx.beginPath();
+      drawRoundRect(ctx, 40, 36, 46, 46, 12);
+      ctx.fill();
+
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 26px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('K', 63, 59);
+
+      // Brand Name & Subtitle
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'alphabetic';
+      ctx.font = '900 22px sans-serif';
+      ctx.fillText('KAWACANAAN SD', 98, 55);
+
+      ctx.fillStyle = '#94a3b8';
+      ctx.font = '600 12px sans-serif';
+      ctx.fillText('KARTU KREDENSIAL RESMI PENDIDIK & SEKOLAH', 98, 75);
+
+      // Top Right Workspace Badge
+      const workspaceLabel =
+        data.workspaceType === 'school'
+          ? 'RUANG KERJA SEKOLAH'
+          : data.teacherRole === 'WALI KELAS'
+          ? 'GURU WALI KELAS'
+          : 'GURU MATA PELAJARAN';
+
+      ctx.fillStyle = 'rgba(37, 99, 235, 0.25)';
+      ctx.strokeStyle = 'rgba(96, 165, 250, 0.5)';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      drawRoundRect(ctx, 880, 36, 280, 42, 21);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = '#93c5fd';
+      ctx.font = 'bold 12px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(workspaceLabel, 1020, 62);
+
+      // Divider Line
+      ctx.strokeStyle = '#1e293b';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(40, 100);
+      ctx.lineTo(1160, 100);
+      ctx.stroke();
+
+      // Helper to load image
+      const loadImage = (src: string): Promise<HTMLImageElement> => {
+        return new Promise((resolve, reject) => {
+          const img = new Image();
+          img.crossOrigin = 'anonymous';
+          img.onload = () => resolve(img);
+          img.onerror = reject;
+          img.src = src;
+        });
+      };
+
+      // 3D Picture Left Panel
+      try {
+        const rawSrc =
+          img3dUrl ||
+          (data.workspaceType === 'school'
+            ? school3dImg
+            : data.teacherRole === 'WALI KELAS'
+            ? waliKelasWanitaImg
+            : guruMapelPriaImg);
+        const img3d = await loadImage(rawSrc);
+        ctx.save();
+        ctx.beginPath();
+        drawRoundRect(ctx, 40, 125, 240, 235, 16);
+        ctx.clip();
+        ctx.drawImage(img3d, 40, 125, 240, 235);
+        ctx.restore();
+        ctx.strokeStyle = '#38bdf8';
+        ctx.lineWidth = 2.5;
+        ctx.strokeRect(40, 125, 240, 235);
+      } catch {
+        ctx.fillStyle = '#1e293b';
+        ctx.beginPath();
+        drawRoundRect(ctx, 40, 125, 240, 235, 16);
+        ctx.fill();
+        ctx.fillStyle = '#64748b';
+        ctx.font = 'bold 15px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('3D Visual Kawacanaan', 160, 245);
+      }
+
+      // QR Code Left Panel
+      try {
+        if (qrUrl) {
+          const qrImg = await loadImage(qrUrl);
+          ctx.fillStyle = '#ffffff';
+          ctx.beginPath();
+          drawRoundRect(ctx, 40, 385, 240, 235, 16);
+          ctx.fill();
+          ctx.drawImage(qrImg, 55, 400, 210, 205);
+        }
+      } catch (e) {
+        console.warn('Direct canvas QR error:', e);
+      }
+
+      ctx.fillStyle = '#94a3b8';
+      ctx.font = '12px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('Scan untuk Masuk ke Portal', 160, 642);
+
+      // Right Panel Information
+      ctx.textAlign = 'left';
+      ctx.fillStyle = '#94a3b8';
+      ctx.font = 'bold 12px sans-serif';
+      ctx.fillText('SATUAN PENDIDIKAN / RUANG KERJA', 315, 135);
+
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 24px sans-serif';
+      ctx.fillText(data.schoolName.slice(0, 50), 315, 168);
+
+      const roleDetail =
+        data.workspaceType === 'school'
+          ? `Penanggung Jawab: ${data.adminName} (Administrator)`
+          : data.teacherRole === 'WALI KELAS'
+          ? `Penanggung Jawab: ${data.adminName} (Wali Kelas ${data.targetGrade || 1})`
+          : `Penanggung Jawab: ${data.adminName} (${data.subjectName || 'Guru Mapel'})`;
+
+      ctx.fillStyle = '#60a5fa';
+      ctx.font = '500 15px sans-serif';
+      ctx.fillText(roleDetail, 315, 196);
+
+      // High-Contrast Credentials Box
+      ctx.fillStyle = '#0b1329';
+      ctx.strokeStyle = '#1e293b';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      drawRoundRect(ctx, 315, 222, 845, 240, 16);
+      ctx.fill();
+      ctx.stroke();
+
+      // Box row 1: Username & Password
+      ctx.fillStyle = '#94a3b8';
+      ctx.font = 'bold 12px sans-serif';
+      ctx.fillText('USERNAME LOGIN', 345, 260);
+      ctx.fillText('PASSWORD LOGIN', 755, 260);
+
+      ctx.fillStyle = '#fde047';
+      ctx.font = 'bold 24px monospace';
+      ctx.fillText(data.username, 345, 296);
+
+      ctx.fillStyle = '#4ade80';
+      ctx.font = 'bold 24px monospace';
+      ctx.fillText(data.password, 755, 296);
+
+      // Box row 2: School Code & Duration
+      ctx.fillStyle = '#94a3b8';
+      ctx.font = 'bold 12px sans-serif';
+      ctx.fillText('KODE AKSES SEKOLAH', 345, 355);
+      ctx.fillText('MASA AKTIF LISENSI', 755, 355);
+
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 20px monospace';
+      ctx.fillText(data.schoolCode, 345, 388);
+
+      ctx.fillStyle = '#e2e8f0';
+      ctx.font = 'bold 16px sans-serif';
+      ctx.fillText(data.subscriptionExpiresAt || '1 Tahun', 755, 388);
+
+      // Status Pill
+      ctx.fillStyle = '#10b981';
+      ctx.font = 'bold 13px monospace';
+      ctx.fillText('● STATUS: AKTIF (TERDAFTAR)', 345, 432);
+
+      // Invoice & Payment Details
+      ctx.fillStyle = '#94a3b8';
+      ctx.font = 'bold 13px sans-serif';
+      ctx.fillText(`No. Invoice : ${data.invoiceNo || '-'}`, 315, 498);
+      ctx.fillText(
+        `Nominal     : Rp ${data.priceAmount.toLocaleString('id-ID')} (${
+          data.paymentStatus === 'paid' ? 'LUNAS' : 'PENDING'
+        })`,
+        315,
+        525
+      );
+      ctx.fillText(`Metode      : ${data.paymentMethod || 'Manual / Owner'}`, 315, 552);
+
+      ctx.fillStyle = '#38bdf8';
+      ctx.font = '14px monospace';
+      ctx.fillText(`Portal Akses: ${window.location.origin}/login`, 315, 586);
+
+      // Footer Divider & Security Seal
+      ctx.strokeStyle = '#1e293b';
+      ctx.beginPath();
+      ctx.moveTo(315, 615);
+      ctx.lineTo(1160, 615);
+      ctx.stroke();
+
+      ctx.fillStyle = '#64748b';
+      ctx.font = '11px monospace';
+      ctx.fillText('SISTEM TERVALIDASI KAWACANAAN SD • SUPER ADMIN REGISTER', 315, 642);
+      ctx.textAlign = 'right';
+      ctx.fillText(
+        `ID: ${data.schoolId?.slice(0, 8) || 'SCH-AUTH'} • ${new Date().toLocaleDateString('id-ID')}`,
+        1160,
+        642
+      );
+
+      return new Promise<Blob | null>((resolve) => {
+        canvas.toBlob(resolve, mimeType, 0.95);
+      });
+    } catch (err) {
+      console.error('generateDirectCanvasBlob fatal error:', err);
+      return null;
+    }
+  };
+
   // Download Credential Card as JPEG
   const handleDownloadJpeg = async () => {
-    if (!credentialCardRef.current || !createdData) return;
+    if (!createdData) return;
     setIsDownloadingJpeg(true);
 
     try {
-      // High-res html2canvas rendering with scale 2
-      const canvas = await html2canvas(credentialCardRef.current, {
-        scale: 2,
-        useCORS: true,
-        allowTaint: true,
-        backgroundColor: '#090d16',
-        logging: false,
-      });
+      let blob: Blob | null = null;
 
-      const jpegUrl = canvas.toDataURL('image/jpeg', 0.96);
-      const link = document.createElement('a');
+      // 1. Coba render via html2canvas (DOM to Canvas)
+      if (credentialCardRef.current) {
+        try {
+          const canvas = await html2canvas(credentialCardRef.current, {
+            scale: 2,
+            useCORS: true,
+            allowTaint: false, // JANGAN true! allowTaint: true meracuni canvas dan menyebabkan SecurityError
+            backgroundColor: '#090d16',
+            logging: false,
+            imageTimeout: 15000,
+          });
+
+          blob = await new Promise<Blob | null>((resolve) => {
+            canvas.toBlob(resolve, 'image/jpeg', 0.95);
+          });
+        } catch (domErr) {
+          console.warn('html2canvas rendering error, beralih ke direct canvas fallback:', domErr);
+        }
+      }
+
+      // 2. Jika html2canvas gagal / menghasilkan null, gunakan Direct Canvas 2D
+      if (!blob) {
+        blob = await generateDirectCanvasBlob(createdData, qrCodeUrl, active3dBase64, 'image/jpeg');
+      }
+
+      if (!blob) {
+        throw new Error('Gagal menghasilkan file gambar kartu kredensial.');
+      }
+
+      // 3. Simpan URL blob untuk fallback atau tab baru
       const cleanSchool = createdData.schoolName.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
-      link.download = `kredensial-kawacanaan-${cleanSchool}-${createdData.username}.jpg`;
-      link.href = jpegUrl;
+      const filename = `kredensial-kawacanaan-${cleanSchool}-${createdData.username}.jpg`;
+
+      const blobUrl = URL.createObjectURL(blob);
+      setFallbackImageUrl(blobUrl);
+
+      // Trigger download
+      const link = document.createElement('a');
+      link.download = filename;
+      link.href = blobUrl;
+      link.target = '_blank';
       document.body.appendChild(link);
       link.click();
-      document.body.removeChild(link);
+
+      setTimeout(() => {
+        document.body.removeChild(link);
+      }, 1000);
 
       showToast('Kartu kredensial JPEG berhasil diunduh!', 'success');
     } catch (err: any) {
       console.error('Gagal mengunduh kartu JPEG:', err);
-      showToast('Gagal mengunduh kartu JPEG. Silakan coba kembali.', 'error');
+      showToast('Gagal mengunduh kartu JPEG: ' + (err.message || 'Silakan coba kembali.'), 'error');
     } finally {
       setIsDownloadingJpeg(false);
+    }
+  };
+
+  // Salin Gambar Kartu ke Clipboard (Bisa langsung Ctrl+V di WhatsApp / Telegram)
+  const handleCopyImage = async () => {
+    if (!createdData) return;
+    setIsCopyingImage(true);
+
+    try {
+      let blob: Blob | null = null;
+
+      if (credentialCardRef.current) {
+        try {
+          const canvas = await html2canvas(credentialCardRef.current, {
+            scale: 2,
+            useCORS: true,
+            allowTaint: false,
+            backgroundColor: '#090d16',
+            logging: false,
+          });
+          blob = await new Promise<Blob | null>((res) => canvas.toBlob(res, 'image/png'));
+        } catch (e) {
+          console.warn('html2canvas blob failed for copy:', e);
+        }
+      }
+
+      if (!blob) {
+        blob = await generateDirectCanvasBlob(createdData, qrCodeUrl, active3dBase64, 'image/png');
+      }
+
+      if (!blob) throw new Error('Gagal merender gambar untuk clipboard.');
+
+      if (navigator.clipboard && (window as any).ClipboardItem) {
+        const item = new (window as any).ClipboardItem({
+          'image/png': blob,
+        });
+        await navigator.clipboard.write([item]);
+        setCopiedImage(true);
+        setTimeout(() => setCopiedImage(false), 3000);
+        showToast('Gambar kartu berhasil disalin ke clipboard! Siap di-paste di WhatsApp.', 'success');
+      } else {
+        // Fallback jika ClipboardItem tidak didukung: trigger download
+        const blobUrl = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = blobUrl;
+        a.download = `kartu-kredensial-${createdData.username}.png`;
+        a.click();
+        showToast('Clipboard gambar tidak didukung di browser ini. File telah otomatis diunduh.', 'info');
+      }
+    } catch (err: any) {
+      console.error('Gagal salin gambar:', err);
+      showToast(err.message || 'Gagal menyalin gambar kartu.', 'error');
+    } finally {
+      setIsCopyingImage(false);
     }
   };
 
@@ -1357,8 +1752,8 @@ Portal Masuk     : ${window.location.origin}/login
                 className="relative bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 text-white rounded-2xl sm:rounded-3xl p-4 sm:p-6 border border-slate-800 shadow-2xl overflow-hidden"
               >
                 {/* Subtle Decorative Background Circles */}
-                <div className="absolute -top-12 -right-12 w-48 h-48 bg-blue-600/15 rounded-full blur-2xl pointer-events-none" />
-                <div className="absolute -bottom-12 -left-12 w-48 h-48 bg-indigo-600/15 rounded-full blur-2xl pointer-events-none" />
+                <div data-html2canvas-ignore="true" className="absolute -top-12 -right-12 w-48 h-48 bg-blue-600/15 rounded-full blur-2xl pointer-events-none" />
+                <div data-html2canvas-ignore="true" className="absolute -bottom-12 -left-12 w-48 h-48 bg-indigo-600/15 rounded-full blur-2xl pointer-events-none" />
 
                 {/* Card Header */}
                 <div className="relative z-10 flex items-center justify-between pb-3.5 border-b border-slate-800/90 gap-2">
@@ -1404,15 +1799,16 @@ Portal Masuk     : ${window.location.origin}/login
                     <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl overflow-hidden border-2 border-blue-400/40 shadow-md bg-slate-800 shrink-0 relative group">
                       <img
                         src={
-                          createdData.workspaceType === 'school'
+                          active3dBase64 ||
+                          (createdData.workspaceType === 'school'
                             ? school3dImg
                             : createdData.teacherRole === 'WALI KELAS'
                             ? waliKelasWanitaImg
-                            : guruMapelPriaImg
+                            : guruMapelPriaImg)
                         }
                         alt="Visual 3D Ruang Kerja"
                         className="w-full h-full object-cover object-top"
-                        referrerPolicy="no-referrer"
+                        crossOrigin="anonymous"
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-slate-950/60 via-transparent to-transparent" />
                       <span className="absolute bottom-1 left-1.5 text-[8px] font-black px-1.5 py-0.5 bg-blue-600/90 text-white rounded">
@@ -1428,6 +1824,7 @@ Portal Masuk     : ${window.location.origin}/login
                             src={qrCodeUrl}
                             alt="QR Login"
                             className="w-full h-full object-contain"
+                            crossOrigin="anonymous"
                           />
                         ) : (
                           <div className="text-[9px] text-slate-400 text-center font-bold">
@@ -1532,7 +1929,7 @@ Portal Masuk     : ${window.location.origin}/login
               {/* ACTION BUTTONS (Download JPEG, Copy Credentials, Finish) */}
               {/* =================================================================== */}
               <div className="pt-2 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-2.5">
-                <div className="flex items-center gap-2 w-full sm:w-auto">
+                <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
                   {/* Download JPEG Button */}
                   <button
                     type="button"
@@ -1544,12 +1941,39 @@ Portal Masuk     : ${window.location.origin}/login
                     {isDownloadingJpeg ? (
                       <>
                         <RefreshCw className="w-4 h-4 animate-spin" />
-                        <span>Merender Gambar...</span>
+                        <span>Merender Kartu...</span>
                       </>
                     ) : (
                       <>
                         <Download className="w-4 h-4" />
                         <span>Unduh Kartu (JPEG)</span>
+                      </>
+                    )}
+                  </button>
+
+                  {/* Copy Image to Clipboard Button (Direct paste in WhatsApp/Telegram) */}
+                  <button
+                    type="button"
+                    onClick={handleCopyImage}
+                    disabled={isCopyingImage}
+                    className="px-3.5 py-2.5 rounded-xl border border-indigo-200 bg-indigo-50/70 hover:bg-indigo-100 text-indigo-700 text-xs font-bold flex items-center justify-center gap-1.5 transition cursor-pointer disabled:opacity-50"
+                    title="Salin gambar kartu ke clipboard untuk ditempel langsung (Ctrl+V) di WhatsApp / Telegram"
+                    id="btn-copy-card-image"
+                  >
+                    {isCopyingImage ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 animate-spin text-indigo-600" />
+                        <span>Menyalin...</span>
+                      </>
+                    ) : copiedImage ? (
+                      <>
+                        <Check className="w-4 h-4 text-emerald-600" />
+                        <span className="text-emerald-700">Gambar Disalin!</span>
+                      </>
+                    ) : (
+                      <>
+                        <ImageIcon className="w-4 h-4 text-indigo-600" />
+                        <span className="hidden sm:inline">Salin Gambar</span>
                       </>
                     )}
                   </button>
@@ -1573,6 +1997,20 @@ Portal Masuk     : ${window.location.origin}/login
                       </>
                     )}
                   </button>
+
+                  {/* Fallback View / Open in Tab */}
+                  {fallbackImageUrl && (
+                    <a
+                      href={fallbackImageUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-3 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 text-xs font-bold flex items-center justify-center gap-1 transition"
+                      title="Buka gambar hasil render di tab baru"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                      <span className="hidden sm:inline">Buka di Tab Baru</span>
+                    </a>
+                  )}
                 </div>
 
                 {/* Finish & Open School Detail */}

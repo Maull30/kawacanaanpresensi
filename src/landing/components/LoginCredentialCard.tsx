@@ -85,6 +85,15 @@ export const LoginCredentialCard: React.FC<LoginCredentialCardProps> = ({
   const codeDisplay =
     data.schoolCode || (data.workspaceType === 'school' ? 'SCH-UTAMA' : 'MANDIRI-PRO');
 
+  // Normalisasi teks masa aktif lisensi: bagi pengguna gratis cukup "Aktif Selamanya"
+  const cleanExpiryText = (() => {
+    const raw = data.expiryDateText || '';
+    if (!raw || raw.toLowerCase().includes('gratis') || raw.toLowerCase().includes('selamanya')) {
+      return 'Aktif Selamanya';
+    }
+    return raw;
+  })();
+
   // Generate QR Code Barcode beresolusi tinggi
   useEffect(() => {
     let isMounted = true;
@@ -183,7 +192,7 @@ export const LoginCredentialCard: React.FC<LoginCredentialCardProps> = ({
     ctx.textAlign = 'left';
     ctx.fillStyle = '#bfdbfe';
     ctx.font = 'bold 11px sans-serif';
-    ctx.fillText('SATUAN PENDIDIKAN / RUANG KERJA', 24, 184);
+    ctx.fillText('SATUAN PENDIDIKAN', 24, 184);
 
     // Nama Sekolah
     ctx.fillStyle = '#ffffff';
@@ -297,7 +306,7 @@ export const LoginCredentialCard: React.FC<LoginCredentialCardProps> = ({
     // Box 3: Kode Akses
     drawInfoBox(420, 166, 245, 72, data.workspaceType === 'school' ? 'KODE AKSES SEKOLAH' : 'KODE RUANG KERJA', codeDisplay, true);
     // Box 4: Masa Aktif
-    drawInfoBox(685, 166, 245, 72, 'MASA AKTIF LISENSI', data.expiryDateText || 'Aktif Selamanya', false);
+    drawInfoBox(685, 166, 245, 72, 'MASA AKTIF LISENSI', cleanExpiryText, false);
 
     // Status Aktif Pill
     ctx.fillStyle = '#ecfdf5';
@@ -532,10 +541,10 @@ export const LoginCredentialCard: React.FC<LoginCredentialCardProps> = ({
                 </span>
               </div>
 
-              {/* Satuan Pendidikan / Ruang Kerja Header */}
+              {/* Satuan Pendidikan Header */}
               <div className="space-y-0.5">
                 <div className="text-[6.5px] font-bold tracking-widest text-blue-200/90 uppercase">
-                  SATUAN PENDIDIKAN / RUANG KERJA
+                  SATUAN PENDIDIKAN
                 </div>
                 <div className="text-[12px] font-black text-white tracking-tight uppercase leading-snug line-clamp-1">
                   {data.schoolName || (data.workspaceType === 'school' ? 'SDN KAWACANAAN' : 'GURU INDIVIDU SD')}
@@ -637,7 +646,7 @@ export const LoginCredentialCard: React.FC<LoginCredentialCardProps> = ({
                   <span>MASA AKTIF LISENSI</span>
                 </div>
                 <div className="text-[10px] font-black text-slate-900 truncate mt-0.5">
-                  {data.expiryDateText || 'Aktif'}
+                  {cleanExpiryText}
                 </div>
               </div>
             </div>

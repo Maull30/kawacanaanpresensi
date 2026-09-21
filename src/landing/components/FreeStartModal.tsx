@@ -206,7 +206,7 @@ export const FreeStartModal: React.FC<FreeStartModalProps> = ({
         username: cleanUsername,
         password: password,
         schoolCode: data.schoolCode || data.workspaceCode || 'MANDIRI-FREE',
-        expiryDateText: 'Aktif Selamanya (Gratis)',
+        expiryDateText: 'Aktif Selamanya',
         nominalText: 'GRATIS (Rp 0)',
         paymentMethodText: 'Pendaftaran Mandiri Otomatis',
         invoiceNo: `INV-FREE-${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, '0')}-${Math.floor(1000 + Math.random() * 9000)}`,
@@ -578,41 +578,44 @@ export const FreeStartModal: React.FC<FreeStartModalProps> = ({
               )}
 
               <form onSubmit={handleSubmit} className="space-y-3.5">
-                {/* Nama Satuan Pendidikan (Setelah Pemilihan Peran) */}
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                    {lang === 'ID' ? 'Nama Satuan Pendidikan' : 'Educational Unit / School Name'} <span className="text-rose-500">*</span>
-                  </label>
-                  <div className="relative">
-                    <Building2 className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                    <input
-                      type="text"
-                      required
-                      value={schoolName}
-                      onChange={(e) => setSchoolName(e.target.value)}
-                      placeholder={lang === 'ID' ? 'Contoh: SDN 1 Kawacanaan' : 'e.g. Kawacanaan Elementary School'}
-                      className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm font-medium text-slate-900 bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-600/20 outline-none transition-all h-11"
-                      id="input-free-schoolname"
-                    />
+                {/* Nama Satuan Pendidikan & Nama Lengkap Berdampingan */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* Kolom 1: Nama Satuan Pendidikan */}
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                      {lang === 'ID' ? 'Nama Satuan Pendidikan' : 'Educational Unit / School Name'} <span className="text-rose-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <Building2 className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="text"
+                        required
+                        value={schoolName}
+                        onChange={(e) => setSchoolName(e.target.value)}
+                        placeholder={lang === 'ID' ? 'Contoh: SDN 1 Kawacanaan' : 'e.g. Kawacanaan Elementary School'}
+                        className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm font-medium text-slate-900 bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-600/20 outline-none transition-all h-11"
+                        id="input-free-schoolname"
+                      />
+                    </div>
                   </div>
-                </div>
 
-                {/* Nama Lengkap */}
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                    Nama Lengkap <span className="text-rose-500">*</span>
-                  </label>
-                  <div className="relative">
-                    <User className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                    <input
-                      type="text"
-                      required
-                      value={fullName}
-                      onChange={(e) => handleFullNameChange(e.target.value)}
-                      placeholder="Contoh: Dra. Sri Wahyuni, M.Pd"
-                      className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm font-medium text-slate-900 bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-600/20 outline-none transition-all h-11"
-                      id="input-free-fullname"
-                    />
+                  {/* Kolom 2: Nama Lengkap */}
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                      Nama Lengkap <span className="text-rose-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <User className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="text"
+                        required
+                        value={fullName}
+                        onChange={(e) => handleFullNameChange(e.target.value)}
+                        placeholder="Contoh: Dra. Sri Wahyuni, M.Pd"
+                        className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm font-medium text-slate-900 bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-600/20 outline-none transition-all h-11"
+                        id="input-free-fullname"
+                      />
+                    </div>
                   </div>
                 </div>
 

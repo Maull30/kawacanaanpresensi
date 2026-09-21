@@ -50,6 +50,7 @@ interface PaymentSessionData {
   planTitle: string;
   billingCycle: BillingCycle;
   teacherFullName: string;
+  schoolName?: string;
   username: string;
   role: string;
   schoolId?: string;
@@ -59,6 +60,7 @@ interface PaymentSessionData {
 
 interface RegistrationSuccessData {
   teacherName: string;
+  schoolName?: string;
   username: string;
   password?: string;
   email?: string;
@@ -89,6 +91,7 @@ export const TeacherRegisterModal: React.FC<TeacherRegisterModalProps> = ({
   const [selectedRole, setSelectedRole] = useState<RoleType>('homeroom');
 
   // Form Fields (Pendaftaran)
+  const [schoolName, setSchoolName] = useState('');
   const [fullName, setFullName] = useState('');
   const [username, setUsername] = useState('');
   const [usernameManuallyEdited, setUsernameManuallyEdited] = useState(false);
@@ -223,9 +226,14 @@ export const TeacherRegisterModal: React.FC<TeacherRegisterModalProps> = ({
     e.preventDefault();
     setFormError('');
 
+    const cleanSchool = schoolName.trim();
     const cleanName = fullName.trim();
     const cleanUsername = username.trim().toLowerCase();
 
+    if (!cleanSchool) {
+      setFormError(lang === 'ID' ? 'Nama satuan pendidikan wajib diisi.' : 'Educational unit / school name is required.');
+      return;
+    }
     if (!cleanName) {
       setFormError(lang === 'ID' ? 'Nama lengkap wajib diisi.' : 'Full name is required.');
       return;
@@ -283,7 +291,7 @@ export const TeacherRegisterModal: React.FC<TeacherRegisterModalProps> = ({
           grade: 1,
           className: 'Kelas 1',
           subjectName: selectedRole === 'subject' ? 'Guru Mata Pelajaran' : undefined,
-          workspaceName: 'Ruang Kerja Individu',
+          workspaceName: cleanSchool,
           schoolId: null,
         }),
       });
@@ -308,7 +316,7 @@ export const TeacherRegisterModal: React.FC<TeacherRegisterModalProps> = ({
           plan_id: 'teacher',
           billing_cycle: billingCycle,
           school_id: createdSchoolId || null,
-          school_name: `Ruang Kerja ${cleanName}`,
+          school_name: cleanSchool,
           contact_name: cleanName,
           email: cleanEmail,
           npsn: null,
@@ -332,6 +340,7 @@ export const TeacherRegisterModal: React.FC<TeacherRegisterModalProps> = ({
         planTitle: midtransData.plan_title || `Paket Guru (${billingCycle === 'yearly' ? '1 Tahun' : '1 Bulan'})`,
         billingCycle,
         teacherFullName: cleanName,
+        schoolName: cleanSchool,
         username: cleanUsername,
         role: payloadRole,
         schoolId: createdSchoolId,
@@ -411,17 +420,19 @@ export const TeacherRegisterModal: React.FC<TeacherRegisterModalProps> = ({
     }
 
     const tName = session?.teacherFullName || fullName.trim();
+    const sName = session?.schoolName || schoolName.trim() || `Ruang Kerja ${tName}`;
     const uName = session?.username || username.trim();
     const rName = session?.role || (selectedRole === 'homeroom' ? 'WALI KELAS' : 'GURU MAPEL');
     const isYr = billingCycle === 'yearly' || session?.billingCycle === 'yearly';
 
     setRegistrationSuccessData({
       teacherName: tName,
+      schoolName: sName,
       username: uName,
       password: password,
       email: email.trim() || `${uName}@guru.kawacanaan.sch.id`,
       role: rName,
-      workspaceName: 'Ruang Kerja Individu Pro',
+      workspaceName: sName,
       invoiceNo: session?.orderId,
       billingCycle: isYr ? 'yearly' : 'monthly',
       amount: session?.amount || (isYr ? yearlyPrice : monthlyPrice),
@@ -847,22 +858,44 @@ export const TeacherRegisterModal: React.FC<TeacherRegisterModalProps> = ({
               )}
 
               <form onSubmit={handleSubmitAndProceedPayment} className="space-y-3.5">
-                {/* 1. Nama Lengkap Guru */}
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                    {lang === 'ID' ? 'Nama Lengkap Guru' : 'Full Name'} <span className="text-rose-500">*</span>
-                  </label>
-                  <div className="relative">
-                    <User className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                    <input
-                      type="text"
-                      required
-                      value={fullName}
-                      onChange={(e) => handleFullNameChange(e.target.value)}
-                      placeholder="Contoh: Dra. Sri Wahyuni, M.Pd"
-                      className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm font-medium text-slate-900 bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-600/20 outline-none transition-all h-11"
-                      id="input-teacher-fullname"
-                    />
+                {/* 1. Nama Satuan Pendidikan & Nama Lengkap Guru (Berdampingan 2 Kolom) */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* Nama Satuan Pendidikan */}
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                      {lang === 'ID' ? 'Nama Satuan Pendidikan' : 'Educational Unit / School Name'} <span className="text-rose-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <Building2 className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="text"
+                        required
+                        value={schoolName}
+                        onChange={(e) => setSchoolName(e.target.value)}
+                        placeholder={lang === 'ID' ? 'Contoh: SDN 1 Kawacanaan' : 'e.g. Kawacanaan Elementary School'}
+                        className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm font-medium text-slate-900 bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-600/20 outline-none transition-all h-11"
+                        id="input-teacher-schoolname"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Nama Lengkap Guru */}
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                      {lang === 'ID' ? 'Nama Lengkap Guru' : 'Full Name'} <span className="text-rose-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <User className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="text"
+                        required
+                        value={fullName}
+                        onChange={(e) => handleFullNameChange(e.target.value)}
+                        placeholder="Contoh: Dra. Sri Wahyuni, M.Pd"
+                        className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm font-medium text-slate-900 bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-600/20 outline-none transition-all h-11"
+                        id="input-teacher-fullname"
+                      />
+                    </div>
                   </div>
                 </div>
 
@@ -1202,7 +1235,7 @@ export const TeacherRegisterModal: React.FC<TeacherRegisterModalProps> = ({
               <LoginCredentialCard
                 data={{
                   workspaceType: 'personal',
-                  schoolName: `Ruang Kerja Pro - ${registrationSuccessData.teacherName}`,
+                  schoolName: registrationSuccessData.schoolName || schoolName.trim() || `Ruang Kerja Pro - ${registrationSuccessData.teacherName}`,
                   personInCharge: `${registrationSuccessData.teacherName} (${registrationSuccessData.role === 'homeroom' ? 'Wali Kelas' : 'Guru Mapel'})`,
                   username: registrationSuccessData.username,
                   password: registrationSuccessData.password || '••••••••',

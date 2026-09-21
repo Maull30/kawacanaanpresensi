@@ -1485,26 +1485,25 @@ ${isSuperadmin ? 'Metode: Direct Subscription (Super Admin)' : `Invoice: ${regis
                     )}
                   </div>
 
-                  {/* 1. NAMA SEKOLAH (Full width) */}
-                  <div>
-                    <label className="text-[11px] sm:text-xs font-bold text-slate-700 uppercase tracking-wider block mb-1 flex items-center gap-1.5">
-                      <School className="w-3.5 h-3.5 text-blue-600" />
-                      <span>Nama Satuan Pendidikan / Sekolah</span>
-                      <span className="text-rose-500">*</span>
-                    </label>
-                    <input
-                      id="input-school-name"
-                      type="text"
-                      value={schoolName}
-                      onChange={(e) => setSchoolName(e.target.value)}
-                      placeholder="Contoh: SD Negeri 01 Menteng"
-                      required
-                      className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs sm:text-sm font-medium text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition-all bg-white shadow-2xs h-9.5 sm:h-10"
-                    />
-                  </div>
-
-                  {/* 2. NAMA LENGKAP ADMIN & 3. USERNAME (2 Kolom Seimbang) */}
+                  {/* 1. NAMA SATUAN PENDIDIKAN & 2. NAMA LENGKAP ADMIN (Berdampingan 2 Kolom) */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3">
+                    <div>
+                      <label className="text-[11px] sm:text-xs font-bold text-slate-700 uppercase tracking-wider block mb-1 flex items-center gap-1.5">
+                        <School className="w-3.5 h-3.5 text-blue-600" />
+                        <span>Nama Satuan Pendidikan</span>
+                        <span className="text-rose-500">*</span>
+                      </label>
+                      <input
+                        id="input-school-name"
+                        type="text"
+                        value={schoolName}
+                        onChange={(e) => setSchoolName(e.target.value)}
+                        placeholder="Contoh: SD Negeri 01 Menteng"
+                        required
+                        className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs sm:text-sm font-medium text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition-all bg-white shadow-2xs h-9.5 sm:h-10"
+                      />
+                    </div>
+
                     <div>
                       <label className="text-[11px] sm:text-xs font-bold text-slate-700 uppercase tracking-wider block mb-1 flex items-center gap-1.5">
                         <User className="w-3.5 h-3.5 text-blue-600" />
@@ -1521,7 +1520,10 @@ ${isSuperadmin ? 'Metode: Direct Subscription (Super Admin)' : `Invoice: ${regis
                         className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs sm:text-sm font-medium text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition-all bg-white shadow-2xs h-9.5 sm:h-10"
                       />
                     </div>
+                  </div>
 
+                  {/* 3. USERNAME ADMIN & 4. EMAIL RESMI (Berdampingan 2 Kolom) */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3">
                     <div>
                       <div className="flex items-center justify-between mb-1">
                         <label className="text-[11px] sm:text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
@@ -1550,6 +1552,21 @@ ${isSuperadmin ? 'Metode: Direct Subscription (Super Admin)' : `Invoice: ${regis
                         onChange={(e) => handleUsernameChange(e.target.value)}
                         placeholder="admin.sekolah"
                         required
+                        className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs sm:text-sm font-medium text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition-all bg-white shadow-2xs h-9.5 sm:h-10"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-[11px] sm:text-xs font-bold text-slate-700 uppercase tracking-wider block mb-1 flex items-center gap-1.5">
+                        <Mail className="w-3.5 h-3.5 text-blue-600" />
+                        <span>Email Resmi (Opsional)</span>
+                      </label>
+                      <input
+                        id="input-email"
+                        type="email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        placeholder="admin@sekolah.sch.id"
                         className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs sm:text-sm font-medium text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition-all bg-white shadow-2xs h-9.5 sm:h-10"
                       />
                     </div>
@@ -1618,22 +1635,6 @@ ${isSuperadmin ? 'Metode: Direct Subscription (Super Admin)' : `Invoice: ${regis
                         </button>
                       </div>
                     </div>
-                  </div>
-
-                  {/* 5. EMAIL RESMI (Full width seimbang) */}
-                  <div>
-                    <label className="text-[11px] sm:text-xs font-bold text-slate-700 uppercase tracking-wider block mb-1 flex items-center gap-1.5">
-                      <Mail className="w-3.5 h-3.5 text-blue-600" />
-                      <span>Email Resmi (Opsional)</span>
-                    </label>
-                    <input
-                      id="input-email"
-                      type="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder="admin@sekolah.sch.id (untuk bukti aktivasi)"
-                      className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs sm:text-sm font-medium text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition-all bg-white shadow-2xs h-9.5 sm:h-10"
-                    />
                   </div>
 
                   {/* 6. KHUSUS SUPERADMIN: NPSN & CATATAN INTERNAL */}

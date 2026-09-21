@@ -589,7 +589,7 @@ export const SchoolOnboardingModal: React.FC<SchoolOnboardingModalProps> = ({
       ctx.textAlign = 'left';
       ctx.fillStyle = '#94a3b8';
       ctx.font = 'bold 12px sans-serif';
-      ctx.fillText('SATUAN PENDIDIKAN / RUANG KERJA', 315, 135);
+      ctx.fillText('SATUAN PENDIDIKAN', 315, 135);
 
       ctx.fillStyle = '#ffffff';
       ctx.font = 'bold 24px sans-serif';

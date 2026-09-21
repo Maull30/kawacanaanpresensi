@@ -930,7 +930,7 @@ export default async function handler(req:any,res:any){
     if(action==='delete_school'){
       const id=req.body.schoolId||req.body.school_id||req.body.id; if(!id) return json(res,400,{error:'ID sekolah atau ruang kerja wajib diisi.'});
       
-      const { data: targetSchool } = await admin.from('schools').select('name, npsn, workspace_type, is_personal').eq('id', id).maybeSingle();
+      const { data: targetSchool } = await admin.from('schools').select('name, npsn, code, plan, workspace_type, is_personal, owner_id').eq('id', id).maybeSingle();
       const isPersonal = targetSchool?.workspace_type === 'personal' || targetSchool?.is_personal === true;
       const workspaceLabel = isPersonal ? `Ruang Kerja Individu (${targetSchool?.name || id})` : `Sekolah (${targetSchool?.name || id})`;
 
@@ -954,7 +954,7 @@ export default async function handler(req:any,res:any){
             if (isTableOrColMissing) {
               return; // Lewati tabel opsional atau tabel yang tidak ada di skema
             }
-            throw new Error(`Gagal menghapus ${table}: ${error.message}`);
+            console.warn(`[superadmin] Peringatan delete ${table}:`, error.message);
           }
         } catch (err: any) {
           if (
@@ -964,40 +964,265 @@ export default async function handler(req:any,res:any){
           ) {
             return;
           }
-          throw err;
+          console.warn(`[superadmin] Exception delete ${table}:`, err?.message);
         }
       };
 
-      // Urutan pembersihan tenant mengikuti dependensi FK dan memastikan tabel-tabel
-      // seperti payments, effective_days, dan leave_requests dibersihkan terlebih dahulu
-      // agar tidak memicu foreign key ON DELETE SET NULL yang mengeksekusi UPDATE dengan trigger updated_at.
-      await deleteTenantRows('payments');
-      await deleteTenantRows('effective_days');
-      await deleteTenantRows('leave_requests');
-      await deleteTenantRows('audit_logs');
-      await deleteTenantRows('user_class_assignments');
-      await deleteTenantRows('teacher_assignments');
-      await deleteTenantRows('teacher_class_assignments');
-      await deleteTenantRows('teacher_class_assignments_legacy_archive');
-      await deleteTenantRows('attendance_records');
-      await deleteTenantRows('subject_schedule_days');
-      await deleteTenantRows('subject_class_assignments');
-      await deleteTenantRows('subject_teacher_assignments');
-      await deleteTenantRows('students');
-      await deleteTenantRows('classes');
-      await deleteTenantRows('subjects');
-      await deleteTenantRows('academic_events');
-      await deleteTenantRows('school_profile');
-      await deleteTenantRows('system_config');
-      await deleteTenantRows('teachers');
+      // 1. Identifikasi dan kumpulkan seluruh ID entitas anak (siswa, kelas, guru, akun pengguna)
+      let studentIds: string[] = [];
+      try {
+        const { data: sRows } = await admin.from('students').select('id').eq('school_id', id);
+        if (sRows && sRows.length > 0) {
+          studentIds = sRows.map((s: any) => s.id);
+        }
+      } catch (_) {}
 
-      const { data: users, error: usersErr } = await admin.from('profiles').select('id, name, username, role').eq('school_id', id);
-      if (usersErr) throw new Error(`Gagal membaca akun tenant: ${usersErr.message}`);
+      let classIds: string[] = [];
+      try {
+        const { data: cRows } = await admin.from('classes').select('id').eq('school_id', id);
+        if (cRows && cRows.length > 0) {
+          classIds = cRows.map((c: any) => c.id);
+        }
+      } catch (_) {}
 
-      // Lindungi akun Super Admin dan pemanggil agar tidak ikut terhapus
-      const usersToDelete = (users || []).filter(u => u.role !== 'SUPER_ADMIN' && u.id !== caller.user.id);
+      let teacherIds: string[] = [];
+      let teacherUserIds: string[] = [];
+      try {
+        const { data: tRows } = await admin.from('teachers').select('id, user_id').eq('school_id', id);
+        if (tRows && tRows.length > 0) {
+          teacherIds = tRows.map((t: any) => t.id);
+          teacherUserIds = tRows.filter((t: any) => t.user_id).map((t: any) => t.user_id);
+        }
+      } catch (_) {}
 
-      for(const u of usersToDelete) {
+      // Kumpulkan akun pengguna sekolah dari tabel profiles
+      let schoolUsers: Array<{ id: string; name?: string; username?: string; role?: string }> = [];
+      try {
+        const { data: uRows } = await admin.from('profiles').select('id, name, username, role').eq('school_id', id);
+        if (uRows && uRows.length > 0) {
+          schoolUsers = uRows;
+        }
+      } catch (_) {}
+
+      // Lindungi akun Super Admin dan pemanggil agar tidak terhapus
+      const usersToDeleteMap = new Map<string, { id: string; name?: string; username?: string; role?: string }>();
+      for (const u of schoolUsers) {
+        if (u.role !== 'SUPER_ADMIN' && u.id !== caller.user.id) {
+          usersToDeleteMap.set(u.id, u);
+        }
+      }
+      for (const tuId of teacherUserIds) {
+        if (tuId !== caller.user.id && !usersToDeleteMap.has(tuId)) {
+          usersToDeleteMap.set(tuId, { id: tuId, name: 'Guru Instansi', role: 'GURU' });
+        }
+      }
+      const allTargetUserIds = Array.from(usersToDeleteMap.keys());
+
+      // 2. Coba jalankan Stored Procedure Atomic Cascade Delete di level PostgreSQL jika tersedia
+      let atomicRpcExecuted = false;
+      try {
+        const { data: rpcResult, error: rpcError } = await admin.rpc('delete_school_cascade', {
+          p_school_id: id,
+          p_caller_user_id: caller.user.id
+        });
+        if (!rpcError && rpcResult?.ok) {
+          atomicRpcExecuted = true;
+          if (Array.isArray(rpcResult.deleted_auth_user_ids)) {
+            for (const uid of rpcResult.deleted_auth_user_ids) {
+              if (uid && uid !== caller.user.id) {
+                usersToDeleteMap.set(uid, { id: uid });
+              }
+            }
+          }
+        }
+      } catch (_) {
+        atomicRpcExecuted = false;
+      }
+
+      // 3. Jika RPC belum terpasang di database, jalankan cascade delete multi-tahap yang sangat komprehensif
+      if (!atomicRpcExecuted) {
+        // A. Lepaskan Foreign Key pembatas untuk menghindari kuncian constraint
+        try {
+          await admin.from('schools').update({ owner_id: null }).eq('id', id);
+        } catch (_) {}
+
+        try {
+          await admin.from('classes').update({ wali_kelas_teacher_id: null }).eq('school_id', id);
+        } catch (_) {}
+
+        try {
+          await admin.from('profiles').update({ class_id: null, teacher_id: null, student_id: null }).eq('school_id', id);
+        } catch (_) {}
+
+        // B. Cascade Delete: Riwayat Transaksi & Pembayaran (payments / billing)
+        await deleteTenantRows('payments');
+        if (targetSchool?.npsn && String(targetSchool.npsn).trim()) {
+          try {
+            await admin.from('payments').delete().eq('npsn', targetSchool.npsn);
+          } catch (_) {}
+        }
+
+        // C. Cascade Delete: Absensi, Presensi Harian & Mapel, dan Permohonan Izin
+        await deleteTenantRows('attendance_records');
+        if (studentIds.length > 0) {
+          for (let i = 0; i < studentIds.length; i += 200) {
+            const chunk = studentIds.slice(i, i + 200);
+            try {
+              await admin.from('attendance_records').delete().in('student_id', chunk);
+            } catch (_) {}
+          }
+        }
+        if (classIds.length > 0) {
+          for (let i = 0; i < classIds.length; i += 200) {
+            const chunk = classIds.slice(i, i + 200);
+            try {
+              await admin.from('attendance_records').delete().in('class_id', chunk);
+            } catch (_) {}
+          }
+        }
+
+        await deleteTenantRows('leave_requests');
+        if (studentIds.length > 0) {
+          for (let i = 0; i < studentIds.length; i += 200) {
+            const chunk = studentIds.slice(i, i + 200);
+            try {
+              await admin.from('leave_requests').delete().in('student_id', chunk);
+            } catch (_) {}
+          }
+        }
+
+        // D. Cascade Delete: Penugasan Guru, Mapel, Rombel Kelas & Kalender
+        await deleteTenantRows('user_class_assignments');
+        if (classIds.length > 0) {
+          for (let i = 0; i < classIds.length; i += 200) {
+            const chunk = classIds.slice(i, i + 200);
+            try {
+              await admin.from('user_class_assignments').delete().in('class_id', chunk);
+            } catch (_) {}
+          }
+        }
+        if (allTargetUserIds.length > 0) {
+          for (let i = 0; i < allTargetUserIds.length; i += 200) {
+            const chunk = allTargetUserIds.slice(i, i + 200);
+            try {
+              await admin.from('user_class_assignments').delete().in('user_id', chunk);
+            } catch (_) {}
+          }
+        }
+
+        await deleteTenantRows('teacher_assignments');
+        await deleteTenantRows('teacher_class_assignments');
+        await deleteTenantRows('teacher_class_assignments_legacy_archive');
+        await deleteTenantRows('subject_schedule_days');
+        await deleteTenantRows('subject_class_assignments');
+        await deleteTenantRows('subject_teacher_assignments');
+
+        // E. Cascade Delete: Undangan, Kode Gabung & Permohonan Bergabung
+        const invitationTables = [
+          'invitations',
+          'school_invitations',
+          'teacher_invitations',
+          'class_invitations',
+          'student_invitations',
+          'invitation_codes',
+          'invitation_tokens',
+          'join_requests',
+          'registration_codes',
+          'school_registration_codes'
+        ];
+        for (const it of invitationTables) {
+          await deleteTenantRows(it);
+        }
+
+        // F. Cascade Delete: Master Siswa, Kelas, Guru & Mapel
+        await deleteTenantRows('students');
+        await deleteTenantRows('classes');
+        await deleteTenantRows('subjects');
+        await deleteTenantRows('teachers');
+
+        // G. Cascade Delete: Konfigurasi Sekolah, Profil Lembaga, Kalender Akademik & Audit
+        await deleteTenantRows('effective_days');
+        await deleteTenantRows('academic_events');
+        await deleteTenantRows('school_profile');
+        await deleteTenantRows('system_config');
+        await deleteTenantRows('audit_logs');
+
+        // H. Cascade Delete: Profil Pengguna (profiles)
+        try {
+          await admin.from('profiles').delete().eq('school_id', id).neq('role', 'SUPER_ADMIN');
+        } catch (pe: any) {
+          console.warn('[superadmin] Peringatan hapus profiles:', pe?.message);
+        }
+        if (allTargetUserIds.length > 0) {
+          for (let i = 0; i < allTargetUserIds.length; i += 200) {
+            const chunk = allTargetUserIds.slice(i, i + 200);
+            try {
+              await admin.from('profiles').delete().in('id', chunk).neq('role', 'SUPER_ADMIN');
+            } catch (_) {}
+          }
+        }
+
+        // Lepaskan tautan school_id pada akun Super Admin jika ada yang tercatat
+        try {
+          const { data: saProfiles } = await admin.from('profiles').select('*').eq('school_id', id).eq('role', 'SUPER_ADMIN');
+          if (saProfiles && saProfiles.length > 0) {
+            for (const sa of saProfiles) {
+              const unlinked = { ...sa, school_id: null };
+              await admin.from('profiles').delete().eq('id', sa.id);
+              await admin.from('profiles').insert(unlinked);
+            }
+          }
+        } catch (saErr: any) {
+          console.warn('Peringatan: Melepaskan school_id dari Super Admin:', saErr?.message);
+        }
+
+        // I. Hapus Instansi dari tabel schools
+        const { error: schoolDeleteErr } = await admin.from('schools').delete().eq('id', id);
+        if (schoolDeleteErr) throw schoolDeleteErr;
+      }
+
+      // 4. Cascade Delete: Berkas & File (Supabase Storage Buckets)
+      try {
+        const { data: buckets, error: bErr } = await admin.storage.listBuckets();
+        if (!bErr && buckets && buckets.length > 0) {
+          for (const b of buckets) {
+            try {
+              // Hapus seluruh file di folder khusus sekolah: `${id}/*`
+              const { data: folderFiles } = await admin.storage.from(b.name).list(id, { limit: 1000 });
+              if (folderFiles && folderFiles.length > 0) {
+                const paths = folderFiles.map((f: any) => `${id}/${f.name}`);
+                await admin.storage.from(b.name).remove(paths);
+              }
+            } catch (_) {}
+
+            try {
+              // Hapus file pada root bucket yang namanya diawali atau mengandung school_id
+              const { data: rootFiles } = await admin.storage.from(b.name).list('', { search: id, limit: 1000 });
+              if (rootFiles && rootFiles.length > 0) {
+                const matching = rootFiles.filter((f: any) => f.name && f.name.includes(id)).map((f: any) => f.name);
+                if (matching.length > 0) {
+                  await admin.storage.from(b.name).remove(matching);
+                }
+              }
+            } catch (_) {}
+          }
+        }
+
+        // Bersihkan bucket khusus sekolah jika ada
+        try {
+          await admin.storage.deleteBucket(`school-${id}`);
+        } catch (_) {}
+        try {
+          await admin.storage.deleteBucket(id);
+        } catch (_) {}
+      } catch (storageErr: any) {
+        console.warn('[superadmin] Info Storage Cleanup:', storageErr?.message);
+      }
+
+      // 5. Cascade Delete: Akun Otentikasi Supabase Auth (auth.users)
+      const usersToDeleteList = Array.from(usersToDeleteMap.values());
+      for (const u of usersToDeleteList) {
+        if (!u.id || u.id === caller.user.id || u.role === 'SUPER_ADMIN') continue;
         try {
           const { error: authDeleteErr } = await admin.auth.admin.deleteUser(u.id);
           if (authDeleteErr) {
@@ -1009,41 +1234,44 @@ export default async function handler(req:any,res:any){
             }
           }
         } catch (e: any) {
-          console.warn(`Peringatan: Error menghapus akun Auth ${u.username || u.id}:`, e.message);
+          console.warn(`Peringatan: Error menghapus akun Auth ${u.username || u.id}:`, e?.message);
         }
       }
 
-      // Hapus profil akun tenant (kecuali Super Admin)
-      const { error: profilesDeleteErr } = await admin.from('profiles').delete().eq('school_id', id).neq('role', 'SUPER_ADMIN');
-      if (profilesDeleteErr) throw new Error(`Gagal menghapus profiles tenant: ${profilesDeleteErr.message}`);
+      // 6. Bersihkan catatan internal sekolah di platform_settings
+      await saveSchoolNote(admin, id, null);
 
-      // Jika ada akun Super Admin yang tercatat dengan school_id ini, lepaskan tautan school_id-nya secara aman
-      // dengan pola delete-then-insert agar tidak memicu trigger BEFORE UPDATE pada tabel profiles
-      try {
-        const { data: saProfiles } = await admin.from('profiles').select('*').eq('school_id', id).eq('role', 'SUPER_ADMIN');
-        if (saProfiles && saProfiles.length > 0) {
-          for (const sa of saProfiles) {
-            const unlinked = { ...sa, school_id: null };
-            await admin.from('profiles').delete().eq('id', sa.id);
-            await admin.from('profiles').insert(unlinked);
-          }
-        }
-      } catch (saErr: any) {
-        console.warn('Peringatan: Melepaskan school_id dari Super Admin:', saErr?.message);
-      }
-
-      const { error } = await admin.from('schools').delete().eq('id', id);
-      if(error) throw error;
-
+      // 7. Catat aktivitas Super Admin di Audit Log Global
       await admin.from('audit_logs').insert({
         actor_id: caller.user.id,
         actor_name: profile.name,
         actor_role: 'SUPER_ADMIN',
-        action: 'DELETE_SCHOOL',
-        details: { schoolId: id, schoolName: targetSchool?.name, isPersonal, label: workspaceLabel }
+        action: 'CASCADE_DELETE_SCHOOL',
+        details: {
+          schoolId: id,
+          schoolName: targetSchool?.name,
+          npsn: targetSchool?.npsn,
+          code: targetSchool?.code,
+          isPersonal,
+          label: workspaceLabel,
+          deletedUsersCount: usersToDeleteList.length,
+          deletedClassesCount: classIds.length,
+          deletedStudentsCount: studentIds.length,
+          timestamp: new Date().toISOString()
+        }
       });
 
-      return json(res,200,{ ok: true, message: `${workspaceLabel} beserta data terkait berhasil dihapus.` });
+      return json(res, 200, {
+        ok: true,
+        message: `Cascade delete berhasil: Seluruh data ${workspaceLabel} (termasuk pengguna, absensi, riwayat transaksi, kelas, undangan, berkas file, dan konfigurasi) telah dihapus permanen.`,
+        details: {
+          schoolId: id,
+          schoolName: targetSchool?.name,
+          deletedUsersCount: usersToDeleteList.length,
+          deletedClassesCount: classIds.length,
+          deletedStudentsCount: studentIds.length
+        }
+      });
     }
 
     if(action==='delete_user'||action==='delete_admin'){

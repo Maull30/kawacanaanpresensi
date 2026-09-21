@@ -2033,7 +2033,7 @@ export const SchoolsSection: React.FC<{
               <div className="p-3 bg-rose-50 border border-rose-200 rounded-2xl text-rose-800 text-[11px] leading-relaxed flex items-start gap-2">
                 <AlertTriangle size={16} className="shrink-0 text-rose-600 mt-0.5" />
                 <span>
-                  Perhatian: Seluruh data akun pengguna, rombel kelas, peserta didik, dan rekap presensi instansi ini akan dihapus secara menyeluruh dari basis data.
+                  Perhatian: Sistem melakukan <strong>Cascade Delete</strong> menyeluruh. Seluruh data instansi termasuk akun pengguna (profil & login otentikasi), rekap presensi & izin, riwayat transaksi & pembayaran, rombel kelas & penugasan, kode undangan, berkas file & dokumen, serta konfigurasi sekolah akan dihapus permanen.
                 </span>
               </div>
 

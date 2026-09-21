@@ -189,7 +189,17 @@ export default async function handler(req:any,res:any){
         admin.from('system_config').select('*').eq('school_id', schoolId).maybeSingle(),
         admin.from('profiles').select('id, name, username, email, role, is_active, created_at').eq('school_id', schoolId).order('created_at', { ascending: false }),
         admin.from('classes').select('id, name, grade, academic_year').eq('school_id', schoolId),
-        admin.from('students').select('id, nama, nisn, class_id, status').eq('school_id', schoolId).limit(250),
+        admin
+          .from('students')
+          .select('id, nama, nisn, class_id, status')
+          .eq('school_id', schoolId)
+          .limit(250)
+          .then(async (res) => {
+            if (res.error) {
+              return admin.from('students').select('id, nama, nisn, class_id').eq('school_id', schoolId).limit(250);
+            }
+            return res;
+          }),
         admin.from('payments').select('*').or(`school_id.eq.${schoolId},school_name.eq."${school.name}"`).order('created_at', { ascending: false }),
         admin.from('audit_logs').select('*').eq('school_id', schoolId).order('created_at', { ascending: false }).limit(50)
       ]);
@@ -481,7 +491,15 @@ export default async function handler(req:any,res:any){
         {data:recentAttendance}
       ]=await Promise.all([
         admin.from('schools').select('id,name,npsn,code,plan,status,subscription_expires_at,max_teachers,max_students,max_classes,workspace_type,is_personal,created_at').order('created_at', { ascending: false }),
-        admin.from('students').select('id, school_id, created_at'),
+        admin
+          .from('students')
+          .select('id, school_id, created_at')
+          .then(async (res) => {
+            if (res.error) {
+              return admin.from('students').select('id, school_id');
+            }
+            return res;
+          }),
         admin.from('classes').select('id, school_id'),
         admin.from('profiles').select('id, role, school_id, created_at').neq('role','SUPER_ADMIN'),
         admin.from('school_profile').select('school_id, nama_sekolah, npsn'),
@@ -615,7 +633,16 @@ export default async function handler(req:any,res:any){
       ] = await Promise.all([
         admin.from('schools').select('id,name,npsn,code,plan,status,workspace_type,created_at').order('created_at', { ascending: false }),
         admin.from('profiles').select('id,school_id,name,username,email,role,student_id,is_active,created_at').neq('role','SUPER_ADMIN'),
-        admin.from('students').select('id,school_id,nama,nisn,class_id,status,created_at'),
+        admin
+          .from('students')
+          .select('id,school_id,nama,nisn,class_id,status,created_at')
+          .then(async (res) => {
+            if (res.error) {
+              console.warn('[superadmin] Warning querying students columns:', res.error.message);
+              return admin.from('students').select('id,school_id,nama,nisn,class_id');
+            }
+            return res;
+          }),
         admin.from('classes').select('id,school_id,name,grade'),
         admin.from('school_profile').select('school_id,nama_sekolah,npsn'),
       ]);

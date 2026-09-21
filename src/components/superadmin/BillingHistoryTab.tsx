@@ -35,135 +35,113 @@ interface TransactionRecord {
   referenceNo: string;
 }
 
-const INITIAL_TRANSACTIONS: TransactionRecord[] = [
-  {
-    id: 'tx-1',
-    orderId: 'TRX-2026-000248',
-    schoolId: 'sch-1',
-    schoolName: 'SMAN 1 Kota Bandung',
-    payerName: 'Dra. Hj. Nunung M.Pd (Kepsek)',
-    amount: 14500000,
-    paymentType: 'bank_transfer',
-    channel: 'BCA Virtual Account',
-    status: 'settled',
-    createdAt: '19 Sep 2026 10:24',
-    settledAt: '19 Sep 2026 10:26',
-    referenceNo: 'MDT-BCA-9812491',
-  },
-  {
-    id: 'tx-2',
-    orderId: 'TRX-2026-000247',
-    schoolId: 'sch-2',
-    schoolName: 'SMP Negeri 3 Jakarta',
-    payerName: 'Drs. Bambang Sudiro (Bendahara)',
-    amount: 11000000,
-    paymentType: 'qris',
-    channel: 'QRIS Dinamis (GoPay/Shopee)',
-    status: 'settled',
-    createdAt: '19 Sep 2026 09:17',
-    settledAt: '19 Sep 2026 09:18',
-    referenceNo: 'MDT-QRS-7721890',
-  },
-  {
-    id: 'tx-3',
-    orderId: 'TRX-2026-000246',
-    schoolId: 'sch-3',
-    schoolName: 'SMK Telkom Sandhy Putra',
-    payerName: 'Ahmad Fauzi, M.T. (Wakasek)',
-    amount: 16500000,
-    paymentType: 'echannel',
-    channel: 'Mandiri Bill Payment',
-    status: 'pending',
-    createdAt: '18 Sep 2026 16:43',
-    referenceNo: 'MDT-MDR-6612098',
-  },
-  {
-    id: 'tx-4',
-    orderId: 'TRX-2026-000245',
-    schoolId: 'sch-5',
-    schoolName: 'SMA Al-Azhar 1 Kebayoran',
-    payerName: 'Muhammad Rizki, M.Pd (Bendahara)',
-    amount: 9500000,
-    paymentType: 'bank_transfer',
-    channel: 'BRI Virtual Account',
-    status: 'settled',
-    createdAt: '18 Sep 2026 14:20',
-    settledAt: '18 Sep 2026 14:22',
-    referenceNo: 'MDT-BRI-5510982',
-  },
-  {
-    id: 'tx-5',
-    orderId: 'TRX-2026-000244',
-    schoolId: 'sch-4',
-    schoolName: 'SD Negeri 01 Menteng',
-    payerName: 'Sri Wahyuni, S.Pd',
-    amount: 6500000,
-    paymentType: 'bank_transfer',
-    channel: 'BNI Virtual Account',
-    status: 'expired',
-    createdAt: '17 Sep 2026 11:05',
-    referenceNo: 'MDT-BNI-4409182',
-  },
-  {
-    id: 'tx-6',
-    orderId: 'TRX-2026-000243',
-    schoolId: 'sch-6',
-    schoolName: 'SDIT Luqman Al Hakim',
-    payerName: 'Ustadz Hamdan',
-    amount: 3200000,
-    paymentType: 'qris',
-    channel: 'QRIS Dinamis',
-    status: 'settled',
-    createdAt: '16 Sep 2026 15:40',
-    settledAt: '16 Sep 2026 15:41',
-    referenceNo: 'MDT-QRS-3301982',
-  },
-  {
-    id: 'tx-7',
-    orderId: 'TRX-2026-000242',
-    schoolId: 'sch-7',
-    schoolName: 'SMP Labschool Rawamangun',
-    payerName: 'Dra. Endah Suryani',
-    amount: 8000000,
-    paymentType: 'bank_transfer',
-    channel: 'BCA Virtual Account',
-    status: 'settled',
-    createdAt: '15 Sep 2026 08:30',
-    settledAt: '15 Sep 2026 08:32',
-    referenceNo: 'MDT-BCA-2201992',
-  },
-  {
-    id: 'tx-8',
-    orderId: 'TRX-2026-000241',
-    schoolId: 'sch-8',
-    schoolName: 'SMA Taruna Nusantara',
-    payerName: 'Kol. (Purn) Suryanto',
-    amount: 10500000,
-    paymentType: 'manual_transfer',
-    channel: 'Transfer Bank Manual',
-    status: 'cancelled',
-    createdAt: '14 Sep 2026 13:10',
-    referenceNo: 'MAN-TRF-1100293',
-  },
-];
-
 interface BillingHistoryTabProps {
+  payments?: any[];
+  schools?: any[];
+  call?: (action: string, payload?: any) => Promise<any>;
   showToast: (msg: string, type: 'success' | 'error' | 'info') => void;
   onSelectInvoice: (inv: any) => void;
+  onReload?: () => void;
 }
 
 export const BillingHistoryTab: React.FC<BillingHistoryTabProps> = ({
+  payments = [],
+  schools = [],
+  call,
   showToast,
   onSelectInvoice,
+  onReload,
 }) => {
-  const [transactions, setTransactions] = useState<TransactionRecord[]>(INITIAL_TRANSACTIONS);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [channelFilter, setChannelFilter] = useState<string>('all');
   const [isSyncing, setIsSyncing] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedReceipt, setSelectedReceipt] = useState<TransactionRecord | null>(null);
-  const itemsPerPage = 6;
+  const itemsPerPage = 8;
+
+  // Derive real transaction records from Supabase payments
+  const transactions: TransactionRecord[] = useMemo(() => {
+    if (!payments || payments.length === 0) {
+      return [];
+    }
+
+    return payments.map((p: any) => {
+      const isSettled = p.status === 'SETTLED' || p.status === 'paid';
+      const isPending = p.status === 'PENDING' || p.status === 'pending';
+      const isExpired = p.status === 'EXPIRED' || p.status === 'expired';
+
+      let status: 'settled' | 'pending' | 'expired' | 'cancelled' = 'cancelled';
+      if (isSettled) status = 'settled';
+      else if (isPending) status = 'pending';
+      else if (isExpired) status = 'expired';
+
+      const rawCreated = p.createdAt || p.created_at;
+      const createdStr = rawCreated
+        ? new Date(rawCreated).toLocaleDateString('id-ID', {
+            day: '2-digit',
+            month: 'short',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+          })
+        : '-';
+
+      const rawPaid = p.paidAt || p.paid_at;
+      const settledStr = rawPaid
+        ? new Date(rawPaid).toLocaleDateString('id-ID', {
+            day: '2-digit',
+            month: 'short',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+          })
+        : undefined;
+
+      const schoolObj = schools.find((s: any) => s.id === (p.schoolId || p.school_id));
+      const schoolName = p.schoolName || p.school_name || schoolObj?.name || 'Sekolah Pengguna';
+      const payerName = p.contactName || p.contact_name || schoolObj?.pic_name || 'Bendahara Sekolah';
+
+      const rawMethod = (p.paymentMethod || p.payment_method || '').toLowerCase();
+      let channel = p.paymentMethod || p.payment_method || 'Midtrans Gateway';
+      let pType = 'bank_transfer';
+
+      if (rawMethod.includes('qris') || rawMethod.includes('gopay')) {
+        channel = 'QRIS Dinamis (GoPay/Shopee/OVO)';
+        pType = 'qris';
+      } else if (rawMethod.includes('bca')) {
+        channel = 'BCA Virtual Account';
+        pType = 'bank_transfer';
+      } else if (rawMethod.includes('mandiri')) {
+        channel = 'Mandiri Bill Payment';
+        pType = 'echannel';
+      } else if (rawMethod.includes('bni')) {
+        channel = 'BNI Virtual Account';
+        pType = 'bank_transfer';
+      } else if (rawMethod.includes('bri')) {
+        channel = 'BRI Virtual Account (BRIVA)';
+        pType = 'bank_transfer';
+      } else if (rawMethod.includes('manual')) {
+        channel = 'Transfer Bank Manual';
+        pType = 'manual_transfer';
+      }
+
+      return {
+        id: p.id,
+        orderId: p.invoiceNo || p.invoice_no || `TRX-${String(p.id).slice(0, 8).toUpperCase()}`,
+        schoolId: p.schoolId || p.school_id || '',
+        schoolName,
+        payerName,
+        amount: Number(p.totalAmount || p.total_amount || p.amount || 0),
+        paymentType: pType,
+        channel,
+        status,
+        createdAt: createdStr,
+        settledAt: settledStr,
+        referenceNo: p.paymentRef || p.snapToken || `MDT-${String(p.id).slice(0, 10).toUpperCase()}`,
+      };
+    });
+  }, [payments, schools]);
 
   // Stats calculation
   const totalSettled = useMemo(() => transactions.filter((t) => t.status === 'settled').length, [transactions]);
@@ -216,12 +194,18 @@ export const BillingHistoryTab: React.FC<BillingHistoryTabProps> = ({
     showToast('Berkas CSV riwayat transaksi berhasil diunduh.', 'success');
   };
 
-  const handleSyncGateway = () => {
+  const handleSyncGateway = async () => {
     setIsSyncing(true);
-    setTimeout(() => {
+    try {
+      if (onReload) {
+        await onReload();
+      }
+      showToast('Sinkronisasi status pembayaran real-time dari Supabase & Midtrans selesai.', 'success');
+    } catch (err: any) {
+      showToast('Gagal melakukan sinkronisasi data transaksi.', 'error');
+    } finally {
       setIsSyncing(false);
-      showToast('Sinkronisasi status webhook Midtrans real-time selesai. Semua transaksi mutakhir.', 'success');
-    }, 700);
+    }
   };
 
   return (

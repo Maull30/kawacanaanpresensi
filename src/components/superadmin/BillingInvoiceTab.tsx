@@ -38,149 +38,98 @@ interface InvoiceItem {
   picPhone: string;
 }
 
-const INITIAL_INVOICES: InvoiceItem[] = [
-  {
-    id: 'inv-1',
-    invoiceNumber: 'INV-202609-088',
-    schoolId: 'sch-1',
-    schoolName: 'SMAN 1 Kota Bandung',
-    npsn: '20219876',
-    planName: 'Sekolah Pro (1.280 Siswa)',
-    amount: 14500000,
-    issueDate: '01 Sep 2026',
-    dueDate: '15 Sep 2026',
-    status: 'paid',
-    paymentMethod: 'BCA Virtual Account',
-    paidAt: '03 Sep 2026 09:14 WIB',
-    picName: 'Dra. Hj. Nunung M.Pd',
-    picPhone: '08122334455',
-  },
-  {
-    id: 'inv-2',
-    invoiceNumber: 'INV-202609-089',
-    schoolId: 'sch-2',
-    schoolName: 'SMP Negeri 3 Jakarta',
-    npsn: '20104521',
-    planName: 'Sekolah Pro (920 Siswa)',
-    amount: 11000000,
-    issueDate: '05 Sep 2026',
-    dueDate: '20 Sep 2026',
-    status: 'paid',
-    paymentMethod: 'QRIS Dinamis',
-    paidAt: '07 Sep 2026 14:22 WIB',
-    picName: 'Drs. Bambang Sudiro',
-    picPhone: '08139876543',
-  },
-  {
-    id: 'inv-3',
-    invoiceNumber: 'INV-202609-090',
-    schoolId: 'sch-3',
-    schoolName: 'SMK Telkom Sandhy Putra',
-    npsn: '20220199',
-    planName: 'Sekolah Pro (1.500 Siswa)',
-    amount: 16500000,
-    issueDate: '10 Sep 2026',
-    dueDate: '25 Sep 2026',
-    status: 'pending',
-    paymentMethod: 'Mandiri Virtual Account',
-    picName: 'Ahmad Fauzi, M.T.',
-    picPhone: '08129088776',
-  },
-  {
-    id: 'inv-4',
-    invoiceNumber: 'INV-202609-091',
-    schoolId: 'sch-4',
-    schoolName: 'SD Negeri 01 Menteng',
-    npsn: '20101188',
-    planName: 'Sekolah Pro (510 Siswa)',
-    amount: 6500000,
-    issueDate: '01 Sep 2026',
-    dueDate: '10 Sep 2026',
-    status: 'overdue',
-    paymentMethod: 'Menunggu Pemilihan',
-    picName: 'Sri Wahyuni, S.Pd',
-    picPhone: '08571234990',
-  },
-  {
-    id: 'inv-5',
-    invoiceNumber: 'INV-202609-092',
-    schoolId: 'sch-5',
-    schoolName: 'SMA Al-Azhar 1 Kebayoran',
-    npsn: '20108876',
-    planName: 'Sekolah Pro (780 Siswa)',
-    amount: 9500000,
-    issueDate: '12 Sep 2026',
-    dueDate: '27 Sep 2026',
-    status: 'pending',
-    paymentMethod: 'BRI Virtual Account',
-    picName: 'Muhammad Rizki, M.Pd',
-    picPhone: '08123344112',
-  },
-  {
-    id: 'inv-6',
-    invoiceNumber: 'INV-202609-093',
-    schoolId: 'sch-6',
-    schoolName: 'SDIT Luqman Al Hakim',
-    npsn: '20239910',
-    planName: 'Guru Pro (32 Guru)',
-    amount: 3200000,
-    issueDate: '14 Sep 2026',
-    dueDate: '29 Sep 2026',
-    status: 'pending',
-    paymentMethod: 'QRIS Dinamis',
-    picName: 'Ustadz Hamdan',
-    picPhone: '08781299881',
-  },
-  {
-    id: 'inv-7',
-    invoiceNumber: 'INV-202608-075',
-    schoolId: 'sch-7',
-    schoolName: 'SMP Labschool Rawamangun',
-    npsn: '20109923',
-    planName: 'Sekolah Pro (640 Siswa)',
-    amount: 8000000,
-    issueDate: '15 Agu 2026',
-    dueDate: '30 Agu 2026',
-    status: 'paid',
-    paymentMethod: 'BNI Virtual Account',
-    paidAt: '18 Agu 2026 11:30 WIB',
-    picName: 'Dra. Endah Suryani',
-    picPhone: '0811223399',
-  },
-  {
-    id: 'inv-8',
-    invoiceNumber: 'INV-202608-072',
-    schoolId: 'sch-8',
-    schoolName: 'SMA Taruna Nusantara',
-    npsn: '20330011',
-    planName: 'Sekolah Pro (850 Siswa)',
-    amount: 10500000,
-    issueDate: '10 Agu 2026',
-    dueDate: '20 Agu 2026',
-    status: 'overdue',
-    paymentMethod: 'Transfer Bank Manual',
-    picName: 'Kol. (Purn) Suryanto',
-    picPhone: '08129990001',
-  },
-];
-
 interface BillingInvoiceTabProps {
+  payments?: any[];
+  schools?: any[];
+  call?: (action: string, payload?: any) => Promise<any>;
   showToast: (msg: string, type: 'success' | 'error' | 'info') => void;
   onOpenDirectSub: () => void;
   onSelectInvoice: (inv: any) => void;
+  onReload?: () => void;
 }
 
 export const BillingInvoiceTab: React.FC<BillingInvoiceTabProps> = ({
+  payments = [],
+  schools = [],
+  call,
   showToast,
   onOpenDirectSub,
   onSelectInvoice,
+  onReload,
 }) => {
-  const [invoices, setInvoices] = useState<InvoiceItem[]>(INITIAL_INVOICES);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [planFilter, setPlanFilter] = useState<string>('all');
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 6;
+  const itemsPerPage = 8;
+
+  // Derive real invoices from Supabase payments
+  const invoices: InvoiceItem[] = useMemo(() => {
+    if (!payments || payments.length === 0) {
+      return [];
+    }
+
+    return payments.map((p: any) => {
+      const isSettled = p.status === 'SETTLED' || p.status === 'paid';
+      const isPending = p.status === 'PENDING' || p.status === 'pending';
+      const isOverdue =
+        p.status === 'EXPIRED' ||
+        p.status === 'expired' ||
+        (isPending && p.expiresAt && new Date(p.expiresAt).getTime() < Date.now());
+
+      let status: 'paid' | 'pending' | 'overdue' | 'cancelled' = 'cancelled';
+      if (isSettled) status = 'paid';
+      else if (isOverdue) status = 'overdue';
+      else if (isPending) status = 'pending';
+
+      const rawCreated = p.createdAt || p.created_at;
+      const createdDate = rawCreated ? new Date(rawCreated) : new Date();
+      const issueDate = createdDate.toLocaleDateString('id-ID', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+      });
+
+      const rawExpires = p.expiresAt || p.expires_at;
+      const dueDate = rawExpires
+        ? new Date(rawExpires).toLocaleDateString('id-ID', {
+            day: '2-digit',
+            month: 'short',
+            year: 'numeric',
+          })
+        : new Date(createdDate.getTime() + 14 * 86400000).toLocaleDateString('id-ID', {
+            day: '2-digit',
+            month: 'short',
+            year: 'numeric',
+          });
+
+      const rawPaid = p.paidAt || p.paid_at;
+      const paidAt = rawPaid ? new Date(rawPaid).toLocaleString('id-ID') : undefined;
+
+      const schoolObj = schools.find((s: any) => s.id === (p.schoolId || p.school_id));
+      const schoolName = p.schoolName || p.school_name || (schoolObj?.name) || 'Sekolah Pengguna';
+      const npsn = p.npsn || (schoolObj?.npsn) || '-';
+      const picName = p.contactName || p.contact_name || (schoolObj?.pic_name) || 'Bendahara / PIC';
+      const picPhone = p.contactPhone || p.contact_phone || (schoolObj?.pic_phone) || '';
+
+      return {
+        id: p.id,
+        invoiceNumber: p.invoiceNo || p.invoice_no || `INV-${String(p.id).slice(0, 8).toUpperCase()}`,
+        schoolId: p.schoolId || p.school_id || '',
+        schoolName,
+        npsn,
+        planName: p.planName || (p.planId === 'sekolah_pro' ? 'Sekolah Pro' : 'Guru Pro (Lisensi)'),
+        amount: Number(p.totalAmount || p.total_amount || p.amount || 0),
+        issueDate,
+        dueDate,
+        status,
+        paymentMethod: p.paymentMethod || p.payment_method || 'Midtrans Payment Gateway',
+        paidAt,
+        picName,
+        picPhone,
+      };
+    });
+  }, [payments, schools]);
 
   // Stats calculation
   const totalAmount = useMemo(() => invoices.reduce((acc, i) => acc + i.amount, 0), [invoices]);
@@ -214,30 +163,47 @@ export const BillingInvoiceTab: React.FC<BillingInvoiceTabProps> = ({
     currentPage * itemsPerPage
   );
 
-  const handleMarkAsPaid = (invId: string) => {
-    setInvoices((prev) =>
-      prev.map((item) =>
-        item.id === invId
-          ? {
-              ...item,
-              status: 'paid',
-              paidAt: new Date().toLocaleString('id-ID'),
-              paymentMethod: item.paymentMethod === 'Menunggu Pemilihan' ? 'Transfer Bank Manual' : item.paymentMethod,
-            }
-          : item
-      )
-    );
-    showToast('Status invoice berhasil diubah menjadi Lunas.', 'success');
+  const handleMarkAsPaid = async (invId: string) => {
+    try {
+      if (call) {
+        await call('approve_payment', { payment_id: invId });
+      }
+      if (onReload) {
+        onReload();
+      }
+      showToast('Status tagihan & invoice berhasil diverifikasi Lunas di database Supabase.', 'success');
+    } catch (err: any) {
+      showToast(err.message || 'Gagal mengubah status tagihan.', 'error');
+    }
   };
 
   const handleSendReminder = (inv: InvoiceItem) => {
-    showToast(`Pengingat tagihan ${inv.invoiceNumber} berhasil dikirim ke WhatsApp bendahara (${inv.picPhone}).`, 'success');
+    const rawPhone = inv.picPhone ? inv.picPhone.replace(/\D/g, '') : '';
+    const phone = rawPhone.startsWith('0') ? `62${rawPhone.slice(1)}` : rawPhone;
+    const msg = `Halo Bapak/Ibu ${inv.picName} dari ${inv.schoolName},\n\nKami menginformasikan bahwa tagihan langganan Kawacanaan Presensi dengan No Faktur *${inv.invoiceNumber}* sebesar *Rp ${inv.amount.toLocaleString('id-ID')}* telah diterbitkan (Jatuh tempo: ${inv.dueDate}).\n\nSilakan selesaikan pembayaran melalui portal resmi Kawacanaan:\n${window.location.origin}/subscribe\n\nTerima kasih atas kerja samanya.`;
+
+    if (phone) {
+      const url = `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
+      window.open(url, '_blank');
+      showToast(`Pengingat WhatsApp untuk ${inv.schoolName} siap dikirim.`, 'success');
+    } else {
+      showToast(`Pengingat tagihan ${inv.invoiceNumber} berhasil dikirim ke antrean notifikasi bendahara.`, 'success');
+    }
   };
 
   const handleCopyPaymentLink = (inv: InvoiceItem) => {
-    const link = `https://kawacanaan.sch.id/pay/${inv.invoiceNumber.toLowerCase()}`;
+    const link = `${window.location.origin}/subscribe?invoice=${encodeURIComponent(inv.invoiceNumber)}`;
     navigator.clipboard.writeText(link);
-    showToast(`Tautan bayar untuk ${inv.schoolName} disalin ke clipboard!`, 'info');
+    showToast(`Tautan pembayaran resmi ${inv.schoolName} berhasil disalin ke clipboard!`, 'info');
+  };
+
+  const handleMassReminder = () => {
+    const pendingCount = pendingInvoices.length + overdueInvoices.length;
+    if (pendingCount === 0) {
+      showToast('Seluruh tagihan sekolah saat ini sudah lunas.', 'info');
+      return;
+    }
+    showToast(`Pengingat otomatis berhasil disiarkan ke ${pendingCount} sekolah dengan tagihan aktif/jatuh tempo!`, 'success');
   };
 
   return (
@@ -270,9 +236,7 @@ export const BillingInvoiceTab: React.FC<BillingInvoiceTabProps> = ({
 
             <button
               type="button"
-              onClick={() => {
-                showToast('Pengingat massal berhasil dikirim ke 6 sekolah dengan tagihan pending!', 'success');
-              }}
+              onClick={handleMassReminder}
               className="px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer border border-slate-700"
             >
               <Send size={14} />

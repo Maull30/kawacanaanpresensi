@@ -1125,6 +1125,7 @@ export const BillingSection: React.FC<{
           {/* Kolom Kanan: Aktivitas Pembayaran & Bantuan */}
           <div className="lg:col-span-4">
             <RecentActivitiesFeed
+              payments={payments}
               onOpenSupport={() => setShowSupportModal(true)}
               onViewAllActivities={() => {
                 setPaymentStatusFilter('all');
@@ -1142,9 +1143,13 @@ export const BillingSection: React.FC<{
       {/* ========================================================================= */}
       {currentSubTab === 'invoice' && (
         <BillingInvoiceTab
+          payments={payments}
+          schools={schools}
+          call={call}
           showToast={showToast}
           onOpenDirectSub={() => setShowDirectSubModal(true)}
           onSelectInvoice={setSelectedInvoice}
+          onReload={loadData}
         />
       )}
 
@@ -1153,8 +1158,12 @@ export const BillingSection: React.FC<{
       {/* ========================================================================= */}
       {currentSubTab === 'riwayat' && (
         <BillingHistoryTab
+          payments={payments}
+          schools={schools}
+          call={call}
           showToast={showToast}
           onSelectInvoice={setSelectedInvoice}
+          onReload={loadData}
         />
       )}
 
@@ -1163,6 +1172,7 @@ export const BillingSection: React.FC<{
       {/* ========================================================================= */}
       {currentSubTab === 'metode' && (
         <BillingMethodsTab
+          call={call}
           showToast={showToast}
         />
       )}
@@ -1172,6 +1182,9 @@ export const BillingSection: React.FC<{
       {/* ========================================================================= */}
       {currentSubTab === 'laporan' && (
         <BillingReportsTab
+          payments={payments}
+          schools={schools}
+          plans={[]}
           showToast={showToast}
           onOpenReportModal={() => setShowFinancialReportModal(true)}
         />

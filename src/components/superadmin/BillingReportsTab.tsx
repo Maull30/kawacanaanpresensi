@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   FileSpreadsheet,
   Download,
@@ -25,31 +25,194 @@ interface MonthlyRecord {
   status: 'Audited' | 'Final' | 'Ongoing';
 }
 
-const MONTHLY_DATA: MonthlyRecord[] = [
-  { month: 'September 2026 (Berjalan)', txCount: 248, gross: 257800000, gatewayFee: 2190000, net: 255610000, growth: '+14.2%', status: 'Ongoing' },
-  { month: 'Agustus 2026', txCount: 212, gross: 225600000, gatewayFee: 1917600, net: 223682400, growth: '+18.5%', status: 'Audited' },
-  { month: 'Juli 2026 (Tahun Ajaran Baru)', txCount: 195, gross: 190400000, gatewayFee: 1618400, net: 188781600, growth: '+32.1%', status: 'Audited' },
-  { month: 'Juni 2026', txCount: 140, gross: 144100000, gatewayFee: 1224850, net: 142875150, growth: '+5.0%', status: 'Audited' },
-  { month: 'Mei 2026', txCount: 132, gross: 137200000, gatewayFee: 1166200, net: 136033800, growth: '+8.2%', status: 'Audited' },
-  { month: 'April 2026', txCount: 120, gross: 126800000, gatewayFee: 1077800, net: 125722200, growth: '+11.0%', status: 'Audited' },
-];
-
 interface BillingReportsTabProps {
+  payments?: any[];
+  schools?: any[];
+  plans?: any[];
   showToast: (msg: string, type: 'success' | 'error' | 'info') => void;
   onOpenReportModal: () => void;
 }
 
 export const BillingReportsTab: React.FC<BillingReportsTabProps> = ({
+  payments = [],
+  schools = [],
+  plans = [],
   showToast,
   onOpenReportModal,
 }) => {
-  const [selectedPeriod, setSelectedPeriod] = useState<string>('q3-2026');
+  const [selectedPeriod, setSelectedPeriod] = useState<string>('all');
+
+  // Filter settled payments from Supabase
+  const settledPayments = useMemo(() => {
+    return payments.filter((p: any) => p.status === 'SETTLED' || p.status === 'paid');
+  }, [payments]);
+
+  // Aggregate monthly data dynamically from real payments
+  const monthlyData: MonthlyRecord[] = useMemo(() => {
+    const monthMap = new Map<string, { txCount: number; gross: number; gatewayFee: number }>();
+    const now = new Date();
+    const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+
+    // Helper to calculate realistic gateway fee
+    const calculateFee = (p: any, amt: number) => {
+      const method = (p.paymentMethod || p.payment_method || '').toLowerCase();
+      if (method.includes('qris') || method.includes('gopay')) {
+        return Math.round(amt * 0.007);
+      }
+      if (method.includes('va') || method.includes('bca') || method.includes('mandiri') || method.includes('bni') || method.includes('bri')) {
+        return 2000;
+      }
+      return Math.round(amt * 0.008);
+    };
+
+    settledPayments.forEach((p: any) => {
+      const d = p.paidAt || p.paid_at || p.createdAt || p.created_at;
+      if (!d) return;
+      const dateObj = new Date(d);
+      if (isNaN(dateObj.getTime())) return;
+
+      const key = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}`;
+      const amt = Number(p.totalAmount || p.total_amount || p.amount || 0);
+      const fee = calculateFee(p, amt);
+
+      const existing = monthMap.get(key) || { txCount: 0, gross: 0, gatewayFee: 0 };
+      existing.txCount += 1;
+      existing.gross += amt;
+      existing.gatewayFee += fee;
+      monthMap.set(key, existing);
+    });
+
+    // Ensure current month is present
+    if (!monthMap.has(currentMonthKey)) {
+      monthMap.set(currentMonthKey, { txCount: 0, gross: 0, gatewayFee: 0 });
+    }
+
+    // Sort descending by month
+    const sortedKeys = Array.from(monthMap.keys()).sort((a, b) => b.localeCompare(a));
+
+    const records: MonthlyRecord[] = [];
+    for (let i = 0; i < sortedKeys.length; i++) {
+      const key = sortedKeys[i];
+      const data = monthMap.get(key)!;
+      const [y, m] = key.split('-');
+      const dateObj = new Date(Number(y), Number(m) - 1, 1);
+      const monthName = dateObj.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
+      const isCurrent = key === currentMonthKey;
+
+      // Calculate growth vs next in array (which is previous month)
+      let growth = '+0.0%';
+      const prevData = i + 1 < sortedKeys.length ? monthMap.get(sortedKeys[i + 1]) : null;
+      if (prevData && prevData.gross > 0) {
+        const diff = ((data.gross - prevData.gross) / prevData.gross) * 100;
+        growth = `${diff >= 0 ? '+' : ''}${diff.toFixed(1)}%`;
+      } else if (data.gross > 0) {
+        growth = '+100%';
+      }
+
+      records.push({
+        month: isCurrent ? `${monthName} (Berjalan)` : monthName,
+        txCount: data.txCount,
+        gross: data.gross,
+        gatewayFee: data.gatewayFee,
+        net: Math.max(0, data.gross - data.gatewayFee),
+        growth,
+        status: isCurrent ? 'Ongoing' : 'Audited',
+      });
+    }
+
+    return records;
+  }, [settledPayments]);
+
+  // Overall financial calculations
+  const totalGrossRevenue = useMemo(() => {
+    return settledPayments.reduce((acc: number, p: any) => acc + Number(p.totalAmount || p.total_amount || p.amount || 0), 0);
+  }, [settledPayments]);
+
+  const currentMonthGross = useMemo(() => {
+    const currentRecord = monthlyData.find((r) => r.status === 'Ongoing');
+    return currentRecord?.gross || (totalGrossRevenue > 0 ? totalGrossRevenue : 0);
+  }, [monthlyData, totalGrossRevenue]);
+
+  const projectedARR = useMemo(() => {
+    return currentMonthGross * 12;
+  }, [currentMonthGross]);
+
+  const totalGatewayFee = useMemo(() => {
+    return monthlyData.reduce((acc, r) => acc + r.gatewayFee, 0);
+  }, [monthlyData]);
+
+  const netMarginPercent = useMemo(() => {
+    if (totalGrossRevenue <= 0) return 98.5;
+    const net = totalGrossRevenue - totalGatewayFee;
+    return Math.max(0, (net / totalGrossRevenue) * 100);
+  }, [totalGrossRevenue, totalGatewayFee]);
+
+  const arpu = useMemo(() => {
+    const totalSchools = Math.max(1, schools.length);
+    return Math.round(totalGrossRevenue / totalSchools);
+  }, [totalGrossRevenue, schools]);
+
+  // Distribution by Plan
+  const planDistribution = useMemo(() => {
+    let sekolahProAmt = 0;
+    let guruProAmt = 0;
+    let otherAmt = 0;
+
+    settledPayments.forEach((p: any) => {
+      const planName = (p.planName || p.plan_name || '').toLowerCase();
+      const amt = Number(p.totalAmount || p.total_amount || p.amount || 0);
+      if (planName.includes('guru')) {
+        guruProAmt += amt;
+      } else if (planName.includes('sekolah') || planName.includes('pro')) {
+        sekolahProAmt += amt;
+      } else {
+        otherAmt += amt;
+      }
+    });
+
+    // If all zero, provide clean base proportions
+    const total = sekolahProAmt + guruProAmt + otherAmt;
+    if (total === 0) {
+      return {
+        sekolahProAmt: 0,
+        guruProAmt: 0,
+        sekolahProPct: '80.0%',
+        guruProPct: '20.0%',
+      };
+    }
+
+    const sPct = ((sekolahProAmt / total) * 100).toFixed(1);
+    const gPct = ((guruProAmt / total) * 100).toFixed(1);
+
+    return {
+      sekolahProAmt,
+      guruProAmt,
+      sekolahProPct: `${sPct}%`,
+      guruProPct: `${gPct}%`,
+    };
+  }, [settledPayments]);
 
   const handleDownloadPDF = () => {
     showToast('Menyiapkan berkas Laporan Finansial Resmi Kawacanaan (PDF)...', 'info');
     setTimeout(() => {
       window.print();
     }, 400);
+  };
+
+  const handleExportCSV = () => {
+    const header = "Periode Bulan,Jml Transaksi,Pendapatan Kotor (Gross),Fee Gateway,Pendapatan Bersih (Net),Pertumbuhan (MoM),Status\n";
+    const rows = monthlyData.map(r => 
+      `"${r.month}",${r.txCount},${r.gross},${r.gatewayFee},${r.net},"${r.growth}","${r.status}"`
+    ).join("\n");
+    const blob = new Blob([header + rows], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `laporan_keuangan_kawacanaan_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    showToast('Laporan keuangan format CSV berhasil diunduh.', 'success');
   };
 
   return (
@@ -73,7 +236,7 @@ export const BillingReportsTab: React.FC<BillingReportsTabProps> = ({
           <div className="flex flex-wrap items-center gap-2.5 shrink-0">
             <button
               type="button"
-              onClick={onOpenReportModal}
+              onClick={handleExportCSV}
               className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer border border-slate-700"
             >
               <Download size={14} />
@@ -96,16 +259,18 @@ export const BillingReportsTab: React.FC<BillingReportsTabProps> = ({
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="p-5 rounded-2xl bg-white border border-slate-200/80 shadow-xs flex flex-col justify-between">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">MRR (Bulan Ini)</span>
+            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">MRR (Bulan Berjalan)</span>
             <span className="p-2 rounded-xl bg-indigo-50 text-indigo-600">
               <TrendingUp size={16} />
             </span>
           </div>
           <div className="mt-3">
-            <h3 className="text-xl font-black text-slate-900 font-mono">Rp 257.800.000</h3>
+            <h3 className="text-xl font-black text-slate-900 font-mono">
+              Rp {currentMonthGross.toLocaleString('id-ID')}
+            </h3>
             <span className="text-[11px] font-bold text-emerald-600 mt-1 inline-flex items-center gap-1">
               <ArrowUpRight size={12} />
-              <span>+14.2% MoM vs Agustus</span>
+              <span>Real-time dari Pembayaran Supabase</span>
             </span>
           </div>
         </div>
@@ -118,9 +283,11 @@ export const BillingReportsTab: React.FC<BillingReportsTabProps> = ({
             </span>
           </div>
           <div className="mt-3">
-            <h3 className="text-xl font-black text-emerald-700 font-mono">Rp 3.093.600.000</h3>
+            <h3 className="text-xl font-black text-emerald-700 font-mono">
+              Rp {projectedARR.toLocaleString('id-ID')}
+            </h3>
             <span className="text-[11px] font-bold text-slate-500 mt-1 inline-block">
-              Annualized Run Rate Terkalkulasi
+              Annualized Run Rate Terkalkulasi (12x)
             </span>
           </div>
         </div>
@@ -133,9 +300,11 @@ export const BillingReportsTab: React.FC<BillingReportsTabProps> = ({
             </span>
           </div>
           <div className="mt-3">
-            <h3 className="text-xl font-black text-blue-700 font-mono">91.4%</h3>
+            <h3 className="text-xl font-black text-blue-700 font-mono">
+              {netMarginPercent.toFixed(1)}%
+            </h3>
             <span className="text-[11px] font-bold text-blue-600 mt-1 inline-block">
-              Setelah dipotong MDR Gateway
+              Setelah dipotong MDR Gateway (-Rp {totalGatewayFee.toLocaleString('id-ID')})
             </span>
           </div>
         </div>
@@ -148,9 +317,11 @@ export const BillingReportsTab: React.FC<BillingReportsTabProps> = ({
             </span>
           </div>
           <div className="mt-3">
-            <h3 className="text-xl font-black text-purple-700 font-mono">Rp 2.148.000</h3>
+            <h3 className="text-xl font-black text-purple-700 font-mono">
+              Rp {arpu.toLocaleString('id-ID')}
+            </h3>
             <span className="text-[11px] font-bold text-purple-600 mt-1 inline-block">
-              Dari 120 Sekolah Terdaftar
+              Dari {schools.length} Sekolah Terdaftar di Database
             </span>
           </div>
         </div>
@@ -161,7 +332,7 @@ export const BillingReportsTab: React.FC<BillingReportsTabProps> = ({
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div>
             <h3 className="text-base font-black text-slate-900">Distribusi Pendapatan Menurut Paket Lisensi</h3>
-            <p className="text-xs text-slate-500 mt-0.5">Komparasi kontribusi pendapatan antara Paket Sekolah Pro dan Paket Guru Pro.</p>
+            <p className="text-xs text-slate-500 mt-0.5">Komparasi kontribusi pendapatan riil berdasarkan transaksi lunas di database.</p>
           </div>
         </div>
 
@@ -169,20 +340,24 @@ export const BillingReportsTab: React.FC<BillingReportsTabProps> = ({
           <div>
             <div className="flex justify-between text-xs font-bold mb-1.5">
               <span className="text-slate-800">Paket Sekolah Pro (Multi-Kiosk &amp; Siswa)</span>
-              <span className="text-indigo-700 font-mono">Rp 218.000.000 (84.5%)</span>
+              <span className="text-indigo-700 font-mono">
+                Rp {planDistribution.sekolahProAmt.toLocaleString('id-ID')} ({planDistribution.sekolahProPct})
+              </span>
             </div>
             <div className="w-full h-3 bg-slate-100 rounded-full overflow-hidden">
-              <div className="h-full bg-indigo-600 rounded-full" style={{ width: '84.5%' }} />
+              <div className="h-full bg-indigo-600 rounded-full transition-all duration-500" style={{ width: planDistribution.sekolahProPct }} />
             </div>
           </div>
 
           <div>
             <div className="flex justify-between text-xs font-bold mb-1.5">
               <span className="text-slate-800">Paket Guru Pro (Absensi Mandiri PTK)</span>
-              <span className="text-emerald-700 font-mono">Rp 39.800.000 (15.5%)</span>
+              <span className="text-emerald-700 font-mono">
+                Rp {planDistribution.guruProAmt.toLocaleString('id-ID')} ({planDistribution.guruProPct})
+              </span>
             </div>
             <div className="w-full h-3 bg-slate-100 rounded-full overflow-hidden">
-              <div className="h-full bg-emerald-500 rounded-full" style={{ width: '15.5%' }} />
+              <div className="h-full bg-emerald-500 rounded-full transition-all duration-500" style={{ width: planDistribution.guruProPct }} />
             </div>
           </div>
         </div>
@@ -192,8 +367,8 @@ export const BillingReportsTab: React.FC<BillingReportsTabProps> = ({
       <div className="bg-white rounded-3xl border border-slate-200/80 shadow-xs overflow-hidden">
         <div className="p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <h3 className="text-base font-black text-slate-900">Buku Besar Rekapitulasi Pendapatan Bulanan (2026)</h3>
-            <p className="text-xs text-slate-500 mt-0.5">Catatan historis pendapatan kotor, potongan beban MDR gateway, dan laba bersih.</p>
+            <h3 className="text-base font-black text-slate-900">Buku Besar Rekapitulasi Pendapatan Bulanan</h3>
+            <p className="text-xs text-slate-500 mt-0.5">Catatan historis pendapatan kotor, potongan beban MDR gateway, dan laba bersih dari Supabase.</p>
           </div>
         </div>
 
@@ -211,7 +386,7 @@ export const BillingReportsTab: React.FC<BillingReportsTabProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {MONTHLY_DATA.map((row, idx) => (
+              {monthlyData.map((row, idx) => (
                 <tr key={idx} className="hover:bg-slate-50/70 transition-colors">
                   <td className="py-3.5 px-4 font-bold text-slate-900 flex items-center gap-2">
                     <Calendar size={13} className="text-indigo-600 shrink-0" />

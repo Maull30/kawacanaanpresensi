@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   TrendingUp,
   PieChart,
@@ -84,35 +84,67 @@ export const MiniSparkline: React.FC<{
 
 /**
  * 2. Interactive 6-Month Revenue & Arrears Trend Line Chart
- * Matches the reference image:
- * Y-Axis: 250 jt, 200 jt, 150 jt, 100 jt, 50 jt, 0
- * X-Axis: Mar 2026, Apr 2026, Mei 2026, Jun 2026, Jul 2026, Agu 2026
- * Curves: Total Pembayaran (Blue) & Tunggakan (Orange)
+ * Computes trend dynamically from real payments in database
  */
-export const RevenueTrendChart: React.FC = () => {
+export const RevenueTrendChart: React.FC<{ payments?: any[] }> = ({ payments = [] }) => {
   const [hoveredMonth, setHoveredMonth] = useState<number | null>(null);
 
-  const months = [
-    { label: 'Mar 2026', revenue: 108000000, revenueFormatted: 'Rp 108 jt', arrears: 24000000, arrearsFormatted: 'Rp 24 jt', x: 45 },
-    { label: 'Apr 2026', revenue: 132000000, revenueFormatted: 'Rp 132 jt', arrears: 21000000, arrearsFormatted: 'Rp 21 jt', x: 125 },
-    { label: 'Mei 2026', revenue: 145000000, revenueFormatted: 'Rp 145 jt', arrears: 28000000, arrearsFormatted: 'Rp 28 jt', x: 205 },
-    { label: 'Jun 2026', revenue: 182000000, revenueFormatted: 'Rp 182 jt', arrears: 19000000, arrearsFormatted: 'Rp 19 jt', x: 285 },
-    { label: 'Jul 2026', revenue: 175000000, revenueFormatted: 'Rp 175 jt', arrears: 44000000, arrearsFormatted: 'Rp 44 jt', x: 365 },
-    { label: 'Agu 2026', revenue: 238000000, revenueFormatted: 'Rp 238 jt', arrears: 32000000, arrearsFormatted: 'Rp 32 jt', x: 445 },
-  ];
+  const months = useMemo(() => {
+    const now = new Date();
+    const result = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const mIdx = d.getMonth();
+      const y = d.getFullYear();
+      const monthShort = d.toLocaleDateString('id-ID', { month: 'short' });
+      const label = `${monthShort} ${y}`;
 
-  // Max value is 250 jt (height mapping: y=20 to y=180, range 160)
+      let revenue = 0;
+      let arrears = 0;
+
+      (payments || []).forEach((p: any) => {
+        const rawDate = p.createdAt || p.created_at;
+        if (!rawDate) return;
+        const pDate = new Date(rawDate);
+        if (pDate.getFullYear() === y && pDate.getMonth() === mIdx) {
+          const amt = Number(p.totalAmount || p.total_amount || p.amount || 0);
+          const isSettled = p.status === 'SETTLED' || p.status === 'paid';
+          const isPending = p.status === 'PENDING' || p.status === 'pending';
+          if (isSettled) revenue += amt;
+          else if (isPending) arrears += amt;
+        }
+      });
+
+      const formatShort = (val: number) => {
+        if (val >= 1000000) return `Rp ${(val / 1000000).toFixed(1).replace('.0', '')} jt`;
+        if (val >= 1000) return `Rp ${(val / 1000).toFixed(0)} rb`;
+        return `Rp ${val.toLocaleString('id-ID')}`;
+      };
+
+      result.push({
+        label,
+        revenue,
+        revenueFormatted: formatShort(revenue),
+        arrears,
+        arrearsFormatted: formatShort(arrears),
+        x: 45 + (5 - i) * 80,
+      });
+    }
+    return result;
+  }, [payments]);
+
+  // Max value calculation based on real data
+  const maxRecorded = Math.max(...months.map(m => Math.max(m.revenue, m.arrears)), 0);
+  const maxVal = maxRecorded > 0 ? Math.ceil((maxRecorded * 1.3) / 10000) * 10000 : 250000;
+
   const getY = (val: number) => {
-    const maxVal = 250000000;
     const ratio = Math.min(1, Math.max(0, val / maxVal));
     return 180 - ratio * 160;
   };
 
-  // SVG paths for smooth Bezier curves
   const revenuePoints = months.map(m => ({ x: m.x, y: getY(m.revenue) }));
   const arrearsPoints = months.map(m => ({ x: m.x, y: getY(m.arrears) }));
 
-  // Helper to create cubic bezier SVG path string
   const createSmoothPath = (pts: { x: number; y: number }[]) => {
     return pts.reduce((acc, pt, i, arr) => {
       if (i === 0) return `M ${pt.x} ${pt.y}`;
@@ -127,8 +159,20 @@ export const RevenueTrendChart: React.FC = () => {
 
   const revenueLinePath = createSmoothPath(revenuePoints);
   const arrearsLinePath = createSmoothPath(arrearsPoints);
-
   const revenueAreaPath = `${revenueLinePath} L ${months[months.length - 1].x} 180 L ${months[0].x} 180 Z`;
+
+  // Total efficiency metric
+  const totalSettledCount = payments.filter((p: any) => p.status === 'SETTLED' || p.status === 'paid').length;
+  const totalValidCount = payments.length;
+  const efficiencyRate = totalValidCount > 0 ? Math.round((totalSettledCount / totalValidCount) * 100) : 100;
+
+  const yLabels = [
+    { label: maxVal >= 1000000 ? `${(maxVal / 1000000).toFixed(0)} jt` : `${(maxVal / 1000).toFixed(0)} rb`, val: maxVal },
+    { label: maxVal * 0.75 >= 1000000 ? `${(maxVal * 0.75 / 1000000).toFixed(1)} jt` : `${(maxVal * 0.75 / 1000).toFixed(0)} rb`, val: maxVal * 0.75 },
+    { label: maxVal * 0.5 >= 1000000 ? `${(maxVal * 0.5 / 1000000).toFixed(1)} jt` : `${(maxVal * 0.5 / 1000).toFixed(0)} rb`, val: maxVal * 0.5 },
+    { label: maxVal * 0.25 >= 1000000 ? `${(maxVal * 0.25 / 1000000).toFixed(1)} jt` : `${(maxVal * 0.25 / 1000).toFixed(0)} rb`, val: maxVal * 0.25 },
+    { label: '0', val: 0 },
+  ];
 
   return (
     <div className="bg-white rounded-2xl border border-slate-100 shadow-xs p-5 flex flex-col justify-between h-full">
@@ -172,14 +216,7 @@ export const RevenueTrendChart: React.FC = () => {
           </defs>
 
           {/* Grid lines & Y-Axis labels */}
-          {[
-            { label: '250 jt', val: 250000000 },
-            { label: '200 jt', val: 200000000 },
-            { label: '150 jt', val: 150000000 },
-            { label: '100 jt', val: 100000000 },
-            { label: '50 jt', val: 50000000 },
-            { label: '0', val: 0 },
-          ].map((grid, i) => {
+          {yLabels.map((grid, i) => {
             const y = getY(grid.val);
             return (
               <g key={i}>
@@ -193,7 +230,7 @@ export const RevenueTrendChart: React.FC = () => {
                   y2={y}
                   stroke="#F1F5F9"
                   strokeWidth="1"
-                  strokeDasharray={i === 5 ? "none" : "3 3"}
+                  strokeDasharray={i === yLabels.length - 1 ? "none" : "3 3"}
                 />
               </g>
             );
@@ -284,16 +321,16 @@ export const RevenueTrendChart: React.FC = () => {
                 {isHovered && (
                   <g>
                     <rect
-                      x={Math.max(10, Math.min(410, m.x - 55))}
+                      x={Math.max(10, Math.min(380, m.x - 55))}
                       y={Math.max(10, ry - 46)}
-                      width="110"
+                      width="120"
                       height="38"
                       rx="6"
                       fill="#0F172A"
                       className="drop-shadow-lg"
                     />
                     <text
-                      x={Math.max(10, Math.min(410, m.x - 55)) + 8}
+                      x={Math.max(10, Math.min(380, m.x - 55)) + 8}
                       y={Math.max(10, ry - 46) + 15}
                       fill="#93C5FD"
                       className="text-[9px] font-bold"
@@ -301,7 +338,7 @@ export const RevenueTrendChart: React.FC = () => {
                       ● Masuk: {m.revenueFormatted}
                     </text>
                     <text
-                      x={Math.max(10, Math.min(410, m.x - 55)) + 8}
+                      x={Math.max(10, Math.min(380, m.x - 55)) + 8}
                       y={Math.max(10, ry - 46) + 29}
                       fill="#FCD34D"
                       className="text-[9px] font-bold"
@@ -317,9 +354,9 @@ export const RevenueTrendChart: React.FC = () => {
       </div>
 
       <div className="pt-2 mt-2 border-t border-slate-50 flex items-center justify-between text-[11px] text-slate-500">
-        <span>Kuartal 3 & 4 Tahun Ajaran 2026/2027</span>
+        <span>Periode Berjalan Tahun Ajaran 2026/2027</span>
         <span className="text-emerald-600 font-bold flex items-center gap-1">
-          <ArrowUpRight size={13} /> +34.2% Efisiensi Penagihan
+          <ArrowUpRight size={13} /> {efficiencyRate}% Efisiensi Penagihan Lunas
         </span>
       </div>
     </div>
@@ -328,28 +365,58 @@ export const RevenueTrendChart: React.FC = () => {
 
 /**
  * 3. Donut Chart for Payment Methods
- * Transfer Bank: 58.1% (Blue)
- * Virtual Account: 22.6% (Green/Mint)
- * QRIS: 12.5% (Purple)
- * E-Wallet: 6.8% (Orange)
- * Center hole displays: "248" + "Transaksi"
+ * Dynamically computed from payments table in Supabase
  */
-export const PaymentMethodDonut: React.FC = () => {
-  const methods = [
-    { label: 'Transfer Bank', pct: 58.1, count: 144, color: '#3B82F6', textClass: 'text-blue-600', dotClass: 'bg-blue-500' },
-    { label: 'Virtual Account', pct: 22.6, count: 56, color: '#10B981', textClass: 'text-emerald-600', dotClass: 'bg-emerald-500' },
-    { label: 'QRIS', pct: 12.5, count: 31, color: '#8B5CF6', textClass: 'text-purple-600', dotClass: 'bg-purple-500' },
-    { label: 'E-Wallet', pct: 6.8, count: 17, color: '#F59E0B', textClass: 'text-amber-500', dotClass: 'bg-amber-500' },
-  ];
+export const PaymentMethodDonut: React.FC<{ payments?: any[] }> = ({ payments = [] }) => {
+  const { methods, totalCount } = useMemo(() => {
+    let transfer = 0;
+    let va = 0;
+    let qris = 0;
+    let ewallet = 0;
+    let other = 0;
+
+    payments.forEach((p: any) => {
+      const m = String(p.paymentMethod || p.payment_method || '').toLowerCase();
+      if (m.includes('qris')) qris++;
+      else if (m.includes('va') || m.includes('virtual') || m.includes('bca') || m.includes('bri') || m.includes('bni') || m.includes('mandiri')) va++;
+      else if (m.includes('wallet') || m.includes('gopay') || m.includes('ovo') || m.includes('dana') || m.includes('shopee')) ewallet++;
+      else if (m.includes('transfer') || m.includes('bank') || m.includes('manual') || m.includes('direct') || m.includes('superadmin')) transfer++;
+      else if (m) other++;
+      else transfer++;
+    });
+
+    const total = payments.length;
+    if (total === 0) {
+      return {
+        totalCount: 0,
+        methods: [
+          { label: 'Transfer Bank', pct: 0, count: 0, color: '#3B82F6', dotClass: 'bg-blue-500' },
+          { label: 'Virtual Account', pct: 0, count: 0, color: '#10B981', dotClass: 'bg-emerald-500' },
+          { label: 'QRIS', pct: 0, count: 0, color: '#8B5CF6', dotClass: 'bg-purple-500' },
+          { label: 'E-Wallet', pct: 0, count: 0, color: '#F59E0B', dotClass: 'bg-amber-500' },
+        ],
+      };
+    }
+
+    const calcPct = (cnt: number) => Math.round((cnt / total) * 1000) / 10;
+    return {
+      totalCount: total,
+      methods: [
+        { label: 'Transfer Bank', pct: calcPct(transfer), count: transfer, color: '#3B82F6', dotClass: 'bg-blue-500' },
+        { label: 'Virtual Account', pct: calcPct(va), count: va, color: '#10B981', dotClass: 'bg-emerald-500' },
+        { label: 'QRIS', pct: calcPct(qris), count: qris, color: '#8B5CF6', dotClass: 'bg-purple-500' },
+        { label: 'E-Wallet / Lain', pct: calcPct(ewallet + other), count: ewallet + other, color: '#F59E0B', dotClass: 'bg-amber-500' },
+      ],
+    };
+  }, [payments]);
 
   // Circumference of radius 52 is 2 * PI * 52 ≈ 326.7
   const circumference = 326.7;
 
-  // Calculate stroke-dasharray and offsets
-  const seg1 = (58.1 / 100) * circumference;
-  const seg2 = (22.6 / 100) * circumference;
-  const seg3 = (12.5 / 100) * circumference;
-  const seg4 = (6.8 / 100) * circumference;
+  const seg1 = ((methods[0]?.pct || 0) / 100) * circumference;
+  const seg2 = ((methods[1]?.pct || 0) / 100) * circumference;
+  const seg3 = ((methods[2]?.pct || 0) / 100) * circumference;
+  const seg4 = ((methods[3]?.pct || 0) / 100) * circumference;
 
   const offset1 = 0;
   const offset2 = -seg1;
@@ -366,7 +433,7 @@ export const PaymentMethodDonut: React.FC = () => {
           </div>
           <div>
             <h3 className="text-sm font-bold text-slate-900">Metode Pembayaran</h3>
-            <p className="text-[11px] text-slate-400">Distribusi kanal transaksi</p>
+            <p className="text-[11px] text-slate-400">Distribusi kanal transaksi nyata</p>
           </div>
         </div>
       </div>
@@ -385,59 +452,71 @@ export const PaymentMethodDonut: React.FC = () => {
               stroke="#F1F5F9"
               strokeWidth="16"
             />
-            {/* Segment 1: Transfer Bank */}
-            <circle
-              cx="65"
-              cy="65"
-              r="52"
-              fill="transparent"
-              stroke="#3B82F6"
-              strokeWidth="16"
-              strokeDasharray={`${seg1} ${circumference - seg1}`}
-              strokeDashoffset={offset1}
-              strokeLinecap="round"
-            />
-            {/* Segment 2: Virtual Account */}
-            <circle
-              cx="65"
-              cy="65"
-              r="52"
-              fill="transparent"
-              stroke="#10B981"
-              strokeWidth="16"
-              strokeDasharray={`${seg2} ${circumference - seg2}`}
-              strokeDashoffset={offset2}
-              strokeLinecap="round"
-            />
-            {/* Segment 3: QRIS */}
-            <circle
-              cx="65"
-              cy="65"
-              r="52"
-              fill="transparent"
-              stroke="#8B5CF6"
-              strokeWidth="16"
-              strokeDasharray={`${seg3} ${circumference - seg3}`}
-              strokeDashoffset={offset3}
-              strokeLinecap="round"
-            />
-            {/* Segment 4: E-Wallet */}
-            <circle
-              cx="65"
-              cy="65"
-              r="52"
-              fill="transparent"
-              stroke="#F59E0B"
-              strokeWidth="16"
-              strokeDasharray={`${seg4} ${circumference - seg4}`}
-              strokeDashoffset={offset4}
-              strokeLinecap="round"
-            />
+            {totalCount > 0 ? (
+              <>
+                {/* Segment 1: Transfer Bank */}
+                {seg1 > 0 && (
+                  <circle
+                    cx="65"
+                    cy="65"
+                    r="52"
+                    fill="transparent"
+                    stroke="#3B82F6"
+                    strokeWidth="16"
+                    strokeDasharray={`${seg1} ${circumference - seg1}`}
+                    strokeDashoffset={offset1}
+                    strokeLinecap="round"
+                  />
+                )}
+                {/* Segment 2: Virtual Account */}
+                {seg2 > 0 && (
+                  <circle
+                    cx="65"
+                    cy="65"
+                    r="52"
+                    fill="transparent"
+                    stroke="#10B981"
+                    strokeWidth="16"
+                    strokeDasharray={`${seg2} ${circumference - seg2}`}
+                    strokeDashoffset={offset2}
+                    strokeLinecap="round"
+                  />
+                )}
+                {/* Segment 3: QRIS */}
+                {seg3 > 0 && (
+                  <circle
+                    cx="65"
+                    cy="65"
+                    r="52"
+                    fill="transparent"
+                    stroke="#8B5CF6"
+                    strokeWidth="16"
+                    strokeDasharray={`${seg3} ${circumference - seg3}`}
+                    strokeDashoffset={offset3}
+                    strokeLinecap="round"
+                  />
+                )}
+                {/* Segment 4: E-Wallet */}
+                {seg4 > 0 && (
+                  <circle
+                    cx="65"
+                    cy="65"
+                    r="52"
+                    fill="transparent"
+                    stroke="#F59E0B"
+                    strokeWidth="16"
+                    strokeDasharray={`${seg4} ${circumference - seg4}`}
+                    strokeDashoffset={offset4}
+                    strokeLinecap="round"
+                  />
+                )}
+              </>
+            ) : null}
           </svg>
 
-          {/* Center Hole Text: 248 Transaksi */}
+          {/* Center Hole Text */}
           <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none select-none">
-            <span className="text-xl font-black text-slate-900 tracking-tight leading-none">248</span>
+            <span className="text-xl font-black text-slate-900 tracking-tight leading-none">{totalCount}</span>
             <span className="text-[10px] font-semibold text-slate-400 mt-0.5">Transaksi</span>
           </div>
         </div>
@@ -450,16 +529,18 @@ export const PaymentMethodDonut: React.FC = () => {
                 <span className={`w-2.5 h-2.5 rounded-full ${m.dotClass}`} />
                 <span className="font-medium text-slate-700 text-[11px] truncate">{m.label}</span>
               </div>
-              <span className="font-black text-slate-900 text-xs">{m.pct}%</span>
+              <span className="font-black text-slate-900 text-xs">
+                {m.pct}% ({m.count})
+              </span>
             </div>
           ))}
         </div>
       </div>
 
       <div className="pt-2 mt-2 border-t border-slate-50 flex items-center justify-between text-[11px] text-slate-400">
-        <span>BCA & Mandiri kanal terfavorit</span>
-        <span className="font-semibold text-blue-600 cursor-pointer hover:underline">
-          Detail kanal →
+        <span>Kanal pembayaran terverifikasi</span>
+        <span className="font-semibold text-blue-600">
+          Data riil Supabase
         </span>
       </div>
     </div>
@@ -575,61 +656,61 @@ export const BillingQuickActions: React.FC<{
  * 5. Feed Aktivitas Terbaru & Widget Bantuan (Right Sidebar Column)
  */
 export const RecentActivitiesFeed: React.FC<{
+  payments?: any[];
   onOpenSupport: () => void;
   onViewAllActivities: () => void;
-}> = ({ onOpenSupport, onViewAllActivities }) => {
-  const activities = [
-    {
-      id: 'act-1',
-      title: 'Pembayaran berhasil',
-      subtitle: 'Rina Putri - SDN KAWUNG LUWUK',
-      amount: 'Rp 25.000',
-      time: '10:24',
-      type: 'success',
-      icon: CheckCircle2,
-      color: 'bg-emerald-50 text-emerald-600',
-    },
-    {
-      id: 'act-2',
-      title: 'Tagihan baru dibuat',
-      subtitle: 'Andi Saputra - SMKN 1 Luwuk',
-      amount: 'Rp 150.000',
-      time: '09:50',
-      type: 'purple',
-      icon: FileText,
-      color: 'bg-purple-50 text-purple-600',
-    },
-    {
-      id: 'act-3',
-      title: 'Pembayaran berhasil',
-      subtitle: 'Siti Nurhaliza - SMPN 1 Luwuk',
-      amount: 'Rp 75.000',
-      time: '16:43',
-      type: 'success',
-      icon: CheckCircle2,
-      color: 'bg-emerald-50 text-emerald-600',
-    },
-    {
-      id: 'act-4',
-      title: 'Tunggakan terdeteksi',
-      subtitle: 'Budi Santoso - SMK Negeri 1 Luwuk',
-      amount: 'Rp 120.000',
-      time: '14:20',
-      type: 'danger',
-      icon: AlertTriangle,
-      color: 'bg-rose-50 text-rose-600',
-    },
-    {
-      id: 'act-5',
-      title: 'Laporan bulanan selesai',
-      subtitle: 'Rekap pembayaran September 2026',
-      amount: '',
-      time: '12:10',
-      type: 'info',
-      icon: FileSpreadsheet,
-      color: 'bg-blue-50 text-blue-600',
-    },
-  ];
+}> = ({ payments = [], onOpenSupport, onViewAllActivities }) => {
+  const activities = useMemo(() => {
+    if (!payments || payments.length === 0) {
+      return [];
+    }
+
+    return payments.slice(0, 5).map((p: any) => {
+      const isSettled = p.status === 'SETTLED' || p.status === 'paid';
+      const isPending = p.status === 'PENDING' || p.status === 'pending';
+      const amt = Number(p.totalAmount || p.total_amount || p.amount || 0);
+      const rawDate = p.paidAt || p.paid_at || p.createdAt || p.created_at;
+      const d = rawDate ? new Date(rawDate) : new Date();
+      const timeStr = d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' });
+
+      if (isSettled) {
+        return {
+          id: p.id || String(Math.random()),
+          title: 'Pembayaran Lunas',
+          subtitle: `${p.schoolName || p.school_name || 'Sekolah'} - ${p.planName || 'Paket Pro'}`,
+          amount: `Rp ${amt.toLocaleString('id-ID')}`,
+          time: timeStr,
+          type: 'success',
+          icon: CheckCircle2,
+          color: 'bg-emerald-50 text-emerald-600',
+        };
+      }
+
+      if (isPending) {
+        return {
+          id: p.id || String(Math.random()),
+          title: 'Menunggu Pembayaran',
+          subtitle: `${p.schoolName || p.school_name || 'Sekolah'} - ${p.invoiceNo || p.invoice_no || 'Tagihan'}`,
+          amount: `Rp ${amt.toLocaleString('id-ID')}`,
+          time: timeStr,
+          type: 'warning',
+          icon: Clock,
+          color: 'bg-amber-50 text-amber-600',
+        };
+      }
+
+      return {
+        id: p.id || String(Math.random()),
+        title: 'Transaksi Dibatalkan / Expired',
+        subtitle: `${p.schoolName || p.school_name || 'Sekolah'} - ${p.invoiceNo || p.invoice_no || ''}`,
+        amount: amt > 0 ? `Rp ${amt.toLocaleString('id-ID')}` : '',
+        time: timeStr,
+        type: 'danger',
+        icon: AlertTriangle,
+        color: 'bg-rose-50 text-rose-600',
+      };
+    });
+  }, [payments]);
 
   return (
     <div className="space-y-4">
@@ -650,39 +731,47 @@ export const RecentActivitiesFeed: React.FC<{
         </div>
 
         {/* Activity Items List */}
-        <div className="divide-y divide-slate-100 space-y-2">
-          {activities.map((item) => {
-            const Icon = item.icon;
-            return (
-              <div key={item.id} className="pt-2.5 first:pt-0 flex items-start justify-between gap-3">
-                <div className="flex items-start gap-2.5 min-w-0">
-                  <div className={`w-8 h-8 rounded-xl ${item.color} flex items-center justify-center shrink-0 mt-0.5`}>
-                    <Icon size={15} />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="text-xs font-bold text-slate-800 truncate leading-snug">
-                      {item.title}
+        {activities.length > 0 ? (
+          <div className="divide-y divide-slate-100 space-y-2">
+            {activities.map((item) => {
+              const Icon = item.icon;
+              return (
+                <div key={item.id} className="pt-2.5 first:pt-0 flex items-start justify-between gap-3">
+                  <div className="flex items-start gap-2.5 min-w-0">
+                    <div className={`w-8 h-8 rounded-xl ${item.color} flex items-center justify-center shrink-0 mt-0.5`}>
+                      <Icon size={15} />
                     </div>
-                    <div className="text-[10.5px] text-slate-400 truncate mt-0.5">
-                      {item.subtitle}
+                    <div className="min-w-0">
+                      <div className="text-xs font-bold text-slate-800 truncate leading-snug">
+                        {item.title}
+                      </div>
+                      <div className="text-[10.5px] text-slate-400 truncate mt-0.5">
+                        {item.subtitle}
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                <div className="text-right shrink-0">
-                  {item.amount && (
-                    <div className={`text-[11px] font-bold ${item.type === 'danger' ? 'text-rose-600' : 'text-slate-800'}`}>
-                      {item.amount}
+                  <div className="text-right shrink-0">
+                    {item.amount && (
+                      <div className={`text-[11px] font-bold ${item.type === 'danger' ? 'text-rose-600' : 'text-slate-800'}`}>
+                        {item.amount}
+                      </div>
+                    )}
+                    <div className="text-[10px] text-slate-400 mt-0.5 font-medium">
+                      {item.time}
                     </div>
-                  )}
-                  <div className="text-[10px] text-slate-400 mt-0.5 font-medium">
-                    {item.time}
                   </div>
                 </div>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="py-6 text-center text-slate-400">
+            <Clock size={24} className="mx-auto mb-2 text-slate-300" />
+            <p className="text-xs font-medium">Belum ada riwayat aktivitas transaksi.</p>
+            <p className="text-[11px] text-slate-400 mt-0.5">Data pembayaran akan tercatat otomatis di sini.</p>
+          </div>
+        )}
       </div>
 
       {/* Widget Butuh Bantuan? */}

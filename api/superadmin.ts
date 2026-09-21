@@ -321,6 +321,8 @@ export default async function handler(req:any,res:any){
             is_production: false,
             merchant_id: merchantId,
             enabled,
+            fee_bearer: dbMidtrans.fee_bearer || 'tenant',
+            channels: dbMidtrans.channels || null,
             is_server_key_configured: Boolean(serverKey && serverKey.length > 0)
           }
         });
@@ -337,6 +339,8 @@ export default async function handler(req:any,res:any){
         is_production: false, // Selalu false untuk sandbox
         merchant_id: midtransData.merchant_id !== undefined ? midtransData.merchant_id.trim() : merchantId,
         enabled: midtransData.enabled !== undefined ? Boolean(midtransData.enabled) : enabled,
+        fee_bearer: midtransData.fee_bearer || dbMidtrans.fee_bearer || 'tenant',
+        channels: midtransData.channels !== undefined ? midtransData.channels : (dbMidtrans.channels || null),
       };
 
       const integrations = { ...(settings?.integrations || {}), midtrans_config: updatedMidtransConfig };
@@ -352,6 +356,8 @@ export default async function handler(req:any,res:any){
           is_production: false,
           merchant_id: updatedMidtransConfig.merchant_id,
           enabled: updatedMidtransConfig.enabled,
+          fee_bearer: updatedMidtransConfig.fee_bearer,
+          channels: updatedMidtransConfig.channels,
           is_server_key_configured: Boolean(finalServerKey && finalServerKey.length > 0)
         }
       });
@@ -1207,6 +1213,7 @@ export default async function handler(req:any,res:any){
           amount:Number(p.amount),
           uniqueCode:Number(p.unique_code),
           totalAmount:Number(p.total_amount),
+          schoolId:p.school_id,
           schoolName:p.school_name,
           npsn:p.npsn||'',
           contactName:p.contact_name,

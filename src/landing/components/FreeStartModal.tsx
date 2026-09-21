@@ -8,6 +8,7 @@ import {
   ArrowRight,
   ArrowLeft,
   User,
+  Building2,
   Mail,
   Lock,
   Eye,
@@ -48,6 +49,7 @@ export const FreeStartModal: React.FC<FreeStartModalProps> = ({
   const [selectedRole, setSelectedRole] = useState<RoleType>('homeroom');
 
   // Form Fields
+  const [schoolName, setSchoolName] = useState('');
   const [fullName, setFullName] = useState('');
   const [username, setUsername] = useState('');
   const [usernameManuallyEdited, setUsernameManuallyEdited] = useState(false);
@@ -91,9 +93,14 @@ export const FreeStartModal: React.FC<FreeStartModalProps> = ({
     e.preventDefault();
     setFormError('');
 
+    const cleanSchool = schoolName.trim();
     const cleanName = fullName.trim();
     const cleanUsername = username.trim().toLowerCase();
 
+    if (!cleanSchool) {
+      setFormError(lang === 'ID' ? 'Nama satuan pendidikan wajib diisi.' : 'School name is required.');
+      return;
+    }
     if (!cleanName) {
       setFormError(lang === 'ID' ? 'Nama lengkap wajib diisi.' : 'Full name is required.');
       return;
@@ -148,7 +155,8 @@ export const FreeStartModal: React.FC<FreeStartModalProps> = ({
         grade: 1,
         className: 'Kelas 1',
         subjectName: selectedRole === 'subject' ? 'Guru Mata Pelajaran' : undefined,
-        workspaceName: selectedRole === 'homeroom' ? `Ruang Kerja Wali Kelas - ${cleanName}` : `Ruang Kerja Guru Mapel - ${cleanName}`,
+        workspaceName: cleanSchool,
+        schoolName: cleanSchool,
         schoolId: null,
       };
 
@@ -169,6 +177,7 @@ export const FreeStartModal: React.FC<FreeStartModalProps> = ({
         localStorage.removeItem('kawacanaan_cached_school_ws');
         localStorage.removeItem('kawacanaan_last_workspace_id');
         localStorage.setItem('kawacanaan_last_registered_name', cleanName);
+        localStorage.setItem('kawacanaan_last_registered_school', cleanSchool);
         localStorage.setItem('kawacanaan_last_registered_role', payloadRole);
         if (data.userId && data.schoolId) {
           localStorage.setItem(`kawacanaan_last_workspace_id_${data.userId}`, data.schoolId);
@@ -178,7 +187,7 @@ export const FreeStartModal: React.FC<FreeStartModalProps> = ({
             workspaceId: data.schoolId,
             workspaceCode: null,
             role: payloadRole,
-            workspaceName: 'Ruang Kerja Individu',
+            workspaceName: cleanSchool,
             workspaceType: 'personal',
             registrationMode: 'personal',
             npsn: null,
@@ -192,7 +201,7 @@ export const FreeStartModal: React.FC<FreeStartModalProps> = ({
       // Siapkan data kredensial untuk ditampilkan pada kartu kredensial login
       const credentialPayload: LoginCredentialCardData = {
         workspaceType: 'personal',
-        schoolName: selectedRole === 'homeroom' ? `Ruang Kerja Wali Kelas - ${cleanName}` : `Ruang Kerja Guru Mapel - ${cleanName}`,
+        schoolName: cleanSchool,
         personInCharge: `${cleanName} (${selectedRole === 'homeroom' ? 'Wali Kelas' : 'Guru Mapel'})`,
         username: cleanUsername,
         password: password,
@@ -569,6 +578,25 @@ export const FreeStartModal: React.FC<FreeStartModalProps> = ({
               )}
 
               <form onSubmit={handleSubmit} className="space-y-3.5">
+                {/* Nama Satuan Pendidikan (Setelah Pemilihan Peran) */}
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                    {lang === 'ID' ? 'Nama Satuan Pendidikan' : 'Educational Unit / School Name'} <span className="text-rose-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <Building2 className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      required
+                      value={schoolName}
+                      onChange={(e) => setSchoolName(e.target.value)}
+                      placeholder={lang === 'ID' ? 'Contoh: SDN 1 Kawacanaan' : 'e.g. Kawacanaan Elementary School'}
+                      className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm font-medium text-slate-900 bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-600/20 outline-none transition-all h-11"
+                      id="input-free-schoolname"
+                    />
+                  </div>
+                </div>
+
                 {/* Nama Lengkap */}
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">

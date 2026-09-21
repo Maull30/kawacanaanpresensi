@@ -220,6 +220,23 @@ const MainAppContent: React.FC = () => {
     return () => window.removeEventListener('popstate', handlePopState);
   }, [currentUser, isAuthChecking, isLoginPreparing]);
 
+  React.useEffect(() => {
+    if (currentUser) {
+      if (activeView === 'login') {
+        const targetView = defaultViewForRole(currentUser.role);
+        setActiveView(targetView);
+      }
+      setShowLanding(false);
+      try {
+        const url = new URL(window.location.href);
+        if (url.searchParams.get('page') === 'login') {
+          url.searchParams.delete('page');
+          window.history.pushState(null, '', url.pathname + (url.search ? url.search : ''));
+        }
+      } catch (_) {}
+    }
+  }, [currentUser, activeView, setActiveView]);
+
   const handleEnterSystem = () => {
     setShowLanding(false);
     setActiveView('login');
@@ -276,7 +293,7 @@ const MainAppContent: React.FC = () => {
   if ((isLoginPreparing || isAuthCallbackUrl()) && !currentUser) {
     return (
       <>
-        <LoginView onBackToLanding={handleBackToLanding} />
+        <LoginView onBackToLanding={handleBackToLanding} onEnterDashboard={handleEnterDashboard} />
         <ToastContainer />
       </>
     );
@@ -300,7 +317,7 @@ const MainAppContent: React.FC = () => {
   if (!currentUser || activeView === 'login') {
     return (
       <>
-        <LoginView onBackToLanding={handleBackToLanding} />
+        <LoginView onBackToLanding={handleBackToLanding} onEnterDashboard={handleEnterDashboard} />
         <ToastContainer />
       </>
     );

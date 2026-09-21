@@ -19,11 +19,25 @@ export default async function handler(req: any, res: any) {
   }
 
   // 2. Cari di profiles berdasarkan username ATAU email
-  const { data } = await db.from('profiles')
+  let foundEmail = '';
+  const { data: userByUsername } = await db.from('profiles')
     .select('email, username')
-    .or(`username.ilike.${identifier},email.ilike.${identifier}`)
+    .eq('username', identifier)
     .eq('is_active', true)
     .maybeSingle();
 
-  return json(res, 200, { ok: true, email: data?.email || (identifier.includes('@') ? identifier : `${identifier}@login.edushift.local`) });
+  if (userByUsername?.email) {
+    foundEmail = userByUsername.email;
+  } else {
+    const { data: userByEmail } = await db.from('profiles')
+      .select('email, username')
+      .eq('email', identifier)
+      .eq('is_active', true)
+      .maybeSingle();
+    if (userByEmail?.email) {
+      foundEmail = userByEmail.email;
+    }
+  }
+
+  return json(res, 200, { ok: true, email: foundEmail || (identifier.includes('@') ? identifier : `${identifier}@login.edushift.local`) });
 }

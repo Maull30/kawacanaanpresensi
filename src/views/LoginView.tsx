@@ -26,9 +26,10 @@ import {
 
 interface LoginViewProps {
   onBackToLanding?: () => void;
+  onEnterDashboard?: () => void;
 }
 
-export const LoginView: React.FC<LoginViewProps> = ({ onBackToLanding }) => {
+export const LoginView: React.FC<LoginViewProps> = ({ onBackToLanding, onEnterDashboard }) => {
   const {
     showToast,
     schoolProfile,
@@ -36,6 +37,8 @@ export const LoginView: React.FC<LoginViewProps> = ({ onBackToLanding }) => {
     openOnboarding,
     loadData,
     loginWithCredentials,
+    currentUser,
+    setActiveView,
     isLoginPreparing,
     loginProgressMessage,
     loginStep,
@@ -153,6 +156,21 @@ export const LoginView: React.FC<LoginViewProps> = ({ onBackToLanding }) => {
     }
   }, [registrationRequired, openOnboarding]);
 
+  useEffect(() => {
+    if (currentUser) {
+      if (onEnterDashboard) {
+        onEnterDashboard();
+      } else {
+        setActiveView('dashboard');
+        try {
+          const url = new URL(window.location.href);
+          url.searchParams.delete('page');
+          window.history.pushState(null, '', url.pathname + (url.search ? url.search : ''));
+        } catch (_) {}
+      }
+    }
+  }, [currentUser, onEnterDashboard, setActiveView]);
+
   // Handle standard login through Supabase Auth.
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -184,6 +202,16 @@ export const LoginView: React.FC<LoginViewProps> = ({ onBackToLanding }) => {
 
       showToast('Login berhasil. Selamat datang!', 'success');
       // Transisi ke dashboard ditangani langsung dengan data yang sudah 100% siap
+      if (onEnterDashboard) {
+        onEnterDashboard();
+      } else {
+        setActiveView('dashboard');
+        try {
+          const url = new URL(window.location.href);
+          url.searchParams.delete('page');
+          window.history.pushState(null, '', url.pathname + (url.search ? url.search : ''));
+        } catch (_) {}
+      }
     } catch (err: any) {
       console.error('Login error:', err);
       setErrorMessage(err?.message || 'Terjadi kendala saat proses autentikasi. Silakan coba lagi.');
@@ -656,8 +684,33 @@ export const LoginView: React.FC<LoginViewProps> = ({ onBackToLanding }) => {
       <FreeStartModal
         isOpen={isFreeStartOpen}
         onClose={() => setIsFreeStartOpen(false)}
-        onOpenLogin={() => setIsFreeStartOpen(false)}
-        onEnterSystem={() => setIsFreeStartOpen(false)}
+        onOpenLogin={(prefill) => {
+          setIsFreeStartOpen(false);
+          if (prefill?.username) {
+            setEmailOrUser(prefill.username);
+            if (prefill.password) {
+              setPassword(prefill.password);
+            }
+            setErrorMessage('');
+            setResetSuccessMessage('Akun baru berhasil dibuat. Silakan klik Masuk untuk mulai menggunakan sistem.');
+          }
+        }}
+        onEnterSystem={() => {
+          setIsFreeStartOpen(false);
+          if (onEnterDashboard) {
+            onEnterDashboard();
+          } else {
+            setActiveView('dashboard');
+          }
+        }}
+        onEnterDashboard={() => {
+          setIsFreeStartOpen(false);
+          if (onEnterDashboard) {
+            onEnterDashboard();
+          } else {
+            setActiveView('dashboard');
+          }
+        }}
         lang="ID"
       />
     </div>

@@ -55,7 +55,15 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onEnterSystem,
   };
 
   // Membuka login sistem presensi sekolah dasar
-  const handleOpenLogin = () => {
+  const handleOpenLogin = (prefill?: { username: string; password?: string }) => {
+    if (prefill?.username) {
+      try {
+        sessionStorage.setItem('kwc_prefill_username', prefill.username);
+        if (prefill.password) {
+          sessionStorage.setItem('kwc_prefill_password', prefill.password);
+        }
+      } catch (_) {}
+    }
     onEnterSystem();
   };
 

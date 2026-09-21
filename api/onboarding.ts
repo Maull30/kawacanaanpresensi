@@ -1740,7 +1740,8 @@ export default async function handler(req: any, res: any) {
 
       if (mode === 'personal' || !finalSchoolId) {
         const isPersonal = mode === 'personal';
-        wsName = isPersonal ? 'Ruang Kerja Individu' : String(body.workspaceName || `Ruang Kerja ${fullName}`).trim();
+        const inputSchoolName = String(body.schoolName || body.workspaceName || '').trim();
+        wsName = inputSchoolName || (isPersonal ? 'Ruang Kerja Individu' : `Ruang Kerja ${fullName}`);
         const trial = calculateGuruProTrialPeriod();
         const inviteCode = generateSchoolInviteCode();
         // Seluruh pendaftaran akun baru mandiri dimulai dari Paket Guru Gratis (guru_gratis).
@@ -1767,10 +1768,10 @@ export default async function handler(req: any, res: any) {
         newSchoolRecord = newSchool;
         finalSchoolId = newSchool.id;
 
-        // Untuk Ruang Kerja Individu baru, nama satuan pendidikan tetap KOSONG (tidak diisi otomatis oleh sistem)
+        // Nama satuan pendidikan diisi sesuai input pendaftar
         await db.from('school_profile').upsert({
           school_id: finalSchoolId,
-          nama_sekolah: isPersonal ? '' : wsName,
+          nama_sekolah: inputSchoolName || (isPersonal ? '' : wsName),
           npsn: '',
           jenjang: 'SD',
           nama_wali_kelas: role === 'WALI KELAS' ? fullName : '',
@@ -1784,7 +1785,7 @@ export default async function handler(req: any, res: any) {
         await db.from('system_config').insert({
           school_id: finalSchoolId,
           app_title: 'Kawacanaan Presensi',
-          app_subtitle: isPersonal ? '' : wsName,
+          app_subtitle: inputSchoolName || (isPersonal ? '' : wsName),
         });
 
         // Kelas untuk sekolah diproses setelah teacher berhasil dibuat.
@@ -1894,7 +1895,7 @@ export default async function handler(req: any, res: any) {
             ...(mode === 'personal'
               ? {
                   personal_workspace_id: finalSchoolId,
-                  personal_workspace_name: 'Ruang Kerja Individu',
+                  personal_workspace_name: wsName || 'Ruang Kerja Individu',
                 }
               : {
                   school_workspace_id: finalSchoolId,

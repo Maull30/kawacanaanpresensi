@@ -26,7 +26,7 @@ import { LoginCredentialCard, LoginCredentialCardData } from './LoginCredentialC
 interface FreeStartModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onOpenLogin: () => void;
+  onOpenLogin: (prefill?: { username: string; password?: string }) => void;
   onEnterSystem: () => void;
   onEnterDashboard?: () => void;
   lang: 'ID' | 'EN';
@@ -43,6 +43,16 @@ export const FreeStartModal: React.FC<FreeStartModalProps> = ({
   lang,
 }) => {
   const { loginWithCredentials, setActiveView } = useApp();
+
+  const handleModalClose = () => {
+    if (createdCredentialData) {
+      onOpenLogin({
+        username: createdCredentialData.username,
+        password: createdCredentialData.password,
+      });
+    }
+    onClose();
+  };
 
   // Wizard Steps: 1 = Pilih Peran, 2 = Formulir Identitas & Akun, 3 = Selesai & Kartu Kredensial
   const [step, setStep] = useState<1 | 2 | 3>(1);
@@ -230,7 +240,10 @@ export const FreeStartModal: React.FC<FreeStartModalProps> = ({
       if (!loginResult.success) {
         const retryEmailResult = await loginWithCredentials(cleanEmail, createdCredentialData.password);
         if (!retryEmailResult.success) {
-          onOpenLogin();
+          onOpenLogin({
+            username: createdCredentialData.username,
+            password: createdCredentialData.password,
+          });
           onClose();
           return;
         }
@@ -239,6 +252,8 @@ export const FreeStartModal: React.FC<FreeStartModalProps> = ({
       setActiveView('dashboard');
       if (onEnterDashboard) {
         onEnterDashboard();
+      } else if (onEnterSystem) {
+        onEnterSystem();
       } else {
         try {
           const url = new URL(window.location.href);
@@ -249,7 +264,14 @@ export const FreeStartModal: React.FC<FreeStartModalProps> = ({
       onClose();
     } catch (err) {
       console.error(err);
-      onOpenLogin();
+      if (createdCredentialData) {
+        onOpenLogin({
+          username: createdCredentialData.username,
+          password: createdCredentialData.password,
+        });
+      } else {
+        onOpenLogin();
+      }
       onClose();
     } finally {
       setIsEnteringSystem(false);
@@ -332,7 +354,7 @@ export const FreeStartModal: React.FC<FreeStartModalProps> = ({
             {/* Close Button */}
             <button
               type="button"
-              onClick={onClose}
+              onClick={handleModalClose}
               className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-full transition-colors cursor-pointer min-w-[32px] min-h-[32px] flex items-center justify-center"
               aria-label="Tutup"
             >
@@ -729,6 +751,21 @@ export const FreeStartModal: React.FC<FreeStartModalProps> = ({
                         <ArrowRight size={16} />
                       </>
                     )}
+                  </button>
+                </div>
+
+                {/* Tautan kembali ke Login jika sudah memiliki akun */}
+                <div className="pt-2 text-center text-xs text-slate-500 font-medium">
+                  <span>{lang === 'ID' ? 'Sudah memiliki akun? ' : 'Already have an account? '}</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onClose();
+                      onOpenLogin(username ? { username } : undefined);
+                    }}
+                    className="font-bold text-blue-600 hover:underline cursor-pointer"
+                  >
+                    {lang === 'ID' ? 'Masuk di sini' : 'Sign in here'}
                   </button>
                 </div>
               </form>

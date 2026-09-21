@@ -15,10 +15,12 @@ import {
   AlertCircle,
   Loader2,
   X,
+  CheckCircle2,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import waliKelasWanitaImg from '../../assets/images/wali_kelas_wanita_1789830539387.jpg';
 import guruMapelPriaImg from '../../assets/images/guru_mapel_pria_1789830556851.jpg';
+import { LoginCredentialCard, LoginCredentialCardData } from './LoginCredentialCard';
 
 interface FreeStartModalProps {
   isOpen: boolean;
@@ -41,8 +43,8 @@ export const FreeStartModal: React.FC<FreeStartModalProps> = ({
 }) => {
   const { loginWithCredentials, setActiveView } = useApp();
 
-  // Wizard Steps: 1 = Pilih Peran, 2 = Formulir Identitas & Akun
-  const [step, setStep] = useState<1 | 2>(1);
+  // Wizard Steps: 1 = Pilih Peran, 2 = Formulir Identitas & Akun, 3 = Selesai & Kartu Kredensial
+  const [step, setStep] = useState<1 | 2 | 3>(1);
   const [selectedRole, setSelectedRole] = useState<RoleType>('homeroom');
 
   // Form Fields
@@ -56,7 +58,9 @@ export const FreeStartModal: React.FC<FreeStartModalProps> = ({
 
   // Submission & Error State
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isEnteringSystem, setIsEnteringSystem] = useState(false);
   const [formError, setFormError] = useState('');
+  const [createdCredentialData, setCreatedCredentialData] = useState<LoginCredentialCardData | null>(null);
 
   if (!isOpen) return null;
 
@@ -185,12 +189,41 @@ export const FreeStartModal: React.FC<FreeStartModalProps> = ({
         }
       } catch (_) {}
 
-      // Login otomatis
-      const loginResult = await loginWithCredentials(cleanUsername, password);
+      // Siapkan data kredensial untuk ditampilkan pada kartu kredensial login
+      const credentialPayload: LoginCredentialCardData = {
+        workspaceType: 'personal',
+        schoolName: selectedRole === 'homeroom' ? `Ruang Kerja Wali Kelas - ${cleanName}` : `Ruang Kerja Guru Mapel - ${cleanName}`,
+        personInCharge: `${cleanName} (${selectedRole === 'homeroom' ? 'Wali Kelas' : 'Guru Mapel'})`,
+        username: cleanUsername,
+        password: password,
+        schoolCode: data.schoolCode || data.workspaceCode || 'MANDIRI-FREE',
+        expiryDateText: 'Aktif Selamanya (Gratis)',
+        nominalText: 'GRATIS (Rp 0)',
+        paymentMethodText: 'Pendaftaran Mandiri Otomatis',
+        invoiceNo: `INV-FREE-${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, '0')}-${Math.floor(1000 + Math.random() * 9000)}`,
+      };
+
+      setCreatedCredentialData(credentialPayload);
+      setStep(3);
+    } catch (err: any) {
+      setFormError(err.message || (lang === 'ID' ? 'Terjadi kesalahan pada sistem.' : 'A system error occurred.'));
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDirectLogin = async () => {
+    if (!createdCredentialData) return;
+    setIsEnteringSystem(true);
+    try {
+      const cleanEmail = email.trim().toLowerCase() || `${createdCredentialData.username}@login.edushift.local`;
+      const loginResult = await loginWithCredentials(createdCredentialData.username, createdCredentialData.password);
       if (!loginResult.success) {
-        const retryEmailResult = await loginWithCredentials(cleanEmail, password);
+        const retryEmailResult = await loginWithCredentials(cleanEmail, createdCredentialData.password);
         if (!retryEmailResult.success) {
-          throw new Error(loginResult.error || (lang === 'ID' ? 'Akun berhasil dibuat. Silakan login.' : 'Account created. Please log in.'));
+          onOpenLogin();
+          onClose();
+          return;
         }
       }
 
@@ -205,9 +238,12 @@ export const FreeStartModal: React.FC<FreeStartModalProps> = ({
         } catch (_) {}
       }
       onClose();
-    } catch (err: any) {
-      setFormError(err.message || (lang === 'ID' ? 'Terjadi kesalahan pada sistem.' : 'A system error occurred.'));
-      setIsSubmitting(false);
+    } catch (err) {
+      console.error(err);
+      onOpenLogin();
+      onClose();
+    } finally {
+      setIsEnteringSystem(false);
     }
   };
 
@@ -236,7 +272,7 @@ export const FreeStartModal: React.FC<FreeStartModalProps> = ({
 
           {/* Stepper & Close Button */}
           <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-            {/* Stepper Indicator: 1 Pilih Peran -> 2 Buat Akun */}
+            {/* Stepper Indicator: 1 Pilih Peran -> 2 Buat Akun -> 3 Kredensial */}
             <div className="flex items-center gap-1 sm:gap-1.5 text-xs">
               <div className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 rounded-lg text-[10px] sm:text-xs font-bold transition-all ${
                 step === 1 
@@ -248,7 +284,7 @@ export const FreeStartModal: React.FC<FreeStartModalProps> = ({
                 }`}>
                   {step > 1 ? '✓' : '1'}
                 </span>
-                <span>{lang === 'ID' ? 'Pilih Peran' : 'Select Role'}</span>
+                <span className="hidden xs:inline">{lang === 'ID' ? 'Peran' : 'Role'}</span>
               </div>
 
               <span className="text-slate-300 font-bold text-[10px] sm:text-xs">→</span>
@@ -256,14 +292,31 @@ export const FreeStartModal: React.FC<FreeStartModalProps> = ({
               <div className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 rounded-lg text-[10px] sm:text-xs font-bold transition-all ${
                 step === 2 
                   ? 'bg-blue-600 text-white shadow-xs' 
+                  : step > 2
+                  ? 'bg-blue-50 text-blue-700 border border-blue-200/70'
                   : 'bg-slate-100 text-slate-400'
               }`}>
                 <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] sm:text-[10px] ${
-                  step === 2 ? 'bg-white text-blue-600 font-black' : 'bg-slate-300 text-white font-bold'
+                  step === 2 ? 'bg-white text-blue-600 font-black' : step > 2 ? 'bg-blue-600 text-white font-bold' : 'bg-slate-300 text-white font-bold'
                 }`}>
-                  2
+                  {step > 2 ? '✓' : '2'}
                 </span>
-                <span>{lang === 'ID' ? 'Buat Akun' : 'Create Account'}</span>
+                <span className="hidden xs:inline">{lang === 'ID' ? 'Akun' : 'Account'}</span>
+              </div>
+
+              <span className="text-slate-300 font-bold text-[10px] sm:text-xs">→</span>
+
+              <div className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 rounded-lg text-[10px] sm:text-xs font-bold transition-all ${
+                step === 3 
+                  ? 'bg-emerald-600 text-white shadow-xs' 
+                  : 'bg-slate-100 text-slate-400'
+              }`}>
+                <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] sm:text-[10px] ${
+                  step === 3 ? 'bg-white text-emerald-600 font-black' : 'bg-slate-300 text-white font-bold'
+                }`}>
+                  3
+                </span>
+                <span>{lang === 'ID' ? 'Kredensial' : 'Credentials'}</span>
               </div>
             </div>
 
@@ -639,8 +692,8 @@ export const FreeStartModal: React.FC<FreeStartModalProps> = ({
                       <>
                         <span>
                           {lang === 'ID'
-                            ? 'Selesaikan Pendaftaran & Masuk'
-                            : 'Complete Registration & Enter'}
+                            ? 'Selesaikan Pendaftaran'
+                            : 'Complete Registration'}
                         </span>
                         <ArrowRight size={16} />
                       </>
@@ -648,6 +701,34 @@ export const FreeStartModal: React.FC<FreeStartModalProps> = ({
                   </button>
                 </div>
               </form>
+            </div>
+          )}
+
+          {/* ========================================================================= */}
+          {/* LANGKAH 3: TAHAP SELESAI & KARTU KREDENSIAL LOGIN (SESUAI GAMBAR ACUAN)    */}
+          {/* ========================================================================= */}
+          {step === 3 && createdCredentialData && (
+            <div className="space-y-4 py-2 animate-in fade-in zoom-in-95 duration-200">
+              <div className="text-center space-y-1.5 max-w-md mx-auto">
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold">
+                  <CheckCircle2 size={14} className="text-emerald-600" />
+                  <span>{lang === 'ID' ? 'Pendaftaran Berhasil & Aktif' : 'Registration Successful'}</span>
+                </div>
+                <h3 className="text-base sm:text-lg font-black text-slate-900">
+                  {lang === 'ID' ? 'Kartu Kredensial Ruang Kerja Anda' : 'Your Workspace Credential Card'}
+                </h3>
+                <p className="text-xs text-slate-500 leading-relaxed">
+                  {lang === 'ID'
+                    ? 'Simpan atau unduh kartu kredensial login resmi Anda di bawah ini sebagai bukti pendaftaran & akses portal.'
+                    : 'Save or download your official login credential card below for secure portal access.'}
+                </p>
+              </div>
+
+              {/* Komponen Kartu Kredensial Login 480 × 300 px */}
+              <LoginCredentialCard
+                data={createdCredentialData}
+                onEnterSystem={handleDirectLogin}
+              />
             </div>
           )}
 

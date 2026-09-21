@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { KawacanaanEmblem } from '../../components/KawacanaanEmblem';
 import { supabase } from '../../lib/supabase';
+import { LoginCredentialCard, LoginCredentialCardData } from './LoginCredentialCard';
 
 // Friendly school building illustration matching reference design
 const SchoolIllustration: React.FC<{ className?: string }> = ({ className = "w-20 h-20" }) => (
@@ -815,175 +816,92 @@ ${isSuperadmin ? 'Metode: Direct Subscription (Super Admin)' : `Invoice: ${regis
         </div>
 
         {/* ------------------------------------------------------------------ */}
-        {/* VIEW 3: LAYAR PAKET SEKOLAH AKTIF & KREDENSIAL TERBIT */}
+        {/* VIEW 3: LAYAR PAKET SEKOLAH AKTIF & KREDENSIAL TERBIT (KARTU KREDENSIAL LOGIN) */}
         {/* ------------------------------------------------------------------ */}
         {registrationSuccessData ? (
           <div
             id="registration-success-view"
-            className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1"
+            className="p-3 sm:p-5 md:p-6 space-y-4 overflow-y-auto flex-1 animate-in fade-in zoom-in-95 duration-200"
           >
-            <div className="lg:grid lg:grid-cols-12 lg:gap-6 items-stretch">
-              {/* Kolom Kiri: Notifikasi Sukses & Kode Sekolah */}
-              <div className="lg:col-span-5 flex flex-col justify-between space-y-3.5">
-                <div className="text-left space-y-2">
-                  <div className="inline-flex items-center justify-center p-2.5 bg-emerald-100 text-emerald-700 rounded-xl shadow-xs">
-                    <CheckCircle2 className="w-7 h-7" />
-                  </div>
-                  <h3 className="text-base sm:text-lg font-bold text-slate-900">
-                    {isSuperadmin ? 'Sekolah & Admin Berhasil Dibuat!' : 'Paket Sekolah Aktif & Terverifikasi!'}
-                  </h3>
-                  <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
-                    Satuan pendidikan{' '}
-                    <span className="font-bold text-slate-900">{registrationSuccessData.schoolName}</span> telah resmi
-                    terdaftar dan aktif di sistem database pusat Kawacanaan SD.
-                  </p>
+            {/* Header Status Sukses */}
+            <div className="text-center space-y-1.5 max-w-lg mx-auto">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold">
+                <CheckCircle2 size={14} className="text-emerald-600" />
+                <span>
+                  {isSuperadmin
+                    ? 'Sekolah & Akun Administrator Berhasil Dibuat!'
+                    : 'Paket Sekolah Aktif & Terverifikasi!'}
+                </span>
+              </div>
+              <h3 className="text-base sm:text-lg font-black text-slate-900">
+                Kartu Kredensial Ruang Kerja Sekolah
+              </h3>
+              <p className="text-xs text-slate-500 leading-relaxed">
+                Simpan atau unduh kartu kredensial login resmi Anda di bawah ini sebagai bukti pendaftaran & akses portal administrator.
+              </p>
+            </div>
+
+            {/* Komponen Kartu Kredensial Login 480 × 300 px Sesuai Format Referensi Visual */}
+            <LoginCredentialCard
+              data={{
+                workspaceType: 'school', // Teks pill: RUANG KERJA SEKOLAH
+                schoolName: registrationSuccessData.schoolName,
+                personInCharge: `${registrationSuccessData.adminName} (Administrator)`,
+                username: registrationSuccessData.username,
+                password: registrationSuccessData.password,
+                schoolCode: registrationSuccessData.schoolCode,
+                expiryDateText:
+                  registrationSuccessData.expiryDays >= 9000
+                    ? 'Permanen (Seumur Hidup)'
+                    : `${registrationSuccessData.expiryDays} Hari Aktif`,
+                invoiceNo:
+                  registrationSuccessData.invoiceNo ||
+                  `INV-SCH-${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, '0')}-${Math.floor(1000 + Math.random() * 9000)}`,
+                nominalText: isSuperadmin ? 'Superadmin Direct' : 'Rp 25.000 (LUNAS)',
+                paymentMethodText: isSuperadmin
+                  ? 'Registrasi Superadmin'
+                  : 'Gateway Midtrans Terverifikasi',
+              }}
+              onEnterSystem={isSuperadmin ? handleFinishSuperadmin : handleEnterDashboard}
+            />
+
+            {/* School Invitation Code Card (Untuk dibagikan ke Dewan Guru) */}
+            <div className="max-w-[480px] mx-auto bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200/90 rounded-xl p-3 shadow-2xs flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <div className="text-[10px] font-bold uppercase tracking-wider text-blue-900 flex items-center gap-1">
+                  <KeyRound size={12} className="text-blue-700 shrink-0" />
+                  <span>Kode Undangan Bergabung Guru</span>
                 </div>
-
-                {/* School Invitation Code Card */}
-                <div className="bg-gradient-to-br from-blue-50 via-indigo-50 to-amber-50 border border-blue-200/90 rounded-2xl p-4 shadow-xs">
-                  <div className="text-[11px] font-bold uppercase tracking-wider text-blue-900 flex items-center gap-1.5">
-                    <KeyRound className="w-4 h-4 text-blue-700" />
-                    Kode Undangan Sekolah
-                  </div>
-                  <div className="font-mono text-2xl font-black text-blue-950 mt-1 tracking-wider">
-                    {registrationSuccessData.schoolCode}
-                  </div>
-                  <p className="text-xs text-slate-600 mt-1">
-                    Bagikan kode resmi ini kepada rekan Wali Kelas & Guru Mapel untuk bergabung ke sekolah.
-                  </p>
-
-                  <button
-                    type="button"
-                    id="btn-copy-school-code"
-                    onClick={() => {
-                      navigator.clipboard.writeText(registrationSuccessData.schoolCode);
-                      setCopiedSchoolCode(true);
-                      setTimeout(() => setCopiedSchoolCode(false), 2000);
-                    }}
-                    className="mt-3 w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-blue-700 hover:bg-blue-800 text-white font-bold text-xs shadow-xs transition-all cursor-pointer"
-                  >
-                    {copiedSchoolCode ? (
-                      <>
-                        <Check className="w-3.5 h-3.5 text-emerald-300" />
-                        <span>Kode Disalin!</span>
-                      </>
-                    ) : (
-                      <>
-                        <Copy className="w-3.5 h-3.5" />
-                        <span>Salin Kode Undangan</span>
-                      </>
-                    )}
-                  </button>
+                <div className="font-mono text-sm font-black text-blue-950 mt-0.5 tracking-wider">
+                  {registrationSuccessData.schoolCode}
+                </div>
+                <div className="text-[10px] text-slate-500 truncate">
+                  Bagikan kode ini kepada rekan Wali Kelas & Guru Mapel untuk terhubung ke sekolah ini.
                 </div>
               </div>
 
-              {/* Kolom Kanan: Kredensial Administrator & Navigasi */}
-              <div className="lg:col-span-7 mt-3 lg:mt-0 flex flex-col justify-between space-y-3.5">
-                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-3">
-                  <div className="flex items-center justify-between border-b border-slate-200 pb-2.5">
-                    <span className="text-xs font-bold text-slate-700 uppercase tracking-wide flex items-center gap-1.5">
-                      <ShieldCheck className="w-4 h-4 text-emerald-600" />
-                      Kredensial Login Administrator
-                    </span>
-                    <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 px-2.5 py-0.5 rounded-full border border-emerald-300">
-                      {isSuperadmin
-                        ? 'Direct Subscription • Aktif Langsung'
-                        : `Lunas (${registrationSuccessData.expiryDays} Hari Aktif)`}
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2.5 text-xs">
-                    <div>
-                      <div className="text-slate-500 text-[10px] font-semibold">Satuan Pendidikan</div>
-                      <div className="font-bold text-slate-900 truncate mt-0.5">{registrationSuccessData.schoolName}</div>
-                    </div>
-
-                    <div>
-                      <div className="text-slate-500 text-[10px] font-semibold">Tipe Ruang Kerja</div>
-                      <div className="font-bold text-blue-700 truncate mt-0.5">
-                        {registrationSuccessData.workspaceType === 'personal' ? 'Ruang Kerja Individu' : 'Ruang Kerja Sekolah'}
-                      </div>
-                    </div>
-
-                    <div>
-                      <div className="text-slate-500 text-[10px] font-semibold">Nama Admin</div>
-                      <div className="font-bold text-slate-900 truncate mt-0.5">{registrationSuccessData.adminName}</div>
-                    </div>
-
-                    <div>
-                      <div className="text-slate-500 text-[10px] font-semibold">Username Akses</div>
-                      <div className="font-mono font-bold text-blue-700 bg-blue-50 border border-blue-200 px-2 py-1 rounded-lg mt-0.5 inline-block text-xs">
-                        {registrationSuccessData.username}
-                      </div>
-                    </div>
-
-                    <div>
-                      <div className="text-slate-500 text-[10px] font-semibold">Kata Sandi (Password)</div>
-                      <div className="font-mono font-bold text-slate-900 bg-white border border-slate-300 px-2 py-1 rounded-lg mt-0.5 inline-block text-xs">
-                        {registrationSuccessData.password}
-                      </div>
-                    </div>
-
-                    <div>
-                      <div className="text-slate-500 text-[10px] font-semibold">Masa Aktif Lisensi</div>
-                      <div className="font-semibold text-slate-800 mt-0.5">
-                        {registrationSuccessData.expiryDays >= 9000 ? 'Permanen (Seumur Hidup)' : `${registrationSuccessData.expiryDays} Hari`}
-                      </div>
-                    </div>
-
-                    {registrationSuccessData.email && (
-                      <div className="col-span-2">
-                        <div className="text-slate-500 text-[10px] font-semibold">Email Korespondensi</div>
-                        <div className="text-slate-800 font-medium text-xs truncate mt-0.5">{registrationSuccessData.email}</div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Action Buttons */}
-                <div className="flex flex-col sm:flex-row gap-2.5 pt-1">
-                  <button
-                    id="btn-copy-credentials"
-                    type="button"
-                    onClick={handleCopyCredentials}
-                    className="flex-1 inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl border border-slate-300 text-slate-700 font-bold text-xs uppercase tracking-wider hover:bg-slate-50 transition-all cursor-pointer min-h-[42px]"
-                  >
-                    {copiedCredentials ? (
-                      <>
-                        <Check className="w-4 h-4 text-emerald-600" />
-                        <span>Kredensial Disalin!</span>
-                      </>
-                    ) : (
-                      <>
-                        <Copy className="w-4 h-4 text-slate-500" />
-                        <span>Salin Kredensial</span>
-                      </>
-                    )}
-                  </button>
-
-                  {isSuperadmin ? (
-                    <button
-                      id="btn-finish-superadmin-onboarding"
-                      type="button"
-                      onClick={handleFinishSuperadmin}
-                      className="flex-1 inline-flex items-center justify-center gap-1.5 px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-bold text-xs uppercase tracking-wider shadow-sm transition-all cursor-pointer min-h-[42px]"
-                    >
-                      <span>Selesai & Kelola Sekolah</span>
-                      <ArrowRight className="w-4 h-4" />
-                    </button>
-                  ) : (
-                    <button
-                      id="btn-enter-school-dashboard"
-                      type="button"
-                      onClick={handleEnterDashboard}
-                      className="flex-1 inline-flex items-center justify-center gap-1.5 px-5 py-2.5 rounded-xl bg-blue-700 hover:bg-blue-800 active:scale-95 text-white font-bold text-xs uppercase tracking-wider shadow-sm transition-all cursor-pointer min-h-[42px]"
-                    >
-                      <span>Masuk ke Dashboard</span>
-                      <ArrowRight className="w-4 h-4" />
-                    </button>
-                  )}
-                </div>
-              </div>
+              <button
+                type="button"
+                id="btn-copy-school-code"
+                onClick={() => {
+                  navigator.clipboard.writeText(registrationSuccessData.schoolCode);
+                  setCopiedSchoolCode(true);
+                  setTimeout(() => setCopiedSchoolCode(false), 2000);
+                }}
+                className="shrink-0 inline-flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-lg bg-blue-700 hover:bg-blue-800 text-white font-bold text-[11px] shadow-xs transition-all cursor-pointer"
+              >
+                {copiedSchoolCode ? (
+                  <>
+                    <Check size={12} className="text-emerald-300" />
+                    <span>Tersalin!</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy size={12} />
+                    <span>Salin Kode</span>
+                  </>
+                )}
+              </button>
             </div>
           </div>
         ) : paymentSession ? (

@@ -28,6 +28,7 @@ import {
 import { useApp } from '../../context/AppContext';
 import waliKelasWanitaImg from '../../assets/images/wali_kelas_wanita_1789830539387.jpg';
 import guruMapelPriaImg from '../../assets/images/guru_mapel_pria_1789830556851.jpg';
+import { LoginCredentialCard, LoginCredentialCardData } from './LoginCredentialCard';
 
 interface TeacherRegisterModalProps {
   isOpen: boolean;
@@ -1176,136 +1177,43 @@ export const TeacherRegisterModal: React.FC<TeacherRegisterModalProps> = ({
           {/* LANGKAH 4: AKTIF (URUTAN 4 - SUKSES AKTIVASI & KREDENSIAL AKUN)            */}
           {/* ========================================================================= */}
           {step === 4 && registrationSuccessData && (
-            <div className="max-w-lg mx-auto space-y-3.5 animate-in fade-in zoom-in-95 duration-200">
+            <div className="space-y-4 py-2 animate-in fade-in zoom-in-95 duration-200">
               {/* Badge Sukses */}
-              <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl text-center space-y-1.5">
-                <div className="w-12 h-12 bg-emerald-600 text-white rounded-full flex items-center justify-center mx-auto shadow-md shadow-emerald-600/20">
-                  <CheckCircle2 className="w-7 h-7" />
+              <div className="text-center space-y-1.5 max-w-md mx-auto">
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold">
+                  <CheckCircle2 size={14} className="text-emerald-600" />
+                  <span>
+                    {lang === 'ID'
+                      ? `Paket Guru Pro (${billingCycle === 'yearly' ? 'Tahunan' : 'Bulanan'}) Aktif!`
+                      : 'Teacher Pro Workspace Activated!'}
+                  </span>
                 </div>
-                <h3 className="text-base font-extrabold text-emerald-950">
-                  {lang === 'ID' ? 'Paket Guru Pro Berhasil Diaktifkan!' : 'Teacher Pro Workspace Activated!'}
+                <h3 className="text-base sm:text-lg font-black text-slate-900">
+                  {lang === 'ID' ? 'Kartu Kredensial Ruang Kerja Anda' : 'Your Workspace Credential Card'}
                 </h3>
-                <p className="text-xs text-emerald-700 max-w-md mx-auto">
+                <p className="text-xs text-slate-500 leading-relaxed">
                   {lang === 'ID'
-                    ? `Selamat! Ruang Kerja Individu Pro Anda telah aktif selama ${registrationSuccessData.expiresInDays} hari. Pembayaran Midtrans telah lunas dan terverifikasi.`
-                    : `Congratulations! Your Teacher Workspace is now active for ${registrationSuccessData.expiresInDays} days.`}
+                    ? `Selamat! Ruang Kerja Individu Pro Anda telah aktif selama ${registrationSuccessData.expiresInDays} hari. Silakan unduh atau salin kredensial login Anda di bawah ini.`
+                    : `Congratulations! Your Teacher Workspace is now active for ${registrationSuccessData.expiresInDays} days. Please download your card below.`}
                 </p>
               </div>
 
-              {/* Rincian Kredensial Akun Guru */}
-              <div className="p-3.5 sm:p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
-                <div className="flex items-center justify-between border-b border-slate-200 pb-2.5">
-                  <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                    <User className="w-4 h-4 text-blue-600" />
-                    <span>Kredensial Akun Guru Pro</span>
-                  </span>
-                  <span className="px-2 py-0.5 rounded bg-blue-100 text-blue-800 text-[10px] font-bold uppercase">
-                    {registrationSuccessData.role}
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
-                  {/* Username */}
-                  <div className="p-2.5 bg-white border border-slate-200 rounded-xl">
-                    <span className="text-[10px] text-slate-400 uppercase font-mono block">Username Login:</span>
-                    <div className="flex items-center justify-between mt-0.5">
-                      <span className="font-bold text-slate-900 font-mono text-xs">
-                        {registrationSuccessData.username}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => copyToClipboard(registrationSuccessData.username, 'cred_user')}
-                        className="text-blue-600 hover:text-blue-700 cursor-pointer"
-                      >
-                        {copiedField === 'cred_user' ? (
-                          <Check className="w-3.5 h-3.5 text-emerald-600" />
-                        ) : (
-                          <Copy className="w-3.5 h-3.5" />
-                        )}
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Kata Sandi */}
-                  <div className="p-2.5 bg-white border border-slate-200 rounded-xl">
-                    <span className="text-[10px] text-slate-400 uppercase font-mono block">Kata Sandi:</span>
-                    <div className="flex items-center justify-between mt-0.5">
-                      <span className="font-bold text-slate-900 font-mono text-xs">
-                        {registrationSuccessData.password || '••••••••'}
-                      </span>
-                      {registrationSuccessData.password && (
-                        <button
-                          type="button"
-                          onClick={() => copyToClipboard(registrationSuccessData.password!, 'cred_pwd')}
-                          className="text-blue-600 hover:text-blue-700 cursor-pointer"
-                        >
-                          {copiedField === 'cred_pwd' ? (
-                            <Check className="w-3.5 h-3.5 text-emerald-600" />
-                          ) : (
-                            <Copy className="w-3.5 h-3.5" />
-                          )}
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Nama Guru */}
-                  <div className="p-2.5 bg-white border border-slate-200 rounded-xl">
-                    <span className="text-[10px] text-slate-400 uppercase font-mono block">Nama Guru:</span>
-                    <span className="font-bold text-slate-800 text-xs block truncate mt-0.5">
-                      {registrationSuccessData.teacherName}
-                    </span>
-                  </div>
-
-                  {/* Status Pembayaran */}
-                  <div className="p-2.5 bg-white border border-slate-200 rounded-xl">
-                    <span className="text-[10px] text-slate-400 uppercase font-mono block">Status Pembayaran:</span>
-                    <span className="font-bold text-emerald-700 text-xs block mt-0.5">
-                      LUNAS (SETTLED) • Midtrans
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="space-y-2 pt-1">
-                <button
-                  type="button"
-                  id="btn-teacher-enter-workspace"
-                  disabled={isSubmitting}
-                  onClick={handleEnterDashboard}
-                  className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 active:scale-[0.99] text-white text-xs font-bold uppercase tracking-wider rounded-2xl shadow-md shadow-blue-600/20 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
-                >
-                  {isSubmitting ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      <span>{lang === 'ID' ? 'Memasuki Ruang Kerja...' : 'Entering Workspace...'}</span>
-                    </>
-                  ) : (
-                    <>
-                      <span>{lang === 'ID' ? 'Masuk ke Ruang Kerja Saya' : 'Enter My Workspace'}</span>
-                      <ArrowRight className="w-4 h-4" />
-                    </>
-                  )}
-                </button>
-
-                <button
-                  type="button"
-                  id="btn-teacher-copy-all"
-                  onClick={() => {
-                    const text = `KREDENSIAL GURU PRO KAWACANAAN\nNama: ${registrationSuccessData.teacherName}\nPeran: ${registrationSuccessData.role}\nUsername: ${registrationSuccessData.username}\nPassword: ${registrationSuccessData.password}\nInvoice: ${registrationSuccessData.invoiceNo || '-'}\nRuang Kerja: Ruang Kerja Individu Pro (Aktif ${registrationSuccessData.expiresInDays} Hari)`;
-                    copyToClipboard(text, 'all');
-                  }}
-                  className="w-full py-2.5 border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-                >
-                  {copiedField === 'all' ? (
-                    <Check className="w-3.5 h-3.5 text-emerald-600" />
-                  ) : (
-                    <Copy className="w-3.5 h-3.5" />
-                  )}
-                  <span>{copiedField === 'all' ? 'Seluruh Kredensial Disalin!' : 'Salin Seluruh Kredensial'}</span>
-                </button>
-              </div>
+              {/* Komponen Kartu Kredensial Login 480 × 300 px Sesuai Format Referensi */}
+              <LoginCredentialCard
+                data={{
+                  workspaceType: 'personal',
+                  schoolName: `Ruang Kerja Pro - ${registrationSuccessData.teacherName}`,
+                  personInCharge: `${registrationSuccessData.teacherName} (${registrationSuccessData.role === 'homeroom' ? 'Wali Kelas' : 'Guru Mapel'})`,
+                  username: registrationSuccessData.username,
+                  password: registrationSuccessData.password || '••••••••',
+                  schoolCode: 'MANDIRI-PRO',
+                  expiryDateText: `${registrationSuccessData.expiresInDays} Hari (${billingCycle === 'yearly' ? 'Tahunan' : 'Bulanan'})`,
+                  invoiceNo: registrationSuccessData.invoiceNo || `INV-TCH-${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, '0')}-${Math.floor(1000 + Math.random() * 9000)}`,
+                  nominalText: `Rp ${Number(registrationSuccessData.amount || currentPrice).toLocaleString('id-ID')} (LUNAS)`,
+                  paymentMethodText: 'Gateway Midtrans Terverifikasi',
+                }}
+                onEnterSystem={handleEnterDashboard}
+              />
             </div>
           )}
         </div>

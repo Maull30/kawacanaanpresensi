@@ -19,8 +19,17 @@ export default async function handler(req: any, res: any) {
   // Handle GET request to check if Super Admin is already configured
   if (req.method === 'GET') {
     try {
-      const { count } = await admin.from('profiles').select('id', { count: 'exact', head: true }).eq('role', 'SUPER_ADMIN');
-      return json(res, 200, { isSetup: (count || 0) > 0, requiresSecret: Boolean(setupSecret) });
+      const { data: superProfiles } = await admin.from('profiles').select('id, username, email, name, is_active').eq('role', 'SUPER_ADMIN').limit(1);
+      const isSetup = (superProfiles?.length || 0) > 0;
+      const superProfile = superProfiles?.[0];
+      return json(res, 200, {
+        isSetup,
+        requiresSecret: Boolean(setupSecret),
+        username: superProfile?.username || 'superadmin',
+        email: superProfile?.email || 'superadmin@login.edushift.local',
+        name: superProfile?.name || 'SUPER ADMIN',
+        defaultPasswordHint: 'SuperAdmin2026!'
+      });
     } catch (err: any) {
       return json(res, 500, { error: err.message || 'Gagal memeriksa status setup.' });
     }
@@ -28,11 +37,62 @@ export default async function handler(req: any, res: any) {
 
   if (req.method !== 'POST') return json(res, 405, { error: 'Method not allowed.' });
 
+  const { action, newPassword, setupSecret: suppliedSecret, name, username, email, password } = req.body || {};
+
+  // FITUR RESET SANDI SUPER ADMIN
+  if (action === 'reset_superadmin_password') {
+    try {
+      const { data: superProfiles } = await admin.from('profiles').select('id, username, email, name').eq('role', 'SUPER_ADMIN').limit(1);
+      if (!superProfiles || superProfiles.length === 0) {
+        return json(res, 404, { error: 'Akun Super Admin belum terdaftar di database.' });
+      }
+      const sa = superProfiles[0];
+      const targetPassword = String(newPassword || password || 'SuperAdmin2026!').trim();
+      if (targetPassword.length < 8) {
+        return json(res, 400, { error: 'Kata sandi minimal 8 karakter.' });
+      }
+
+      const { error: updateErr } = await admin.auth.admin.updateUserById(sa.id, {
+        password: targetPassword,
+        email_confirm: true,
+      });
+      if (updateErr) {
+        return json(res, 500, { error: `Gagal memperbarui kata sandi: ${updateErr.message}` });
+      }
+
+      await admin.from('profiles').update({
+        is_active: true,
+        must_change_password: false,
+      }).eq('id', sa.id);
+
+      await admin.from('audit_logs').insert({
+        actor_id: sa.id,
+        actor_name: sa.name || 'SUPER ADMIN',
+        actor_role: 'SUPER_ADMIN',
+        action: 'RESET_SUPERADMIN_PASSWORD',
+        details: { username: sa.username, email: sa.email, timestamp: new Date().toISOString() },
+      });
+
+      return json(res, 200, {
+        ok: true,
+        message: 'Kata sandi akun Super Admin berhasil diperbarui.',
+        username: sa.username,
+        password: targetPassword,
+      });
+    } catch (err: any) {
+      return json(res, 500, { error: err?.message || 'Gagal memproses reset kata sandi Super Admin.' });
+    }
+  }
+
   const { count, error: countError } = await admin.from('profiles').select('id', { count: 'exact', head: true }).eq('role', 'SUPER_ADMIN');
   if (countError) return json(res, 500, { error: countError.message });
-  if ((count || 0) > 0) return json(res, 409, { error: 'SUPER ADMIN sudah pernah dibuat. Endpoint setup telah dikunci permanen.' });
-
-  const { setupSecret: suppliedSecret, name, username, email, password } = req.body || {};
+  if ((count || 0) > 0) {
+    return json(res, 409, {
+      error: 'SUPER ADMIN sudah pernah dibuat. Gunakan aksi reset jika ingin mengatur ulang kata sandi.',
+      isSetup: true,
+      username: 'superadmin'
+    });
+  }
 
   // Validasi setup secret: jika setupSecret dikonfigurasi, terima kecocokan persis ATAU jika belum ada SUPER_ADMIN sama sekali di database maka perbolehkan inisialisasi awal
   if (setupSecret && suppliedSecret && suppliedSecret !== setupSecret) {

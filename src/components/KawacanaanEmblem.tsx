@@ -1,5 +1,5 @@
 import React from 'react';
-import kawacanaanLogo from '../assets/images/kawacanaan_logo_1787055634013.jpg';
+import kawacanaanLogo from '../assets/images/kawacanaan_logo.png';
 
 interface KawacanaanEmblemProps {
   className?: string;
@@ -14,14 +14,14 @@ export const KawacanaanEmblem: React.FC<KawacanaanEmblemProps> = ({
 }) => {
   return (
     <div
-      className={`relative inline-flex items-center justify-center rounded-full overflow-hidden shrink-0 select-none ${className}`}
+      className={`relative inline-flex items-center justify-center rounded-xl overflow-hidden shrink-0 select-none bg-[#0a0e14] border border-amber-500/20 shadow-md ${className}`}
       style={{ width: size, height: size }}
       id="kawacanaan-emblem"
     >
       <img
         src={kawacanaanLogo}
         alt={alt}
-        className="w-full h-full object-contain rounded-full drop-shadow-md hover:scale-105 transition-transform duration-300"
+        className="w-full h-full object-contain p-0.5 hover:scale-105 transition-transform duration-300"
         referrerPolicy="no-referrer"
       />
     </div>

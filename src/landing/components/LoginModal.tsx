@@ -15,6 +15,7 @@ import {
   ArrowRight,
   CheckCircle2
 } from 'lucide-react';
+import { KawacanaanEmblem } from '../../components/KawacanaanEmblem';
 
 interface LoginModalProps {
   isOpen: boolean;
@@ -64,9 +65,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onOpenD
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-100 pb-4">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded bg-blue-600 flex items-center justify-center text-white font-black text-sm shadow-xs">
-              K
-            </div>
+            <KawacanaanEmblem size={38} />
             <div>
               <h3 className="font-black uppercase tracking-tight text-slate-900 text-base">
                 {lang === 'ID' ? 'Masuk' : 'Sign In'}

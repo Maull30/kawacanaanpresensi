@@ -37,6 +37,7 @@ import {
 import { useApp } from '../context/AppContext';
 import { supabase } from '../lib/supabase';
 import { SchoolLogo } from '../components/SchoolLogo';
+import { KawacanaanEmblem } from '../components/KawacanaanEmblem';
 
 // 4 Rumpun Terpadu Sections
 import { OverviewSection } from '../components/superadmin/OverviewSection';
@@ -297,9 +298,7 @@ export const SuperAdminView: React.FC = () => {
         <div className="p-4 sm:p-5 border-b border-slate-800/80 bg-slate-950/70">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3 select-none">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 via-indigo-600 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-600/25 text-white font-black shrink-0">
-                <SchoolLogo size={24} className="brightness-200" />
-              </div>
+              <KawacanaanEmblem size={40} />
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
                   <span className="font-black text-white text-base tracking-tight truncate">KAWACANAAN</span>

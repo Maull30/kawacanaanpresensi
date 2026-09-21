@@ -29,6 +29,7 @@ import { useApp } from '../../context/AppContext';
 import waliKelasWanitaImg from '../../assets/images/wali_kelas_wanita_1789830539387.jpg';
 import guruMapelPriaImg from '../../assets/images/guru_mapel_pria_1789830556851.jpg';
 import { LoginCredentialCard, LoginCredentialCardData } from './LoginCredentialCard';
+import { KawacanaanEmblem } from '../../components/KawacanaanEmblem';
 
 interface TeacherRegisterModalProps {
   isOpen: boolean;
@@ -494,9 +495,7 @@ export const TeacherRegisterModal: React.FC<TeacherRegisterModalProps> = ({
         <div className="flex items-center justify-between px-3.5 sm:px-6 py-2.5 sm:py-3.5 border-b border-slate-100 bg-white shrink-0">
           {/* Brand / Logo Kawacanaan SD */}
           <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
-            <div className="w-8 h-8 sm:w-9 sm:h-9 bg-gradient-to-br from-blue-700 via-blue-800 to-indigo-900 rounded-xl flex items-center justify-center text-white font-black text-sm sm:text-base shadow-sm shadow-blue-700/25 shrink-0 border border-blue-500/40 relative">
-              <span className="relative z-10">K</span>
-            </div>
+            <KawacanaanEmblem size={36} />
             <div className="flex items-center gap-1.5">
               <span className="font-black text-slate-900 text-sm sm:text-base tracking-tight uppercase">
                 Kawacanaan

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Menu, X } from 'lucide-react';
 import { NavItem } from '../types';
+import { KawacanaanEmblem } from '../../components/KawacanaanEmblem';
 
 interface NavbarProps {
   onOpenLogin: () => void;
@@ -79,11 +80,8 @@ export const Navbar: React.FC<NavbarProps> = ({
               }}
               className="flex items-center gap-2.5 sm:gap-3 group text-left cursor-pointer min-w-0"
             >
-              {/* Educational Blue Shield Emblem */}
-              <div className="w-10 h-10 sm:w-11 sm:h-11 bg-gradient-to-br from-blue-700 via-blue-800 to-indigo-900 rounded-xl flex items-center justify-center text-white font-black text-lg sm:text-xl shadow-md shadow-blue-700/25 group-hover:scale-105 transition-transform shrink-0 border border-blue-500/40 relative">
-                <span className="relative z-10">K</span>
-                <div className="absolute inset-0 bg-white/10 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
-              </div>
+              {/* Authentic Kawacanaan Logo Emblem */}
+              <KawacanaanEmblem size={42} className="group-hover:scale-105 transition-transform" />
 
               {/* Brand Title and Subtitle */}
               <div className="flex flex-col min-w-0">

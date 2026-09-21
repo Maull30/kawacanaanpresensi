@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
 import { supabase } from '../lib/supabase';
 import { SchoolLogo } from './SchoolLogo';
+import { KawacanaanEmblem } from './KawacanaanEmblem';
 import { UserProfileModal } from './UserProfileModal';
 import { ChangePasswordModal } from './ChangePasswordModal';
 import { 
@@ -318,7 +319,11 @@ export const Header: React.FC = () => {
             id="header-school-brand"
           >
             <div className="flex-shrink-0">
-              <SchoolLogo size={36} className="sm:w-[40px] sm:h-[40px]" />
+              {currentUser?.role === 'SUPER_ADMIN' ? (
+                <KawacanaanEmblem size={36} className="sm:w-[40px] sm:h-[40px]" />
+              ) : (
+                <SchoolLogo size={36} className="sm:w-[40px] sm:h-[40px]" />
+              )}
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-2">

@@ -1,5 +1,4 @@
 import React from 'react';
-import kawacanaanLogo from '../assets/images/kawacanaan_logo.png';
 
 interface KawacanaanEmblemProps {
   className?: string;
@@ -10,18 +9,25 @@ interface KawacanaanEmblemProps {
 export const KawacanaanEmblem: React.FC<KawacanaanEmblemProps> = ({
   className = '',
   size = 64,
-  alt = 'Emblem Kawacanaan',
+  alt = 'Emblem Resmi Kawacanaan',
 }) => {
   return (
     <div
-      className={`relative inline-flex items-center justify-center rounded-xl overflow-hidden shrink-0 select-none bg-[#0a0e14] border border-amber-500/20 shadow-md ${className}`}
+      className={`relative inline-flex items-center justify-center shrink-0 select-none ${className}`}
       style={{ width: size, height: size }}
       id="kawacanaan-emblem"
     >
       <img
-        src={kawacanaanLogo}
+        src="/lk.png"
         alt={alt}
-        className="w-full h-full object-contain p-0.5 hover:scale-105 transition-transform duration-300"
+        className="w-full h-full object-contain hover:scale-105 transition-transform duration-300 drop-shadow-sm"
+        onError={(e) => {
+          // Fallback jika /lk.png sedang dimuat atau berada di path alternatif
+          const target = e.currentTarget;
+          if (target.src !== `${window.location.origin}/kawacanaan-logo.png`) {
+            target.src = '/kawacanaan-logo.png';
+          }
+        }}
         referrerPolicy="no-referrer"
       />
     </div>

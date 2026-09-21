@@ -11,7 +11,6 @@ import {
   ShieldCheck
 } from 'lucide-react';
 import { KawacanaanEmblem } from '../../components/KawacanaanEmblem';
-import kawacanaanLogo from '../../assets/images/kawacanaan_logo_1787055634013.jpg';
 
 interface WhatsAppQrModalProps {
   isOpen: boolean;
@@ -97,14 +96,8 @@ export const WhatsAppQrModal: React.FC<WhatsAppQrModalProps> = ({
           
           {/* Top Emblem Badge */}
           <div className="flex justify-center -mt-9 sm:-mt-10 mb-2.5">
-            <div className="p-1 rounded-full bg-white shadow-md ring-2 ring-slate-100">
-              <div className="w-13 h-13 rounded-full overflow-hidden flex items-center justify-center bg-[#071F42]">
-                <img 
-                  src={kawacanaanLogo} 
-                  alt="Kawacanaan Logo" 
-                  className="w-full h-full object-cover" 
-                />
-              </div>
+            <div className="p-1 rounded-2xl bg-white shadow-md ring-2 ring-slate-100">
+              <KawacanaanEmblem size={52} />
             </div>
           </div>
 

@@ -17,7 +17,6 @@ import {
 import QRCode from 'qrcode';
 import { KawacanaanEmblem } from '../../components/KawacanaanEmblem';
 import { WhatsAppQrModal } from './WhatsAppQrModal';
-import kawacanaanLogo from '../../assets/images/kawacanaan_logo_1787055634013.jpg';
 
 interface ContactSectionProps {
   lang: 'ID' | 'EN';
@@ -181,7 +180,7 @@ export const ContactSection: React.FC<ContactSectionProps> = ({ lang }) => {
           document.body.removeChild(link);
           setIsDownloading(false);
         };
-        emblemImg.src = kawacanaanLogo;
+        emblemImg.src = '/lk.png';
       };
       qrImg.src = qrDataUrl;
     } catch (err) {
@@ -454,14 +453,8 @@ export const ContactSection: React.FC<ContactSectionProps> = ({ lang }) => {
                 
                 {/* Circular Emblem at top of card */}
                 <div className="flex justify-center -mt-10 sm:-mt-11 mb-2.5">
-                  <div className="p-1 rounded-full bg-white shadow-md ring-2 ring-slate-100">
-                    <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full overflow-hidden flex items-center justify-center bg-[#071F42]">
-                      <img 
-                        src={kawacanaanLogo} 
-                        alt="Kawacanaan Logo" 
-                        className="w-full h-full object-cover" 
-                      />
-                    </div>
+                  <div className="p-1 rounded-2xl bg-white shadow-md ring-2 ring-slate-100">
+                    <KawacanaanEmblem size={52} />
                   </div>
                 </div>
 

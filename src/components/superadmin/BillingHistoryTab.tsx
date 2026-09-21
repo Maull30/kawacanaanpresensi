@@ -17,7 +17,8 @@ import {
   X,
   CreditCard,
   QrCode,
-  Wallet
+  Wallet,
+  Trash2
 } from 'lucide-react';
 
 interface TransactionRecord {
@@ -205,6 +206,22 @@ export const BillingHistoryTab: React.FC<BillingHistoryTabProps> = ({
       showToast('Gagal melakukan sinkronisasi data transaksi.', 'error');
     } finally {
       setIsSyncing(false);
+    }
+  };
+
+  const handleDeleteTransaction = async (tx: TransactionRecord) => {
+    if (!window.confirm(`Hapus permanen riwayat transaksi ${tx.orderId} (${tx.schoolName} - Rp ${tx.amount.toLocaleString('id-ID')})? Data transaksi akan dihapus dari sistem.`)) {
+      return;
+    }
+    if (!call) return;
+    try {
+      await call('delete_payment', { payment_id: tx.id, invoice_no: tx.orderId, force: true });
+      showToast(`Riwayat transaksi ${tx.orderId} berhasil dihapus permanen.`, 'success');
+      if (onReload) {
+        await onReload();
+      }
+    } catch (err: any) {
+      showToast(err.message || 'Gagal menghapus riwayat transaksi.', 'error');
     }
   };
 
@@ -444,14 +461,26 @@ export const BillingHistoryTab: React.FC<BillingHistoryTabProps> = ({
                     )}
                   </td>
                   <td className="py-3.5 px-4 text-right">
-                    <button
-                      type="button"
-                      onClick={() => setSelectedReceipt(tx)}
-                      className="px-2.5 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold transition cursor-pointer inline-flex items-center gap-1"
-                    >
-                      <Eye size={12} />
-                      <span>Kuitansi</span>
-                    </button>
+                    <div className="inline-flex items-center justify-end gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedReceipt(tx)}
+                        className="px-2.5 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold transition cursor-pointer inline-flex items-center gap-1"
+                        title="Lihat Kuitansi"
+                      >
+                        <Eye size={12} />
+                        <span>Kuitansi</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteTransaction(tx)}
+                        className="px-2 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs font-bold transition cursor-pointer inline-flex items-center gap-1"
+                        title="Hapus riwayat transaksi"
+                      >
+                        <Trash2 size={12} />
+                        <span>Hapus</span>
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}

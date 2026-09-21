@@ -232,12 +232,12 @@ export const BillingSection: React.FC<{
 
   const handleDeletePayment = async (p: any) => {
     const inv = p.invoiceNo || p.invoice_no;
-    if (!window.confirm(`Yakin ingin menghapus catatan transaksi ${inv}? Transaksi yang belum lunas akan dihapus permanen.`)) {
+    if (!window.confirm(`Yakin ingin menghapus riwayat transaksi ${inv}? Data transaksi akan dihapus permanen.`)) {
       return;
     }
     try {
-      await call('delete_payment', { payment_id: p.id, invoice_no: inv });
-      showToast(`Catatan transaksi ${inv} berhasil dihapus.`, 'success');
+      await call('delete_payment', { payment_id: p.id, invoice_no: inv, force: true });
+      showToast(`Catatan transaksi ${inv} berhasil dihapus permanen.`, 'success');
       loadData();
     } catch (e: any) {
       showToast(e.message || 'Gagal menghapus transaksi.', 'error');
@@ -1044,19 +1044,17 @@ export const BillingSection: React.FC<{
                                         </button>
                                       )}
 
-                                      {!isSettled && (
-                                        <button
-                                          type="button"
-                                          onClick={() => {
-                                            handleDeletePayment(p);
-                                            setActionMenuOpenId(null);
-                                          }}
-                                          className="w-full px-3 py-1.5 hover:bg-rose-50 text-rose-600 flex items-center gap-2 cursor-pointer"
-                                        >
-                                          <Trash2 size={13} />
-                                          <span>Hapus Catatan</span>
-                                        </button>
-                                      )}
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          handleDeletePayment(p);
+                                          setActionMenuOpenId(null);
+                                        }}
+                                        className="w-full px-3 py-1.5 hover:bg-rose-50 text-rose-600 flex items-center gap-2 cursor-pointer"
+                                      >
+                                        <Trash2 size={13} />
+                                        <span>Hapus Catatan</span>
+                                      </button>
                                     </div>
                                   )}
                                 </div>

@@ -78,19 +78,6 @@ export const OverviewSection: React.FC<OverviewSectionProps> = ({
   const totals = data?.totals || {};
   const dbSchools = data?.schools || [];
 
-  // Hitung pembayaran bulan ini secara riil
-  const currentMonthStr = new Date().toISOString().slice(0, 7);
-  let thisMonthPaidTotal = totals.thisMonthRevenue ?? 0;
-  if (!thisMonthPaidTotal && payments.length > 0) {
-    payments.forEach((p: any) => {
-      const isThisMonth = (p.createdAt || p.created_at || '').startsWith(currentMonthStr);
-      const isSettled = p.status === 'paid' || p.status === 'SETTLED' || p.status === 'success';
-      if (isSettled && isThisMonth) {
-        thisMonthPaidTotal += Number(p.totalAmount || p.total_amount || p.amount || 0);
-      }
-    });
-  }
-
   // Data sekolah terbaru persis dari database yang sebenarnya
   const recentSchools = dbSchools.slice(0, 5).map((s: any, idx: number) => ({
     id: s.id || s.school_id || `sc-${idx}`,
@@ -177,9 +164,9 @@ export const OverviewSection: React.FC<OverviewSectionProps> = ({
       </div>
 
       {/* ========================================================================= */}
-      {/* 2. TOP 5 METRIC CARDS (REALTIME DATA)                                    */}
+      {/* 2. TOP 4 METRIC CARDS (REALTIME DATA)                                    */}
       {/* ========================================================================= */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-3.5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-3.5">
         {/* Card 1: Total Sekolah Terdaftar */}
         <div
           onClick={() => onNavigate('sekolah')}
@@ -279,53 +266,23 @@ export const OverviewSection: React.FC<OverviewSectionProps> = ({
           </div>
         </div>
 
-        {/* Card 4: Total Tenant Aktif */}
+        {/* Card 4: Total Pengguna */}
         <div
-          onClick={() => onNavigate('sekolah')}
+          onClick={() => onNavigate('sekolah', 'pengguna')}
           className="bg-white rounded-2xl border border-slate-100 shadow-xs hover:shadow-md p-3 sm:p-3.5 transition-all cursor-pointer group flex flex-col justify-between"
         >
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-xl bg-amber-500 text-white flex items-center justify-center shadow-md shadow-amber-500/20 shrink-0 group-hover:scale-105 transition-transform">
-              <Layers size={17} />
+              <Users size={17} />
             </div>
             <span className="text-[11px] font-semibold text-slate-500 leading-tight">
-              Tenant Aktif
+              Total Pengguna
             </span>
           </div>
 
           <div className="mt-2">
             <div className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-              {totals.active !== undefined ? totals.active : dbSchools.filter((s: any) => s.status === 'active').length}
-            </div>
-          </div>
-
-          <div className="mt-1 pt-1 flex items-end justify-between">
-            <div className="text-[10.5px] font-medium text-slate-400">
-              {totals.schools > 0
-                ? `${Math.round(((totals.active ?? 0) / totals.schools) * 100)}% rasio aktif`
-                : 'Instansi aktif'}
-            </div>
-            <MetricSparkline color="amber" className="w-14 h-6" />
-          </div>
-        </div>
-
-        {/* Card 5: Total Pendapatan Bulan Ini */}
-        <div
-          onClick={() => onNavigate('pembayaran', 'pembayaran')}
-          className="bg-white rounded-2xl border border-slate-100 shadow-xs hover:shadow-md p-3 sm:p-3.5 transition-all cursor-pointer group flex flex-col justify-between"
-        >
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-rose-500 text-white flex items-center justify-center shadow-md shadow-rose-500/20 shrink-0 group-hover:scale-105 transition-transform">
-              <CreditCard size={17} />
-            </div>
-            <span className="text-[11px] font-semibold text-slate-500 leading-tight">
-              Pendapatan
-            </span>
-          </div>
-
-          <div className="mt-2">
-            <div className="text-lg sm:text-xl font-black text-slate-900 tracking-tight truncate">
-              Rp {thisMonthPaidTotal.toLocaleString('id-ID')}
+              {(totals.users ?? 0).toLocaleString('id-ID')}
             </div>
           </div>
 
@@ -333,12 +290,12 @@ export const OverviewSection: React.FC<OverviewSectionProps> = ({
             <div className="text-[10.5px] font-bold text-emerald-600 flex items-center gap-0.5">
               <ArrowUp size={12} strokeWidth={2.5} />
               <span>
-                {totals.settledCount !== undefined
-                  ? `${totals.settledCount} transaksi`
-                  : 'Riil bulan ini'}
+                {totals.newUsersThisMonth !== undefined
+                  ? `${totals.newUsersThisMonth} baru bln ini`
+                  : 'Akun terdaftar'}
               </span>
             </div>
-            <MetricSparkline color="rose" className="w-14 h-6" />
+            <MetricSparkline color="amber" className="w-14 h-6" />
           </div>
         </div>
       </div>

@@ -584,6 +584,7 @@ export default async function handler(req:any,res:any){
       const newSchoolsThisMonth = rows.filter((s: any) => s.created_at && s.created_at >= startOfMonth).length;
       const newStudentsThisMonth = (students || []).filter((st: any) => st.created_at && st.created_at >= startOfMonth).length;
       const newTeachersThisMonth = (users || []).filter((u: any) => ['ADMIN','WALI KELAS','GURU MAPEL','KEPALA SEKOLAH'].includes(u.role) && u.created_at && u.created_at >= startOfMonth).length;
+      const newUsersThisMonth = (users || []).filter((u: any) => u.created_at && u.created_at >= startOfMonth).length;
 
       // Pendapatan riil
       let thisMonthRevenue = 0;
@@ -615,6 +616,7 @@ export default async function handler(req:any,res:any){
           newSchoolsThisMonth,
           newStudentsThisMonth,
           newTeachersThisMonth,
+          newUsersThisMonth,
           thisMonthRevenue,
           totalRevenue,
           settledCount,
@@ -1602,11 +1604,11 @@ export default async function handler(req:any,res:any){
 
       if (pErr || !payment) return json(res, 404, { error: 'Transaksi pembayaran tidak ditemukan.' });
 
-      // LINDUNGI TRANSAKSI LUNAS: Transaksi SETTLED/PAID dilarang dihapus
+      // LINDUNGI TRANSAKSI LUNAS: Transaksi SETTLED/PAID dilarang dihapus kecuali force: true
       const currentStatus = String(payment.status || '').toUpperCase();
-      if (currentStatus === 'SETTLED' || currentStatus === 'PAID') {
+      if ((currentStatus === 'SETTLED' || currentStatus === 'PAID') && !req.body.force) {
         return json(res, 403, {
-          error: 'Transaksi berstatus LUNAS (SETTLED) dilindungi dan tidak boleh dihapus demi integritas histori keuangan.'
+          error: 'Transaksi berstatus LUNAS (SETTLED) dilindungi. Berikan konfirmasi force untuk menghapus riwayat transaksi ini.'
         });
       }
 
@@ -1624,10 +1626,11 @@ export default async function handler(req:any,res:any){
           invoice_no: payment.invoice_no,
           school_name: payment.school_name,
           status: payment.status,
+          forced: !!req.body.force,
         },
       });
 
-      return json(res, 200, { ok: true, message: 'Data pembayaran belum lunas berhasil dihapus.' });
+      return json(res, 200, { ok: true, message: 'Data riwayat pembayaran berhasil dihapus permanen.' });
     }
 
     if(action==='create_direct_subscription'){

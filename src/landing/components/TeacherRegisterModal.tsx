@@ -839,7 +839,7 @@ export const TeacherRegisterModal: React.FC<TeacherRegisterModalProps> = ({
               {/* Title Header */}
               <div className="mb-4 sm:mb-5">
                 <h3 className="text-lg sm:text-2xl font-black text-slate-900 tracking-tight">
-                  {lang === 'ID' ? 'Pendaftaran Akun Guru Pro' : 'Teacher Pro Registration'}
+                  {lang === 'ID' ? 'Pendaftaran Akun Paket Guru' : 'Teacher Plan Registration'}
                 </h3>
                 <p className="text-xs text-slate-500 mt-1">
                   {lang === 'ID'
@@ -1079,7 +1079,7 @@ export const TeacherRegisterModal: React.FC<TeacherRegisterModalProps> = ({
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <span className="text-[10px] font-bold text-blue-700 uppercase tracking-wider block">
-                      Paket Guru Pro
+                      Paket Guru
                     </span>
                     <h4 className="text-sm sm:text-base font-extrabold text-slate-900 mt-0.5">
                       {paymentSession.planTitle}
@@ -1216,8 +1216,8 @@ export const TeacherRegisterModal: React.FC<TeacherRegisterModalProps> = ({
                   <CheckCircle2 size={14} className="text-emerald-600" />
                   <span>
                     {lang === 'ID'
-                      ? `Paket Guru Pro (${billingCycle === 'yearly' ? 'Tahunan' : 'Bulanan'}) Aktif!`
-                      : 'Teacher Pro Workspace Activated!'}
+                      ? `Paket Guru (${billingCycle === 'yearly' ? 'Tahunan' : 'Bulanan'}) Aktif!`
+                      : 'Teacher Workspace Activated!'}
                   </span>
                 </div>
                 <h3 className="text-base sm:text-lg font-black text-slate-900">
@@ -1225,7 +1225,7 @@ export const TeacherRegisterModal: React.FC<TeacherRegisterModalProps> = ({
                 </h3>
                 <p className="text-xs text-slate-500 leading-relaxed">
                   {lang === 'ID'
-                    ? `Selamat! Ruang Kerja Individu Pro Anda telah aktif selama ${registrationSuccessData.expiresInDays} hari. Silakan unduh atau salin kredensial login Anda di bawah ini.`
+                    ? `Selamat! Ruang Kerja Individu Paket Guru Anda telah aktif selama ${registrationSuccessData.expiresInDays} hari. Silakan unduh atau salin kredensial login Anda di bawah ini.`
                     : `Congratulations! Your Teacher Workspace is now active for ${registrationSuccessData.expiresInDays} days. Please download your card below.`}
                 </p>
               </div>

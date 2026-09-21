@@ -36,11 +36,11 @@ export const FinancialReportModal: React.FC<{
       // Mock CSV generation and download
       const csvContent = "data:text/csv;charset=utf-8," + 
         "No,ID Transaksi,Sekolah,Siswa/PIC,Paket,Metode,Jumlah,Tanggal,Status\n" +
-        "1,TRX-2026-000248,SDN KAWUNG LUWUK,Rina Putri,Paket Sekolah Pro (1 Bulan),Transfer Bank,25000,19/09/2026 10:24,Lunas\n" +
+        "1,TRX-2026-000248,SDN KAWUNG LUWUK,Rina Putri,Paket Sekolah (1 Bulan),Transfer Bank,25000,19/09/2026 10:24,Lunas\n" +
         "2,TRX-2026-000247,SMKN 1 Luwuk,Andi Saputra,Paket Premium (1 Bulan),Virtual Account,150000,19/09/2026 09:17,Lunas\n" +
         "3,TRX-2026-000246,SMPN 1 Luwuk,Siti Nurhaliza,Paket Basic (1 Bulan),QRIS,75000,18/09/2026 16:43,Lunas\n" +
         "4,TRX-2026-000245,SMK Negeri 1 Luwuk,Budi Santoso,Paket Premium (1 Bulan),E-Wallet,120000,18/09/2026 14:20,Lunas\n" +
-        "5,TRX-2026-000244,SDN 1 Luwuk,Nabila Zahra,Paket Sekolah Pro (1 Bulan),Transfer Bank,25000,17/09/2026 11:05,Menunggu\n";
+        "5,TRX-2026-000244,SDN 1 Luwuk,Nabila Zahra,Paket Sekolah (1 Bulan),Transfer Bank,25000,17/09/2026 11:05,Menunggu\n";
       
       const encodedUri = encodeURI(csvContent);
       const link = document.createElement("a");

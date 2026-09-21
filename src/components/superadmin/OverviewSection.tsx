@@ -525,7 +525,7 @@ export const OverviewSection: React.FC<OverviewSectionProps> = ({
                   <span>1. Manajemen Sekolah &amp; Tenant</span>
                 </div>
                 <p className="text-slate-500 pl-5">
-                  Daftarkan unit sekolah baru melalui tombol <strong>Tambah Sekolah</strong>, atur paket lisensi (Guru Gratis, Guru Pro, atau Sekolah Pro), dan konfigurasi kuota rombel.
+                  Daftarkan unit sekolah baru melalui tombol <strong>Tambah Sekolah</strong>, atur paket lisensi (Paket Gratis, Paket Guru, atau Paket Sekolah), dan konfigurasi kuota rombel.
                 </p>
               </div>
 

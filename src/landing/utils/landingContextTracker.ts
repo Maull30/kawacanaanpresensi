@@ -54,7 +54,7 @@ const SECTION_METADATA: Record<
       {
         label: 'Daftar Sekolah',
         target: 'modal_register_school',
-        description: 'Membuka formulir pendaftaran paket Sekolah Pro untuk rombel kelas 1-6 satu sekolah penuh.',
+        description: 'Membuka formulir pendaftaran Paket Sekolah untuk rombel kelas 1-6 satu sekolah penuh.',
       },
       {
         label: 'Masuk ke Sistem',
@@ -114,14 +114,14 @@ const SECTION_METADATA: Record<
         description: 'Pendaftaran gratis untuk 1 guru kelas, s.d. 32 siswa, aktif selamanya.',
       },
       {
-        label: 'Pilih Guru Pro (Rp5.000/bln)',
+        label: 'Pilih Paket Guru (Rp5.000/bln)',
         target: 'modal_teacher_pro',
-        description: 'Pendaftaran Paket Guru Pro untuk s.d. 5 rombel dan 150 siswa (Rp5.000/bln atau Rp60.000/thn).',
+        description: 'Pendaftaran Paket Guru untuk s.d. 5 rombel dan 150 siswa (Rp5.000/bln atau Rp60.000/thn).',
       },
       {
-        label: 'Daftar Sekolah Pro (Rp25.000/bln)',
+        label: 'Daftar Paket Sekolah (Rp25.000/bln)',
         target: 'modal_register_school',
-        description: 'Pendaftaran paket 1 sekolah penuh kelas 1-6 paralel, multi-guru, s.d. 1.000 siswa (Rp25.000/bln atau Rp250.000/thn perdana).',
+        description: 'Pendaftaran Paket Sekolah 1 sekolah penuh kelas 1-6 paralel, multi-guru, s.d. 1.000 siswa (Rp25.000/bln atau Rp250.000/thn perdana).',
       },
       {
         label: 'Konsultasi Paket Custom',
@@ -293,7 +293,7 @@ export function getCurrentLandingContext(lang: 'ID' | 'EN' = 'ID'): LandingDynam
   // 5. Deteksi Paket Harga yang terlihat
   let activePricingPlan: string | null = null;
   if (currentSectionId === 'harga') {
-    activePricingPlan = 'Paket Gratis (Rp0), Guru Pro (Rp5.000/bln / Rp60.000/thn), Sekolah Pro (Rp25.000/bln / Rp250.000/thn perdana & Rp300.000/thn perpanjangan), dan Custom Yayasan';
+    activePricingPlan = 'Paket Gratis (Rp0), Paket Guru (Rp5.000/bln / Rp60.000/thn), Paket Sekolah (Rp25.000/bln / Rp250.000/thn perdana & Rp300.000/thn perpanjangan), dan Custom Yayasan';
   }
 
   // 6. Kumpulkan CTA di sekitar pengguna

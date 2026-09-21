@@ -334,7 +334,7 @@ export const UpgradePromptModal: React.FC<UpgradePromptModalProps> = ({
                 <div className="bg-blue-50/80 border border-blue-200 rounded-2xl p-4 space-y-2.5">
                   <div className="flex items-center gap-2 text-blue-900 font-bold text-sm">
                     <Building2 size={18} className="text-blue-700 shrink-0" />
-                    <span>Sekolah Anda Berlangganan Paket Sekolah Pro</span>
+                    <span>Sekolah Anda Berlangganan Paket Sekolah</span>
                   </div>
                   <p className="text-xs text-slate-600 leading-relaxed">
                     Ruang kerja satuan pendidikan <strong>{schoolProfile?.namaSekolah || 'sekolah Anda'}</strong> saat ini memiliki lisensi aktif. Seluruh Kepala Sekolah, Wali Kelas, dan Guru Mapel otomatis memiliki akses fitur profesional penuh.

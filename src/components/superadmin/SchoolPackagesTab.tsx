@@ -274,7 +274,7 @@ export const SchoolPackagesTab: React.FC<SchoolPackagesTabProps> = ({
       </div>
 
       {/* 2. STATS OVERVIEW CARDS */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs">
           <div className="flex items-center justify-between text-slate-500 mb-2">
             <span className="text-[11px] font-bold uppercase tracking-wider">Total Instansi</span>
@@ -286,7 +286,7 @@ export const SchoolPackagesTab: React.FC<SchoolPackagesTabProps> = ({
 
         <div className="bg-white p-4 rounded-2xl border border-indigo-100 shadow-xs">
           <div className="flex items-center justify-between text-indigo-600 mb-2">
-            <span className="text-[11px] font-bold uppercase tracking-wider">Sekolah Pro</span>
+            <span className="text-[11px] font-bold uppercase tracking-wider">Paket Sekolah</span>
             <Sparkles size={16} className="text-indigo-500" />
           </div>
           <div className="text-2xl font-black text-indigo-700">{stats.sekolahPro}</div>
@@ -295,7 +295,7 @@ export const SchoolPackagesTab: React.FC<SchoolPackagesTabProps> = ({
 
         <div className="bg-white p-4 rounded-2xl border border-blue-100 shadow-xs">
           <div className="flex items-center justify-between text-blue-600 mb-2">
-            <span className="text-[11px] font-bold uppercase tracking-wider">Guru Pro</span>
+            <span className="text-[11px] font-bold uppercase tracking-wider">Paket Guru</span>
             <Zap size={16} className="text-blue-500" />
           </div>
           <div className="text-2xl font-black text-blue-700">{stats.guruPro}</div>
@@ -309,18 +309,6 @@ export const SchoolPackagesTab: React.FC<SchoolPackagesTabProps> = ({
           </div>
           <div className="text-2xl font-black text-slate-700">{stats.gratis}</div>
           <p className="text-[10px] text-slate-400 mt-1">Edisi standar dasar</p>
-        </div>
-
-        <div className="bg-white p-4 rounded-2xl border border-amber-100 shadow-xs col-span-2 lg:col-span-1">
-          <div className="flex items-center justify-between text-amber-600 mb-2">
-            <span className="text-[11px] font-bold uppercase tracking-wider">Perlu Perhatian</span>
-            <AlertTriangle size={16} className="text-amber-500" />
-          </div>
-          <div className="flex items-baseline gap-2">
-            <span className="text-2xl font-black text-amber-600">{stats.expiring}</span>
-            <span className="text-xs text-slate-400 font-bold">/ {stats.expired} habis</span>
-          </div>
-          <p className="text-[10px] text-amber-600/80 mt-1">&lt;30 hari atau kedaluwarsa</p>
         </div>
       </div>
 
@@ -350,8 +338,8 @@ export const SchoolPackagesTab: React.FC<SchoolPackagesTabProps> = ({
                 className="px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-700 focus:outline-indigo-600"
               >
                 <option value="all">Semua Paket</option>
-                <option value="sekolah_pro">Paket Sekolah Pro</option>
-                <option value="guru_pro">Paket Guru Pro</option>
+                <option value="sekolah_pro">Paket Sekolah</option>
+                <option value="guru_pro">Paket Guru</option>
                 <option value="guru_gratis">Paket Gratis</option>
               </select>
 
@@ -422,15 +410,15 @@ export const SchoolPackagesTab: React.FC<SchoolPackagesTabProps> = ({
                               {p === 'sekolah_pro' ? (
                                 <>
                                   <Sparkles size={11} />
-                                  <span>Sekolah Pro</span>
+                                  <span>Paket Sekolah</span>
                                 </>
                               ) : p === 'guru_pro' ? (
                                 <>
                                   <Zap size={11} />
-                                  <span>Guru Pro</span>
+                                  <span>Paket Guru</span>
                                 </>
                               ) : (
-                                <span>Gratis</span>
+                                <span>Paket Gratis</span>
                               )}
                             </span>
                           </td>
@@ -548,7 +536,7 @@ export const SchoolPackagesTab: React.FC<SchoolPackagesTabProps> = ({
                         : 'border-slate-200 hover:border-slate-300 text-slate-700 text-xs'
                     }`}
                   >
-                    <div className="text-xs font-bold">Gratis</div>
+                    <div className="text-xs font-bold">Paket Gratis</div>
                     <div className="text-[10px] text-slate-400 mt-0.5">Dasar</div>
                   </button>
                   <button
@@ -560,7 +548,7 @@ export const SchoolPackagesTab: React.FC<SchoolPackagesTabProps> = ({
                         : 'border-slate-200 hover:border-slate-300 text-slate-700 text-xs'
                     }`}
                   >
-                    <div className="text-xs font-bold">Guru Pro</div>
+                    <div className="text-xs font-bold">Paket Guru</div>
                     <div className="text-[10px] text-slate-400 mt-0.5">Mandiri</div>
                   </button>
                   <button
@@ -572,7 +560,7 @@ export const SchoolPackagesTab: React.FC<SchoolPackagesTabProps> = ({
                         : 'border-slate-200 hover:border-slate-300 text-slate-700 text-xs'
                     }`}
                   >
-                    <div className="text-xs font-bold">Sekolah Pro</div>
+                    <div className="text-xs font-bold">Paket Sekolah</div>
                     <div className="text-[10px] text-slate-400 mt-0.5">Institusi</div>
                   </button>
                 </div>

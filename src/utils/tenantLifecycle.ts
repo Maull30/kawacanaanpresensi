@@ -264,7 +264,7 @@ export function getTenantLifecycleInfo(
     badgeClass: 'bg-slate-100 text-slate-700 border-slate-300',
     dotClass: 'bg-slate-500',
     borderClass: 'border-slate-300',
-    description: `Masa Paket Sekolah Pro telah berakhir (${daysPast} hari lalu). Ruang kerja tetap berjalan dengan fitur Paket Gratis (guru_gratis).`,
+    description: `Masa Paket Sekolah telah berakhir (${daysPast} hari lalu). Ruang kerja tetap berjalan dengan fitur Paket Gratis (guru_gratis).`,
     daysRemaining: diffDays,
     graceDaysRemaining: 0,
     isExpiringSoon: false,

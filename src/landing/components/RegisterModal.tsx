@@ -423,7 +423,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
       password: password,
       email: session.email,
       invoiceNo: session.orderId,
-      plan: 'Paket Sekolah Pro',
+      plan: 'Paket Sekolah',
       billingCycle: session.billingCycle,
       expiryDays: session.billingCycle === 'yearly' ? 365 : 30,
     };

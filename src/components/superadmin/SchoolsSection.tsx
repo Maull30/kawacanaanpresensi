@@ -784,7 +784,7 @@ export const SchoolsSection: React.FC<{
                   {!isSuspended ? 'Aktif' : 'Nonaktif / Dibekukan'}
                 </span>
                 <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 uppercase">
-                  {sch.plan === 'teacher' ? 'Paket Guru Pro' : sch.plan === 'school' || sch.plan === 'sekolah' ? 'Paket Sekolah Pro' : 'Paket Gratis'}
+                  {sch.plan === 'teacher' ? 'Paket Guru' : sch.plan === 'school' || sch.plan === 'sekolah' ? 'Paket Sekolah' : 'Paket Gratis'}
                 </span>
               </div>
               <div className="text-xs text-slate-500 mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -1538,26 +1538,6 @@ export const SchoolsSection: React.FC<{
         <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={loadSchools}
-            disabled={loading}
-            className="p-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition cursor-pointer disabled:opacity-50"
-            title="Muat Ulang Data Sekolah"
-          >
-            <RefreshCw size={15} className={loading ? 'animate-spin text-blue-600' : ''} />
-          </button>
-
-          <button
-            type="button"
-            onClick={handleExportSchools}
-            className="px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold flex items-center gap-1.5 cursor-pointer transition shadow-xs"
-            title="Ekspor CSV Data Sekolah"
-          >
-            <Download size={14} />
-            <span className="hidden sm:inline">Ekspor CSV</span>
-          </button>
-
-          <button
-            type="button"
             onClick={() => setIsCreateOpen(true)}
             className="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-xs flex items-center gap-1.5 cursor-pointer transition shrink-0"
           >
@@ -1670,13 +1650,15 @@ export const SchoolsSection: React.FC<{
 
                       // Normalisasi Paket Badge
                       const planStr = (s.plan || 'gratis').toLowerCase();
-                      let planBadge = { label: 'GRATIS', cls: 'bg-sky-50 text-sky-700 border-sky-200' };
+                      let planBadge = { label: 'PAKET GRATIS', cls: 'bg-sky-50 text-sky-700 border-sky-200' };
                       if (planStr.includes('ent')) {
                         planBadge = { label: 'ENTERPRISE', cls: 'bg-indigo-50 text-indigo-700 border-indigo-200' };
-                      } else if (planStr.includes('pro') || planStr.includes('school') || planStr.includes('sekolah')) {
-                        planBadge = { label: 'PRO', cls: 'bg-purple-50 text-purple-700 border-purple-200' };
-                      } else if (planStr.includes('bas') || planStr.includes('guru') || planStr.includes('teacher')) {
-                        planBadge = { label: 'BASIC', cls: 'bg-blue-50 text-blue-700 border-blue-200' };
+                      } else if (planStr.includes('school') || planStr.includes('sekolah')) {
+                        planBadge = { label: 'PAKET SEKOLAH', cls: 'bg-purple-50 text-purple-700 border-purple-200' };
+                      } else if (planStr.includes('guru') || planStr.includes('teacher')) {
+                        planBadge = { label: 'PAKET GURU', cls: 'bg-blue-50 text-blue-700 border-blue-200' };
+                      } else if (planStr.includes('pro')) {
+                        planBadge = { label: 'PAKET SEKOLAH', cls: 'bg-purple-50 text-purple-700 border-purple-200' };
                       }
 
                       // Format Tanggal Masa Berlaku

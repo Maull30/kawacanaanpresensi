@@ -89,7 +89,7 @@ export const PricingSection: React.FC<PricingSectionProps> = ({ onOpenRegister, 
     {
       id: 'teacher' as const,
       name: isId ? 'Paket Guru' : 'Teacher Plan',
-      workspaceType: isId ? 'Ruang Kerja Individu Pro' : 'Teacher Workspace Pro',
+      workspaceType: isId ? 'Ruang Kerja Individu' : 'Teacher Workspace',
       workspaceIcon: Users,
       price: billingCycle === 'monthly'
         ? formatRupiah(teacherMonthlyPrice)

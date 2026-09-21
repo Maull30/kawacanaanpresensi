@@ -399,7 +399,7 @@ export const BillingSection: React.FC<{
       invoiceNo: 'TRX-2026-000248',
       schoolName: 'SDN KAWUNG LUWUK',
       studentName: 'Rina Putri',
-      planName: 'Paket Sekolah Pro (1 Bulan)',
+      planName: 'Paket Sekolah (1 Bulan)',
       paymentMethod: 'Transfer Bank',
       totalAmount: 25000,
       createdAt: '2026-09-19T10:24:00Z',
@@ -443,7 +443,7 @@ export const BillingSection: React.FC<{
       invoiceNo: 'TRX-2026-000244',
       schoolName: 'SDN 1 Luwuk',
       studentName: 'Nabila Zahra',
-      planName: 'Paket Sekolah Pro (1 Bulan)',
+      planName: 'Paket Sekolah (1 Bulan)',
       paymentMethod: 'Transfer Bank',
       totalAmount: 25000,
       createdAt: '2026-09-17T11:05:00Z',
@@ -454,7 +454,7 @@ export const BillingSection: React.FC<{
       invoiceNo: 'TRX-2026-000243',
       schoolName: 'SMP Al-Azhar Luwuk',
       studentName: 'Ahmad Fauzi',
-      planName: 'Paket Sekolah Pro (1 Tahun)',
+      planName: 'Paket Sekolah (1 Tahun)',
       paymentMethod: 'Virtual Account',
       totalAmount: 250000,
       createdAt: '2026-09-16T15:30:00Z',
@@ -465,7 +465,7 @@ export const BillingSection: React.FC<{
       invoiceNo: 'TRX-2026-000242',
       schoolName: 'SMA Negeri 2 Luwuk',
       studentName: 'Dewi Lestari',
-      planName: 'Paket Guru Pro (1 Bulan)',
+      planName: 'Paket Guru (1 Bulan)',
       paymentMethod: 'QRIS',
       totalAmount: 5000,
       createdAt: '2026-09-15T08:45:00Z',
@@ -1338,7 +1338,7 @@ export const BillingSection: React.FC<{
                   <option value="">-- Pilih Instansi Sekolah --</option>
                   {schools.map((s) => {
                     const id = s.id || s.school_id;
-                    const planLabel = s.plan === 'teacher' || s.plan === 'guru_pro' ? 'Guru Pro' : 'Sekolah Pro';
+                    const planLabel = s.plan === 'teacher' || s.plan === 'guru_pro' ? 'Paket Guru' : 'Paket Sekolah';
                     const statusLabel = s.status === 'active' ? 'Aktif' : 'Nonaktif';
                     return (
                       <option key={id} value={id}>
@@ -1365,7 +1365,7 @@ export const BillingSection: React.FC<{
                     }`}
                   >
                     <div className="font-bold text-xs flex items-center justify-between">
-                      <span>Paket Sekolah Pro</span>
+                      <span>Paket Sekolah</span>
                       {directSubForm.plan === 'sekolah_pro' && <CheckCircle size={14} className="text-indigo-600" />}
                     </div>
                     <div className="text-[10px] text-slate-500 mt-1 leading-tight">
@@ -1383,7 +1383,7 @@ export const BillingSection: React.FC<{
                     }`}
                   >
                     <div className="font-bold text-xs flex items-center justify-between">
-                      <span>Paket Guru Pro</span>
+                      <span>Paket Guru</span>
                       {directSubForm.plan === 'guru_pro' && <CheckCircle size={14} className="text-indigo-600" />}
                     </div>
                     <div className="text-[10px] text-slate-500 mt-1 leading-tight">

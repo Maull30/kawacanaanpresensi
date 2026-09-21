@@ -4,7 +4,7 @@
  * Standar Penamaan Entitas & Database (Bahasa Indonesia):
  * - ruang_kerja: Ruang kerja tenant (tipe: 'individu' | 'sekolah')
  * - anggota_ruang_kerja: Keanggotaan pengguna dalam ruang kerja dengan role
- * - paket: Master konfigurasi paket (Guru Gratis, Guru Uji Coba, Guru Pro, Sekolah Gratis, Sekolah Uji Coba, Sekolah Pro)
+ * - paket: Master konfigurasi paket (Paket Gratis, Paket Guru, Paket Sekolah)
  * - langganan: Status langganan ruang kerja ('gratis' | 'uji_coba' | 'pro')
  * - pembayaran: Transaksi & invoice pembayaran upgrade paket
  * - tahun_ajaran: Tahun ajaran aktif untuk isolasi penugasan

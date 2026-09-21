@@ -2119,7 +2119,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     // Aturan Opsi B: Ruang kerja individu diblokir total jika sekolah aktif Paket Sekolah Pro
     if (isPersonal && isSchoolPro) {
       showToast(
-        "Sekolah Anda sedang aktif berlangganan Paket Sekolah Pro. Aktivitas berpusat di Ruang Kerja Sekolah.",
+        "Sekolah Anda sedang aktif berlangganan Paket Sekolah. Aktivitas berpusat di Ruang Kerja Sekolah.",
         "info",
       );
       return;
@@ -7666,7 +7666,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       // Validasi Aturan Hierarki: Pengguna di sekolah yang aktif Paket Sekolah Pro DILARANG membeli Paket Guru
       if (isSchoolPro) {
         const schoolName = schoolProfile?.namaSekolah || 'Sekolah Anda';
-        const msg = `${schoolName} telah aktif berlangganan Paket Sekolah Pro. Seluruh fitur Guru Pro sudah aktif otomatis dan Anda tidak diperkenankan membeli Paket Guru.`;
+        const msg = `${schoolName} telah aktif berlangganan Paket Sekolah. Seluruh fitur Paket Guru sudah aktif otomatis dan Anda tidak diperkenankan membeli Paket Guru.`;
         showToast(msg, 'error');
         throw new Error(msg);
       }
@@ -7779,7 +7779,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       // frontend fokus pada pembaruan state lokal & cache in-memory.
 
       showToast(
-        'Pembayaran berhasil! Paket Guru Pro resmi aktif di Ruang Kerja Anda.',
+        'Pembayaran berhasil! Paket Guru resmi aktif di Ruang Kerja Anda.',
         'success'
       );
       return true;

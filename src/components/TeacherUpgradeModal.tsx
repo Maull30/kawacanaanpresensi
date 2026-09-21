@@ -309,15 +309,15 @@ export const TeacherUpgradeModal: React.FC<TeacherUpgradeModalProps> = ({
             <div className="flex items-center gap-2 mb-2">
               <span className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-emerald-500/20 text-emerald-200 border border-emerald-400/30 text-[11px] font-bold tracking-wide uppercase">
                 <ShieldCheck size={13} />
-                Paket Sekolah Pro Aktif
+                Paket Sekolah Aktif
               </span>
             </div>
 
             <h3 className="text-lg sm:text-xl font-black leading-snug">
-              Sekolah Anda Telah Berlangganan Paket Sekolah Pro
+              Sekolah Anda Telah Berlangganan Paket Sekolah
             </h3>
             <p className="text-xs sm:text-sm text-blue-100 mt-1 leading-relaxed">
-              Ruang kerja satuan pendidikan <strong>{schoolName}</strong> saat ini aktif berlangganan Paket Sekolah Pro.
+              Ruang kerja satuan pendidikan <strong>{schoolName}</strong> saat ini aktif berlangganan Paket Sekolah.
             </p>
           </div>
 
@@ -330,7 +330,7 @@ export const TeacherUpgradeModal: React.FC<TeacherUpgradeModalProps> = ({
                 </div>
                 <div className="space-y-1">
                   <h4 className="text-xs sm:text-sm font-black text-slate-900">
-                    Akses Fitur Guru Pro Telah Otomatis Terbuka Penuh
+                    Akses Fitur Paket Guru Telah Otomatis Terbuka Penuh
                   </h4>
                   <p className="text-xs text-slate-600 leading-relaxed">
                     Akun Anda (<strong>{teacherName}</strong>) bersama seluruh Kepala Sekolah, Wali Kelas, dan Guru Mapel di sekolah ini telah mendapatkan akses penuh tanpa batasan.
@@ -415,7 +415,7 @@ export const TeacherUpgradeModal: React.FC<TeacherUpgradeModalProps> = ({
             {step === 1 && 'Konfirmasi Profil & Penugasan Pendidik'}
             {step === 2 && 'Pilih Opsi Langganan atau Uji Coba 14 Hari'}
             {step === 3 && 'Pembayaran Payment Gateway Midtrans'}
-            {step === 4 && 'Selamat Datang di Paket Guru Pro!'}
+            {step === 4 && 'Selamat Datang di Paket Guru!'}
           </h3>
           <p className="text-xs sm:text-sm text-emerald-100 mt-1">
             {step === 1 && 'Akun Anda sudah terdaftar. Konfirmasi tugas mengajar Anda untuk menyesuaikan kapasitas.'}
@@ -582,7 +582,7 @@ export const TeacherUpgradeModal: React.FC<TeacherUpgradeModalProps> = ({
                       <p className="text-xs text-slate-600 mt-0.5">
                         {hasUsedTeacherTrial
                           ? 'Kesempatan uji coba 14 hari telah digunakan. Silakan pilih paket langganan resmi di bawah ini.'
-                          : 'Coba seluruh fitur Guru Pro selama 14 hari penuh tanpa biaya dan tanpa kartu kredit.'}
+                          : 'Coba seluruh fitur Paket Guru selama 14 hari penuh tanpa biaya dan tanpa kartu kredit.'}
                       </p>
                     </div>
                   </div>
@@ -767,7 +767,7 @@ export const TeacherUpgradeModal: React.FC<TeacherUpgradeModalProps> = ({
                   <div className="flex justify-between">
                     <span>Paket:</span>
                     <span className="font-bold text-slate-800">
-                      Paket Guru Pro ({billingCycle === 'yearly' ? '1 Tahun' : '1 Bulan'})
+                      Paket Guru ({billingCycle === 'yearly' ? '1 Tahun' : '1 Bulan'})
                     </span>
                   </div>
                   <div className="flex justify-between">
@@ -837,7 +837,7 @@ export const TeacherUpgradeModal: React.FC<TeacherUpgradeModalProps> = ({
               </div>
               <div>
                 <h4 className="text-xl font-black text-slate-800">
-                  Selamat, Akun Anda Kini Guru Pro!
+                  Selamat, Akun Anda Kini Paket Guru!
                 </h4>
                 <p className="text-xs sm:text-sm text-slate-600 mt-1.5 max-w-md mx-auto">
                   Paket Guru pada Ruang Kerja Individu <strong>{teacherName}</strong> telah aktif. Seluruh fitur profesional siap digunakan.

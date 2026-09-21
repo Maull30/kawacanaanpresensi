@@ -57,7 +57,7 @@ const SAMPLE_ACTIVITIES: ActivityItem[] = [
     id: 'act-sample-1',
     action: 'SUPERADMIN_DIRECT_SUBSCRIPTION',
     category: 'billing',
-    title: 'Perpanjangan Lisensi Paket Sekolah Pro',
+    title: 'Perpanjangan Lisensi Paket Sekolah',
     description: 'Aktivasi Direct Subscription 365 hari untuk instansi SDN KAWUNG LUWUK (INV/202603/DIR/9B2A10).',
     actor_name: 'Super Admin',
     actor_role: 'SUPER_ADMIN',

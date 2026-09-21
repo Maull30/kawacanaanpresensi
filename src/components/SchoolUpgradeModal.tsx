@@ -673,7 +673,7 @@ export const SchoolUpgradeModal: React.FC<SchoolUpgradeModalProps> = ({
                   <div className="flex justify-between">
                     <span>Produk:</span>
                     <span className="font-bold text-slate-800">
-                      Paket Sekolah Pro ({billingCycle === 'yearly' ? '1 Tahun' : '1 Bulan'})
+                      Paket Sekolah ({billingCycle === 'yearly' ? '1 Tahun' : '1 Bulan'})
                     </span>
                   </div>
                   <div className="flex justify-between">

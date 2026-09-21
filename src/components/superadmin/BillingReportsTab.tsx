@@ -339,7 +339,7 @@ export const BillingReportsTab: React.FC<BillingReportsTabProps> = ({
         <div className="space-y-3 pt-2">
           <div>
             <div className="flex justify-between text-xs font-bold mb-1.5">
-              <span className="text-slate-800">Paket Sekolah Pro (Multi-Kiosk &amp; Siswa)</span>
+              <span className="text-slate-800">Paket Sekolah (Multi-Kiosk &amp; Siswa)</span>
               <span className="text-indigo-700 font-mono">
                 Rp {planDistribution.sekolahProAmt.toLocaleString('id-ID')} ({planDistribution.sekolahProPct})
               </span>
@@ -351,7 +351,7 @@ export const BillingReportsTab: React.FC<BillingReportsTabProps> = ({
 
           <div>
             <div className="flex justify-between text-xs font-bold mb-1.5">
-              <span className="text-slate-800">Paket Guru Pro (Absensi Mandiri PTK)</span>
+              <span className="text-slate-800">Paket Guru (Absensi Mandiri PTK)</span>
               <span className="text-emerald-700 font-mono">
                 Rp {planDistribution.guruProAmt.toLocaleString('id-ID')} ({planDistribution.guruProPct})
               </span>

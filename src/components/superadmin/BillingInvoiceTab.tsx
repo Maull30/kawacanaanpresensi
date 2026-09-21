@@ -118,7 +118,7 @@ export const BillingInvoiceTab: React.FC<BillingInvoiceTabProps> = ({
         schoolId: p.schoolId || p.school_id || '',
         schoolName,
         npsn,
-        planName: p.planName || (p.planId === 'sekolah_pro' ? 'Sekolah Pro' : 'Guru Pro (Lisensi)'),
+        planName: p.planName || (p.planId === 'sekolah_pro' ? 'Paket Sekolah' : 'Paket Guru (Lisensi)'),
         amount: Number(p.totalAmount || p.total_amount || p.amount || 0),
         issueDate,
         dueDate,
@@ -357,8 +357,8 @@ export const BillingInvoiceTab: React.FC<BillingInvoiceTabProps> = ({
             className="px-3 py-2 rounded-xl border border-slate-200 text-xs bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium"
           >
             <option value="all">Semua Jenis Paket</option>
-            <option value="sekolah">Paket Sekolah Pro</option>
-            <option value="guru">Paket Guru Pro</option>
+            <option value="sekolah">Paket Sekolah</option>
+            <option value="guru">Paket Guru</option>
           </select>
         </div>
       </div>

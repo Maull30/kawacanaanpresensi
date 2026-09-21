@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowRight, Gift, Home } from 'lucide-react';
+import { ArrowRight, Gift } from 'lucide-react';
 import { DeviceMockup } from './DeviceMockup';
 import { PublicStatsBanner } from './PublicStatsBanner';
 
@@ -20,7 +20,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
   return (
     <section 
       id="beranda" 
-      className="relative min-h-[calc(100vh-80px)] pt-24 sm:pt-28 lg:pt-32 pb-14 sm:pb-20 flex flex-col justify-between overflow-hidden bg-gradient-to-b from-[#F5F9FF] via-[#ECF4FE] to-[#DCEBFE] text-slate-900 antialiased"
+      className="relative min-h-[calc(100vh-70px)] lg:min-h-screen lg:h-screen lg:max-h-screen pt-20 sm:pt-24 lg:pt-20 xl:pt-24 pb-6 sm:pb-8 lg:pb-3 flex flex-col justify-between overflow-hidden bg-gradient-to-b from-[#F5F9FF] via-[#ECF4FE] to-[#DCEBFE] text-slate-900 antialiased scroll-mt-20"
     >
       {/* Background Soft Glow Circles & Orbs (as in screenshot) */}
       <div className="absolute -top-12 -left-12 w-64 h-64 sm:w-96 sm:h-96 bg-blue-300/25 rounded-full blur-3xl pointer-events-none" />
@@ -46,19 +46,13 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
 
       {/* Main Content Grid */}
       <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full flex-1 flex flex-col justify-center">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 sm:gap-12 lg:gap-8 items-center pt-2 sm:pt-4">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-10 lg:gap-8 items-center pt-1 sm:pt-2 lg:pt-0">
           
           {/* ========================================================================= */}
-          {/* Left Column: Pill Badge, Bold Headline, Terpadu Tag, Text & 2 CTA Buttons */}
+          {/* Left Column: Bold Headline, Terpadu Tag, Text & 2 CTA Buttons            */}
           {/* ========================================================================= */}
-          <div className="w-full lg:col-span-6 xl:col-span-6 space-y-5 sm:space-y-6 text-left">
+          <div className="w-full lg:col-span-6 xl:col-span-6 space-y-3.5 sm:space-y-4 lg:space-y-3 xl:space-y-4 text-left">
             
-            {/* Top Pill Badge with Home Icon (as in screenshot: SISTEM PRESENSI DIGITAL SEKOLAH DASAR) */}
-            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 bg-blue-100/80 border border-blue-200/90 text-blue-700 text-xs sm:text-xs font-black uppercase tracking-wider rounded-full shadow-2xs">
-              <Home className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-              <span>{isId ? 'SISTEM PRESENSI DIGITAL SEKOLAH DASAR' : 'PRIMARY SCHOOL DIGITAL ATTENDANCE SYSTEM'}</span>
-            </div>
-
             {/* Main Headline with 2 Dedicated Scaled Lines */}
             <h1 className="leading-[1.1] sm:leading-[1.08] font-black tracking-tight uppercase select-none">
               {isId ? (
@@ -195,15 +189,15 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
         {/* ========================================================================= */}
         {/* Solid Blue Horizontal Public Statistics Banner (as in screenshot)         */}
         {/* ========================================================================= */}
-        <div className="mt-12 sm:mt-14 lg:mt-16 w-full">
+        <div className="mt-8 sm:mt-10 lg:mt-4 xl:mt-6 w-full">
           <PublicStatsBanner lang={lang} />
         </div>
       </div>
 
       {/* Curved Wave Bottom Divider (as in screenshot) */}
-      <div className="w-full overflow-hidden leading-none pointer-events-none mt-6 sm:mt-8">
+      <div className="w-full overflow-hidden leading-none pointer-events-none mt-4 sm:mt-6 lg:mt-2 xl:mt-4 shrink-0">
         <svg 
-          className="relative block w-full h-10 sm:h-16 text-white fill-current" 
+          className="relative block w-full h-8 sm:h-12 lg:h-8 xl:h-10 text-white fill-current" 
           viewBox="0 0 1200 120" 
           preserveAspectRatio="none"
         >

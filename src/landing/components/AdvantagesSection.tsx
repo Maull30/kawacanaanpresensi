@@ -1,6 +1,5 @@
 import React from 'react';
 import { 
-  Star,
   ShieldCheck, 
   CalendarDays, 
   FileSpreadsheet, 
@@ -8,13 +7,13 @@ import {
   Clock, 
   Users, 
   Cloud, 
-  Heart,
-  School,
-  FileCheck,
-  TrendingUp,
-  Lock,
-  Smartphone,
-  Sparkles,
+  Heart, 
+  School, 
+  FileCheck, 
+  TrendingUp, 
+  Lock, 
+  Smartphone, 
+  Sparkles, 
   ArrowRight
 } from 'lucide-react';
 
@@ -241,7 +240,7 @@ export const AdvantagesSection: React.FC<AdvantagesSectionProps> = ({ lang, onOp
   return (
     <section 
       id="keunggulan" 
-      className="scroll-mt-16 sm:scroll-mt-20 pt-16 sm:pt-20 pb-16 sm:pb-20 bg-gradient-to-b from-[#F2F8FF] via-[#EAF3FE] to-[#DCEBFE] text-slate-900 relative antialiased overflow-hidden"
+      className="scroll-mt-16 sm:scroll-mt-20 pt-16 sm:pt-20 pb-16 sm:pb-20 lg:py-0 lg:min-h-screen lg:h-screen lg:max-h-screen lg:flex lg:flex-col lg:justify-center bg-gradient-to-b from-[#F2F8FF] via-[#EAF3FE] to-[#DCEBFE] text-slate-900 relative antialiased overflow-hidden"
     >
       {/* Background Soft Glows & Ambient Orbs */}
       <div className="absolute top-10 left-10 w-96 h-96 bg-blue-200/35 rounded-full blur-3xl pointer-events-none" />
@@ -266,14 +265,14 @@ export const AdvantagesSection: React.FC<AdvantagesSectionProps> = ({ lang, onOp
       <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
         
         {/* ========================================================================= */}
-        {/* SECTION HEADER: Pill Badge, Main Title, Subtitle & Playful 3D / Doodle    */}
+        {/* SECTION HEADER: Main Title, Subtitle & Playful 3D / Doodle                */}
         {/* ========================================================================= */}
-        <div className="relative text-center mb-12 sm:mb-16">
+        <div className="relative text-center mb-6 sm:mb-8 lg:mb-3 xl:mb-5">
           
           {/* Top-Left Playful Handwritten Annotation with Rays */}
           <div className="hidden lg:block absolute -top-4 left-4 xl:left-8 pointer-events-none select-none text-left">
             <div className="inline-block -rotate-[7deg] bg-white/50 backdrop-blur-xs px-3.5 py-2 rounded-2xl border border-blue-200/50 shadow-2xs">
-              <div className="relative font-bold text-blue-600 leading-tight tracking-tight text-sm xl:text-base">
+              <div className="relative font-bold text-blue-600 leading-tight tracking-tight text-xs xl:text-sm">
                 <div className="text-blue-600 font-medium">`Solusi Lengkap</div>
                 <div className="text-blue-700 font-extrabold">untuk Manajemen`</div>
                 <div className="text-blue-800 font-black">Sekolah Dasar.</div>
@@ -287,7 +286,7 @@ export const AdvantagesSection: React.FC<AdvantagesSectionProps> = ({ lang, onOp
           </div>
 
           {/* Top-Right 3D Illustration of Indonesian School, Books & Pencil Holder */}
-          <div className="hidden lg:block absolute -top-12 right-2 xl:right-6 pointer-events-none select-none w-48 xl:w-56">
+          <div className="hidden lg:block absolute -top-8 right-2 xl:right-6 pointer-events-none select-none w-32 xl:w-40 opacity-80">
             <img 
               src="/images/advantages_school_3d.jpg" 
               alt="Indonesian School & Books 3D Illustration" 
@@ -296,33 +295,27 @@ export const AdvantagesSection: React.FC<AdvantagesSectionProps> = ({ lang, onOp
             />
           </div>
 
-          {/* Center Pill Badge with Star Icon */}
-          <div className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-blue-100/90 border border-blue-200 text-blue-800 text-xs font-bold tracking-wide shadow-2xs mb-3.5">
-            <Star className="w-3.5 h-3.5 text-blue-600 fill-blue-600/30 shrink-0" />
-            <span>{isId ? 'Keunggulan Platform SAAS' : 'SaaS Platform Advantages'}</span>
-          </div>
-
           {/* High-Contrast Main Title */}
-          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-slate-900 tracking-tight leading-tight uppercase max-w-2xl mx-auto">
+          <h2 className="text-2xl sm:text-3xl lg:text-3xl xl:text-4xl font-black text-slate-900 tracking-tight leading-tight uppercase max-w-2xl mx-auto">
             <span>{isId ? 'Keunggulan Khusus' : 'Special Advantages'}</span>
-            <span className="block text-blue-600 mt-1">{isId ? 'Sekolah Dasar' : 'Primary School'}</span>
+            <span className="block text-blue-600 mt-0.5">{isId ? 'Sekolah Dasar' : 'Primary School'}</span>
           </h2>
 
           {/* Subtitle Description */}
-          <p className="mt-3 text-slate-600 text-xs sm:text-sm md:text-base leading-relaxed max-w-xl mx-auto font-normal">
+          <p className="mt-2 lg:mt-1 text-slate-600 text-xs sm:text-sm lg:text-xs xl:text-sm leading-relaxed max-w-xl mx-auto font-normal">
             {isId
               ? 'Arsitektur sistem presensi modern yang dirancang khusus memenuhi regulasi administrasi sekolah dasar.'
               : 'Modern attendance system architecture specifically engineered to comply with primary school administrative regulations.'}
           </p>
 
           {/* Small Blue Divider Capsule */}
-          <div className="w-12 h-1.5 bg-blue-600 rounded-full mx-auto mt-4" />
+          <div className="w-10 h-1.5 bg-blue-600 rounded-full mx-auto mt-2.5 lg:mt-2" />
         </div>
 
         {/* ========================================================================= */}
         {/* 8 CARDS GRID: 4 columns x 2 rows (Responsive for Mobile, Tablet & PC)     */}
         {/* ========================================================================= */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 sm:gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-3 xl:gap-3.5">
           {advantages.map((item, idx) => {
             const MainIcon = item.mainIcon;
             const BadgeIcon = item.badgeIcon;
@@ -330,42 +323,42 @@ export const AdvantagesSection: React.FC<AdvantagesSectionProps> = ({ lang, onOp
               <div 
                 key={idx}
                 id={`advantage-card-${idx}`}
-                className="bg-white/95 rounded-3xl p-6 shadow-[0_8px_24px_-8px_rgba(37,99,235,0.09)] border border-blue-50/80 hover:border-blue-300 hover:shadow-xl hover:shadow-blue-500/10 transition-all duration-300 flex flex-col justify-between relative overflow-hidden group min-h-[230px]"
+                className="bg-white/95 rounded-3xl p-4 sm:p-5 lg:p-3 xl:p-4 shadow-[0_8px_24px_-8px_rgba(37,99,235,0.09)] border border-blue-50/80 hover:border-blue-300 hover:shadow-xl hover:shadow-blue-500/10 transition-all duration-300 flex flex-col justify-between relative overflow-hidden group min-h-[170px] lg:min-h-[135px] xl:min-h-[155px]"
               >
                 {/* Bottom-right organic pastel decorative corner shape */}
-                <div className={`absolute -bottom-8 -right-8 w-28 h-28 ${item.cornerBlob} rounded-tl-full pointer-events-none transition-transform group-hover:scale-110`} />
+                <div className={`absolute -bottom-8 -right-8 w-24 h-24 ${item.cornerBlob} rounded-tl-full pointer-events-none transition-transform group-hover:scale-110`} />
 
                 <div>
                   {/* Top Row: Icon + Soft Blob Background on Left, Number Pill on Right */}
-                  <div className="flex items-start justify-between gap-3 mb-4">
+                  <div className="flex items-start justify-between gap-2 mb-2 lg:mb-1.5 xl:mb-2">
                     {/* Soft Blob + Icon */}
                     <div className="relative">
-                      <div className={`w-14 h-14 rounded-2xl ${item.blobClass} flex items-center justify-center p-2 transition-transform group-hover:scale-105 duration-300`}>
-                        <div className={`w-10 h-10 rounded-xl ${item.iconContainer} flex items-center justify-center shadow-md`}>
-                          <MainIcon className="w-5 h-5 stroke-[2.2]" />
+                      <div className={`w-10 h-10 lg:w-8.5 lg:h-8.5 xl:w-9.5 xl:h-9.5 rounded-xl ${item.blobClass} flex items-center justify-center p-1 transition-transform group-hover:scale-105 duration-300`}>
+                        <div className={`w-7.5 h-7.5 lg:w-6.5 lg:h-6.5 xl:w-7.5 xl:h-7.5 rounded-lg ${item.iconContainer} flex items-center justify-center shadow-xs`}>
+                          <MainIcon className="w-4 h-4 lg:w-3.5 lg:h-3.5 xl:w-4 xl:h-4 stroke-[2.2]" />
                         </div>
                       </div>
                     </div>
 
                     {/* Number Badge Pill (e.g. 01, 02, etc.) */}
-                    <span className={`px-3 py-0.5 rounded-full text-xs font-black font-mono tracking-wider ${item.numPillClass}`}>
+                    <span className={`px-2.5 py-0.5 rounded-full text-[11px] lg:text-[10px] xl:text-[11px] font-black font-mono tracking-wider ${item.numPillClass}`}>
                       {item.num}
                     </span>
                   </div>
 
                   {/* Title & Description */}
-                  <h3 className="text-base sm:text-lg font-black text-slate-900 tracking-tight leading-snug mb-2 group-hover:text-blue-600 transition-colors">
+                  <h3 className="text-sm sm:text-base lg:text-xs xl:text-sm font-black text-slate-900 tracking-tight leading-snug mb-1 group-hover:text-blue-600 transition-colors">
                     {item.title}
                   </h3>
-                  <p className="text-xs sm:text-[13px] text-slate-500 leading-relaxed font-normal">
+                  <p className="text-xs lg:text-[11px] xl:text-xs text-slate-500 leading-relaxed font-normal line-clamp-2">
                     {item.desc}
                   </p>
                 </div>
 
                 {/* Bottom Pill Badge with Icon & Label (e.g. Sesuai Regulasi, Otomatis & Akurat) */}
-                <div className="relative z-10 pt-4 mt-2 border-t border-slate-100/80">
-                  <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border shadow-2xs ${item.badgeClass}`}>
-                    <BadgeIcon className="w-3.5 h-3.5 shrink-0" />
+                <div className="relative z-10 pt-2 lg:pt-1.5 xl:pt-2 mt-1.5 border-t border-slate-100/80">
+                  <div className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10.5px] lg:text-[10px] xl:text-[10.5px] font-bold border shadow-2xs ${item.badgeClass}`}>
+                    <BadgeIcon className="w-3 h-3 shrink-0" />
                     <span>{item.badgeText}</span>
                   </div>
                 </div>

@@ -81,7 +81,7 @@ export const FaqSection: React.FC<FaqSectionProps> = ({ lang }) => {
   return (
     <section 
       id="faq" 
-      className="scroll-mt-16 sm:scroll-mt-20 pt-16 sm:pt-20 pb-16 sm:pb-24 bg-gradient-to-b from-[#F3F8FF] via-[#E9F3FE] to-[#DCEBFE] text-slate-900 relative antialiased overflow-hidden"
+      className="scroll-mt-16 sm:scroll-mt-20 pt-16 sm:pt-20 pb-16 sm:pb-24 lg:py-0 lg:min-h-screen lg:h-screen lg:max-h-screen lg:flex lg:flex-col lg:justify-center bg-gradient-to-b from-[#F3F8FF] via-[#E9F3FE] to-[#DCEBFE] text-slate-900 relative antialiased overflow-hidden"
     >
       {/* Background Soft Glows & Ambient Orbs */}
       <div className="absolute top-10 left-10 w-96 h-96 bg-blue-200/30 rounded-full blur-3xl pointer-events-none" />
@@ -108,12 +108,12 @@ export const FaqSection: React.FC<FaqSectionProps> = ({ lang }) => {
         {/* ========================================================================= */}
         {/* SECTION HEADER: Non-overlapping 3-Column / Fluid Layout                    */}
         {/* ========================================================================= */}
-        <div className="relative mb-10 sm:mb-14">
+        <div className="relative mb-6 sm:mb-8 lg:mb-3 xl:mb-5">
           
-          <div className="flex flex-col lg:flex-row items-center justify-between gap-6 lg:gap-4">
+          <div className="flex flex-col lg:flex-row items-center justify-between gap-4">
             
             {/* Left Decorative Doodle (Visible on large screens, cleanly positioned outside text) */}
-            <div className="hidden xl:flex flex-col items-start w-48 pointer-events-none select-none shrink-0 pl-2">
+            <div className="hidden xl:flex flex-col items-start w-40 pointer-events-none select-none shrink-0 pl-2">
               <div className="relative">
                 {/* Doodle Spark Lines */}
                 <div className="absolute -top-3.5 right-4 flex gap-1 rotate-12">
@@ -123,7 +123,7 @@ export const FaqSection: React.FC<FaqSectionProps> = ({ lang }) => {
                 </div>
                 
                 {/* Handwritten Blue Note */}
-                <p className="font-sans font-bold text-base text-blue-600 -rotate-6 leading-snug tracking-tight">
+                <p className="font-sans font-bold text-sm text-blue-600 -rotate-6 leading-snug tracking-tight">
                   {isId ? 'Masih ada' : 'Still have'}
                   <br />
                   <span className="font-extrabold text-blue-700">
@@ -132,36 +132,30 @@ export const FaqSection: React.FC<FaqSectionProps> = ({ lang }) => {
                 </p>
 
                 {/* Curved Underline Arrow pointing toward the accordion cards */}
-                <svg className="w-16 h-7 text-blue-500 mt-1 -rotate-6" viewBox="0 0 100 40" fill="none">
+                <svg className="w-14 h-6 text-blue-500 mt-0.5 -rotate-6" viewBox="0 0 100 40" fill="none">
                   <path d="M10 10 Q 30 35 70 30" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
                   <path d="M60 22 L 72 30 L 62 38" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               </div>
             </div>
 
-            {/* Center Content: Pill, Title, Subtitle, Indicator */}
+            {/* Center Content: Title, Subtitle, Indicator */}
             <div className="text-center flex-1 max-w-2xl mx-auto">
-              {/* Center Pill Badge with MessageSquare Icon */}
-              <div className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-blue-100/90 border border-blue-200 text-blue-800 text-xs font-bold tracking-wide shadow-2xs mb-3.5">
-                <MessageSquare className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                <span>{isId ? 'TANYA JAWAB RESMI' : 'FREQUENTLY ASKED QUESTIONS'}</span>
-              </div>
-
               {/* High-Contrast Main Title */}
-              <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-slate-900 tracking-tight leading-tight">
+              <h2 className="text-2xl sm:text-3xl lg:text-3xl xl:text-4xl font-black text-slate-900 tracking-tight leading-tight">
                 <span>{isId ? 'Pertanyaan yang Sering' : 'Frequently Asked'}</span>
-                <span className="block text-blue-600 mt-1">{isId ? 'Ditanyakan' : 'Questions'}</span>
+                <span className="block text-blue-600 mt-0.5">{isId ? 'Ditanyakan' : 'Questions'}</span>
               </h2>
 
               {/* Subtitle Description */}
-              <p className="mt-3 text-slate-600 text-xs sm:text-sm md:text-base leading-relaxed max-w-xl mx-auto font-normal">
+              <p className="mt-1.5 lg:mt-1 text-slate-600 text-xs sm:text-sm lg:text-xs xl:text-sm leading-relaxed max-w-xl mx-auto font-normal">
                 {isId
                   ? 'Jawaban lengkap seputar fitur, akses pengguna, dan implementasi sistem Kawacanaan.'
                   : 'Complete answers regarding features, user access levels, and system implementation of Kawacanaan.'}
               </p>
 
               {/* Small Center Capsule Indicator */}
-              <div className="flex items-center justify-center gap-1.5 mt-5">
+              <div className="flex items-center justify-center gap-1.5 mt-2.5 lg:mt-2">
                 <div className="w-8 h-1.5 bg-blue-600 rounded-full" />
                 <div className="w-1.5 h-1.5 bg-blue-300 rounded-full" />
                 <div className="w-1.5 h-1.5 bg-blue-200 rounded-full" />
@@ -169,8 +163,8 @@ export const FaqSection: React.FC<FaqSectionProps> = ({ lang }) => {
             </div>
 
             {/* Right 3D Stylized School with Flag, Clock Tower & Textbooks */}
-            <div className="hidden xl:flex justify-end w-48 pointer-events-none select-none shrink-0 pr-2">
-              <div className="w-40 xl:w-44">
+            <div className="hidden xl:flex justify-end w-40 pointer-events-none select-none shrink-0 pr-2">
+              <div className="w-32 xl:w-36">
                 <img 
                   src="/images/faq_school_clean.jpg" 
                   alt="Indonesian Elementary School 3D Illustration" 
@@ -187,7 +181,7 @@ export const FaqSection: React.FC<FaqSectionProps> = ({ lang }) => {
         {/* ========================================================================= */}
         {/* ACCORDION FAQ CARDS: Modern Clean Cards with Rounded Corners & Blue Ring  */}
         {/* ========================================================================= */}
-        <div className="space-y-3.5 sm:space-y-4 max-w-4xl mx-auto">
+        <div className="space-y-2 lg:space-y-2 xl:space-y-2.5 max-w-3xl mx-auto">
           {faqs.map((faq, idx) => {
             const isOpen = openIndex === idx;
             return (
@@ -203,32 +197,32 @@ export const FaqSection: React.FC<FaqSectionProps> = ({ lang }) => {
                 <button
                   type="button"
                   onClick={() => toggleFaq(idx)}
-                  className="w-full px-5 py-4 sm:px-6 sm:py-5 text-left flex items-center justify-between gap-4 cursor-pointer"
+                  className="w-full px-4 py-3 sm:px-5 sm:py-3.5 lg:py-2.5 xl:py-3 text-left flex items-center justify-between gap-3 cursor-pointer"
                 >
-                  <div className="flex items-center gap-3.5 sm:gap-4 min-w-0">
+                  <div className="flex items-center gap-3 min-w-0">
                     {/* Number Pill Badge (e.g. 01, 02) */}
-                    <span className="font-sans text-xs sm:text-sm font-bold text-blue-600 bg-blue-100/80 w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center shrink-0">
+                    <span className="font-sans text-xs font-bold text-blue-600 bg-blue-100/80 w-7 h-7 sm:w-8 sm:h-8 rounded-xl flex items-center justify-center shrink-0">
                       {faq.id}
                     </span>
-                    <h3 className="text-sm sm:text-base font-bold text-slate-900 leading-snug">
+                    <h3 className="text-xs sm:text-sm lg:text-xs xl:text-sm font-bold text-slate-900 leading-snug">
                       {faq.q}
                     </h3>
                   </div>
 
                   {/* Circular Chevron Toggle Button */}
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 transition-all duration-200 ${
+                  <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 transition-all duration-200 ${
                     isOpen ? 'bg-blue-600 text-white' : 'bg-blue-50 text-blue-600 group-hover:bg-blue-100'
                   }`}>
                     {isOpen ? (
-                      <ChevronUp className="w-4 h-4" />
+                      <ChevronUp className="w-3.5 h-3.5" />
                     ) : (
-                      <ChevronDown className="w-4 h-4" />
+                      <ChevronDown className="w-3.5 h-3.5" />
                     )}
                   </div>
                 </button>
 
                 {isOpen && (
-                  <div className="px-5 pb-5 sm:px-6 sm:pb-6 pt-0 text-xs sm:text-sm text-slate-600 leading-relaxed border-t border-slate-100 mt-1 pt-3.5 pl-14 sm:pl-16 font-normal">
+                  <div className="px-4 pb-4 sm:px-5 sm:pb-4.5 pt-0 text-xs lg:text-[11.5px] xl:text-xs text-slate-600 leading-relaxed border-t border-slate-100 mt-0.5 pt-2.5 pl-12 sm:pl-14 font-normal">
                     {faq.a}
                   </div>
                 )}
@@ -240,11 +234,11 @@ export const FaqSection: React.FC<FaqSectionProps> = ({ lang }) => {
         {/* ========================================================================= */}
         {/* BOTTOM CONSULTATION CTA BANNER (as in screenshot)                         */}
         {/* ========================================================================= */}
-        <div className="mt-10 sm:mt-12 max-w-3xl mx-auto">
-          <div className="p-4 sm:p-5 bg-white/80 backdrop-blur-xs border border-blue-200/90 rounded-3xl shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4 text-center sm:text-left">
-            <div className="flex items-center gap-3 text-xs sm:text-sm text-slate-700 font-medium">
-              <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center shrink-0 text-blue-600">
-                <MessageSquare className="w-4 h-4" />
+        <div className="mt-4 sm:mt-6 lg:mt-3 xl:mt-4.5 max-w-2xl mx-auto">
+          <div className="p-3 sm:p-3.5 bg-white/80 backdrop-blur-xs border border-blue-200/90 rounded-2xl sm:rounded-3xl shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">
+            <div className="flex items-center gap-2.5 text-xs sm:text-sm text-slate-700 font-medium">
+              <div className="w-7 h-7 rounded-full bg-blue-100 flex items-center justify-center shrink-0 text-blue-600">
+                <MessageSquare className="w-3.5 h-3.5" />
               </div>
               <span>
                 {isId 
@@ -257,10 +251,10 @@ export const FaqSection: React.FC<FaqSectionProps> = ({ lang }) => {
               href="https://wa.me/6281312498919?text=Halo%20Tim%20Kawacanaan%2C%20saya%20ingin%20konsultasi%20gratis%20mengenai%20presensi%20sekolah"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-bold shadow-md shadow-blue-600/20 hover:shadow-blue-600/30 transition-all cursor-pointer shrink-0"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-md shadow-blue-600/20 hover:shadow-blue-600/30 transition-all cursor-pointer shrink-0"
             >
               <span>{isId ? 'Konsultasi Gratis dengan Tim Kami' : 'Free Consultation with Our Team'}</span>
-              <ArrowRight className="w-3.5 h-3.5" />
+              <ArrowRight className="w-3 h-3" />
             </a>
           </div>
         </div>

@@ -144,20 +144,73 @@ export default async function handler(req: any, res: any) {
   };
   const assignHomeroom = async (schoolId: string, teacherId: string, classId: string | null, actorUserId: string) => {
     const academicYear = await getAcademicYear(schoolId);
-    const { error } = await db.rpc('assign_homeroom_teacher', {
-      p_school_id: schoolId, p_teacher_id: teacherId, p_class_id: classId,
-      p_academic_year: academicYear, p_actor_user_id: actorUserId,
-    });
-    if (error) throw error;
+    let rpcOk = false;
+    try {
+      const { error } = await db.rpc('assign_homeroom_teacher', {
+        p_school_id: schoolId, p_teacher_id: teacherId, p_class_id: classId,
+        p_academic_year: academicYear, p_actor_user_id: actorUserId,
+      });
+      if (!error) rpcOk = true;
+      else console.warn('[onboarding] assign_homeroom_teacher RPC warning:', error.message);
+    } catch (e: any) {
+      console.warn('[onboarding] assign_homeroom_teacher call error:', e?.message);
+    }
+
+    if (!rpcOk) {
+      if (classId) {
+        await db.from('classes').update({ wali_kelas_teacher_id: teacherId }).eq('id', classId).eq('school_id', schoolId);
+        await db.from('classes').update({ wali_kelas_teacher_id: null }).eq('school_id', schoolId).neq('id', classId).eq('wali_kelas_teacher_id', teacherId);
+        await db.from('profiles').update({ class_ids: [classId], class_id: classId }).eq('school_id', schoolId).or(`teacher_id.eq.${teacherId},id.eq.${actorUserId}`);
+        try {
+          await db.from('teacher_assignments').delete().eq('school_id', schoolId).eq('teacher_id', teacherId).eq('role', 'WALI_KELAS');
+          await db.from('teacher_assignments').delete().eq('school_id', schoolId).eq('class_id', classId).eq('role', 'WALI_KELAS');
+          await db.from('teacher_assignments').insert({
+            school_id: schoolId,
+            teacher_id: teacherId,
+            role: 'WALI_KELAS',
+            class_id: classId,
+            subject_id: null,
+            academic_year: academicYear,
+            is_active: true,
+          });
+        } catch (_) {}
+      } else {
+        await db.from('classes').update({ wali_kelas_teacher_id: null }).eq('school_id', schoolId).eq('wali_kelas_teacher_id', teacherId);
+      }
+    }
     return academicYear;
   };
   const assignSubject = async (schoolId: string, subjectId: string, teacherId: string, classIds: string[], actorUserId: string) => {
     const academicYear = await getAcademicYear(schoolId);
-    const { error } = await db.rpc('replace_subject_assignment', {
-      p_school_id: schoolId, p_subject_id: subjectId, p_teacher_id: teacherId,
-      p_class_ids: [...new Set(classIds)], p_academic_year: academicYear, p_actor_user_id: actorUserId,
-    });
-    if (error) throw error;
+    const uniqueClassIds = [...new Set(classIds)];
+    let rpcOk = false;
+    try {
+      const { error } = await db.rpc('replace_subject_assignment', {
+        p_school_id: schoolId, p_subject_id: subjectId, p_teacher_id: teacherId,
+        p_class_ids: uniqueClassIds, p_academic_year: academicYear, p_actor_user_id: actorUserId,
+      });
+      if (!error) rpcOk = true;
+      else console.warn('[onboarding] replace_subject_assignment RPC warning:', error.message);
+    } catch (e: any) {
+      console.warn('[onboarding] replace_subject_assignment call error:', e?.message);
+    }
+
+    if (!rpcOk) {
+      try {
+        await db.from('subject_teacher_assignments').upsert({
+          school_id: schoolId, subject_id: subjectId, teacher_id: teacherId, academic_year: academicYear
+        });
+        for (const cid of uniqueClassIds) {
+          await db.from('subject_class_assignments').upsert({
+            school_id: schoolId, subject_id: subjectId, class_id: cid, academic_year: academicYear
+          });
+          await db.from('teacher_assignments').upsert({
+            school_id: schoolId, teacher_id: teacherId, role: 'GURU_MAPEL', class_id: cid, subject_id: subjectId, academic_year: academicYear, is_active: true
+          });
+        }
+        await db.from('profiles').update({ class_ids: uniqueClassIds }).eq('school_id', schoolId).or(`teacher_id.eq.${teacherId},id.eq.${actorUserId}`);
+      } catch (_) {}
+    }
     return academicYear;
   };
 

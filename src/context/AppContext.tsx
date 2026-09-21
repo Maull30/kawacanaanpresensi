@@ -4488,26 +4488,42 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       if (isWali && !isMapel) {
         if (uniqueClassIds.length > 1)
           throw new Error("Wali Kelas hanya boleh memiliki 1 kelas.");
-        const { error } = await supabase.rpc("assign_homeroom_teacher", {
-          p_school_id: schoolId,
-          p_teacher_id: teacherId,
-          p_class_id: uniqueClassIds[0] || null,
-          p_academic_year: academicYear,
-          p_actor_user_id: currentUser?.id || null,
-        });
-        if (error) throw error;
-      } else if (isMapel || (mapelRows || []).length > 0) {
-        const targetSubjectIds = (mapelRows || []).map((r: any) => r.subject_id);
-        for (const subId of targetSubjectIds) {
-          const { error } = await supabase.rpc("replace_subject_assignment", {
+        try {
+          const { error } = await supabase.rpc("assign_homeroom_teacher", {
             p_school_id: schoolId,
-            p_subject_id: subId,
             p_teacher_id: teacherId,
-            p_class_ids: uniqueClassIds,
+            p_class_id: uniqueClassIds[0] || null,
             p_academic_year: academicYear,
             p_actor_user_id: currentUser?.id || null,
           });
-          if (error) throw error;
+          if (error) {
+            console.warn("assign_homeroom_teacher RPC warning, using executeTeacherAssignment fallback:", error.message);
+            await executeTeacherAssignment(teacherId, "WALI_KELAS", undefined, uniqueClassIds);
+          }
+        } catch (rpcErr: any) {
+          console.warn("assign_homeroom_teacher exception, using executeTeacherAssignment fallback:", rpcErr?.message);
+          await executeTeacherAssignment(teacherId, "WALI_KELAS", undefined, uniqueClassIds);
+        }
+      } else if (isMapel || (mapelRows || []).length > 0) {
+        const targetSubjectIds = (mapelRows || []).map((r: any) => r.subject_id);
+        for (const subId of targetSubjectIds) {
+          try {
+            const { error } = await supabase.rpc("replace_subject_assignment", {
+              p_school_id: schoolId,
+              p_subject_id: subId,
+              p_teacher_id: teacherId,
+              p_class_ids: uniqueClassIds,
+              p_academic_year: academicYear,
+              p_actor_user_id: currentUser?.id || null,
+            });
+            if (error) {
+              console.warn("replace_subject_assignment RPC warning, using executeTeacherAssignment fallback:", error.message);
+              await executeTeacherAssignment(teacherId, "GURU_MAPEL", subId, uniqueClassIds);
+            }
+          } catch (rpcErr: any) {
+            console.warn("replace_subject_assignment exception, using executeTeacherAssignment fallback:", rpcErr?.message);
+            await executeTeacherAssignment(teacherId, "GURU_MAPEL", subId, uniqueClassIds);
+          }
         }
       } else if (uniqueClassIds.length) {
         throw new Error(

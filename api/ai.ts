@@ -283,7 +283,7 @@ ${dynamicContextBlock}
         let response;
         try {
           response = await ai.models.generateContent({
-            model: 'gemini-3.6-flash',
+            model: 'gemini-3.8-flash',
             contents: [
               ...historyMessages,
               {
@@ -298,7 +298,7 @@ ${dynamicContextBlock}
           });
         } catch (mErr: any) {
           response = await ai.models.generateContent({
-            model: 'gemini-3.8-flash',
+            model: 'gemini-3.1-flash-lite',
             contents: [
               ...historyMessages,
               {
@@ -482,7 +482,7 @@ ${dynamicContextBlock}
         let response;
         try {
           response = await ai.models.generateContent({
-            model: 'gemini-3.6-flash',
+            model: 'gemini-3.8-flash',
             contents: geminiContents,
             config: {
               systemInstruction: systemInstructionText,
@@ -491,7 +491,7 @@ ${dynamicContextBlock}
           });
         } catch (mErr: any) {
           response = await ai.models.generateContent({
-            model: 'gemini-3.8-flash',
+            model: 'gemini-3.1-flash-lite',
             contents: geminiContents,
             config: {
               systemInstruction: systemInstructionText,

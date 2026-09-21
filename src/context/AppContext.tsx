@@ -3302,11 +3302,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
             throw new Error('Kapasitas Wali Kelas di Ruang Kerja Individu hanya 1 kelas. Silakan edit kelas yang sudah ada.');
           }
         }
-      } else {
-        // Ruang Kerja Sekolah: Total 12 kelas tersedia (1A–6B)
-        if (classes.length >= 12) {
-          throw new Error('Kapasitas Ruang Kerja Sekolah maksimal 12 kelas (Struktur Kelas 1–6 Paralel A/B). Batas kuota kelas telah tercapai.');
-        }
       }
 
       const academicYear =
@@ -7845,8 +7840,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
         subscription: {
           plan: 'sekolah_pro',
           status: 'active',
-          maxClasses: 12,
-          maxStudents: 500,
+          maxClasses: 999999,
+          maxStudents: 1000,
           maxTeachers: 25,
           expiresAt: expiresAt,
         } as any,

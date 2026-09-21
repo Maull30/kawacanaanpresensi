@@ -34,8 +34,8 @@ const generateSchoolInviteCode = (): string => {
 const getPlanLimits = (plan: string, role?: string) => {
   const norm = normalizePlan(plan);
   if (norm === 'sekolah_pro') {
-    // Ruang Kerja Sekolah: Total 12 kelas tersedia (Kelas 1–6 paralel A/B), maks 50 siswa/kelas (600 siswa)
-    return { max_teachers: 50, max_students: 600, max_classes: 12, days: 30, defaultClasses: 12, name: 'Paket Sekolah Pro' };
+    // Ruang Kerja Sekolah: Kapasitas fleksibel sesuai kebutuhan sekolah, rombel diinput mandiri oleh admin sekolah
+    return { max_teachers: 999999, max_students: 999999, max_classes: 999999, days: 30, defaultClasses: 0, name: 'Paket Sekolah' };
   }
   const isSubjectTeacher = (role || '').toUpperCase().trim() === 'GURU MAPEL';
   if (norm === 'guru_pro') {
@@ -48,24 +48,6 @@ const getPlanLimits = (plan: string, role?: string) => {
   }
   // guru_gratis: Aktif tanpa batas waktu kedaluwarsa (days: null), tanpa sistem trial lama
   return { max_teachers: 1, max_students: 32, max_classes: 1, days: null, defaultClasses: 1, name: 'Paket Guru Gratis' };
-};
-
-const generateInitialClasses = (schoolId: string, count: number) => {
-  const classesList: { school_id: string; name: string; grade: number }[] = [];
-  if (count <= 1) {
-    classesList.push({ school_id: schoolId, name: 'Kelas 1A', grade: 1 });
-  } else if (count <= 6) {
-    for (let g = 1; g <= 6; g++) {
-      classesList.push({ school_id: schoolId, name: `Kelas ${g}A`, grade: g });
-    }
-  } else {
-    // Ruang Kerja Sekolah: Struktur 12 Kelas Standar: Kelas 1–6 Paralel A/B (1A s.d. 6B)
-    for (let g = 1; g <= 6; g++) {
-      classesList.push({ school_id: schoolId, name: `Kelas ${g}A`, grade: g });
-      classesList.push({ school_id: schoolId, name: `Kelas ${g}B`, grade: g });
-    }
-  }
-  return classesList;
 };
 
 export default async function handler(req: any, res: any) {
@@ -360,16 +342,17 @@ export default async function handler(req: any, res: any) {
       auto_mark_late: true,
     });
 
-    // 7. Inisialisasi Otomatis Rombel Kelas Sesuai Paket
+    // 7. Inisialisasi Rombel Kelas
+    // Logika pembuatan 12 rombel standar otomatis (1A–6B) pada paket sekolah dihapus
+    // agar admin sekolah sendiri yang menginput datanya secara mandiri.
     let initialClasses: { school_id: string; name: string; grade: number }[] = [];
+    let createdClassRows: any[] = [];
     if (isTeacherPlan) {
       initialClasses = [{ school_id: school.id, name: `Kelas ${teacherGrade}`, grade: teacherGrade }];
-    } else {
-      initialClasses = generateInitialClasses(school.id, planLimits.defaultClasses);
+      const { data: rows, error: classInsertError } = await admin.from('classes').insert(initialClasses).select();
+      if (classInsertError) throw classInsertError;
+      createdClassRows = rows || [];
     }
-
-    const { data: createdClassRows, error: classInsertError } = await admin.from('classes').insert(initialClasses).select();
-    if (classInsertError) throw classInsertError;
 
     // 8. Inisialisasi Mata Pelajaran Dasar SD
     const defaultSubjects = [

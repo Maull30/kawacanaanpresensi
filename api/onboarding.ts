@@ -2750,13 +2750,6 @@ export default async function handler(req: any, res: any) {
               });
             }
           }
-        } else {
-          // Ruang Kerja Sekolah: Total 12 kelas tersedia (Kelas 1–6 paralel A/B)
-          if ((currentClassCount || 0) >= 12) {
-            return json(res, 400, {
-              error: 'Kapasitas Ruang Kerja Sekolah maksimal 12 kelas (Struktur Kelas 1–6 Paralel A/B). Batas kuota kelas telah tercapai.',
-            });
-          }
         }
       }
 

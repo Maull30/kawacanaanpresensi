@@ -1303,7 +1303,7 @@ ${isSuperadmin ? 'Metode: Direct Subscription (Super Admin)' : `Invoice: ${regis
                             <div className="w-4.5 h-4.5 rounded-full bg-blue-500/70 text-white flex items-center justify-center shrink-0 border border-blue-300/40 shadow-xs">
                               <Check className="w-3 h-3 stroke-[3]" />
                             </div>
-                            <span>12 Rombel Lengkap (1A–6B)</span>
+                            <span>Input &amp; Kelola Rombel Mandiri</span>
                           </div>
                           <div className="flex items-center gap-2 text-xs text-white/95 font-medium">
                             <div className="w-4.5 h-4.5 rounded-full bg-blue-500/70 text-white flex items-center justify-center shrink-0 border border-blue-300/40 shadow-xs">
@@ -1474,7 +1474,7 @@ ${isSuperadmin ? 'Metode: Direct Subscription (Super Admin)' : `Invoice: ${regis
                         <div className="w-4.5 h-4.5 rounded-full bg-blue-500/70 text-white flex items-center justify-center shrink-0 border border-blue-300/40 shadow-xs">
                           <Check className="w-3 h-3 stroke-[3]" />
                         </div>
-                        <span>12 Rombel Lengkap (1A–6B)</span>
+                        <span>Input &amp; Kelola Rombel Mandiri</span>
                       </div>
                       <div className="flex items-center gap-2 text-xs text-white/95 font-medium">
                         <div className="w-4.5 h-4.5 rounded-full bg-blue-500/70 text-white flex items-center justify-center shrink-0 border border-blue-300/40 shadow-xs">

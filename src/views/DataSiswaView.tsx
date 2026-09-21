@@ -634,7 +634,7 @@ export const DataSiswaView: React.FC = () => {
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-indigo-50 border border-indigo-200/80 text-indigo-800 text-xs font-bold w-fit">
               <span>Ruang Kerja Sekolah</span>
               <span className="text-indigo-300">•</span>
-              <span>Kapasitas: Maks. 50 Siswa/Kelas (12 Kelas)</span>
+              <span>Kapasitas: Maks. 50 Siswa/Kelas</span>
             </div>
           )}
         </div>

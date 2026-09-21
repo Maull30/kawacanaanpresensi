@@ -712,7 +712,7 @@ Tautan Masuk: ${window.location.origin}/login`;
                       <div>
                         <div className="text-xs font-black text-slate-900">Ruang Kerja Sekolah</div>
                         <div className="text-[11px] text-slate-500 mt-0.5">
-                          Institusi resmi lengkap dengan 12 rombel (1A–6B) &amp; multi-guru.
+                          Institusi resmi terpadu dengan input rombel mandiri &amp; multi-guru.
                         </div>
                       </div>
                     </button>

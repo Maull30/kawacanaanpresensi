@@ -278,50 +278,6 @@ export const DataKelasView: React.FC = () => {
 
   // Import Kelas Modal State
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
-  const [isApplying12, setIsApplying12] = useState(false);
-
-  // Terapkan Struktur 12 Kelas Paralel (1A–6B) untuk Ruang Kerja Sekolah
-  const handleApply12ParallelClasses = async () => {
-    if (isApplying12) return;
-    setIsApplying12(true);
-    try {
-      const standard12 = [
-        { name: 'Kelas 1A', grade: 1 },
-        { name: 'Kelas 1B', grade: 1 },
-        { name: 'Kelas 2A', grade: 2 },
-        { name: 'Kelas 2B', grade: 2 },
-        { name: 'Kelas 3A', grade: 3 },
-        { name: 'Kelas 3B', grade: 3 },
-        { name: 'Kelas 4A', grade: 4 },
-        { name: 'Kelas 4B', grade: 4 },
-        { name: 'Kelas 5A', grade: 5 },
-        { name: 'Kelas 5B', grade: 5 },
-        { name: 'Kelas 6A', grade: 6 },
-        { name: 'Kelas 6B', grade: 6 },
-      ];
-      const existingNames = new Set(classes.map((c) => c.name.trim().toLowerCase()));
-      let added = 0;
-      for (const item of standard12) {
-        if (!existingNames.has(item.name.toLowerCase()) && classes.length + added < 12) {
-          await addClass({
-            name: item.name,
-            grade: item.grade,
-            academicYear: schoolProfile?.tahunPelajaran || '2026/2027',
-          });
-          added++;
-        }
-      }
-      if (added > 0) {
-        showToast(`Berhasil menerapkan struktur ${added} rombel paralel (1A–6B).`, 'success');
-      } else {
-        showToast('Seluruh struktur 12 rombel paralel (1A–6B) sudah lengkap.', 'info');
-      }
-    } catch (err: any) {
-      showToast(err?.message || 'Gagal menerapkan struktur rombel paralel.', 'error');
-    } finally {
-      setIsApplying12(false);
-    }
-  };
 
   // Notifikasi batas kelas untuk Wali Kelas (cukup 1 kelas yang dibina)
   const [waliLimitNoticeOpen, setWaliLimitNoticeOpen] = useState(false);
@@ -463,12 +419,6 @@ export const DataKelasView: React.FC = () => {
         showToast('Kapasitas Guru Mapel di Ruang Kerja Individu maksimal 6 kelas. Batas kuota rombel telah tercapai.', 'warning');
         return;
       }
-    } else {
-      // Ruang Kerja Sekolah: Total 12 kelas tersedia (1A–6B)
-      if (classes.length >= 12) {
-        showToast('Kapasitas Ruang Kerja Sekolah maksimal 12 kelas (Struktur Kelas 1–6 Paralel A/B). Batas kuota kelas telah tercapai.', 'warning');
-        return;
-      }
     }
 
     if (isFreePlan && classes.length >= 1 && !isPersonalWorkspace) {
@@ -517,11 +467,6 @@ export const DataKelasView: React.FC = () => {
         }
         if (isGuruMapel && classes.length >= 6) {
           showToast('Kapasitas Guru Mapel di Ruang Kerja Individu maksimal 6 kelas. Batas kuota kelas telah tercapai.', 'warning');
-          return;
-        }
-      } else {
-        if (classes.length >= 12) {
-          showToast('Kapasitas Ruang Kerja Sekolah maksimal 12 kelas (Struktur Kelas 1–6 Paralel A/B).', 'warning');
           return;
         }
       }
@@ -867,7 +812,7 @@ export const DataKelasView: React.FC = () => {
                   <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-800 border border-indigo-200 text-[11px] font-bold">
                     <ShieldCheck size={13} className="text-indigo-600" />
                     <span>
-                      Ruang Kerja Sekolah: {classes.length}/12 Kelas Tersedia (Struktur Paralel 1A–6B, Maks. 50 Siswa/Kelas)
+                      Ruang Kerja Sekolah: {classes.length} Rombel Terdaftar (Diinput Mandiri oleh Admin Sekolah, Maks. 50 Siswa/Kelas)
                     </span>
                   </div>
                   {!isAdmin && (isWaliKelas || isGuru) && (
@@ -883,20 +828,6 @@ export const DataKelasView: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
-            {canAddClass && !isPersonalWorkspace && classes.length < 12 && (
-              <button
-                type="button"
-                onClick={handleApply12ParallelClasses}
-                disabled={isApplying12}
-                id="btn-apply-12-classes"
-                className="inline-flex items-center gap-1.5 px-3.5 py-2.5 bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-bold rounded-xl border border-blue-200 transition-all cursor-pointer shadow-xs disabled:opacity-50"
-                title="Lengkapi Struktur 12 Kelas Paralel SD (1A sampai 6B)"
-              >
-                <Layers size={15} />
-                <span>{isApplying12 ? 'Menyiapkan 12 Rombel...' : 'Struktur 12 Rombel (1A–6B)'}</span>
-              </button>
-            )}
-
             {canAddClass && !isPersonalWorkspace && (
               <button
                 onClick={() => {

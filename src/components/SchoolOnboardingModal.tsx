@@ -1,9 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   X,
   Building2,
   User,
-  Calendar,
   ShieldCheck,
   Check,
   Copy,
@@ -11,19 +10,35 @@ import {
   ArrowLeft,
   Eye,
   EyeOff,
-  Lock,
   Mail,
-  FileText,
   Zap,
   KeyRound,
   CheckCircle2,
-  Sparkles,
   RefreshCw,
+  School,
+  Download,
+  Receipt,
+  Phone,
+  GraduationCap,
+  BookOpen,
+  Sparkles,
+  Calendar,
   Layers,
-  School
+  FileText,
+  DollarSign,
+  CreditCard,
+  Hash,
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
+import QRCode from 'qrcode';
+import html2canvas from 'html2canvas';
+import { supabase } from '../lib/supabaseClient';
 import { useApp } from '../context/AppContext';
+
+// 3D Picture Assets
+import school3dImg from '../assets/images/pricing_school_3d_1789854004156.jpg';
+import waliKelasWanitaImg from '../assets/images/wali_kelas_wanita_1789830539387.jpg';
+import guruMapelPriaImg from '../assets/images/guru_mapel_pria_1789830556851.jpg';
+import directSub3dImg from '../assets/images/superadmin_direct_sub_3d_1789903520542.jpg';
 
 export interface SchoolOnboardingModalProps {
   isOpen: boolean;
@@ -33,20 +48,33 @@ export interface SchoolOnboardingModalProps {
   onSchoolCreated?: (newSchool: any) => Promise<void> | void;
 }
 
-export type DirectSubStep = 'pendaftaran' | 'direct_subscription' | 'aktif';
+export type OnboardingStep = 'pilih_ruang_kerja' | 'pendaftaran' | 'selesai';
+export type WorkspaceSelection = 'school' | 'personal';
+export type TeacherRoleSelection = 'WALI KELAS' | 'GURU MAPEL';
+export type DurationPreset = 'monthly' | 'yearly' | 'permanent' | 'custom';
 
-interface CreatedSuccessInfo {
+export interface CreatedSchoolData {
   schoolId?: string;
   schoolName: string;
   schoolCode: string;
   adminName: string;
   username: string;
   password: string;
+  role: string;
+  teacherRole?: string;
+  targetGrade?: number;
+  subjectName?: string;
   npsn?: string;
   email?: string;
-  workspaceType: 'school' | 'personal';
-  durationPreset: 'monthly' | 'yearly' | 'permanent';
+  phone?: string;
+  workspaceType: WorkspaceSelection;
+  durationPreset: DurationPreset;
   subscriptionExpiresAt: string;
+  invoiceNo?: string;
+  priceAmount: number;
+  paymentMethod: string;
+  paymentStatus: string;
+  paymentNotes?: string;
   rawSchool?: any;
 }
 
@@ -55,34 +83,56 @@ export const SchoolOnboardingModal: React.FC<SchoolOnboardingModalProps> = ({
   onClose,
   onSchoolCreated,
 }) => {
-  const { supabase } = useApp();
+  const { showToast } = useApp();
 
-  // Step state: 1. pendaftaran -> 2. direct_subscription -> 3. aktif
-  const [currentStep, setCurrentStep] = useState<DirectSubStep>('pendaftaran');
+  // 1. Step Navigation: pilih_ruang_kerja -> pendaftaran -> selesai
+  const [currentStep, setCurrentStep] = useState<OnboardingStep>('pilih_ruang_kerja');
 
-  // Step 1: Data Lembaga & Admin
-  const [schoolName, setSchoolName] = useState('');
-  const [npsn, setNpsn] = useState('');
-  const [adminName, setAdminName] = useState('');
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [email, setEmail] = useState('');
+  // 2. Ruang Kerja State
+  const [workspaceType, setWorkspaceType] = useState<WorkspaceSelection>('school');
 
-  // Step 2: Direct Subscription Config
-  const [workspaceType, setWorkspaceType] = useState<'school' | 'personal'>('school');
-  const [durationPreset, setDurationPreset] = useState<'monthly' | 'yearly' | 'permanent'>('yearly');
-  const [customExpiresAt, setCustomExpiresAt] = useState('');
-  const [adminNotes, setAdminNotes] = useState('');
+  // 3. Form: Ruang Kerja Individu State
+  const [teacherRole, setTeacherRole] = useState<TeacherRoleSelection>('WALI KELAS');
+  const [teacherGrade, setTeacherGrade] = useState<number>(1);
+  const [teacherSubject, setTeacherSubject] = useState<string>('Pendidikan Jasmani, Olahraga & Kesehatan (PJOK)');
+  const [teacherName, setTeacherName] = useState<string>('');
+  const [teacherNip, setTeacherNip] = useState<string>('');
+  const [teacherOriginSchool, setTeacherOriginSchool] = useState<string>('');
 
-  // UI state
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [errorMessage, setErrorMessage] = useState('');
-  const [createdInfo, setCreatedInfo] = useState<CreatedSuccessInfo | null>(null);
-  const [copiedCredentials, setCopiedCredentials] = useState(false);
-  const [copiedCode, setCopiedCode] = useState(false);
+  // 4. Form: Ruang Kerja Sekolah State
+  const [schoolName, setSchoolName] = useState<string>('');
+  const [npsn, setNpsn] = useState<string>('');
+  const [adminName, setAdminName] = useState<string>('');
 
-  // Initialize expiry date when modal opens or duration changes
+  // 5. Shared Account State
+  const [username, setUsername] = useState<string>('');
+  const [password, setPassword] = useState<string>('');
+  const [showPassword, setShowPassword] = useState<boolean>(false);
+  const [email, setEmail] = useState<string>('');
+  const [phone, setPhone] = useState<string>('');
+
+  // 6. Subscription & Duration State
+  const [durationPreset, setDurationPreset] = useState<DurationPreset>('yearly');
+  const [customExpiresAt, setCustomExpiresAt] = useState<string>('');
+
+  // 7. Transaksi & Input Harga Finansial State (Direct Owner)
+  const [priceAmount, setPriceAmount] = useState<number>(1500000);
+  const [paymentMethod, setPaymentMethod] = useState<string>('Transfer Bank Langsung ke Owner');
+  const [paymentStatus, setPaymentStatus] = useState<'paid' | 'pending'>('paid');
+  const [paymentNotes, setPaymentNotes] = useState<string>('Pembayaran langsung ke owner (Direct Sub)');
+
+  // 8. Result & UI State
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [formError, setFormError] = useState<string>('');
+  const [createdData, setCreatedData] = useState<CreatedSchoolData | null>(null);
+  const [qrCodeUrl, setQrCodeUrl] = useState<string>('');
+  const [isDownloadingJpeg, setIsDownloadingJpeg] = useState<boolean>(false);
+  const [copiedCredentials, setCopiedCredentials] = useState<boolean>(false);
+  const [copiedCode, setCopiedCode] = useState<boolean>(false);
+
+  const credentialCardRef = useRef<HTMLDivElement>(null);
+
+  // Auto-calculate expiry date
   useEffect(() => {
     if (isOpen) {
       if (durationPreset === 'monthly') {
@@ -93,43 +143,92 @@ export const SchoolOnboardingModal: React.FC<SchoolOnboardingModalProps> = ({
         const d = new Date();
         d.setFullYear(d.getFullYear() + 1);
         setCustomExpiresAt(d.toISOString().slice(0, 10));
-      } else {
+      } else if (durationPreset === 'permanent') {
         setCustomExpiresAt('');
       }
     }
   }, [isOpen, durationPreset]);
 
-  // Reset form when closed
-  const handleClose = () => {
+  // Adjust default price when workspace type or duration changes
+  useEffect(() => {
+    if (workspaceType === 'personal') {
+      if (durationPreset === 'monthly') setPriceAmount(50000);
+      else if (durationPreset === 'yearly') setPriceAmount(500000);
+      else if (durationPreset === 'permanent') setPriceAmount(1000000);
+    } else {
+      if (durationPreset === 'monthly') setPriceAmount(150000);
+      else if (durationPreset === 'yearly') setPriceAmount(1500000);
+      else if (durationPreset === 'permanent') setPriceAmount(3000000);
+    }
+  }, [workspaceType, durationPreset]);
+
+  // Generate QR Code on Step 'selesai'
+  useEffect(() => {
+    if (currentStep === 'selesai' && createdData) {
+      const loginUrl = `${window.location.origin}/login`;
+      QRCode.toDataURL(loginUrl, {
+        width: 220,
+        margin: 1,
+        color: {
+          dark: '#0f172a',
+          light: '#ffffff',
+        },
+      })
+        .then((url) => setQrCodeUrl(url))
+        .catch((err) => console.warn('Gagal render QRCode login:', err));
+    }
+  }, [currentStep, createdData]);
+
+  // Reset form
+  const handleResetModal = () => {
     if (isSubmitting) return;
-    setCurrentStep('pendaftaran');
+    setCurrentStep('pilih_ruang_kerja');
+    setWorkspaceType('school');
+    setTeacherRole('WALI KELAS');
+    setTeacherGrade(1);
+    setTeacherSubject('Pendidikan Jasmani, Olahraga & Kesehatan (PJOK)');
+    setTeacherName('');
+    setTeacherNip('');
+    setTeacherOriginSchool('');
     setSchoolName('');
     setNpsn('');
     setAdminName('');
     setUsername('');
     setPassword('');
     setEmail('');
-    setWorkspaceType('school');
+    setPhone('');
     setDurationPreset('yearly');
-    setAdminNotes('');
-    setErrorMessage('');
-    setCreatedInfo(null);
+    setPriceAmount(1500000);
+    setPaymentMethod('Transfer Bank Langsung ke Owner');
+    setPaymentStatus('paid');
+    setPaymentNotes('Pembayaran langsung ke owner (Direct Sub)');
+    setFormError('');
+    setCreatedData(null);
+    setQrCodeUrl('');
     setCopiedCredentials(false);
     setCopiedCode(false);
     onClose();
   };
 
-  // Helper: Quick generate username suggestion
+  // Quick username suggestion
   const generateSuggestedUsername = () => {
-    if (!schoolName.trim()) return;
-    const clean = schoolName
-      .toLowerCase()
-      .replace(/[^a-z0-9]/g, '')
-      .slice(0, 12);
-    setUsername(`admin.${clean || 'sekolah'}`);
+    if (workspaceType === 'school') {
+      const clean = (schoolName || 'sekolah')
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, '')
+        .slice(0, 12);
+      setUsername(`admin.${clean || 'sd'}`);
+    } else {
+      const clean = (teacherName || 'guru')
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, '')
+        .slice(0, 10);
+      const rolePrefix = teacherRole === 'WALI KELAS' ? `wali.k${teacherGrade}` : 'mapel';
+      setUsername(`${rolePrefix}.${clean || 'sd'}`);
+    }
   };
 
-  // Helper: Quick generate random secure password
+  // Quick random password generator
   const generateRandomPassword = () => {
     const chars = 'abcdefghjkmnpqrstuvwxyz23456789';
     let rand = '';
@@ -139,93 +238,92 @@ export const SchoolOnboardingModal: React.FC<SchoolOnboardingModalProps> = ({
     setPassword(`Sdm@${rand}`);
   };
 
-  // Duration selection handler
-  const handleSelectDuration = (preset: 'monthly' | 'yearly' | 'permanent') => {
-    setDurationPreset(preset);
-    if (preset === 'monthly') {
-      const d = new Date();
-      d.setDate(d.getDate() + 30);
-      setCustomExpiresAt(d.toISOString().slice(0, 10));
-    } else if (preset === 'yearly') {
-      const d = new Date();
-      d.setFullYear(d.getFullYear() + 1);
-      setCustomExpiresAt(d.toISOString().slice(0, 10));
+  // Submission handler
+  const handleSubmitRegistration = async () => {
+    setFormError('');
+
+    // Validations
+    if (workspaceType === 'school') {
+      if (!schoolName.trim()) {
+        setFormError('Nama Satuan Pendidikan wajib diisi.');
+        return;
+      }
+      if (!adminName.trim()) {
+        setFormError('Nama Administrator / Penanggung Jawab sekolah wajib diisi.');
+        return;
+      }
     } else {
-      setCustomExpiresAt('');
+      if (!teacherName.trim()) {
+        setFormError('Nama Lengkap Pendidik wajib diisi.');
+        return;
+      }
+      if (!teacherOriginSchool.trim()) {
+        setFormError('Nama Satuan Pendidikan / Asal Sekolah pendidik wajib diisi.');
+        return;
+      }
     }
-  };
 
-  // Validation Step 1
-  const handleProceedToStep2 = () => {
-    setErrorMessage('');
-    const cleanSchool = schoolName.trim();
-    const cleanAdmin = adminName.trim();
-    const cleanUser = username.trim();
-    const cleanPass = password.trim();
-
-    if (!cleanSchool) {
-      setErrorMessage('Mohon isi nama satuan pendidikan / sekolah.');
+    if (!username.trim()) {
+      setFormError('Username login akun wajib ditentukan.');
       return;
     }
-    if (!cleanAdmin) {
-      setErrorMessage('Mohon isi nama lengkap penanggung jawab / admin.');
-      return;
-    }
-    if (!cleanUser) {
-      setErrorMessage('Mohon isi username login administrator.');
-      return;
-    }
-    if (cleanUser.length < 3) {
-      setErrorMessage('Username minimal 3 karakter.');
-      return;
-    }
-    if (!cleanPass) {
-      setErrorMessage('Mohon isi kata sandi login.');
-      return;
-    }
-    if (cleanPass.length < 6) {
-      setErrorMessage('Kata sandi minimal 6 karakter.');
+    if (!password.trim() || password.trim().length < 6) {
+      setFormError('Kata sandi login minimal 6 karakter demi keamanan akun.');
       return;
     }
 
-    setCurrentStep('direct_subscription');
-  };
-
-  // Execute Direct Subscription (Submit to API)
-  const handleExecuteDirectSubscription = async () => {
-    setErrorMessage('');
     setIsSubmitting(true);
 
     try {
-      const cleanSchool = schoolName.trim();
-      const cleanAdmin = adminName.trim();
-      const cleanUser = username.trim().toLowerCase();
-      const cleanPass = password.trim();
-      const cleanNpsn = npsn.trim();
-      const cleanEmail = email.trim();
+      // Safe auth token retrieval (prevents Cannot read properties of undefined reading 'auth')
+      let token: string | null = null;
+      try {
+        if (supabase && typeof supabase.auth?.getSession === 'function') {
+          const { data: sessionData } = await supabase.auth.getSession();
+          token = sessionData?.session?.access_token || null;
+        }
+      } catch (authErr) {
+        console.warn('Gagal membaca token auth supabase:', authErr);
+      }
 
-      // Retrieve bearer token if available
-      const { data: authSession } = await supabase.auth.getSession();
-      const token = authSession?.session?.access_token;
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (token) {
         headers['Authorization'] = `Bearer ${token}`;
       }
 
+      const effectiveSchoolName =
+        workspaceType === 'school' ? schoolName.trim() : teacherOriginSchool.trim();
+      const effectiveFullName =
+        workspaceType === 'school' ? adminName.trim() : teacherName.trim();
+      const effectivePlan = workspaceType === 'school' ? 'sekolah_pro' : 'guru_pro';
+
       const payload = {
-        schoolName: cleanSchool,
-        adminName: cleanAdmin,
-        username: cleanUser,
-        password: cleanPass,
-        email: cleanEmail || undefined,
-        npsn: cleanNpsn || undefined,
-        plan: workspaceType === 'school' ? 'sekolah_pro' : 'guru_pro',
-        workspace_type: workspaceType,
-        workspace_service: workspaceType === 'school' ? 'school_integrated' : 'teacher_independent',
-        subscription_expires_at: durationPreset === 'permanent' ? null : (customExpiresAt || null),
-        notes: adminNotes.trim() || undefined,
-        isSuperadmin: true,
         mode: 'superadmin',
+        isSuperadmin: true,
+        workspace_type: workspaceType,
+        workspaceType,
+        schoolName: effectiveSchoolName,
+        adminName: effectiveFullName,
+        fullName: effectiveFullName,
+        username: username.trim().toLowerCase(),
+        password: password.trim(),
+        npsn: npsn.trim() || undefined,
+        email: email.trim() || undefined,
+        adminEmail: email.trim() || undefined,
+        adminPhone: phone.trim() || undefined,
+        plan: effectivePlan,
+        teacherType: workspaceType === 'personal' ? (teacherRole === 'GURU MAPEL' ? 'GURU_MAPEL' : 'WALI_KELAS') : undefined,
+        role: workspaceType === 'personal' ? teacherRole : 'ADMIN',
+        teacherGrade: workspaceType === 'personal' && teacherRole === 'WALI KELAS' ? teacherGrade : undefined,
+        teacherSubject: workspaceType === 'personal' && teacherRole === 'GURU MAPEL' ? teacherSubject.trim() : undefined,
+        teacherNip: workspaceType === 'personal' ? teacherNip.trim() : undefined,
+        subscription_expires_at: durationPreset === 'permanent' ? null : (customExpiresAt || null),
+        price: priceAmount,
+        amount: priceAmount,
+        paymentMethod,
+        paymentStatus,
+        paymentNotes: paymentNotes.trim() || undefined,
+        notes: paymentNotes.trim() || undefined,
       };
 
       const res = await fetch('/api/register-school', {
@@ -234,763 +332,1259 @@ export const SchoolOnboardingModal: React.FC<SchoolOnboardingModalProps> = ({
         body: JSON.stringify(payload),
       });
 
-      const data = await res.json();
-      if (!res.ok || !data.ok) {
-        throw new Error(data?.error || 'Gagal memproses direct subscription sekolah.');
+      const resData = await res.json();
+      if (!res.ok || !resData.ok) {
+        throw new Error(resData.error || 'Gagal memproses pendaftaran ruang kerja.');
       }
 
-      const createdSchool = data.school;
-      const createdAdmin = data.admin;
+      const createdSchool = resData.school;
+      const createdAdmin = resData.admin;
+      const invoiceNo = resData.invoiceNo || resData.payment?.invoice_no || `INV-${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, '0')}-${Math.floor(100 + Math.random() * 900)}`;
 
-      const successData: CreatedSuccessInfo = {
-        schoolId: createdSchool?.id || createdSchool?.school_id,
-        schoolName: createdSchool?.name || cleanSchool,
+      const successInfo: CreatedSchoolData = {
+        schoolId: createdSchool?.id,
+        schoolName: createdSchool?.name || effectiveSchoolName,
         schoolCode: createdSchool?.code || createdSchool?.schoolCode || 'SCH-' + Math.floor(100000 + Math.random() * 900000),
-        adminName: createdAdmin?.name || cleanAdmin,
-        username: createdAdmin?.username || cleanUser,
-        password: cleanPass,
-        npsn: cleanNpsn || createdSchool?.npsn,
-        email: cleanEmail || undefined,
+        adminName: createdAdmin?.name || effectiveFullName,
+        username: createdAdmin?.username || username.trim().toLowerCase(),
+        password: password.trim(),
+        role: workspaceType === 'school' ? 'ADMIN' : teacherRole,
+        teacherRole: workspaceType === 'personal' ? teacherRole : undefined,
+        targetGrade: teacherRole === 'WALI KELAS' ? teacherGrade : undefined,
+        subjectName: teacherRole === 'GURU MAPEL' ? teacherSubject : undefined,
+        npsn: npsn.trim() || createdSchool?.npsn || undefined,
+        email: email.trim() || createdAdmin?.email || undefined,
+        phone: phone.trim() || undefined,
         workspaceType,
         durationPreset,
-        subscriptionExpiresAt: durationPreset === 'permanent' ? 'Permanen (Seumur Hidup)' : (customExpiresAt || '-'),
+        subscriptionExpiresAt: durationPreset === 'permanent' ? 'Permanen (Seumur Hidup)' : (customExpiresAt ? `${customExpiresAt}` : '1 Tahun'),
+        invoiceNo,
+        priceAmount,
+        paymentMethod,
+        paymentStatus,
+        paymentNotes,
         rawSchool: createdSchool,
       };
 
-      setCreatedInfo(successData);
-      setCurrentStep('aktif');
+      setCreatedData(successInfo);
+      setCurrentStep('selesai');
+      showToast('Pendaftaran ruang kerja berhasil disimpan dan diaktifkan!', 'success');
     } catch (err: any) {
-      setErrorMessage(err?.message || 'Terjadi kesalahan sistem saat mendaftarkan sekolah.');
+      setFormError(err.message || 'Terjadi kesalahan sistem saat memproses data pendaftaran.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // Finish and notify parent
-  const handleFinish = async () => {
-    if (onSchoolCreated && createdInfo?.rawSchool) {
-      await onSchoolCreated(createdInfo.rawSchool);
+  // Download Credential Card as JPEG
+  const handleDownloadJpeg = async () => {
+    if (!credentialCardRef.current || !createdData) return;
+    setIsDownloadingJpeg(true);
+
+    try {
+      // High-res html2canvas rendering with scale 2
+      const canvas = await html2canvas(credentialCardRef.current, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#090d16',
+        logging: false,
+      });
+
+      const jpegUrl = canvas.toDataURL('image/jpeg', 0.96);
+      const link = document.createElement('a');
+      const cleanSchool = createdData.schoolName.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
+      link.download = `kredensial-kawacanaan-${cleanSchool}-${createdData.username}.jpg`;
+      link.href = jpegUrl;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      showToast('Kartu kredensial JPEG berhasil diunduh!', 'success');
+    } catch (err: any) {
+      console.error('Gagal mengunduh kartu JPEG:', err);
+      showToast('Gagal mengunduh kartu JPEG. Silakan coba kembali.', 'error');
+    } finally {
+      setIsDownloadingJpeg(false);
     }
-    handleClose();
   };
 
-  // Copy full credentials
+  // Copy plain credentials
   const handleCopyCredentials = () => {
-    if (!createdInfo) return;
-    const text = `KREDENSIAL AKSES KAWACANAAN SD
-Lembaga: ${createdInfo.schoolName}
-Tipe Ruang Kerja: ${createdInfo.workspaceType === 'school' ? 'Ruang Kerja Sekolah (Sekolah Terpadu)' : 'Ruang Kerja Individu (Guru Mandiri)'}
-Kode Akses Sekolah: ${createdInfo.schoolCode}
-${createdInfo.npsn ? `NPSN: ${createdInfo.npsn}\n` : ''}Penanggung Jawab: ${createdInfo.adminName}
-Username: ${createdInfo.username}
-Password: ${createdInfo.password}
-Masa Aktif: ${createdInfo.subscriptionExpiresAt}
-Status: AKTIF (DIRECT SUBSCRIPTION SUPER ADMIN)
-Tautan Masuk: ${window.location.origin}/login`;
+    if (!createdData) return;
+    const roleLabel =
+      createdData.workspaceType === 'school'
+        ? 'Administrator Satuan Pendidikan'
+        : createdData.teacherRole === 'WALI KELAS'
+        ? `Wali Kelas (Kelas ${createdData.targetGrade || 1})`
+        : `Guru Mapel (${createdData.subjectName || 'Mata Pelajaran'})`;
+
+    const text = `=========================================
+KREDENSIAL RESMI KAWACANAAN SD
+=========================================
+Satuan Pendidikan: ${createdData.schoolName}
+Tipe Ruang Kerja : ${createdData.workspaceType === 'school' ? 'Ruang Kerja Sekolah (Terpadu)' : 'Ruang Kerja Individu (Guru Mandiri)'}
+Peran Pengguna   : ${roleLabel}
+Kode Akses       : ${createdData.schoolCode}
+${createdData.npsn ? `NPSN             : ${createdData.npsn}\n` : ''}Penanggung Jawab : ${createdData.adminName}
+-----------------------------------------
+USERNAME LOGIN   : ${createdData.username}
+PASSWORD LOGIN   : ${createdData.password}
+-----------------------------------------
+No. Faktur Inv.  : ${createdData.invoiceNo || '-'}
+Nominal Bayar    : Rp ${createdData.priceAmount.toLocaleString('id-ID')} (${createdData.paymentStatus === 'paid' ? 'LUNAS' : 'MENUNGGU'})
+Metode Bayar     : ${createdData.paymentMethod}
+Masa Aktif Akun  : ${createdData.subscriptionExpiresAt}
+Portal Masuk     : ${window.location.origin}/login
+=========================================`;
 
     navigator.clipboard.writeText(text);
     setCopiedCredentials(true);
     setTimeout(() => setCopiedCredentials(false), 2500);
+    showToast('Teks kredensial berhasil disalin ke clipboard!', 'info');
   };
 
   const handleCopyCode = () => {
-    if (!createdInfo?.schoolCode) return;
-    navigator.clipboard.writeText(createdInfo.schoolCode);
+    if (!createdData?.schoolCode) return;
+    navigator.clipboard.writeText(createdData.schoolCode);
     setCopiedCode(true);
     setTimeout(() => setCopiedCode(false), 2500);
+  };
+
+  const handleFinish = async () => {
+    if (onSchoolCreated && createdData?.rawSchool) {
+      await onSchoolCreated(createdData.rawSchool);
+    }
+    handleResetModal();
   };
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950/65 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-fadeIn">
-      <div
-        id="modal-direct-subscription"
-        className="bg-white rounded-3xl max-w-4xl w-full shadow-2xl border border-slate-100 overflow-hidden my-auto flex flex-col transition-all max-h-[92vh]"
-      >
-        {/* MODAL HEADER: Superadmin & Stepper */}
-        <div className="px-5 sm:px-7 py-4 border-b border-slate-100 flex items-center justify-between gap-4 bg-slate-50/70 shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-blue-600 text-white flex items-center justify-center font-bold shadow-sm shadow-blue-500/20 shrink-0">
-              <Building2 className="w-5 h-5" />
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 bg-slate-950/75 backdrop-blur-sm overflow-y-auto animate-in fade-in duration-200">
+      <div className="relative w-full max-w-2xl md:max-w-3xl bg-white rounded-2xl sm:rounded-3xl shadow-2xl border border-slate-200/90 overflow-hidden my-auto animate-in zoom-in-95 duration-200 flex flex-col max-h-[calc(100dvh-1rem)] sm:max-h-[92vh]">
+        
+        {/* ========================================================================= */}
+        {/* TOP BAR: Brand & Stepper Progress (Pilih Ruang Kerja -> Pendaftaran -> Selesai) */}
+        {/* ========================================================================= */}
+        <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b border-slate-100 bg-white shrink-0">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-8 h-8 sm:w-9 sm:h-9 bg-gradient-to-br from-blue-700 via-blue-800 to-indigo-900 rounded-xl flex items-center justify-center text-white font-black text-sm sm:text-base shadow-sm shadow-blue-700/25 shrink-0 border border-blue-500/40">
+              <span>K</span>
             </div>
             <div>
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">
-                  Super Admin
+              <div className="flex items-center gap-1.5">
+                <span className="font-black text-slate-900 text-sm sm:text-base tracking-tight uppercase">
+                  Kawacanaan
                 </span>
-                <span className="inline-flex items-center gap-1 text-[9px] bg-blue-50 text-blue-700 font-bold px-2 py-0.5 rounded-full border border-blue-200">
-                  <Zap className="w-2.5 h-2.5 text-blue-600 fill-blue-600" />
-                  Direct Subscription
+                <span className="px-1.5 py-0.5 bg-blue-100 text-blue-800 text-[9px] font-black rounded font-mono uppercase tracking-wider border border-blue-200">
+                  SD
                 </span>
               </div>
-              <h2 className="text-base sm:text-lg font-black text-slate-900 leading-tight">
-                {currentStep === 'aktif' ? 'Aktivasi Berhasil' : 'Tambah Satuan Pendidikan'}
-              </h2>
+              <p className="text-[10px] text-slate-500 font-semibold truncate hidden sm:block">
+                Tambah Sekolah &amp; Aktivasi Ruang Kerja Super Admin
+              </p>
             </div>
           </div>
 
-          {/* Stepper Minimalist (Pendaftaran -> Direct Subscription -> Aktif) */}
-          <div className="hidden sm:flex items-center gap-1.5 text-xs font-bold shrink-0">
+          {/* Stepper Steps Bar */}
+          <div className="flex items-center gap-1.5 sm:gap-2">
             {/* Step 1 */}
             <div
-              className={`flex items-center gap-1.5 px-3 py-1 rounded-full transition-all ${
-                currentStep === 'pendaftaran'
+              className={`flex items-center gap-1 px-2 sm:px-2.5 py-1 rounded-lg text-[10px] sm:text-xs font-bold transition-all ${
+                currentStep === 'pilih_ruang_kerja'
                   ? 'bg-blue-600 text-white shadow-xs'
-                  : currentStep === 'direct_subscription' || currentStep === 'aktif'
-                  ? 'bg-blue-100 text-blue-800'
-                  : 'bg-slate-100 text-slate-500'
-              }`}
-            >
-              <span className="w-4 h-4 rounded-full bg-white/20 flex items-center justify-center text-[10px] font-black">
-                {currentStep === 'direct_subscription' || currentStep === 'aktif' ? '✓' : '1'}
-              </span>
-              <span>Pendaftaran</span>
-            </div>
-
-            <div className="h-0.5 w-3 bg-slate-200" />
-
-            {/* Step 2 */}
-            <div
-              className={`flex items-center gap-1.5 px-3 py-1 rounded-full transition-all ${
-                currentStep === 'direct_subscription'
-                  ? 'bg-blue-600 text-white shadow-xs'
-                  : currentStep === 'aktif'
-                  ? 'bg-blue-100 text-blue-800'
+                  : currentStep === 'pendaftaran' || currentStep === 'selesai'
+                  ? 'bg-blue-50 text-blue-700'
                   : 'bg-slate-100 text-slate-400'
               }`}
             >
-              <span className="w-4 h-4 rounded-full bg-white/20 flex items-center justify-center text-[10px] font-black">
-                {currentStep === 'aktif' ? '✓' : '2'}
+              <span className="w-4 h-4 rounded-full bg-white/20 text-current flex items-center justify-center text-[9px] font-black">
+                {currentStep === 'pendaftaran' || currentStep === 'selesai' ? '✓' : '1'}
               </span>
-              <span>Direct Subscription</span>
+              <span className="hidden sm:inline">Pilih Ruang Kerja</span>
             </div>
 
-            <div className="h-0.5 w-3 bg-slate-200" />
+            <span className="text-slate-300 text-xs">›</span>
+
+            {/* Step 2 */}
+            <div
+              className={`flex items-center gap-1 px-2 sm:px-2.5 py-1 rounded-lg text-[10px] sm:text-xs font-bold transition-all ${
+                currentStep === 'pendaftaran'
+                  ? 'bg-blue-600 text-white shadow-xs'
+                  : currentStep === 'selesai'
+                  ? 'bg-blue-50 text-blue-700'
+                  : 'bg-slate-100 text-slate-400'
+              }`}
+            >
+              <span className="w-4 h-4 rounded-full bg-white/20 text-current flex items-center justify-center text-[9px] font-black">
+                {currentStep === 'selesai' ? '✓' : '2'}
+              </span>
+              <span className="hidden sm:inline">Pendaftaran</span>
+            </div>
+
+            <span className="text-slate-300 text-xs">›</span>
 
             {/* Step 3 */}
             <div
-              className={`flex items-center gap-1.5 px-3 py-1 rounded-full transition-all ${
-                currentStep === 'aktif'
+              className={`flex items-center gap-1 px-2 sm:px-2.5 py-1 rounded-lg text-[10px] sm:text-xs font-bold transition-all ${
+                currentStep === 'selesai'
                   ? 'bg-emerald-600 text-white shadow-xs'
                   : 'bg-slate-100 text-slate-400'
               }`}
             >
-              <span className="w-4 h-4 rounded-full bg-white/20 flex items-center justify-center text-[10px] font-black">
+              <span className="w-4 h-4 rounded-full bg-white/20 text-current flex items-center justify-center text-[9px] font-black">
                 3
               </span>
-              <span>Aktif</span>
+              <span className="hidden sm:inline">Selesai</span>
             </div>
-          </div>
 
-          <button
-            type="button"
-            id="btn-close-direct-sub-modal"
-            onClick={handleClose}
-            disabled={isSubmitting}
-            className="p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition cursor-pointer"
-            title="Tutup Modal"
-          >
-            <X className="w-5 h-5" />
-          </button>
+            {/* Exit button */}
+            <button
+              type="button"
+              onClick={handleResetModal}
+              disabled={isSubmitting}
+              className="ml-1 sm:ml-2 p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-full transition cursor-pointer min-w-[32px] min-h-[32px] flex items-center justify-center disabled:opacity-40"
+              id="btn-close-school-onboarding"
+              title="Tutup Modal"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
-        {/* MODAL BODY */}
-        <div className="overflow-y-auto p-5 sm:p-7 flex-1">
-          {errorMessage && (
-            <div className="mb-5 p-3.5 bg-rose-50 border border-rose-200 text-rose-800 rounded-2xl text-xs font-semibold flex items-center gap-2.5 animate-shake">
-              <div className="w-6 h-6 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center shrink-0">
-                !
-              </div>
-              <span className="flex-1">{errorMessage}</span>
+        {/* ========================================================================= */}
+        {/* MODAL BODY CONTAINER (Scrollable) */}
+        {/* ========================================================================= */}
+        <div className="p-4 sm:p-6 overflow-y-auto flex-1">
+          {/* Error Banner */}
+          {formError && (
+            <div className="mb-4 p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-start gap-2.5 animate-in shake duration-200">
+              <ShieldCheck className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+              <div className="flex-1 font-semibold">{formError}</div>
             </div>
           )}
 
-          {/* STEP 1: FORM PENDAFTARAN LEMBAGA & ADMIN */}
-          {currentStep === 'pendaftaran' && (
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-              {/* Kolom Kiri: 3D Figur & Status Ringkas */}
-              <div className="lg:col-span-4 bg-gradient-to-b from-blue-50/80 via-white to-blue-50/40 p-4 sm:p-5 rounded-2xl border border-blue-100/80 flex flex-col justify-between space-y-4">
-                <div className="space-y-3">
-                  <div className="relative rounded-2xl overflow-hidden bg-white shadow-sm border border-blue-100/60 aspect-square flex items-center justify-center p-2">
-                    <img
-                      src="/images/superadmin_direct_sub_3d.jpg"
-                      alt="Direct Subscription Illustration"
-                      referrerPolicy="no-referrer"
-                      className="w-full h-full object-contain drop-shadow-sm select-none"
-                    />
-                    <div className="absolute top-2 left-2 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-white/95 text-blue-800 border border-blue-200 shadow-2xs backdrop-blur-xs flex items-center gap-1">
-                      <Sparkles className="w-2.5 h-2.5 text-blue-600" />
-                      Layanan Resmi
-                    </div>
-                  </div>
-
-                  <div>
-                    <h3 className="text-sm font-black text-slate-900 leading-tight">
-                      Registrasi Satuan Pendidikan
-                    </h3>
-                    <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                      Daftarkan lembaga baru dengan otorisasi Super Admin. Akun langsung aktif tanpa antrean pembayaran.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="p-3 bg-white rounded-xl border border-blue-100 space-y-2 text-[11px] text-slate-600 font-medium">
-                  <div className="flex items-center gap-2 text-slate-800 font-bold">
-                    <ShieldCheck className="w-4 h-4 text-blue-600 shrink-0" />
-                    <span>Fasilitas Direct Subscription:</span>
-                  </div>
-                  <div className="flex items-center gap-1.5 text-slate-600 pl-1">
-                    <Check className="w-3.5 h-3.5 text-emerald-600 stroke-[3] shrink-0" />
-                    <span>Aktivasi Instan ke Database Pusat</span>
-                  </div>
-                  <div className="flex items-center gap-1.5 text-slate-600 pl-1">
-                    <Check className="w-3.5 h-3.5 text-emerald-600 stroke-[3] shrink-0" />
-                    <span>Terbit Kode Akses &amp; Admin Utama</span>
-                  </div>
-                  <div className="flex items-center gap-1.5 text-slate-600 pl-1">
-                    <Check className="w-3.5 h-3.5 text-emerald-600 stroke-[3] shrink-0" />
-                    <span>Bypass Midtrans Payment Gateway</span>
-                  </div>
-                </div>
+          {/* ========================================================================= */}
+          {/* STEP 1: PILIH RUANG KERJA (Sekolah Terpadu vs Individu Guru) */}
+          {/* ========================================================================= */}
+          {currentStep === 'pilih_ruang_kerja' && (
+            <div className="space-y-4 sm:space-y-5 animate-in fade-in duration-200">
+              <div>
+                <h2 className="text-lg sm:text-xl font-bold text-slate-900 tracking-tight">
+                  Pilih Tipe Ruang Kerja
+                </h2>
+                <p className="mt-1 text-xs text-slate-500">
+                  Tentukan jenis ekosistem presensi yang ingin didaftarkan untuk satuan pendidikan atau pendidik.
+                </p>
               </div>
 
-              {/* Kolom Kanan: Form Inputs */}
-              <div className="lg:col-span-8 space-y-5">
-                {/* Bagian 1: Data Lembaga */}
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2 pb-1 border-b border-slate-100">
-                    <Building2 className="w-4 h-4 text-blue-600" />
-                    <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-                      Identitas Satuan Pendidikan
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <div className="sm:col-span-2">
-                      <label className="text-xs font-bold text-slate-700 block mb-1">
-                        Nama Satuan Pendidikan / Sekolah <span className="text-rose-500">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        id="input-school-name"
-                        value={schoolName}
-                        onChange={(e) => setSchoolName(e.target.value)}
-                        onBlur={() => {
-                          if (!username && schoolName) generateSuggestedUsername();
-                        }}
-                        placeholder="Contoh: SD Negeri 01 Pagi Merdeka"
-                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs sm:text-sm font-medium text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="text-xs font-bold text-slate-700 block mb-1">
-                        NPSN <span className="text-slate-400 font-normal">(Opsional)</span>
-                      </label>
-                      <input
-                        type="text"
-                        id="input-school-npsn"
-                        value={npsn}
-                        onChange={(e) => setNpsn(e.target.value)}
-                        placeholder="8 digit angka"
-                        maxLength={8}
-                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs sm:text-sm font-mono text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Bagian 2: Akun Administrator Utama */}
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2 pb-1 border-b border-slate-100">
-                    <User className="w-4 h-4 text-blue-600" />
-                    <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-                      Akun Administrator Utama
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <label className="text-xs font-bold text-slate-700 block mb-1">
-                        Nama Lengkap Administrator <span className="text-rose-500">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        id="input-admin-name"
-                        value={adminName}
-                        onChange={(e) => setAdminName(e.target.value)}
-                        placeholder="Nama penanggung jawab"
-                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs sm:text-sm font-medium text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition"
-                      />
-                    </div>
-
-                    <div>
-                      <div className="flex items-center justify-between mb-1">
-                        <label className="text-xs font-bold text-slate-700">
-                          Username Login <span className="text-rose-500">*</span>
-                        </label>
-                        {schoolName && (
-                          <button
-                            type="button"
-                            onClick={generateSuggestedUsername}
-                            className="text-[10px] font-bold text-blue-600 hover:text-blue-700 cursor-pointer"
-                          >
-                            Buat Otomatis
-                          </button>
-                        )}
-                      </div>
-                      <input
-                        type="text"
-                        id="input-admin-username"
-                        value={username}
-                        onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9._-]/g, ''))}
-                        placeholder="contoh: admin.sdn01"
-                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs sm:text-sm font-mono text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition"
-                      />
-                    </div>
-
-                    <div>
-                      <div className="flex items-center justify-between mb-1">
-                        <label className="text-xs font-bold text-slate-700">
-                          Kata Sandi (Password) <span className="text-rose-500">*</span>
-                        </label>
-                        <button
-                          type="button"
-                          onClick={generateRandomPassword}
-                          className="text-[10px] font-bold text-blue-600 hover:text-blue-700 cursor-pointer"
-                        >
-                          Acak Sandi
-                        </button>
-                      </div>
-                      <div className="relative">
-                        <input
-                          type={showPassword ? 'text' : 'password'}
-                          id="input-admin-password"
-                          value={password}
-                          onChange={(e) => setPassword(e.target.value)}
-                          placeholder="Minimal 6 karakter"
-                          className="w-full pl-3.5 pr-10 py-2.5 rounded-xl border border-slate-200 text-xs sm:text-sm font-mono text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition"
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* PILIHAN 1: RUANG KERJA SEKOLAH */}
+                <div
+                  onClick={() => setWorkspaceType('school')}
+                  className={`group relative rounded-2xl p-4 sm:p-5 border-2 transition-all cursor-pointer flex flex-col justify-between ${
+                    workspaceType === 'school'
+                      ? 'border-blue-600 bg-blue-50/30 shadow-md shadow-blue-500/10'
+                      : 'border-slate-200 bg-white hover:border-slate-300 hover:shadow-xs'
+                  }`}
+                >
+                  <div>
+                    {/* Header Image & Badge */}
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl overflow-hidden border-2 border-blue-100 shadow-2xs bg-blue-50 shrink-0">
+                        <img
+                          src={school3dImg}
+                          alt="Ruang Kerja Sekolah"
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                          referrerPolicy="no-referrer"
                         />
-                        <button
-                          type="button"
-                          onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
-                        >
-                          {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                        </button>
+                      </div>
+                      <div className="min-w-0">
+                        <span className="inline-block px-2 py-0.5 rounded bg-blue-100 text-blue-800 text-[10px] font-black uppercase tracking-wider mb-1">
+                          Sekolah Terpadu
+                        </span>
+                        <h3 className="text-sm sm:text-base font-bold text-slate-900 leading-snug">
+                          Ruang Kerja Sekolah
+                        </h3>
+                        <p className="text-[11px] font-semibold text-blue-600">
+                          Satu Ekosistem Satuan Pendidikan
+                        </p>
                       </div>
                     </div>
 
-                    <div>
-                      <label className="text-xs font-bold text-slate-700 block mb-1">
-                        Email Korespondensi <span className="text-slate-400 font-normal">(Opsional)</span>
-                      </label>
-                      <input
-                        type="email"
-                        id="input-admin-email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        placeholder="admin@sekolah.sch.id"
-                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs sm:text-sm font-medium text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Footer Step 1 */}
-                <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-3">
-                  <button
-                    type="button"
-                    onClick={handleClose}
-                    className="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 text-xs font-bold cursor-pointer transition"
-                  >
-                    Batal
-                  </button>
-
-                  <button
-                    type="button"
-                    id="btn-goto-step-2"
-                    onClick={handleProceedToStep2}
-                    className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold flex items-center gap-2 cursor-pointer shadow-sm shadow-blue-500/25 transition active:scale-95"
-                  >
-                    <span>Lanjut ke Direct Subscription</span>
-                    <ArrowRight className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* STEP 2: KONFIGURASI DIRECT SUBSCRIPTION */}
-          {currentStep === 'direct_subscription' && (
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-              {/* Kolom Kiri: Ringkasan Lembaga yang Didaftarkan */}
-              <div className="lg:col-span-4 bg-gradient-to-b from-blue-50/80 via-white to-blue-50/40 p-4 sm:p-5 rounded-2xl border border-blue-100/80 space-y-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-2xl bg-blue-600 text-white flex items-center justify-center font-bold shadow-sm shadow-blue-500/20 shrink-0">
-                    <School className="w-6 h-6" />
-                  </div>
-                  <div>
-                    <span className="text-[10px] font-black uppercase tracking-wider text-blue-700">
-                      Entitas Baru
-                    </span>
-                    <h3 className="text-sm font-black text-slate-900 leading-tight truncate max-w-[190px]">
-                      {schoolName}
-                    </h3>
-                    <p className="text-[11px] text-slate-500 truncate">
-                      Admin: {adminName}
+                    <p className="text-xs text-slate-600 leading-relaxed">
+                      Didesain untuk satu sekolah utuh. Memiliki akun Administrator Sekolah untuk mengelola seluruh rombel kelas, guru kelas, guru mapel, dan rekapitulasi kedinasan.
                     </p>
-                  </div>
-                </div>
 
-                <div className="p-3.5 bg-white rounded-xl border border-blue-100 space-y-2 text-xs">
-                  <div className="flex justify-between items-center pb-1.5 border-b border-slate-100">
-                    <span className="text-slate-500 text-[11px]">Username</span>
-                    <span className="font-mono font-bold text-slate-800">{username}</span>
-                  </div>
-                  {npsn && (
-                    <div className="flex justify-between items-center pb-1.5 border-b border-slate-100">
-                      <span className="text-slate-500 text-[11px]">NPSN</span>
-                      <span className="font-mono font-bold text-slate-800">{npsn}</span>
+                    <div className="mt-3 flex flex-wrap gap-1.5">
+                      <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 text-[10px] font-medium">
+                        Akun Admin Sekolah
+                      </span>
+                      <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 text-[10px] font-medium">
+                        Multi-Rombel Kelas
+                      </span>
+                      <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 text-[10px] font-medium">
+                        Rekap Sekolah Terpadu
+                      </span>
                     </div>
-                  )}
-                  <div className="flex justify-between items-center">
-                    <span className="text-slate-500 text-[11px]">Metode</span>
-                    <span className="text-blue-700 font-bold text-[11px]">Direct Sub</span>
+                  </div>
+
+                  <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-900">
+                      {workspaceType === 'school' ? '✓ Terpilih' : 'Klik untuk memilih'}
+                    </span>
+                    <div
+                      className={`w-5 h-5 rounded-full border flex items-center justify-center text-[10px] font-bold ${
+                        workspaceType === 'school'
+                          ? 'border-blue-600 bg-blue-600 text-white'
+                          : 'border-slate-300 text-transparent'
+                      }`}
+                    >
+                      ✓
+                    </div>
                   </div>
                 </div>
 
-                {/* 3D Visual Miniature */}
-                <div className="rounded-xl overflow-hidden border border-blue-100 bg-white p-2 flex items-center gap-3">
-                  <img
-                    src="/images/superadmin_direct_sub_3d.jpg"
-                    alt="3D Badge"
-                    referrerPolicy="no-referrer"
-                    className="w-12 h-12 object-contain shrink-0"
-                  />
-                  <div className="text-[11px] leading-tight text-slate-600">
-                    <span className="font-bold text-slate-900 block">Otorisasi Super Admin</span>
-                    Status langsung aktif dengan kuota penuh.
+                {/* PILIHAN 2: RUANG KERJA INDIVIDU */}
+                <div
+                  onClick={() => setWorkspaceType('personal')}
+                  className={`group relative rounded-2xl p-4 sm:p-5 border-2 transition-all cursor-pointer flex flex-col justify-between ${
+                    workspaceType === 'personal'
+                      ? 'border-indigo-600 bg-indigo-50/30 shadow-md shadow-indigo-500/10'
+                      : 'border-slate-200 bg-white hover:border-slate-300 hover:shadow-xs'
+                  }`}
+                >
+                  <div>
+                    {/* Header Image & Badge */}
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl overflow-hidden border-2 border-indigo-100 shadow-2xs bg-indigo-50 shrink-0">
+                        <img
+                          src={waliKelasWanitaImg}
+                          alt="Ruang Kerja Individu"
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                          referrerPolicy="no-referrer"
+                        />
+                      </div>
+                      <div className="min-w-0">
+                        <span className="inline-block px-2 py-0.5 rounded bg-indigo-100 text-indigo-800 text-[10px] font-black uppercase tracking-wider mb-1">
+                          Guru Mandiri
+                        </span>
+                        <h3 className="text-sm sm:text-base font-bold text-slate-900 leading-snug">
+                          Ruang Kerja Individu
+                        </h3>
+                        <p className="text-[11px] font-semibold text-indigo-600">
+                          Wali Kelas atau Guru Mapel
+                        </p>
+                      </div>
+                    </div>
+
+                    <p className="text-xs text-slate-600 leading-relaxed">
+                      Didesain untuk guru perorangan (Wali Kelas harian atau Guru Mapel). Mandiri, cepat, dan terfokus pada kelas binaan atau jadwal mengajar tanpa perlu operator sekolah.
+                    </p>
+
+                    <div className="mt-3 flex flex-wrap gap-1.5">
+                      <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 text-[10px] font-medium">
+                        Pilih Wali Kelas / Guru Mapel
+                      </span>
+                      <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 text-[10px] font-medium">
+                        Presensi Cepat Harian
+                      </span>
+                      <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 text-[10px] font-medium">
+                        Jurnal Mengajar Otomatis
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-900">
+                      {workspaceType === 'personal' ? '✓ Terpilih' : 'Klik untuk memilih'}
+                    </span>
+                    <div
+                      className={`w-5 h-5 rounded-full border flex items-center justify-center text-[10px] font-bold ${
+                        workspaceType === 'personal'
+                          ? 'border-indigo-600 bg-indigo-600 text-white'
+                          : 'border-slate-300 text-transparent'
+                      }`}
+                    >
+                      ✓
+                    </div>
                   </div>
                 </div>
               </div>
 
-              {/* Kolom Kanan: Pilihan Ruang Kerja & Durasi Lisensi */}
-              <div className="lg:col-span-8 space-y-5">
-                {/* 1. Tipe Ruang Kerja */}
-                <div className="space-y-2.5">
-                  <label className="text-xs font-bold text-slate-800 uppercase tracking-wider block">
-                    1. Tentukan Tipe Ruang Kerja
-                  </label>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {/* Ruang Kerja Sekolah */}
-                    <button
-                      type="button"
-                      id="card-workspace-school"
-                      onClick={() => setWorkspaceType('school')}
-                      className={`p-3.5 rounded-2xl border text-left cursor-pointer transition-all flex flex-col justify-between space-y-2 ${
-                        workspaceType === 'school'
-                          ? 'border-blue-600 bg-blue-50/60 ring-2 ring-blue-600/10 shadow-xs'
-                          : 'border-slate-200 bg-white hover:border-slate-300'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold shadow-xs">
-                          <Building2 className="w-4 h-4" />
-                        </div>
-                        <div
-                          className={`w-4 h-4 rounded-full border flex items-center justify-center ${
-                            workspaceType === 'school'
-                              ? 'border-blue-600 bg-blue-600 text-white'
-                              : 'border-slate-300 bg-white'
-                          }`}
-                        >
-                          {workspaceType === 'school' && <Check className="w-2.5 h-2.5 stroke-[3]" />}
-                        </div>
-                      </div>
-                      <div>
-                        <div className="text-xs font-black text-slate-900">Ruang Kerja Sekolah</div>
-                        <div className="text-[11px] text-slate-500 mt-0.5">
-                          Institusi resmi terpadu dengan input rombel mandiri &amp; multi-guru.
-                        </div>
-                      </div>
-                    </button>
+              {/* Bottom Action */}
+              <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={handleResetModal}
+                  className="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-xs font-bold hover:bg-slate-50 transition cursor-pointer"
+                >
+                  Batal
+                </button>
 
-                    {/* Ruang Kerja Individu */}
-                    <button
-                      type="button"
-                      id="card-workspace-personal"
-                      onClick={() => setWorkspaceType('personal')}
-                      className={`p-3.5 rounded-2xl border text-left cursor-pointer transition-all flex flex-col justify-between space-y-2 ${
-                        workspaceType === 'personal'
-                          ? 'border-blue-600 bg-blue-50/60 ring-2 ring-blue-600/10 shadow-xs'
-                          : 'border-slate-200 bg-white hover:border-slate-300'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="w-8 h-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold shadow-xs">
-                          <User className="w-4 h-4" />
-                        </div>
-                        <div
-                          className={`w-4 h-4 rounded-full border flex items-center justify-center ${
-                            workspaceType === 'personal'
-                              ? 'border-blue-600 bg-blue-600 text-white'
-                              : 'border-slate-300 bg-white'
-                          }`}
-                        >
-                          {workspaceType === 'personal' && <Check className="w-2.5 h-2.5 stroke-[3]" />}
-                        </div>
-                      </div>
-                      <div>
-                        <div className="text-xs font-black text-slate-900">Ruang Kerja Individu</div>
-                        <div className="text-[11px] text-slate-500 mt-0.5">
-                          Pendidik mandiri untuk rombel binaan &amp; jurnal mengajar pribadi.
-                        </div>
-                      </div>
-                    </button>
-                  </div>
-                </div>
-
-                {/* 2. Masa Aktif Lisensi */}
-                <div className="space-y-2.5">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs font-bold text-slate-800 uppercase tracking-wider block">
-                      2. Masa Berlaku Lisensi (Direct Subscription)
-                    </label>
-                    <span className="text-[11px] font-mono font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200">
-                      {durationPreset === 'permanent'
-                        ? 'Permanen (Seumur Hidup)'
-                        : durationPreset === 'yearly'
-                        ? '1 Tahun (365 Hari)'
-                        : '1 Bulan (30 Hari)'}
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-2">
-                    <button
-                      type="button"
-                      id="btn-preset-monthly"
-                      onClick={() => handleSelectDuration('monthly')}
-                      className={`py-2 px-3 rounded-xl text-xs font-bold transition border cursor-pointer flex flex-col items-center justify-center ${
-                        durationPreset === 'monthly'
-                          ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
-                          : 'bg-white text-slate-700 border-slate-200 hover:border-slate-300'
-                      }`}
-                    >
-                      <span>1 Bulan</span>
-                      <span className="text-[9px] font-normal opacity-85">30 Hari</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      id="btn-preset-yearly"
-                      onClick={() => handleSelectDuration('yearly')}
-                      className={`py-2 px-3 rounded-xl text-xs font-bold transition border cursor-pointer flex flex-col items-center justify-center relative ${
-                        durationPreset === 'yearly'
-                          ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
-                          : 'bg-white text-slate-700 border-slate-200 hover:border-slate-300'
-                      }`}
-                    >
-                      <span className="absolute -top-1.5 px-1.5 py-0.2 rounded-full bg-amber-400 text-slate-950 text-[8px] font-black uppercase">
-                        Rekomendasi
-                      </span>
-                      <span>1 Tahun</span>
-                      <span className="text-[9px] font-normal opacity-85">365 Hari</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      id="btn-preset-permanent"
-                      onClick={() => handleSelectDuration('permanent')}
-                      className={`py-2 px-3 rounded-xl text-xs font-bold transition border cursor-pointer flex flex-col items-center justify-center ${
-                        durationPreset === 'permanent'
-                          ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
-                          : 'bg-white text-slate-700 border-slate-200 hover:border-slate-300'
-                      }`}
-                    >
-                      <span>Permanen</span>
-                      <span className="text-[9px] font-normal opacity-85">Seumur Hidup</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* 3. Catatan Internal Super Admin */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-800 uppercase tracking-wider block">
-                    3. Catatan Administrator <span className="text-slate-400 font-normal">(Opsional)</span>
-                  </label>
-                  <input
-                    type="text"
-                    id="input-admin-notes"
-                    value={adminNotes}
-                    onChange={(e) => setAdminNotes(e.target.value)}
-                    placeholder="Contoh: Kemitraan Dinas Pendidikan, aktivasi offline, dll."
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs sm:text-sm font-medium text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition"
-                  />
-                </div>
-
-                {/* Footer Step 2 */}
-                <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setCurrentStep('pendaftaran')}
-                    disabled={isSubmitting}
-                    className="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 text-xs font-bold flex items-center gap-1.5 cursor-pointer transition disabled:opacity-50"
-                  >
-                    <ArrowLeft className="w-4 h-4" />
-                    <span>Kembali</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    id="btn-execute-direct-sub"
-                    onClick={handleExecuteDirectSubscription}
-                    disabled={isSubmitting}
-                    className="px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold flex items-center gap-2 cursor-pointer shadow-sm shadow-blue-500/25 transition disabled:opacity-50 active:scale-95"
-                  >
-                    {isSubmitting ? (
-                      <>
-                        <RefreshCw className="w-4 h-4 animate-spin" />
-                        <span>Menerbitkan Lisensi...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Check className="w-4 h-4 stroke-[3]" />
-                        <span>Aktifkan Langsung Sekarang</span>
-                      </>
-                    )}
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCurrentStep('pendaftaran');
+                    generateSuggestedUsername();
+                    generateRandomPassword();
+                  }}
+                  className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-98 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm shadow-blue-500/25 transition cursor-pointer"
+                  id="btn-next-to-registration"
+                >
+                  <span>Lanjutkan ke Formulir Pendaftaran</span>
+                  <ArrowRight className="w-4 h-4" />
+                </button>
               </div>
             </div>
           )}
 
-          {/* STEP 3: SUKSES AKTIVASI LANGSUNG (KREDENSIAL SIAP PAKAI) */}
-          {currentStep === 'aktif' && createdInfo && (
-            <div className="max-w-2xl mx-auto space-y-6 py-2">
-              <div className="text-center space-y-2">
-                <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto shadow-sm shadow-emerald-500/20">
-                  <CheckCircle2 className="w-9 h-9 stroke-[2.5]" />
-                </div>
+          {/* ========================================================================= */}
+          {/* STEP 2: PENDAFTARAN (Form Ruang Kerja Sekolah vs Form Ruang Kerja Individu) */}
+          {/* ========================================================================= */}
+          {currentStep === 'pendaftaran' && (
+            <div className="space-y-5 animate-in fade-in duration-200">
+              <div className="flex items-center justify-between">
                 <div>
-                  <span className="text-[10px] font-black uppercase tracking-wider text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
-                    Direct Subscription Berhasil
-                  </span>
-                  <h3 className="text-lg sm:text-xl font-black text-slate-900 mt-1">
-                    {createdInfo.schoolName} Langsung Aktif!
-                  </h3>
-                  <p className="text-xs text-slate-500 max-w-md mx-auto mt-0.5">
-                    Data sekolah dan akun administrator telah terdaftar aktif di database pusat. Silakan salin dan serahkan kredensial di bawah ini.
+                  <h2 className="text-lg sm:text-xl font-bold text-slate-900 tracking-tight">
+                    {workspaceType === 'school'
+                      ? 'Formulir Pendaftaran Ruang Kerja Sekolah'
+                      : 'Formulir Pendaftaran Ruang Kerja Individu'}
+                  </h2>
+                  <p className="mt-0.5 text-xs text-slate-500">
+                    Lengkapi identitas lembaga, kredensial login, durasi, dan catatan transaksi pembayaran.
                   </p>
                 </div>
+
+                <button
+                  type="button"
+                  onClick={() => setCurrentStep('pilih_ruang_kerja')}
+                  className="px-3 py-1.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-100 text-xs font-bold flex items-center gap-1 cursor-pointer transition shrink-0"
+                >
+                  <ArrowLeft className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Ubah Tipe Ruang Kerja</span>
+                </button>
               </div>
 
-              {/* Kartu Kredensial Akses */}
-              <div className="bg-slate-50 rounded-2xl border border-slate-200 p-4 sm:p-5 space-y-4 shadow-2xs">
-                <div className="flex items-center justify-between pb-3 border-b border-slate-200">
-                  <div className="flex items-center gap-2">
-                    <KeyRound className="w-4 h-4 text-blue-600" />
-                    <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-                      Kredensial Akses Administrator
-                    </span>
+              {/* =================================================================== */}
+              {/* KHUSUS RUANG KERJA INDIVIDU: PILIH PERAN (Wali Kelas / Guru Mapel) */}
+              {/* =================================================================== */}
+              {workspaceType === 'personal' && (
+                <div className="p-4 rounded-2xl bg-indigo-50/60 border border-indigo-100 space-y-3">
+                  <label className="block text-xs font-black text-indigo-950 uppercase tracking-wider">
+                    Pilih Peran Pendidik di Ruang Kerja Individu:
+                  </label>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {/* Kartu Peran Wali Kelas */}
+                    <div
+                      onClick={() => {
+                        setTeacherRole('WALI KELAS');
+                        generateSuggestedUsername();
+                      }}
+                      className={`p-3 rounded-xl border-2 transition-all cursor-pointer flex items-center gap-3 ${
+                        teacherRole === 'WALI KELAS'
+                          ? 'border-blue-600 bg-white shadow-xs'
+                          : 'border-slate-200 bg-white/60 hover:bg-white'
+                      }`}
+                    >
+                      <div className="w-12 h-12 rounded-xl overflow-hidden border border-blue-200 shrink-0">
+                        <img
+                          src={waliKelasWanitaImg}
+                          alt="Wali Kelas"
+                          className="w-full h-full object-cover"
+                          referrerPolicy="no-referrer"
+                        />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <h4 className="text-xs font-bold text-slate-900">Wali Kelas SD</h4>
+                        <p className="text-[11px] text-slate-500 line-clamp-1">
+                          Presensi 1 rombel binaan harian
+                        </p>
+                      </div>
+                      <div
+                        className={`w-4 h-4 rounded-full border flex items-center justify-center text-[9px] font-bold ${
+                          teacherRole === 'WALI KELAS'
+                            ? 'border-blue-600 bg-blue-600 text-white'
+                            : 'border-slate-300 text-transparent'
+                        }`}
+                      >
+                        ✓
+                      </div>
+                    </div>
+
+                    {/* Kartu Peran Guru Mapel */}
+                    <div
+                      onClick={() => {
+                        setTeacherRole('GURU MAPEL');
+                        generateSuggestedUsername();
+                      }}
+                      className={`p-3 rounded-xl border-2 transition-all cursor-pointer flex items-center gap-3 ${
+                        teacherRole === 'GURU MAPEL'
+                          ? 'border-emerald-600 bg-white shadow-xs'
+                          : 'border-slate-200 bg-white/60 hover:bg-white'
+                      }`}
+                    >
+                      <div className="w-12 h-12 rounded-xl overflow-hidden border border-emerald-200 shrink-0">
+                        <img
+                          src={guruMapelPriaImg}
+                          alt="Guru Mapel"
+                          className="w-full h-full object-cover"
+                          referrerPolicy="no-referrer"
+                        />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <h4 className="text-xs font-bold text-slate-900">Guru Mapel SD</h4>
+                        <p className="text-[11px] text-slate-500 line-clamp-1">
+                          Presensi per jam &amp; multi-rombel
+                        </p>
+                      </div>
+                      <div
+                        className={`w-4 h-4 rounded-full border flex items-center justify-center text-[9px] font-bold ${
+                          teacherRole === 'GURU MAPEL'
+                            ? 'border-emerald-600 bg-emerald-600 text-white'
+                            : 'border-slate-300 text-transparent'
+                        }`}
+                      >
+                        ✓
+                      </div>
+                    </div>
                   </div>
-                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-md">
-                    Status: Aktif
+
+                  {/* Sub-form Peran Wali Kelas: Pilihan Kelas Binaan */}
+                  {teacherRole === 'WALI KELAS' && (
+                    <div className="pt-2 border-t border-indigo-100 flex items-center gap-3">
+                      <span className="text-xs font-bold text-slate-700 shrink-0">
+                        Pilih Kelas Binaan:
+                      </span>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        {[1, 2, 3, 4, 5, 6].map((g) => (
+                          <button
+                            key={g}
+                            type="button"
+                            onClick={() => {
+                              setTeacherGrade(g);
+                              generateSuggestedUsername();
+                            }}
+                            className={`px-3 py-1 rounded-lg text-xs font-bold transition cursor-pointer ${
+                              teacherGrade === g
+                                ? 'bg-blue-600 text-white shadow-xs'
+                                : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'
+                            }`}
+                          >
+                            Kelas {g}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Sub-form Peran Guru Mapel: Pilihan / Input Mata Pelajaran */}
+                  {teacherRole === 'GURU MAPEL' && (
+                    <div className="pt-2 border-t border-indigo-100 space-y-2">
+                      <label className="block text-xs font-bold text-slate-700">
+                        Nama Mata Pelajaran yang Diampu:
+                      </label>
+                      <input
+                        type="text"
+                        value={teacherSubject}
+                        onChange={(e) => setTeacherSubject(e.target.value)}
+                        placeholder="Contoh: PJOK, PABP, Bahasa Inggris, SBdP, dll"
+                        className="w-full px-3.5 py-2 text-xs font-semibold rounded-xl border border-slate-300 bg-white focus:outline-blue-600"
+                      />
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-[10px] text-slate-500 font-semibold">Pilihan Cepat:</span>
+                        {[
+                          'Pendidikan Jasmani, Olahraga & Kesehatan (PJOK)',
+                          'Pendidikan Agama & Budi Pekerti (PABP)',
+                          'Bahasa Inggris',
+                          'Seni Budaya & Prakarya (SBdP)',
+                          'Muatan Lokal / Bahasa Daerah',
+                        ].map((sub) => (
+                          <button
+                            key={sub}
+                            type="button"
+                            onClick={() => setTeacherSubject(sub)}
+                            className="px-2 py-0.5 rounded-md bg-white border border-slate-200 text-slate-600 hover:text-blue-600 text-[10px] font-medium cursor-pointer"
+                          >
+                            {sub.split('(')[0].trim()}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* =================================================================== */}
+              {/* FORM DATA IDENTITAS & LEMBAGA */}
+              {/* =================================================================== */}
+              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-3">
+                <div className="flex items-center gap-2 pb-2 border-b border-slate-200">
+                  <Building2 className="w-4 h-4 text-blue-600" />
+                  <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider">
+                    {workspaceType === 'school' ? 'Data Satuan Pendidikan (Sekolah)' : 'Data Pendidik & Sekolah Asal'}
+                  </h3>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                  {workspaceType === 'school' ? (
+                    <>
+                      {/* Form Sekolah */}
+                      <div className="sm:col-span-2">
+                        <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                          Nama Satuan Pendidikan <span className="text-rose-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={schoolName}
+                          onChange={(e) => setSchoolName(e.target.value)}
+                          onBlur={generateSuggestedUsername}
+                          placeholder="Contoh: SDN 01 Rawamangun Pagi"
+                          className="w-full px-3.5 py-2 rounded-xl border border-slate-300 bg-white font-semibold focus:outline-blue-600"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                          NPSN (Nomor Pokok Sekolah Nasional)
+                        </label>
+                        <input
+                          type="text"
+                          value={npsn}
+                          onChange={(e) => setNpsn(e.target.value.replace(/\D/g, '').slice(0, 8))}
+                          placeholder="8 digit angka (opsional)"
+                          className="w-full px-3.5 py-2 rounded-xl border border-slate-300 bg-white font-mono font-semibold focus:outline-blue-600"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                          Nama Administrator / Kepala Sekolah <span className="text-rose-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={adminName}
+                          onChange={(e) => setAdminName(e.target.value)}
+                          placeholder="Contoh: Bpk. Hendra Gunawan, M.Pd"
+                          className="w-full px-3.5 py-2 rounded-xl border border-slate-300 bg-white font-semibold focus:outline-blue-600"
+                        />
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      {/* Form Individu Guru */}
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                          Nama Lengkap Pendidik <span className="text-rose-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={teacherName}
+                          onChange={(e) => setTeacherName(e.target.value)}
+                          onBlur={generateSuggestedUsername}
+                          placeholder="Contoh: Ibu Siti Rahmawati, S.Pd"
+                          className="w-full px-3.5 py-2 rounded-xl border border-slate-300 bg-white font-semibold focus:outline-blue-600"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                          NIP (Nomor Induk Pegawai)
+                        </label>
+                        <input
+                          type="text"
+                          value={teacherNip}
+                          onChange={(e) => setTeacherNip(e.target.value)}
+                          placeholder="Contoh: 198504122010012015 (opsional)"
+                          className="w-full px-3.5 py-2 rounded-xl border border-slate-300 bg-white font-mono font-semibold focus:outline-blue-600"
+                        />
+                      </div>
+
+                      <div className="sm:col-span-2">
+                        <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                          Nama Satuan Pendidikan / Asal Sekolah <span className="text-rose-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={teacherOriginSchool}
+                          onChange={(e) => setTeacherOriginSchool(e.target.value)}
+                          placeholder="Contoh: SDN Menteng 01 Pagi"
+                          className="w-full px-3.5 py-2 rounded-xl border border-slate-300 bg-white font-semibold focus:outline-blue-600"
+                        />
+                      </div>
+                    </>
+                  )}
+
+                  {/* Kontak Shared */}
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                      No. WhatsApp / Telepon PIC
+                    </label>
+                    <input
+                      type="text"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      placeholder="Contoh: 081234567890"
+                      className="w-full px-3.5 py-2 rounded-xl border border-slate-300 bg-white font-mono font-semibold focus:outline-blue-600"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                      Alamat Email (Opsional)
+                    </label>
+                    <input
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="email@sekolah.sch.id"
+                      className="w-full px-3.5 py-2 rounded-xl border border-slate-300 bg-white font-semibold focus:outline-blue-600"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* =================================================================== */}
+              {/* KREDENSIAL LOGIN PENGGUNA */}
+              {/* =================================================================== */}
+              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-3">
+                <div className="flex items-center justify-between pb-2 border-b border-slate-200">
+                  <div className="flex items-center gap-2">
+                    <KeyRound className="w-4 h-4 text-amber-600" />
+                    <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider">
+                      Kredensial Akses Masuk (Login)
+                    </h3>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={generateSuggestedUsername}
+                      className="text-[10px] font-bold text-blue-600 hover:underline cursor-pointer"
+                    >
+                      Saran Username
+                    </button>
+                    <span className="text-slate-300">•</span>
+                    <button
+                      type="button"
+                      onClick={generateRandomPassword}
+                      className="text-[10px] font-bold text-amber-700 hover:underline cursor-pointer"
+                    >
+                      Acak Sandi
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                      Username Login <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_.-]/g, ''))}
+                      placeholder="Contoh: admin.sdn01 / guru.siti"
+                      className="w-full px-3.5 py-2 rounded-xl border border-slate-300 bg-white font-mono font-bold text-slate-900 focus:outline-blue-600"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                      Kata Sandi (Password) <span className="text-rose-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showPassword ? 'text' : 'password'}
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        placeholder="Minimal 6 karakter"
+                        className="w-full pl-3.5 pr-10 py-2 rounded-xl border border-slate-300 bg-white font-mono font-bold text-slate-900 focus:outline-blue-600"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                      >
+                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* =================================================================== */}
+              {/* DURASI LISENSI */}
+              {/* =================================================================== */}
+              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-3">
+                <div className="flex items-center gap-2 pb-2 border-b border-slate-200">
+                  <Calendar className="w-4 h-4 text-indigo-600" />
+                  <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider">
+                    Durasi Masa Aktif Langganan
+                  </h3>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {[
+                    { id: 'monthly', label: '1 Bulan', sub: '30 Hari Aktif' },
+                    { id: 'yearly', label: '1 Tahun', sub: '365 Hari (Rekomendasi)' },
+                    { id: 'permanent', label: 'Permanen', sub: 'Seumur Hidup' },
+                    { id: 'custom', label: 'Custom', sub: 'Pilih Tanggal' },
+                  ].map((p) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => setDurationPreset(p.id as any)}
+                      className={`p-2.5 rounded-xl border text-left transition cursor-pointer ${
+                        durationPreset === p.id
+                          ? 'border-blue-600 bg-blue-50 text-blue-900 shadow-xs'
+                          : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                      }`}
+                    >
+                      <div className="font-bold text-xs">{p.label}</div>
+                      <div className="text-[10px] text-slate-500 font-medium truncate">{p.sub}</div>
+                    </button>
+                  ))}
+                </div>
+
+                {durationPreset === 'custom' && (
+                  <div className="pt-2">
+                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                      Tentukan Tanggal Kedaluwarsa:
+                    </label>
+                    <input
+                      type="date"
+                      value={customExpiresAt}
+                      onChange={(e) => setCustomExpiresAt(e.target.value)}
+                      className="px-3.5 py-2 text-xs font-semibold rounded-xl border border-slate-300 bg-white focus:outline-blue-600"
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* =================================================================== */}
+              {/* BAGIAN TRANSAKSI & INVOICE: INPUT HARGA & METODE PEMBAYARAN LANGSUNG */}
+              {/* =================================================================== */}
+              <div className="p-4 rounded-2xl bg-emerald-50/70 border border-emerald-200 space-y-3.5">
+                <div className="flex items-center justify-between pb-2 border-b border-emerald-200/80">
+                  <div className="flex items-center gap-2">
+                    <Receipt className="w-4 h-4 text-emerald-700" />
+                    <div>
+                      <h3 className="text-xs font-black text-emerald-950 uppercase tracking-wider">
+                        Pencatatan Transaksi Finansial &amp; Penerbitan Invoice
+                      </h3>
+                      <p className="text-[10px] text-emerald-700 font-medium">
+                        Catat riwayat pembayaran riil (misal bayar ke owner langsung) agar invoice otomatis terbit.
+                      </p>
+                    </div>
+                  </div>
+
+                  <span className="px-2 py-0.5 rounded bg-emerald-600 text-white text-[10px] font-black uppercase tracking-wider">
+                    Direct Owner
                   </span>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 text-xs">
+                  {/* Input Harga Nominal */}
                   <div>
-                    <span className="text-slate-500 text-[10px] block font-semibold">Nama Satuan Pendidikan</span>
-                    <span className="font-bold text-slate-900 text-xs sm:text-sm truncate block mt-0.5">
-                      {createdInfo.schoolName}
-                    </span>
-                  </div>
-
-                  <div>
-                    <span className="text-slate-500 text-[10px] block font-semibold">Tipe Ruang Kerja</span>
-                    <span className="font-bold text-blue-700 text-xs sm:text-sm block mt-0.5">
-                      {createdInfo.workspaceType === 'school' ? 'Ruang Kerja Sekolah (Terpadu)' : 'Ruang Kerja Individu'}
-                    </span>
-                  </div>
-
-                  <div>
-                    <span className="text-slate-500 text-[10px] block font-semibold">Kode Akses Sekolah</span>
-                    <div className="flex items-center gap-1.5 mt-0.5">
-                      <span className="font-mono font-bold text-slate-900 text-xs sm:text-sm bg-white px-2 py-0.5 rounded border border-slate-200">
-                        {createdInfo.schoolCode}
+                    <label className="block text-[11px] font-bold text-slate-800 mb-1">
+                      Nominal Harga Transaksi (Rp) <span className="text-rose-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-3.5 top-1/2 -translate-y-1/2 font-bold text-slate-400">
+                        Rp
                       </span>
-                      <button
-                        type="button"
-                        onClick={handleCopyCode}
-                        className="p-1 rounded text-slate-400 hover:text-blue-600 cursor-pointer transition"
-                        title="Salin Kode Akses"
-                      >
-                        {copiedCode ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
-                      </button>
+                      <input
+                        type="number"
+                        min="0"
+                        step="1000"
+                        value={priceAmount}
+                        onChange={(e) => setPriceAmount(Math.max(0, Number(e.target.value) || 0))}
+                        className="w-full pl-10 pr-3.5 py-2 rounded-xl border border-emerald-300 bg-white font-mono font-bold text-slate-900 text-sm focus:outline-emerald-600"
+                      />
+                    </div>
+
+                    {/* Quick Preset Buttons */}
+                    <div className="mt-2 flex items-center gap-1.5 flex-wrap">
+                      <span className="text-[10px] text-emerald-800 font-semibold">Preset Cepat:</span>
+                      {[
+                        { label: 'Gratis (Rp 0)', val: 0 },
+                        { label: '50rb', val: 50000 },
+                        { label: '150rb', val: 150000 },
+                        { label: '500rb', val: 500000 },
+                        { label: '1.5 Juta', val: 1500000 },
+                        { label: '3 Juta', val: 3000000 },
+                      ].map((pr) => (
+                        <button
+                          key={pr.val}
+                          type="button"
+                          onClick={() => setPriceAmount(pr.val)}
+                          className="px-2 py-0.5 rounded bg-white hover:bg-emerald-100 border border-emerald-300 text-emerald-900 text-[10px] font-bold cursor-pointer transition"
+                        >
+                          {pr.label}
+                        </button>
+                      ))}
                     </div>
                   </div>
 
-                  <div>
-                    <span className="text-slate-500 text-[10px] block font-semibold">Penanggung Jawab</span>
-                    <span className="font-bold text-slate-900 text-xs sm:text-sm block mt-0.5">
-                      {createdInfo.adminName}
-                    </span>
+                  {/* Status & Metode Pembayaran */}
+                  <div className="space-y-2.5">
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-800 mb-1">
+                        Metode Pembayaran
+                      </label>
+                      <select
+                        value={paymentMethod}
+                        onChange={(e) => setPaymentMethod(e.target.value)}
+                        className="w-full px-3 py-2 rounded-xl border border-emerald-300 bg-white font-semibold text-slate-800 focus:outline-emerald-600 cursor-pointer"
+                      >
+                        <option value="Transfer Bank Langsung ke Owner">Transfer Bank Langsung ke Rekening Owner</option>
+                        <option value="Tunai / Cash Langsung">Tunai / Cash Langsung</option>
+                        <option value="Tagihan Invoice Sekolah (Tempo/APBD)">Tagihan Invoice Sekolah (Tempo/APBD)</option>
+                        <option value="Subsidi / Khusus / Tanpa Biaya">Subsidi / Khusus / Tanpa Biaya</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-800 mb-1">
+                        Status Pembayaran Awal
+                      </label>
+                      <div className="flex items-center gap-3">
+                        <label className="flex items-center gap-1.5 cursor-pointer text-xs font-semibold text-slate-800">
+                          <input
+                            type="radio"
+                            name="payStatus"
+                            checked={paymentStatus === 'paid'}
+                            onChange={() => setPaymentStatus('paid')}
+                            className="accent-emerald-600"
+                          />
+                          <span>Lunas (Settled)</span>
+                        </label>
+                        <label className="flex items-center gap-1.5 cursor-pointer text-xs font-semibold text-slate-800">
+                          <input
+                            type="radio"
+                            name="payStatus"
+                            checked={paymentStatus === 'pending'}
+                            onChange={() => setPaymentStatus('pending')}
+                            className="accent-emerald-600"
+                          />
+                          <span>Menunggu Pembayaran (Pending)</span>
+                        </label>
+                      </div>
+                    </div>
                   </div>
 
-                  <div>
-                    <span className="text-slate-500 text-[10px] block font-semibold">Username Login</span>
-                    <span className="font-mono font-bold text-slate-900 text-xs sm:text-sm block mt-0.5 bg-white px-2 py-0.5 rounded border border-slate-200 inline-block">
-                      {createdInfo.username}
-                    </span>
-                  </div>
-
-                  <div>
-                    <span className="text-slate-500 text-[10px] block font-semibold">Kata Sandi (Password)</span>
-                    <span className="font-mono font-bold text-slate-900 text-xs sm:text-sm block mt-0.5 bg-white px-2 py-0.5 rounded border border-slate-200 inline-block">
-                      {createdInfo.password}
-                    </span>
-                  </div>
-
+                  {/* Catatan Transaksi */}
                   <div className="sm:col-span-2">
-                    <span className="text-slate-500 text-[10px] block font-semibold">Masa Aktif Lisensi</span>
-                    <span className="font-medium text-slate-800 text-xs block mt-0.5">
-                      {createdInfo.subscriptionExpiresAt}
+                    <label className="block text-[11px] font-bold text-slate-800 mb-1">
+                      Catatan / Keterangan Transaksi Pembayaran
+                    </label>
+                    <input
+                      type="text"
+                      value={paymentNotes}
+                      onChange={(e) => setPaymentNotes(e.target.value)}
+                      placeholder="Contoh: Transfer BCA a/n Kepala Sekolah Bpk Hendra, Dana BOS Tahap 1, dll."
+                      className="w-full px-3.5 py-2 rounded-xl border border-emerald-300 bg-white font-medium text-slate-900 focus:outline-emerald-600"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Bottom Actions */}
+              <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-3">
+                <button
+                  type="button"
+                  disabled={isSubmitting}
+                  onClick={() => setCurrentStep('pilih_ruang_kerja')}
+                  className="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-xs font-bold hover:bg-slate-50 transition cursor-pointer disabled:opacity-50"
+                >
+                  Kembali
+                </button>
+
+                <button
+                  type="button"
+                  disabled={isSubmitting}
+                  onClick={handleSubmitRegistration}
+                  className="px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-98 text-white text-xs font-bold flex items-center gap-2 shadow-md shadow-blue-500/25 transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  id="btn-submit-registration"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      <span>Memproses Pendaftaran &amp; Invoice...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>Daftarkan &amp; Terbitkan Kredensial</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* ========================================================================= */}
+          {/* STEP 3: SELESAI & KARTU KREDENSIAL LOGIN (JPEG Download with 3D Picture) */}
+          {/* ========================================================================= */}
+          {currentStep === 'selesai' && createdData && (
+            <div className="space-y-4 sm:space-y-5 animate-in zoom-in-95 duration-200">
+              {/* Success Badge */}
+              <div className="p-3.5 sm:p-4 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                  <CheckCircle2 className="w-5 h-5" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-xs sm:text-sm font-bold text-emerald-950">
+                    Pendaftaran Berhasil &amp; Kredensial Siap Digunakan!
+                  </h3>
+                  <p className="text-[11px] text-emerald-700 mt-0.5">
+                    Ruang kerja dan akun login telah aktif. Invoice nomor{' '}
+                    <strong className="font-mono">{createdData.invoiceNo}</strong> sebesar{' '}
+                    <strong>Rp {createdData.priceAmount.toLocaleString('id-ID')}</strong> berhasil dicatat di sistem.
+                  </p>
+                </div>
+              </div>
+
+              {/* =================================================================== */}
+              {/* KARTU KREDENSIAL LOGIN (High-Fidelity DOM Target for JPEG Download) */}
+              {/* =================================================================== */}
+              <div
+                ref={credentialCardRef}
+                id="credential-card-canvas"
+                className="relative bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 text-white rounded-2xl sm:rounded-3xl p-4 sm:p-6 border border-slate-800 shadow-2xl overflow-hidden"
+              >
+                {/* Subtle Decorative Background Circles */}
+                <div className="absolute -top-12 -right-12 w-48 h-48 bg-blue-600/15 rounded-full blur-2xl pointer-events-none" />
+                <div className="absolute -bottom-12 -left-12 w-48 h-48 bg-indigo-600/15 rounded-full blur-2xl pointer-events-none" />
+
+                {/* Card Header */}
+                <div className="relative z-10 flex items-center justify-between pb-3.5 border-b border-slate-800/90 gap-2">
+                  <div className="flex items-center gap-2 sm:gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-black text-sm shadow-sm">
+                      K
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-black text-white text-xs sm:text-sm tracking-tight uppercase">
+                          Kawacanaan
+                        </span>
+                        <span className="px-1.5 py-0.2 bg-blue-500/30 text-blue-300 text-[8px] font-black rounded border border-blue-400/40">
+                          SD
+                        </span>
+                      </div>
+                      <p className="text-[9px] text-slate-400 font-semibold tracking-wider uppercase">
+                        Kartu Kredensial Akses Pendidik &amp; Sekolah
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="text-right">
+                    <span className="inline-block px-2.5 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-400/30 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider">
+                      {createdData.workspaceType === 'school'
+                        ? 'Ruang Kerja Sekolah'
+                        : createdData.teacherRole === 'WALI KELAS'
+                        ? 'Wali Kelas'
+                        : 'Guru Mapel'}
                     </span>
+                    <p className="text-[9px] text-emerald-400 font-mono mt-0.5">
+                      ● Status: AKTIF (TERDAFTAR)
+                    </p>
                   </div>
                 </div>
 
-                <div className="pt-2 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-2.5">
+                {/* Card Body: 3D Picture + Information Grid + QR Code */}
+                <div className="relative z-10 pt-4 grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
+                  
+                  {/* Left Column: 3D Picture & QR Code Box */}
+                  <div className="md:col-span-4 flex flex-row md:flex-col items-center justify-around gap-3 bg-slate-900/60 p-3 rounded-2xl border border-slate-800/80">
+                    {/* 3D Educator / School Picture */}
+                    <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl overflow-hidden border-2 border-blue-400/40 shadow-md bg-slate-800 shrink-0 relative group">
+                      <img
+                        src={
+                          createdData.workspaceType === 'school'
+                            ? school3dImg
+                            : createdData.teacherRole === 'WALI KELAS'
+                            ? waliKelasWanitaImg
+                            : guruMapelPriaImg
+                        }
+                        alt="Visual 3D Ruang Kerja"
+                        className="w-full h-full object-cover object-top"
+                        referrerPolicy="no-referrer"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-slate-950/60 via-transparent to-transparent" />
+                      <span className="absolute bottom-1 left-1.5 text-[8px] font-black px-1.5 py-0.5 bg-blue-600/90 text-white rounded">
+                        3D OFFICIAL
+                      </span>
+                    </div>
+
+                    {/* QR Code */}
+                    <div className="flex flex-col items-center shrink-0">
+                      <div className="w-20 h-20 sm:w-24 sm:h-24 p-1.5 bg-white rounded-xl shadow-md flex items-center justify-center">
+                        {qrCodeUrl ? (
+                          <img
+                            src={qrCodeUrl}
+                            alt="QR Login"
+                            className="w-full h-full object-contain"
+                          />
+                        ) : (
+                          <div className="text-[9px] text-slate-400 text-center font-bold">
+                            QR Code...
+                          </div>
+                        )}
+                      </div>
+                      <span className="text-[8px] font-mono text-slate-400 mt-1 text-center">
+                        Scan untuk Masuk
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Right Column: Complete Information Details */}
+                  <div className="md:col-span-8 space-y-3">
+                    {/* Title & Organization */}
+                    <div>
+                      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">
+                        Satuan Pendidikan / Ruang Kerja
+                      </span>
+                      <h4 className="text-sm sm:text-base font-black text-white tracking-tight mt-0.5">
+                        {createdData.schoolName}
+                      </h4>
+                      <p className="text-[11px] text-blue-300 font-medium">
+                        Penanggung Jawab: {createdData.adminName}
+                        {createdData.teacherRole === 'WALI KELAS' && ` (Wali Kelas ${createdData.targetGrade || 1})`}
+                        {createdData.teacherRole === 'GURU MAPEL' && ` (${createdData.subjectName || 'Mata Pelajaran'})`}
+                      </p>
+                    </div>
+
+                    {/* High-contrast Credentials Box */}
+                    <div className="bg-slate-900/90 border border-slate-700/80 rounded-xl p-3 grid grid-cols-2 gap-3 text-xs">
+                      <div>
+                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">
+                          Username Login
+                        </span>
+                        <span className="font-mono font-black text-amber-300 text-xs sm:text-sm tracking-wide mt-0.5 block select-all">
+                          {createdData.username}
+                        </span>
+                      </div>
+
+                      <div>
+                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">
+                          Password Login
+                        </span>
+                        <span className="font-mono font-black text-emerald-300 text-xs sm:text-sm tracking-wide mt-0.5 block select-all">
+                          {createdData.password}
+                        </span>
+                      </div>
+
+                      <div>
+                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">
+                          Kode Akses Sekolah
+                        </span>
+                        <span className="font-mono font-bold text-white text-xs mt-0.5 block select-all">
+                          {createdData.schoolCode}
+                        </span>
+                      </div>
+
+                      <div>
+                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">
+                          Masa Aktif Akun
+                        </span>
+                        <span className="font-semibold text-slate-200 text-[11px] mt-0.5 block">
+                          {createdData.subscriptionExpiresAt}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Invoice & Transaction Summary Row */}
+                    <div className="pt-2 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-2 text-[10px]">
+                      <div>
+                        <span className="text-slate-400">No. Invoice: </span>
+                        <span className="font-mono font-bold text-slate-200">{createdData.invoiceNo}</span>
+                      </div>
+
+                      <div>
+                        <span className="text-slate-400">Nominal: </span>
+                        <span className="font-mono font-bold text-emerald-400">
+                          Rp {createdData.priceAmount.toLocaleString('id-ID')}
+                        </span>
+                        <span className="ml-1 text-[9px] px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 font-bold">
+                          {createdData.paymentStatus === 'paid' ? 'LUNAS' : 'PENDING'}
+                        </span>
+                      </div>
+
+                      <div className="text-slate-400 font-mono text-[9px]">
+                        {window.location.origin}/login
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Card Security Seal Footer */}
+                <div className="relative z-10 mt-3.5 pt-2 border-t border-slate-800/60 flex items-center justify-between text-[8px] text-slate-500 font-mono">
+                  <span>SISTEM TERVALIDASI KAWACANAAN SD • SUPER ADMIN REGISTER</span>
+                  <span>ID: {createdData.schoolId?.slice(0, 8) || 'SCH-AUTH'}</span>
+                </div>
+              </div>
+
+              {/* =================================================================== */}
+              {/* ACTION BUTTONS (Download JPEG, Copy Credentials, Finish) */}
+              {/* =================================================================== */}
+              <div className="pt-2 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-2.5">
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                  {/* Download JPEG Button */}
                   <button
                     type="button"
-                    id="btn-copy-full-credentials"
-                    onClick={handleCopyCredentials}
-                    className="w-full sm:w-auto px-4 py-2 rounded-xl bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 text-xs font-bold flex items-center justify-center gap-2 cursor-pointer transition shadow-2xs"
+                    onClick={handleDownloadJpeg}
+                    disabled={isDownloadingJpeg}
+                    className="flex-1 sm:flex-initial px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 active:scale-98 text-white text-xs font-bold flex items-center justify-center gap-2 shadow-sm shadow-indigo-500/25 transition cursor-pointer disabled:opacity-50"
+                    id="btn-download-jpeg-card"
                   >
-                    {copiedCredentials ? (
+                    {isDownloadingJpeg ? (
                       <>
-                        <Check className="w-4 h-4 text-emerald-600" />
-                        <span className="text-emerald-700">Tersalin ke Clipboard!</span>
+                        <RefreshCw className="w-4 h-4 animate-spin" />
+                        <span>Merender Gambar...</span>
                       </>
                     ) : (
                       <>
-                        <Copy className="w-4 h-4 text-slate-500" />
-                        <span>Salin Kredensial Lengkap</span>
+                        <Download className="w-4 h-4" />
+                        <span>Unduh Kartu (JPEG)</span>
                       </>
                     )}
                   </button>
 
+                  {/* Copy Text Button */}
                   <button
                     type="button"
-                    id="btn-finish-direct-sub"
-                    onClick={handleFinish}
-                    className="w-full sm:w-auto px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer shadow-sm shadow-blue-500/25 transition active:scale-95"
+                    onClick={handleCopyCredentials}
+                    className="px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold flex items-center justify-center gap-1.5 transition cursor-pointer"
+                    id="btn-copy-card-text"
                   >
-                    <span>Selesai &amp; Kelola Sekolah</span>
-                    <ArrowRight className="w-4 h-4" />
+                    {copiedCredentials ? (
+                      <>
+                        <Check className="w-4 h-4 text-emerald-600" />
+                        <span className="text-emerald-700">Tersalin!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-4 h-4 text-slate-500" />
+                        <span className="hidden sm:inline">Salin Teks</span>
+                      </>
+                    )}
                   </button>
                 </div>
+
+                {/* Finish & Open School Detail */}
+                <button
+                  type="button"
+                  onClick={handleFinish}
+                  className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-98 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-md shadow-blue-500/25 transition cursor-pointer"
+                  id="btn-finish-school-onboarding"
+                >
+                  <span>Selesai &amp; Buka Manajemen Sekolah</span>
+                  <ArrowRight className="w-4 h-4" />
+                </button>
               </div>
             </div>
           )}

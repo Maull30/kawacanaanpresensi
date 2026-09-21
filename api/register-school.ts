@@ -176,8 +176,9 @@ export default async function handler(req: any, res: any) {
     }
 
     // Penentuan Username & Peran untuk Guru vs Admin
-    const isTeacherPlan = plan === 'guru_pro' || plan === 'guru_gratis';
-    const teacherType = body.teacherType === 'GURU_MAPEL' ? 'GURU_MAPEL' : 'WALI_KELAS';
+    const isTeacherPlan = body.workspace_type === 'personal' || body.workspaceType === 'personal' || plan === 'guru_pro' || plan === 'guru_gratis';
+    const rawTeacherType = String(body.teacherType || body.role || '').toUpperCase().trim();
+    const teacherType = rawTeacherType.includes('MAPEL') ? 'GURU_MAPEL' : 'WALI_KELAS';
     const teacherGrade = Number(body.teacherGrade || 1);
     const teacherSubject = String(body.teacherSubject || 'Tematik / Guru Kelas').trim();
     const teacherNip = String(body.teacherNip || '').trim();
@@ -366,7 +367,7 @@ export default async function handler(req: any, res: any) {
 
     // 9. Buat Akun Auth Supabase untuk Pengguna (Guru / Admin)
     const userAuthEmail = adminEmail || `${effectiveUsername}@login.edushift.local`;
-    const userRole = plan === 'sekolah_pro' ? 'ADMIN' : (teacherType === 'GURU_MAPEL' ? 'GURU MAPEL' : 'WALI KELAS');
+    const userRole = isTeacherPlan ? (teacherType === 'GURU_MAPEL' ? 'GURU MAPEL' : 'WALI KELAS') : 'ADMIN';
 
     const { data: authData, error: authErr } = await admin.auth.admin.createUser({
       email: userAuthEmail,
@@ -483,6 +484,59 @@ export default async function handler(req: any, res: any) {
       });
     } catch (_) {}
 
+    // 12. Catat Transaksi Finansial & Invoice (Pembayaran Langsung / Direct Owner / Midtrans)
+    let paymentRecord: any = null;
+    const rawPrice = body.amount !== undefined ? body.amount : body.price;
+    if (rawPrice !== undefined || isCallerSuperadmin) {
+      try {
+        const numericAmount = Math.max(0, Number(rawPrice) || 0);
+        const now = new Date();
+        const yyyymm = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}`;
+        const randomInvSuffix = Math.floor(100 + Math.random() * 900);
+        const invoiceNo = body.invoiceNo || body.invoice_no || `INV-${yyyymm}-${randomInvSuffix}`;
+        const paymentMethod = body.paymentMethod || body.payment_method || 'TRANSFER_MANUAL_OWNER';
+        const paymentStatus = (body.paymentStatus || 'paid').toLowerCase() === 'pending' ? 'pending' : 'paid';
+
+        const planDisplayName =
+          workspaceType === 'school'
+            ? 'Paket Sekolah Pro'
+            : teacherType === 'GURU_MAPEL'
+            ? 'Paket Guru Pro (Mapel)'
+            : 'Paket Guru Pro (Wali Kelas)';
+
+        const { data: payData, error: payErr } = await admin
+          .from('payments')
+          .insert({
+            invoice_no: invoiceNo,
+            school_id: school.id,
+            plan_name: planDisplayName,
+            amount: numericAmount,
+            unique_code: 0,
+            total_amount: numericAmount,
+            status: paymentStatus === 'paid' ? 'paid' : 'pending',
+            payment_method: paymentMethod,
+            school_name: schoolName,
+            npsn: effectiveNpsn || null,
+            contact_name: adminName,
+            contact_phone: adminPhone || null,
+            email: userAuthEmail || null,
+            created_at: now.toISOString(),
+            paid_at: paymentStatus === 'paid' ? now.toISOString() : null,
+            expires_at: expiryDateStr ? new Date(expiryDateStr).toISOString() : null,
+          })
+          .select()
+          .maybeSingle();
+
+        if (!payErr && payData) {
+          paymentRecord = payData;
+        } else if (payErr) {
+          console.warn('Gagal menyimpan riwayat transaksi payments:', payErr.message);
+        }
+      } catch (pErr: any) {
+        console.warn('Error proses pencatatan invoice/transaksi:', pErr?.message);
+      }
+    }
+
     return json(res, 200, {
       ok: true,
       message: `Pendaftaran berhasil! Akun ${effectiveUsername} (${userRole}) telah aktif.`,
@@ -503,6 +557,8 @@ export default async function handler(req: any, res: any) {
         email: userAuthEmail,
         role: userRole,
       },
+      payment: paymentRecord,
+      invoiceNo: paymentRecord?.invoice_no || null,
       classesCreated: initialClasses.length,
     });
   } catch (error: any) {

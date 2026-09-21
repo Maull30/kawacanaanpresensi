@@ -243,6 +243,7 @@ interface AppContextType {
     studentId: string,
     data: { namaWali?: string; noHpWali?: string; hubungannya?: string }
   ) => Promise<{ success: boolean; message?: string }>;
+  supabase: any;
 }
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
@@ -7878,6 +7879,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
   return (
     <AppContext.Provider
       value={{
+        supabase,
         isSchoolPro,
         isTeacherPro,
         upgradeModal,

@@ -34,7 +34,7 @@ import { validateTeacherRoleAssignment } from '../utils/packageSystem';
 import { getFaseByClassName, getFaseByGrade, getFaseBadgeColor, getGradeFromClassName, formatClassDisplay } from '../utils/faseKurikulum';
 import { BookLoadingModal } from '../components/BookLoader';
 import { normalizeTeacherName, normalizeNip } from '../utils/userScope';
-import { normalizeClassToken } from '../utils/documentParser';
+import { normalizeClassToken, downloadClassTemplateFile, parseImportDocument } from '../utils/documentParser';
 
 // Helper sinkronisasi jenis kelamin & pencocokan rombel siswa
 const isGenderL = (g: any): boolean => {
@@ -609,30 +609,10 @@ export const DataKelasView: React.FC = () => {
     showToast(`Siswa ${student.nama} dikeluarkan dari kelas`, 'info');
   };
 
-  // Download Template CSV Kelas (Format: NAMA KELAS, NAMA WALI KELAS)
+  // Download Template Excel (.xlsx) Kelas (Format: NAMA KELAS, NAMA WALI KELAS)
   const handleDownloadTemplate = () => {
-    const header = 'NAMA KELAS,NAMA WALI KELAS\n';
-    const sampleRows = [
-      'Kelas 1A,Budi Santoso, S.Pd.',
-      'Kelas 1B,Siti Aminah, M.Pd.',
-      'Kelas 2A,Rahmat Hidayat, S.Pd.',
-      'Kelas 3A,Dewi Lestari, S.Pd.',
-      'Kelas 4A,',
-      'Kelas 5A,',
-      'Kelas 6A,',
-    ].join('\n');
-
-    const csvContent = '\uFEFF' + header + sampleRows;
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', 'Template_Import_Data_Kelas.csv');
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-    showToast('Template file CSV Kelas berhasil diunduh (Format: Nama Kelas, Nama Wali Kelas).', 'success');
+    downloadClassTemplateFile('xlsx');
+    showToast('Template file Excel (.xlsx) Kelas berhasil diunduh. Silakan lengkapi dan unggah kembali.', 'success');
   };
 
   // Parser helper function for CSV / TSV text for Classes (Format: Nama Kelas, Nama Wali Kelas)
@@ -710,23 +690,41 @@ export const DataKelasView: React.FC = () => {
     return results;
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     setFileName(file.name);
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const content = event.target?.result as string;
-      const parsed = parseRawTextToClasses(content);
-      setParsedClasses(parsed);
-      if (parsed.length === 0) {
-        showToast('Tidak ada data kelas yang dapat dibaca dari file ini', 'error');
+    try {
+      const isExcel = file.name.endsWith('.xlsx') || file.name.endsWith('.xls');
+      if (isExcel) {
+        const docResult = await parseImportDocument(file);
+        const rawText = docResult.rawText || docResult.rows.map((r) => r.join('\t')).join('\n');
+        const parsed = parseRawTextToClasses(rawText);
+        setParsedClasses(parsed);
+        if (parsed.length === 0) {
+          showToast('Tidak ada data kelas yang dapat dibaca dari file Excel ini', 'error');
+        } else {
+          showToast(`Berhasil membaca ${parsed.length} baris data kelas dari ${file.name}`);
+        }
       } else {
-        showToast(`Berhasil membaca ${parsed.length} baris data kelas dari ${file.name}`);
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const content = event.target?.result as string;
+          const parsed = parseRawTextToClasses(content);
+          setParsedClasses(parsed);
+          if (parsed.length === 0) {
+            showToast('Tidak ada data kelas yang dapat dibaca dari file ini', 'error');
+          } else {
+            showToast(`Berhasil membaca ${parsed.length} baris data kelas dari ${file.name}`);
+          }
+        };
+        reader.readAsText(file);
       }
-    };
-    reader.readAsText(file);
+    } catch (err: any) {
+      console.error('Error reading file:', err);
+      showToast('Gagal membaca file. Pastikan file dalam format Excel (.xlsx), CSV, atau teks yang valid.', 'error');
+    }
   };
 
   const handlePasteChange = (text: string) => {
@@ -808,21 +806,15 @@ export const DataKelasView: React.FC = () => {
                   </div>
                 )
               ) : (
-                <div className="flex flex-wrap items-center gap-2 mt-2">
-                  <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-800 border border-indigo-200 text-[11px] font-bold">
-                    <ShieldCheck size={13} className="text-indigo-600" />
-                    <span>
-                      Ruang Kerja Sekolah: {classes.length} Rombel Terdaftar (Diinput Mandiri oleh Admin Sekolah, Maks. 50 Siswa/Kelas)
-                    </span>
-                  </div>
-                  {!isAdmin && (isWaliKelas || isGuru) && (
+                !isAdmin && (isWaliKelas || isGuru) ? (
+                  <div className="flex flex-wrap items-center gap-2 mt-2">
                     <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 border border-slate-200 text-[11px] font-bold">
                       {isWaliKelas
                         ? `Binaan: ${accessibleClasses.map((c) => c.name).join(', ') || 'Belum ditugaskan'}`
                         : `Diajar: ${accessibleClasses.map((c) => c.name).join(', ') || 'Belum ditugaskan'}`}
                     </span>
-                  )}
-                </div>
+                  </div>
+                ) : null
               )}
             </div>
           </div>
@@ -1386,21 +1378,24 @@ export const DataKelasView: React.FC = () => {
 
             <div className="space-y-4 py-4 overflow-y-auto flex-1 pr-1">
               {/* Step 1: Download Template */}
-              <div className="p-3.5 bg-emerald-50/50 rounded-2xl border border-emerald-100 flex items-center justify-between gap-3">
-                <div>
-                  <h4 className="font-extrabold text-xs text-emerald-950">Gunakan Template Standar Kelas</h4>
-                  <p className="text-[11px] text-emerald-800 mt-0.5">
-                    Format: <strong>NAMA KELAS, NAMA WALI KELAS</strong> (Tingkat kelas otomatis ditentukan dari nama kelas)
+              <div className="p-3.5 bg-slate-50 border border-slate-200/80 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <div className="space-y-0.5">
+                  <h4 className="font-bold text-xs text-slate-800">Format Template Standar Kelas</h4>
+                  <p className="text-[11px] text-slate-500">
+                    Kolom: <span className="font-semibold text-slate-700">NAMA KELAS, NAMA WALI KELAS</span>
                   </p>
                 </div>
-                <button
-                  type="button"
-                  onClick={handleDownloadTemplate}
-                  className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl shadow-xs transition-all flex items-center gap-1.5 shrink-0 cursor-pointer"
-                >
-                  <Download size={13} />
-                  <span>Unduh Template CSV</span>
-                </button>
+                <div className="shrink-0">
+                  <button
+                    type="button"
+                    onClick={handleDownloadTemplate}
+                    className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold text-xs rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
+                    title="Unduh format template Excel (.xlsx)"
+                  >
+                    <Download size={14} />
+                    <span>Template</span>
+                  </button>
+                </div>
               </div>
 
               {/* Step 2: Tab Selector (Upload File vs Tempel Teks) */}
@@ -1413,21 +1408,21 @@ export const DataKelasView: React.FC = () => {
                     type="button"
                     onClick={() => setImportTab('upload')}
                     className={`flex-1 py-2 rounded-lg flex items-center justify-center gap-2 transition cursor-pointer ${
-                      importTab === 'upload' ? 'bg-white text-blue-600 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                      importTab === 'upload' ? 'bg-white text-emerald-700 shadow-xs' : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
                     <UploadCloud size={14} />
-                    <span>Unggah File (.csv / .txt)</span>
+                    <span>Unggah File (Excel / CSV / TXT)</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => setImportTab('paste')}
                     className={`flex-1 py-2 rounded-lg flex items-center justify-center gap-2 transition cursor-pointer ${
-                      importTab === 'paste' ? 'bg-white text-blue-600 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                      importTab === 'paste' ? 'bg-white text-emerald-700 shadow-xs' : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
                     <FileText size={14} />
-                    <span>Tempel Data (Salin dari Excel)</span>
+                    <span>Tempel Data (Salin dari Spreadsheet)</span>
                   </button>
                 </div>
               </div>
@@ -1435,15 +1430,15 @@ export const DataKelasView: React.FC = () => {
               {/* Upload File Body */}
               {importTab === 'upload' ? (
                 <div>
-                  <label className="border-2 border-dashed border-slate-200 hover:border-blue-500 rounded-2xl p-6 flex flex-col items-center justify-center gap-2 cursor-pointer bg-slate-50 hover:bg-blue-50/20 transition-all">
+                  <label className="border-2 border-dashed border-slate-200 hover:border-emerald-500 rounded-2xl p-6 flex flex-col items-center justify-center gap-2 cursor-pointer bg-slate-50 hover:bg-emerald-50/20 transition-all">
                     <UploadCloud size={28} className="text-slate-400" />
                     <span className="text-xs font-extrabold text-slate-700">
-                      {fileName ? `File terpilih: ${fileName}` : 'Klik untuk memilih file CSV / TXT'}
+                      {fileName ? `File terpilih: ${fileName}` : 'Klik untuk memilih file Excel (.xlsx) / CSV / TXT'}
                     </span>
-                    <span className="text-[11px] text-slate-400">Format: Nama Kelas, Nama Wali Kelas (Pemisah koma, titik koma, atau tab)</span>
+                    <span className="text-[11px] text-slate-400">Format: Nama Kelas, Nama Wali Kelas</span>
                     <input
                       type="file"
-                      accept=".csv, .txt, text/csv, text/plain"
+                      accept=".xlsx, .xls, .csv, .txt, text/csv, text/plain, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                       onChange={handleFileUpload}
                       className="hidden"
                     />

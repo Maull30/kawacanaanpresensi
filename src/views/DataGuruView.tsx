@@ -1132,31 +1132,22 @@ export const DataGuruView: React.FC = () => {
 
             <div className="space-y-4 py-4 overflow-y-auto flex-1 pr-1">
               {/* Step 1: Download Template */}
-              <div className="p-3.5 bg-emerald-50/50 rounded-2xl border border-emerald-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                <div>
-                  <h4 className="font-extrabold text-xs text-emerald-950">Gunakan Template Standar</h4>
-                  <p className="text-[11px] text-emerald-800 mt-0.5">
-                    Kolom: <strong>NAMA GURU, NIP/NUPTK, JENIS KELAMIN (L/P), TUGAS UTAMA</strong>
+              <div className="p-3.5 bg-slate-50 border border-slate-200/80 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <div className="space-y-0.5">
+                  <h4 className="font-bold text-xs text-slate-800">Format Template Standar</h4>
+                  <p className="text-[11px] text-slate-500">
+                    Kolom: <span className="font-semibold text-slate-700">NAMA GURU, NIP/NUPTK, JENIS KELAMIN (L/P), TUGAS UTAMA</span>
                   </p>
                 </div>
-                <div className="flex items-center gap-2 shrink-0">
+                <div className="shrink-0">
                   <button
                     type="button"
                     onClick={() => handleDownloadTemplate('xlsx')}
-                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-extrabold text-xs rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
+                    className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold text-xs rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
                     title="Unduh format template Excel"
                   >
-                    <FileSpreadsheet size={13} />
-                    <span>Template Excel (.xlsx)</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleDownloadTemplate('csv')}
-                    className="px-3 py-1.5 bg-white hover:bg-emerald-50 text-emerald-700 border border-emerald-300 font-extrabold text-xs rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
-                    title="Unduh format template CSV"
-                  >
-                    <Download size={13} />
-                    <span>Template CSV</span>
+                    <Download size={14} />
+                    <span>Template</span>
                   </button>
                 </div>
               </div>

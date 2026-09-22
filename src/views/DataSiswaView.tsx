@@ -621,8 +621,8 @@ export const DataSiswaView: React.FC = () => {
         </div>
 
         {/* Workspace / Quota Plan Badge */}
-        <div className="flex items-center gap-2 flex-wrap">
-          {isPersonalWorkspace ? (
+        {isPersonalWorkspace && (
+          <div className="flex items-center gap-2 flex-wrap">
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-blue-50 border border-blue-200/80 text-blue-800 text-xs font-bold w-fit">
               <span>Ruang Kerja Individu</span>
               <span className="text-blue-300">•</span>
@@ -630,14 +630,8 @@ export const DataSiswaView: React.FC = () => {
               <span className="text-blue-300">•</span>
               <span>Kapasitas: Maks. 50 Siswa/Kelas</span>
             </div>
-          ) : (
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-indigo-50 border border-indigo-200/80 text-indigo-800 text-xs font-bold w-fit">
-              <span>Ruang Kerja Sekolah</span>
-              <span className="text-indigo-300">•</span>
-              <span>Kapasitas: Maks. 50 Siswa/Kelas</span>
-            </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       {/* Main Container Card */}
@@ -797,12 +791,12 @@ export const DataSiswaView: React.FC = () => {
             </span>
           </div>
           <button
-            onClick={handleDownloadTemplate}
-            className="text-blue-600 hover:text-blue-800 font-bold flex items-center gap-1 text-[11px] hover:underline cursor-pointer"
-            title="Unduh format file template CSV untuk diisi"
+            onClick={() => handleDownloadTemplate('xlsx')}
+            className="text-slate-600 hover:text-emerald-700 font-bold flex items-center gap-1.5 text-xs hover:underline cursor-pointer transition-colors"
+            title="Unduh format template Excel"
           >
-            <Download size={13} />
-            <span>Unduh Template CSV</span>
+            <Download size={13} className="text-emerald-600" />
+            <span>Template</span>
           </button>
         </div>
 
@@ -980,40 +974,22 @@ export const DataSiswaView: React.FC = () => {
             {/* Modal Body (Scrollable) */}
             <div className="overflow-y-auto space-y-5 py-4 flex-1 pr-1">
               {/* Step 1: Download Template Callout */}
-              <div className="bg-blue-50/80 border border-blue-200 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+              <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                 <div className="space-y-0.5">
-                  <div className="flex items-center gap-1.5 text-xs font-bold text-blue-900">
-                    <AlertCircle size={15} className="text-blue-600" />
-                    <span>Langkah 1: Unduh Format Template Standar</span>
-                  </div>
-                  <p className="text-[11px] text-blue-800 leading-relaxed">
-                    Format urutan kolom: <code className="bg-white px-1.5 py-0.5 rounded font-mono font-bold text-blue-950">NAMA LENGKAP</code>,{' '}
-                    <code className="bg-white px-1.5 py-0.5 rounded font-mono font-bold text-blue-950">L/P</code>,{' '}
-                    <code className="bg-white px-1.5 py-0.5 rounded font-mono font-bold text-blue-950">NISN</code>,{' '}
-                    <code className="bg-white px-1.5 py-0.5 rounded font-mono font-bold text-blue-950">KELAS</code>.
-                  </p>
-                  <p className="text-[10px] text-blue-700 mt-0.5">
-                    Kolom KELAS otomatis terintegrasi dengan Data Kelas (otomatis menghitung siswa L/P &amp; total per kelas).
+                  <h4 className="font-bold text-xs text-slate-800">Format Template Standar Siswa</h4>
+                  <p className="text-[11px] text-slate-500">
+                    Kolom: <span className="font-semibold text-slate-700">NAMA LENGKAP, L/P, NISN, KELAS</span>
                   </p>
                 </div>
-                <div className="flex items-center gap-2 shrink-0">
+                <div className="shrink-0">
                   <button
                     type="button"
                     onClick={() => handleDownloadTemplate('xlsx')}
-                    className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-extrabold text-xs rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
+                    className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold text-xs rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
                     title="Unduh format template Excel"
                   >
-                    <FileSpreadsheet size={14} />
-                    <span>Template Excel (.xlsx)</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleDownloadTemplate('csv')}
-                    className="px-3 py-2 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-extrabold text-xs rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
-                    title="Unduh format template CSV"
-                  >
                     <Download size={14} />
-                    <span>Template CSV</span>
+                    <span>Template</span>
                   </button>
                 </div>
               </div>

@@ -1508,19 +1508,61 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     setTeachers(baseTeachers);
 
     const classList = rawClasses.map((c: any) => {
-      const assignedTeacherId = c.wali_kelas_teacher_id || null;
+      let className = (c.name || '').trim();
+      let assignedTeacherId = c.wali_kelas_teacher_id || null;
+      let waliName = c.wali?.nama || c.wali_kelas_name || null;
+
+      // Smart Inversion Self-Healing: Cek jika data nama rombel dan wali kelas sempat tertukar di database
+      const matchedTeacherByName = baseTeachers.find(
+        (t) => t.nama.trim().toLowerCase() === className.toLowerCase()
+      );
+      const isNameTeacher =
+        !!matchedTeacherByName ||
+        /\b(s\.pd|m\.pd|s\.ag|s\.kom|s\.si|m\.si|s\.sos|drs|dra|dr\.|prof)\b/i.test(className);
+
+      const isWaliClass =
+        /^(kelas|rombel|\d+[a-z]?|[ivx]+[a-z]?)/i.test(waliName || '') ||
+        /^\d+$/i.test(waliName || '');
+
+      if (isNameTeacher && isWaliClass) {
+        const temp = className;
+        className = waliName!;
+        waliName = temp;
+        if (matchedTeacherByName && !assignedTeacherId) {
+          assignedTeacherId = matchedTeacherByName.id;
+        }
+
+        // Silent background self-healing update to Supabase tanpa perlu user menjalankan SQL manual
+        supabase
+          .from('classes')
+          .update({
+            name: className,
+            wali_kelas_teacher_id: assignedTeacherId,
+          })
+          .eq('id', c.id)
+          .then(undefined, () => {});
+      } else if (isNameTeacher && !waliName && matchedTeacherByName) {
+        if (!assignedTeacherId) {
+          assignedTeacherId = matchedTeacherByName.id;
+        }
+        waliName = matchedTeacherByName.nama;
+      }
+
       const matchedTeacher = baseTeachers.find(
         (t) => t.id === assignedTeacherId,
       );
-      const waliName = matchedTeacher?.nama || c.wali?.nama || c.wali_kelas_name || null;
+      const finalWaliName = matchedTeacher?.nama || waliName || null;
+
+      const matchNum = className.match(/\d+/);
+      const autoGrade = matchNum ? parseInt(matchNum[0], 10) : c.grade || 1;
 
       return {
         id: c.id,
-        name: c.name,
-        grade: c.grade,
+        name: className,
+        grade: autoGrade,
         academicYear: c.academic_year,
         waliKelasTeacherId: assignedTeacherId,
-        waliKelasName: waliName,
+        waliKelasName: finalWaliName,
       };
     });
 

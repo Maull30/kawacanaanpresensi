@@ -1357,18 +1357,30 @@ export default async function handler(req: any, res: any) {
       const toInsert: any[] = [];
 
       for (const item of items) {
-        const rawName = String(item.name || '').trim();
+        let rawName = String(item.name || '').trim();
+        let cleanWali = String(item.waliKelasNameInput || '').trim();
+
+        // Deteksi jika terbalik (nama kelas terisi nama orang, dan wali terisi nama kelas)
+        const isNameTeacher = teachersList.some((t: any) => String(t.nama || '').trim().toLowerCase() === rawName.toLowerCase()) ||
+          /\b(s\.pd|m\.pd|s\.ag|s\.kom|s\.si|m\.si|s\.sos|drs|dra)\b/i.test(rawName);
+        const isWaliClass = /^(kelas|rombel|\d+[a-z]?|[ivx]+[a-z]?)/i.test(cleanWali);
+
+        if (isNameTeacher && isWaliClass) {
+          const temp = rawName;
+          rawName = cleanWali;
+          cleanWali = temp;
+        }
+
         if (!rawName) continue;
         const matchNum = rawName.match(/\d+/);
         const grade = item.grade || (matchNum ? parseInt(matchNum[0], 10) : 1);
         let waliId = item.wali_kelas_teacher_id || item.waliKelasTeacherId || null;
-        if (!waliId && item.waliKelasNameInput) {
-          const cleanWali = String(item.waliKelasNameInput).trim();
+        if (!waliId && cleanWali) {
           const cleanWaliLower = cleanWali.toLowerCase();
           const match = teachersList.find((t: any) => String(t.nama || '').trim().toLowerCase() === cleanWaliLower);
           if (match) {
             waliId = match.id;
-          } else if (cleanWali) {
+          } else if (cleanWali && !isWaliClass) {
             const { data: newTeacher } = await admin
               .from('teachers')
               .insert({

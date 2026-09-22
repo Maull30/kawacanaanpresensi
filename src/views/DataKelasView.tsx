@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { useApp } from '../context/AppContext';
-import { SchoolClass, Student } from '../types';
+import { SchoolClass, Student, Teacher } from '../types';
 import {
   Plus,
   Edit2,
@@ -52,6 +52,79 @@ const isStudentInClass = (s: Student, targetClass: { id: string; name: string })
   if (s.className && normalizeClassToken(s.className) === normalizeClassToken(targetClass.name)) return true;
   return false;
 };
+
+// Helper resolver cerdas: mendeteksi dan menyelesaikan data rombel kelas & wali kelas jika sempat tertukar
+export function resolveClassData(
+  c: SchoolClass,
+  teachersList: Teacher[],
+  currentUser?: any,
+  isPersonalWorkspace?: boolean,
+) {
+  let className = (c.name || '').trim();
+  let waliName = (c.waliKelasName || '').trim();
+  let waliTeacherId = c.waliKelasTeacherId || null;
+
+  // 1. Cek apakah className sebenarnya nama guru
+  const matchedTeacherByName = teachersList.find(
+    (t) => t.nama.trim().toLowerCase() === className.toLowerCase(),
+  );
+  const isNameTeacher =
+    !!matchedTeacherByName ||
+    /\b(s\.pd|m\.pd|s\.ag|s\.kom|s\.si|m\.si|s\.sos|drs|dra|dr\.|prof)\b/i.test(className);
+
+  // 2. Cek apakah waliName sebenarnya nama rombel/kelas
+  const isWaliClass =
+    /^(kelas|rombel|\d+[a-z]?|[ivx]+[a-z]?)/i.test(waliName) ||
+    /^\d+$/i.test(waliName);
+
+  // 3. Jika terdeteksi tertukar (misal nama kelas terisi nama guru, dan wali terisi nama kelas)
+  if (isNameTeacher && isWaliClass) {
+    const temp = className;
+    className = waliName;
+    waliName = temp;
+    if (matchedTeacherByName && !waliTeacherId) {
+      waliTeacherId = matchedTeacherByName.id;
+    }
+  } else if (isNameTeacher && !waliName && matchedTeacherByName) {
+    if (!waliTeacherId) {
+      waliTeacherId = matchedTeacherByName.id;
+    }
+    waliName = matchedTeacherByName.nama;
+  }
+
+  // 4. Cari guru definitif dari ID atau Nama
+  const definitiveTeacher = teachersList.find(
+    (t) =>
+      (waliTeacherId && t.id === waliTeacherId) ||
+      (waliName && t.nama.trim().toLowerCase() === waliName.toLowerCase()) ||
+      (c.waliKelasName && t.nama.trim().toLowerCase() === c.waliKelasName.trim().toLowerCase()),
+  );
+
+  const effectiveWali = definitiveTeacher
+    ? definitiveTeacher.nama
+    : isPersonalWorkspace
+    ? currentUser?.name || 'Pendidik Mandiri'
+    : (waliName && !/^(kelas|rombel)/i.test(waliName))
+    ? waliName
+    : 'Belum Ditugaskan';
+
+  const matchNum = className.match(/\d+/);
+  const effectiveGrade = c.grade || (matchNum ? parseInt(matchNum[0], 10) : 1);
+
+  return {
+    resolvedClass: {
+      ...c,
+      name: className,
+      grade: effectiveGrade,
+      waliKelasTeacherId: definitiveTeacher?.id || waliTeacherId,
+      waliKelasName: effectiveWali !== 'Belum Ditugaskan' ? effectiveWali : null,
+    },
+    effectiveClassName: className,
+    effectiveWaliName: effectiveWali,
+    effectiveGrade,
+    isSwapped: isNameTeacher && isWaliClass,
+  };
+}
 
 interface ParsedClassItem {
   name: string;
@@ -441,14 +514,15 @@ export const DataKelasView: React.FC = () => {
   };
 
   const openEdit = (c: SchoolClass) => {
-    setEditing(c);
-    setName(c.name);
-    setGrade(c.grade);
-    setWaliKelasTeacherId(c.waliKelasTeacherId || '');
+    const { resolvedClass } = resolveClassData(c, teachers, currentUser, isPersonalWorkspace);
+    setEditing(resolvedClass);
+    setName(resolvedClass.name);
+    setGrade(resolvedClass.grade);
+    setWaliKelasTeacherId(resolvedClass.waliKelasTeacherId || '');
     
     // Guru Mapel yang saat ini ditugaskan mengajar kelas ini
     const assignedTeachers = subjects
-      .filter((s) => s.targetClassIds && s.targetClassIds.includes(c.id) && s.teacherId)
+      .filter((s) => s.targetClassIds && s.targetClassIds.includes(resolvedClass.id) && s.teacherId)
       .map((s) => s.teacherId as string);
     setEditingClassMapelIds(assignedTeachers);
     setOpen(true);
@@ -520,8 +594,9 @@ export const DataKelasView: React.FC = () => {
   };
 
   const openQuickWaliModal = (c: SchoolClass) => {
-    setAssignWaliModal(c);
-    setQuickWaliId(c.waliKelasTeacherId || '');
+    const { resolvedClass } = resolveClassData(c, teachers, currentUser, isPersonalWorkspace);
+    setAssignWaliModal(resolvedClass);
+    setQuickWaliId(resolvedClass.waliKelasTeacherId || '');
   };
 
   const saveQuickWali = async (e: React.FormEvent) => {
@@ -998,7 +1073,7 @@ export const DataKelasView: React.FC = () => {
                   <tr>
                     <th className="py-3.5 px-4 text-center w-12">No</th>
                     <th className="py-3.5 px-4">Nama Wali Kelas</th>
-                    <th className="py-3.5 px-4 font-black">Kelas & Fase</th>
+                    <th className="py-3.5 px-4 font-black">Nama Rombel / Kelas</th>
                     <th className="py-3.5 px-4 text-center text-blue-700">Jml L</th>
                     <th className="py-3.5 px-4 text-center text-pink-700">Jml P</th>
                     <th className="py-3.5 px-4 text-center text-slate-800">Total Siswa</th>
@@ -1008,25 +1083,24 @@ export const DataKelasView: React.FC = () => {
                 <tbody className="divide-y divide-slate-100">
                   {currentClasses.length > 0 ? (
                     currentClasses.map((c, idx) => {
+                      const {
+                        resolvedClass,
+                        effectiveClassName,
+                        effectiveWaliName,
+                        effectiveGrade,
+                      } = resolveClassData(c, teachers, currentUser, isPersonalWorkspace);
+
                       const classStudentList = students.filter(
                         (s) =>
-                          isStudentInClass(s, c) ||
+                          isStudentInClass(s, { id: c.id, name: effectiveClassName }) ||
                           (isPersonalWorkspace &&
                             (!s.classId || s.classId === 'onboarding-class-default' || accessibleClasses.length === 1))
                       );
                       const countL = classStudentList.filter((s) => isGenderL(s.gender)).length;
                       const countP = classStudentList.filter((s) => isGenderP(s.gender)).length;
                       const totalCount = classStudentList.length;
-                      const matchedTeacher = teachers.find(
-                        (t) => t.id === c.waliKelasTeacherId || (c.waliKelasName && t.nama.trim().toLowerCase() === c.waliKelasName.trim().toLowerCase())
-                      );
-                      const effectiveWaliName = matchedTeacher
-                        ? matchedTeacher.nama
-                        : isPersonalWorkspace
-                        ? currentUser?.name || 'Pendidik Mandiri'
-                        : c.waliKelasName || 'Belum Ditugaskan';
 
-                      const fase = getFaseByClassName(c.name, c.grade);
+                      const fase = getFaseByClassName(effectiveClassName, effectiveGrade);
                       const faseBadgeClass = getFaseBadgeColor(fase);
 
                       return (
@@ -1048,7 +1122,7 @@ export const DataKelasView: React.FC = () => {
                               {isAdmin && (
                                 <button
                                   type="button"
-                                  onClick={() => openQuickWaliModal(c)}
+                                  onClick={() => openQuickWaliModal(resolvedClass)}
                                   className="p-1 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
                                   title="Ganti / Tetapkan Wali Kelas"
                                 >
@@ -1060,10 +1134,10 @@ export const DataKelasView: React.FC = () => {
                           <td className="py-3.5 px-4">
                             <div className="flex items-center gap-2">
                               <span className="font-extrabold text-blue-700 text-sm">
-                                {formatClassDisplay(c.name, c.grade)}
+                                {formatClassDisplay(effectiveClassName)}
                               </span>
                               <span
-                                className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold border ${faseBadgeClass}`}
+                                className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold border ${faseBadgeClass.bg}`}
                               >
                                 {fase}
                               </span>
@@ -1101,16 +1175,16 @@ export const DataKelasView: React.FC = () => {
                               <button
                                 type="button"
                                 id={`btn-qr-class-${c.id}`}
-                                onClick={() => setQrModalClass(c)}
+                                onClick={() => setQrModalClass(resolvedClass)}
                                 className="p-1.5 text-indigo-700 bg-indigo-50/80 hover:bg-indigo-100 rounded-lg transition-colors cursor-pointer border border-indigo-200/60 shadow-2xs"
-                                title={`QR Code Presensi ${c.name} (Cetak / Tampilkan)`}
+                                title={`QR Code Presensi ${effectiveClassName} (Cetak / Tampilkan)`}
                               >
                                 <QrCode size={15} />
                               </button>
                               {canEditClass && (
                                 <button
                                   type="button"
-                                  onClick={() => openEdit(c)}
+                                  onClick={() => openEdit(resolvedClass)}
                                   className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
                                   title="Edit Rombel"
                                 >
@@ -1120,7 +1194,7 @@ export const DataKelasView: React.FC = () => {
                               {!canEditClass && !canDeleteClass && (
                                 <button
                                   type="button"
-                                  onClick={() => setViewingClass(c)}
+                                  onClick={() => setViewingClass(resolvedClass)}
                                   className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors cursor-pointer"
                                   title="Lihat Daftar Siswa"
                                 >
@@ -1131,7 +1205,7 @@ export const DataKelasView: React.FC = () => {
                               {isAdmin && totalCount > 0 && (
                                 <button
                                   type="button"
-                                  onClick={() => setPurgeClassModal(c)}
+                                  onClick={() => setPurgeClassModal(resolvedClass)}
                                   className="p-1.5 text-amber-600 hover:bg-amber-50 rounded-lg transition-colors cursor-pointer"
                                   title="Hapus Semua Siswa di Kelas Ini"
                                 >
@@ -1141,7 +1215,7 @@ export const DataKelasView: React.FC = () => {
                               {canDeleteClass && (
                                 <button
                                   type="button"
-                                  onClick={() => setDeleting(c)}
+                                  onClick={() => setDeleting(resolvedClass)}
                                   className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
                                   title="Hapus Kelas"
                                 >

@@ -21,7 +21,9 @@ import {
   Layers,
   PlusCircle,
   Building2,
-  UserCheck
+  UserCheck,
+  Search,
+  ChevronDown
 } from 'lucide-react';
 import { getTenantLifecycleInfo } from '../utils/tenantLifecycle';
 
@@ -50,6 +52,31 @@ export const Header: React.FC = () => {
 
   const dropdownRef = useRef<HTMLDivElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showSearchDropdown, setShowSearchDropdown] = useState(false);
+  const searchRef = useRef<HTMLDivElement>(null);
+
+  // Close search dropdown on click outside
+  useEffect(() => {
+    const handleSearchClickOutside = (event: MouseEvent) => {
+      if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
+        setShowSearchDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleSearchClickOutside);
+    return () => document.removeEventListener('mousedown', handleSearchClickOutside);
+  }, []);
+
+  const roleLabel = useMemo(() => {
+    if (!currentUser) return '';
+    if (currentUser.role === 'SUPER_ADMIN') return 'Super Admin';
+    if (currentUser.role === 'ADMIN') return 'Admin';
+    if (currentUser.role === 'KEPALA SEKOLAH') return 'Kepala Sekolah';
+    if (currentUser.role === 'WALI KELAS') return 'Wali Kelas';
+    if (currentUser.role === 'GURU MAPEL') return 'Guru Mapel';
+    if (currentUser.role === 'SISWA') return 'Siswa';
+    return currentUser.role;
+  }, [currentUser]);
 
   const isPersonalWorkspace =
     activeWorkspace?.workspaceType === 'personal' ||
@@ -337,6 +364,51 @@ export const Header: React.FC = () => {
             </div>
           </div>
 
+          {/* Center: Search Bar (as shown in reference mockup) */}
+          <div className="relative flex-1 max-w-xs md:max-w-sm lg:max-w-md mx-2 sm:mx-4 hidden sm:block" ref={searchRef}>
+            <div className="relative flex items-center">
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setShowSearchDropdown(true);
+                }}
+                onFocus={() => setShowSearchDropdown(true)}
+                placeholder="Cari siswa, kelas, atau laporan..."
+                className="w-full pl-3.5 pr-8 py-1.5 sm:py-2 bg-slate-50 hover:bg-slate-100/70 focus:bg-white text-xs text-slate-800 placeholder:text-slate-400 rounded-full border border-slate-200/90 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all"
+              />
+              <Search size={14} className="absolute right-3 text-slate-400 pointer-events-none" />
+            </div>
+            {/* Search results popup if query is present */}
+            {showSearchDropdown && searchQuery.trim().length > 0 && (
+              <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl p-3 shadow-xl border border-slate-200 z-50 text-left text-xs space-y-1">
+                <div className="text-[10px] font-bold text-slate-400 uppercase px-2 py-1">Pintasan Cepat</div>
+                <button
+                  onClick={() => { setActiveView('data-referensi'); setShowSearchDropdown(false); setSearchQuery(''); }}
+                  className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-blue-50 text-slate-700 hover:text-blue-700 flex items-center justify-between cursor-pointer"
+                >
+                  <span>Data Siswa & Kelas</span>
+                  <span className="text-[10px] text-slate-400">Referensi</span>
+                </button>
+                <button
+                  onClick={() => { setActiveView('absensi'); setShowSearchDropdown(false); setSearchQuery(''); }}
+                  className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-blue-50 text-slate-700 hover:text-blue-700 flex items-center justify-between cursor-pointer"
+                >
+                  <span>Presensi & Absensi</span>
+                  <span className="text-[10px] text-slate-400">Input</span>
+                </button>
+                <button
+                  onClick={() => { setActiveView('laporan'); setShowSearchDropdown(false); setSearchQuery(''); }}
+                  className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-blue-50 text-slate-700 hover:text-blue-700 flex items-center justify-between cursor-pointer"
+                >
+                  <span>Cetak Laporan</span>
+                  <span className="text-[10px] text-slate-400">Dokumen</span>
+                </button>
+              </div>
+            )}
+          </div>
+
           {/* Right: Date, Notifications, and Profile Avatar */}
           <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
             {currentUser ? (
@@ -346,23 +418,21 @@ export const Header: React.FC = () => {
                 {currentUser.role !== 'SUPER_ADMIN' && currentUser.role !== 'SISWA' && (
                   <div
                     title={`Ruang Kerja: ${isCurrentlyPersonal ? 'Ruang Kerja Individu' : 'Ruang Kerja Sekolah'}${schoolProfile.namaSekolah ? ` (${schoolProfile.namaSekolah})` : ''}`}
-                    className="inline-flex items-center gap-1.5 px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-full border text-xs font-bold select-none bg-slate-50 border-slate-200/90 text-slate-700 shadow-2xs"
+                    className="hidden xl:inline-flex items-center gap-1.5 px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-full border text-xs font-bold select-none bg-slate-50 border-slate-200/90 text-slate-700 shadow-2xs"
                     id="header-workspace-indicator"
                   >
                     <Building2 size={13} className={isCurrentlyPersonal ? "text-emerald-600 shrink-0" : "text-indigo-600 shrink-0"} />
-                    <span className="hidden sm:inline">
+                    <span>
                       {isCurrentlyPersonal ? 'Ruang Kerja Individu' : 'Ruang Kerja Sekolah'}
-                    </span>
-                    <span className="sm:hidden text-[11px] font-extrabold">
-                      {isCurrentlyPersonal ? 'Individu' : 'Sekolah'}
                     </span>
                   </div>
                 )}
                 
                 {/* Date Pill (Desktop & Tablet) */}
                 <div className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-slate-200/90 bg-slate-50/90 text-slate-700 text-xs font-semibold select-none shadow-2xs">
-                  <Calendar size={13} className="text-slate-400" />
+                  <Calendar size={13} className="text-slate-500" />
                   <span>{getFormattedDate()}</span>
+                  <ChevronDown size={11} className="text-slate-400 ml-0.5" />
                 </div>
 
                 {/* Notification Bell */}
@@ -481,11 +551,21 @@ export const Header: React.FC = () => {
                       setShowProfileDropdown(!showProfileDropdown);
                       setShowNotificationDropdown(false);
                     }}
-                    className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-[#0095FF] hover:bg-[#0080FF] text-white flex items-center justify-center font-black text-sm tracking-wider shadow-sm transition-all cursor-pointer active:scale-95 select-none ring-2 ring-transparent hover:ring-sky-200"
+                    className="flex items-center gap-2 p-0.5 sm:pr-2.5 rounded-full hover:bg-slate-100/80 transition-all cursor-pointer active:scale-95 select-none"
                     title={`Profil: ${currentUser.name || currentUser.username}`}
                     id="btn-header-profile-avatar"
                   >
-                    {userInitials}
+                    <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-[#0095FF] hover:bg-[#0080FF] text-white flex items-center justify-center font-black text-xs sm:text-sm tracking-wider shadow-xs">
+                      {userInitials}
+                    </div>
+                    <div className="hidden sm:flex flex-col text-left">
+                      <span className="text-xs font-extrabold text-slate-800 leading-tight truncate max-w-[90px]">
+                        {userInitials}
+                      </span>
+                      <span className="text-[10px] text-slate-500 font-semibold leading-none flex items-center gap-0.5">
+                        {roleLabel} <ChevronDown size={10} className="text-slate-400 shrink-0" />
+                      </span>
+                    </div>
                   </button>
 
                   {/* Profile Dropdown Popup - Matching user's uploaded mockup */}

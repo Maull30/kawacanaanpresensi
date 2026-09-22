@@ -75,7 +75,7 @@ export const SchoolsSection: React.FC<{
   // Toolbar state: Pencarian langsung & Filter utama
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive' | 'attention'>('all');
-  const [planFilter, setPlanFilter] = useState<'all' | 'free' | 'basic' | 'pro' | 'enterprise'>('all');
+  const [planFilter, setPlanFilter] = useState<'all' | 'free' | 'basic' | 'pro'>('all');
   const [expiryFilter, setExpiryFilter] = useState<'all' | 'safe' | 'expiring' | 'expired'>('all');
 
   // Pagination state
@@ -250,15 +250,28 @@ export const SchoolsSection: React.FC<{
       else if (statusFilter === 'attention') matchStatus = isAttention;
 
       const planLower = (s.plan || 'free').toLowerCase();
+      const isGratis =
+        planLower.includes('gratis') ||
+        planLower.includes('free') ||
+        planLower.includes('mulai') ||
+        planLower === 'trial' ||
+        planLower === 'guru_gratis';
+
+      const isGuruPro =
+        !isGratis &&
+        (planLower.includes('guru') || planLower.includes('teacher') || planLower.includes('basic'));
+
+      const isSekolahPro =
+        !isGratis &&
+        (planLower.includes('school') || planLower.includes('sekolah') || planLower.includes('pro'));
+
       let matchPlan = true;
       if (planFilter === 'free') {
-        matchPlan = planLower.includes('free') || planLower.includes('mulai') || planLower.includes('gratis');
+        matchPlan = isGratis;
       } else if (planFilter === 'basic') {
-        matchPlan = planLower.includes('basic') || planLower.includes('guru') || planLower.includes('teacher');
+        matchPlan = isGuruPro;
       } else if (planFilter === 'pro') {
-        matchPlan = planLower.includes('pro') || planLower.includes('school') || planLower.includes('sekolah');
-      } else if (planFilter === 'enterprise') {
-        matchPlan = planLower.includes('ent');
+        matchPlan = isSekolahPro;
       }
 
       const isPersonal = s.workspace_type === 'personal' || s.is_personal;
@@ -287,7 +300,7 @@ export const SchoolsSection: React.FC<{
     let inactive = 0;
     let attention = 0;
     let expiringSoon = 0;
-    const pkgDist = { gratis: 0, basic: 0, pro: 0, enterprise: 0 };
+    const pkgDist = { gratis: 0, basic: 0, pro: 0 };
 
     schools.forEach((s) => {
       const lc = getTenantLifecycleInfo(s);
@@ -302,10 +315,20 @@ export const SchoolsSection: React.FC<{
       }
 
       const p = (s.plan || 'gratis').toLowerCase();
-      if (p.includes('ent')) pkgDist.enterprise++;
-      else if (p.includes('pro') || p.includes('school') || p.includes('sekolah')) pkgDist.pro++;
-      else if (p.includes('bas') || p.includes('guru') || p.includes('teacher')) pkgDist.basic++;
-      else pkgDist.gratis++;
+      const isGratis =
+        p.includes('gratis') ||
+        p.includes('free') ||
+        p.includes('mulai') ||
+        p === 'trial' ||
+        p === 'guru_gratis';
+
+      if (isGratis) {
+        pkgDist.gratis++;
+      } else if (p.includes('school') || p.includes('sekolah') || p.includes('pro')) {
+        pkgDist.pro++;
+      } else {
+        pkgDist.basic++;
+      }
     });
 
     if (schools.length === 0) {
@@ -315,7 +338,7 @@ export const SchoolsSection: React.FC<{
         attention: 5,
         expiringSoon: 3,
         inactive: 4,
-        pkgDist: { gratis: 18, basic: 17, pro: 11, enterprise: 3 },
+        pkgDist: { gratis: 21, basic: 17, pro: 11 },
       };
     }
 
@@ -325,9 +348,9 @@ export const SchoolsSection: React.FC<{
       attention: attention || Math.max(0, Math.round(total * 0.1)),
       expiringSoon: expiringSoon || Math.max(0, Math.round(total * 0.06)),
       inactive: inactive || Math.max(0, total - active - attention),
-      pkgDist: (pkgDist.gratis || pkgDist.basic || pkgDist.pro || pkgDist.enterprise)
+      pkgDist: (pkgDist.gratis || pkgDist.basic || pkgDist.pro)
         ? pkgDist
-        : { gratis: Math.round(total * 0.37), basic: Math.round(total * 0.35), pro: Math.round(total * 0.22), enterprise: Math.max(1, Math.round(total * 0.06)) },
+        : { gratis: Math.round(total * 0.45), basic: Math.round(total * 0.33), pro: Math.round(total * 0.22) },
     };
   }, [schools]);
 
@@ -784,7 +807,16 @@ export const SchoolsSection: React.FC<{
                   {!isSuspended ? 'Aktif' : 'Nonaktif / Dibekukan'}
                 </span>
                 <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 uppercase">
-                  {sch.plan === 'teacher' ? 'Paket Guru' : sch.plan === 'school' || sch.plan === 'sekolah' ? 'Paket Sekolah' : 'Paket Gratis'}
+                  {(() => {
+                    const pl = (sch.plan || 'gratis').toLowerCase();
+                    if (pl.includes('gratis') || pl.includes('free') || pl.includes('mulai') || pl === 'guru_gratis' || pl === 'trial') {
+                      return 'Paket Gratis';
+                    }
+                    if (pl.includes('school') || pl.includes('sekolah') || pl === 'sekolah_pro') {
+                      return 'Paket Sekolah';
+                    }
+                    return 'Paket Guru';
+                  })()}
                 </span>
               </div>
               <div className="text-xs text-slate-500 mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -1575,7 +1607,7 @@ export const SchoolsSection: React.FC<{
             )}
           </div>
 
-          {/* Filter Dropdown Status */}
+          {/* Filter Dropdown Status & Paket */}
           <div className="flex items-center gap-2">
             <select
               value={statusFilter}
@@ -1589,6 +1621,20 @@ export const SchoolsSection: React.FC<{
               <option value="active">Aktif</option>
               <option value="inactive">Nonaktif</option>
               <option value="attention">Perlu Perhatian</option>
+            </select>
+
+            <select
+              value={planFilter}
+              onChange={(e) => {
+                setPlanFilter(e.target.value as any);
+                setCurrentPage(1);
+              }}
+              className="px-3 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 bg-white hover:border-slate-300 focus:outline-blue-600 cursor-pointer"
+            >
+              <option value="all">Semua Paket</option>
+              <option value="free">Paket Gratis</option>
+              <option value="basic">Paket Guru</option>
+              <option value="pro">Paket Sekolah</option>
             </select>
           </div>
         </div>
@@ -1650,15 +1696,22 @@ export const SchoolsSection: React.FC<{
 
                       // Normalisasi Paket Badge
                       const planStr = (s.plan || 'gratis').toLowerCase();
+                      const isGratis =
+                        planStr.includes('gratis') ||
+                        planStr.includes('free') ||
+                        planStr.includes('mulai') ||
+                        planStr === 'trial' ||
+                        planStr === 'guru_gratis';
+
                       let planBadge = { label: 'PAKET GRATIS', cls: 'bg-sky-50 text-sky-700 border-sky-200' };
-                      if (planStr.includes('ent')) {
-                        planBadge = { label: 'ENTERPRISE', cls: 'bg-indigo-50 text-indigo-700 border-indigo-200' };
-                      } else if (planStr.includes('school') || planStr.includes('sekolah')) {
+                      if (isGratis) {
+                        planBadge = { label: 'PAKET GRATIS', cls: 'bg-sky-50 text-sky-700 border-sky-200' };
+                      } else if (planStr.includes('school') || planStr.includes('sekolah') || planStr === 'sekolah_pro') {
                         planBadge = { label: 'PAKET SEKOLAH', cls: 'bg-purple-50 text-purple-700 border-purple-200' };
-                      } else if (planStr.includes('guru') || planStr.includes('teacher')) {
+                      } else if (planStr.includes('guru') || planStr.includes('teacher') || planStr.includes('pro') || planStr === 'guru_pro') {
                         planBadge = { label: 'PAKET GURU', cls: 'bg-blue-50 text-blue-700 border-blue-200' };
-                      } else if (planStr.includes('pro')) {
-                        planBadge = { label: 'PAKET SEKOLAH', cls: 'bg-purple-50 text-purple-700 border-purple-200' };
+                      } else {
+                        planBadge = { label: 'PAKET GRATIS', cls: 'bg-sky-50 text-sky-700 border-sky-200' };
                       }
 
                       // Format Tanggal Masa Berlaku
@@ -2008,7 +2061,14 @@ export const SchoolsSection: React.FC<{
                 )}
                 <div className="flex justify-between">
                   <span className="text-slate-500 font-medium">Paket:</span>
-                  <span className="font-semibold text-slate-700 uppercase">{schoolToDelete.plan || 'Mulai'}</span>
+                  <span className="font-semibold text-slate-700 uppercase">
+                    {(() => {
+                      const p = (schoolToDelete.plan || 'gratis').toLowerCase();
+                      if (p.includes('gratis') || p.includes('free') || p.includes('mulai') || p === 'guru_gratis' || p === 'trial') return 'Paket Gratis';
+                      if (p.includes('school') || p.includes('sekolah') || p === 'sekolah_pro') return 'Paket Sekolah';
+                      return 'Paket Guru';
+                    })()}
+                  </span>
                 </div>
               </div>
 

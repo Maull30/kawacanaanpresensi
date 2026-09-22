@@ -565,18 +565,16 @@ export const PackageDistributionBarChart: React.FC<{
     gratis: number;
     basic: number;
     pro: number;
-    enterprise: number;
   };
 }> = ({
-  distribution = { gratis: 18, basic: 17, pro: 11, enterprise: 3 },
+  distribution = { gratis: 21, basic: 17, pro: 11 },
 }) => {
-  const total = distribution.gratis + distribution.basic + distribution.pro + distribution.enterprise || 1;
+  const total = distribution.gratis + distribution.basic + distribution.pro || 1;
 
   const packages = [
     { label: 'Gratis', count: distribution.gratis, color: 'bg-sky-400', barColor: '#38BDF8' },
-    { label: 'Basic', count: distribution.basic, color: 'bg-blue-500', barColor: '#3B82F6' },
-    { label: 'Pro', count: distribution.pro, color: 'bg-purple-500', barColor: '#A855F7' },
-    { label: 'Enterprise', count: distribution.enterprise, color: 'bg-indigo-700', barColor: '#4338CA' },
+    { label: 'Paket Guru', count: distribution.basic, color: 'bg-blue-500', barColor: '#3B82F6' },
+    { label: 'Paket Sekolah', count: distribution.pro, color: 'bg-purple-500', barColor: '#A855F7' },
   ];
 
   return (

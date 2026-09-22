@@ -22,7 +22,6 @@ import {
   PlusCircle,
   Building2,
   UserCheck,
-  Search,
   ChevronDown
 } from 'lucide-react';
 import { getTenantLifecycleInfo } from '../utils/tenantLifecycle';
@@ -52,20 +51,6 @@ export const Header: React.FC = () => {
 
   const dropdownRef = useRef<HTMLDivElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [showSearchDropdown, setShowSearchDropdown] = useState(false);
-  const searchRef = useRef<HTMLDivElement>(null);
-
-  // Close search dropdown on click outside
-  useEffect(() => {
-    const handleSearchClickOutside = (event: MouseEvent) => {
-      if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
-        setShowSearchDropdown(false);
-      }
-    };
-    document.addEventListener('mousedown', handleSearchClickOutside);
-    return () => document.removeEventListener('mousedown', handleSearchClickOutside);
-  }, []);
 
   const roleLabel = useMemo(() => {
     if (!currentUser) return '';
@@ -362,51 +347,6 @@ export const Header: React.FC = () => {
                 {currentUser?.role === 'SUPER_ADMIN' ? 'KONTROL MULTI-TENANT SEKOLAH' : (systemConfig.appTitle ? systemConfig.appTitle.toUpperCase() : 'ABSENSI SISWA')}
               </p>
             </div>
-          </div>
-
-          {/* Center: Search Bar (as shown in reference mockup) */}
-          <div className="relative flex-1 max-w-xs md:max-w-sm lg:max-w-md mx-2 sm:mx-4 hidden sm:block" ref={searchRef}>
-            <div className="relative flex items-center">
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => {
-                  setSearchQuery(e.target.value);
-                  setShowSearchDropdown(true);
-                }}
-                onFocus={() => setShowSearchDropdown(true)}
-                placeholder="Cari siswa, kelas, atau laporan..."
-                className="w-full pl-3.5 pr-8 py-1.5 sm:py-2 bg-slate-50 hover:bg-slate-100/70 focus:bg-white text-xs text-slate-800 placeholder:text-slate-400 rounded-full border border-slate-200/90 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all"
-              />
-              <Search size={14} className="absolute right-3 text-slate-400 pointer-events-none" />
-            </div>
-            {/* Search results popup if query is present */}
-            {showSearchDropdown && searchQuery.trim().length > 0 && (
-              <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl p-3 shadow-xl border border-slate-200 z-50 text-left text-xs space-y-1">
-                <div className="text-[10px] font-bold text-slate-400 uppercase px-2 py-1">Pintasan Cepat</div>
-                <button
-                  onClick={() => { setActiveView('data-referensi'); setShowSearchDropdown(false); setSearchQuery(''); }}
-                  className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-blue-50 text-slate-700 hover:text-blue-700 flex items-center justify-between cursor-pointer"
-                >
-                  <span>Data Siswa & Kelas</span>
-                  <span className="text-[10px] text-slate-400">Referensi</span>
-                </button>
-                <button
-                  onClick={() => { setActiveView('absensi'); setShowSearchDropdown(false); setSearchQuery(''); }}
-                  className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-blue-50 text-slate-700 hover:text-blue-700 flex items-center justify-between cursor-pointer"
-                >
-                  <span>Presensi & Absensi</span>
-                  <span className="text-[10px] text-slate-400">Input</span>
-                </button>
-                <button
-                  onClick={() => { setActiveView('laporan'); setShowSearchDropdown(false); setSearchQuery(''); }}
-                  className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-blue-50 text-slate-700 hover:text-blue-700 flex items-center justify-between cursor-pointer"
-                >
-                  <span>Cetak Laporan</span>
-                  <span className="text-[10px] text-slate-400">Dokumen</span>
-                </button>
-              </div>
-            )}
           </div>
 
           {/* Right: Date, Notifications, and Profile Avatar */}

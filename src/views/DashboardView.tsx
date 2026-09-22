@@ -149,45 +149,63 @@ export const DashboardView: React.FC = () => {
   const effectiveDaysThisMonth = getEffectiveDaysForMonth(currentYear, currentMonth);
 
   // Scoped students calculation based on role
-  // Untuk Admin Sekolah & Kepala Sekolah di Ruang Kerja Sekolah: akumulasi seluruh siswa dari semua kelas
+  // Untuk Admin Sekolah & Kepala Sekolah serta Ruang Kerja Individu: mencakup seluruh siswa aktif
   const scopedStudents = useMemo(() => {
-    if (isSchoolAdminOrKS) {
+    if (isSchoolAdminOrKS || isPersonalWorkspace) {
       return students;
     }
     if (userScope.isWaliKelas) {
       if (userScope.assignedWaliClassId) {
-        return students.filter((s) => s.classId === userScope.assignedWaliClassId);
+        const byId = students.filter((s) => s.classId === userScope.assignedWaliClassId);
+        if (byId.length > 0) return byId;
+      }
+      if (userScope.assignedWaliClassName) {
+        const normName = userScope.assignedWaliClassName.trim().toLowerCase();
+        const byName = students.filter((s) => s.className && s.className.trim().toLowerCase() === normName);
+        if (byName.length > 0) return byName;
       }
       if (currentUser?.classIds && currentUser.classIds.length > 0) {
-        return students.filter((s) => currentUser.classIds?.includes(s.classId || ''));
+        const byUserClassIds = students.filter((s) => currentUser.classIds?.includes(s.classId || ''));
+        if (byUserClassIds.length > 0) return byUserClassIds;
       }
       return students;
     }
     if (userScope.isGuruMapel) {
       const accessibleClassIds = userScope.accessibleClasses.map((c) => c.id);
       if (accessibleClassIds.length > 0) {
-        return students.filter((s) => accessibleClassIds.includes(s.classId || ''));
+        const byAcc = students.filter((s) => accessibleClassIds.includes(s.classId || ''));
+        if (byAcc.length > 0) return byAcc;
       }
-      return [];
+      return students;
     }
     return students;
-  }, [isSchoolAdminOrKS, userScope, students, currentUser]);
+  }, [isSchoolAdminOrKS, isPersonalWorkspace, userScope, students, currentUser]);
 
   const scopedStudentIds = useMemo(() => new Set(scopedStudents.map((s) => s.id)), [scopedStudents]);
 
   // Metrics for scoped students
-  const scopedTotal = (isSchoolAdminOrKS ? students.length : scopedStudents.length) || cachedSummary?.scopedTotal || 0;
+  const scopedTotal = (isSchoolAdminOrKS || isPersonalWorkspace ? students.length : scopedStudents.length) || cachedSummary?.scopedTotal || 0;
   const scopedMale = scopedStudents.filter((s) => s.gender === 'L').length || cachedSummary?.scopedMale || 0;
   const scopedFemale = scopedStudents.filter((s) => s.gender === 'P').length || cachedSummary?.scopedFemale || 0;
 
-  // Tanggal hari berjalan (current running day) secara lokal
-  const todayDate = useMemo(() => new Date(), []);
+  // Tanggal hari berjalan (current running day) secara lokal disinkronkan dengan tanggal presensi aktif
+  const todayDate = useMemo(() => {
+    if (currentAttendanceDate) {
+      const parts = currentAttendanceDate.split('-').map(Number);
+      if (parts.length === 3 && !isNaN(parts[0]) && !isNaN(parts[1]) && !isNaN(parts[2])) {
+        return new Date(parts[0], parts[1] - 1, parts[2]);
+      }
+    }
+    return new Date();
+  }, [currentAttendanceDate]);
+
   const todayFormatted = useMemo(() => {
+    if (currentAttendanceDate) return currentAttendanceDate;
     const y = todayDate.getFullYear();
     const m = String(todayDate.getMonth() + 1).padStart(2, '0');
     const d = String(todayDate.getDate()).padStart(2, '0');
     return `${y}-${m}-${d}`;
-  }, [todayDate]);
+  }, [currentAttendanceDate, todayDate]);
 
   const dayNamesIndo = useMemo(
     () => ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'],
@@ -306,15 +324,15 @@ export const DashboardView: React.FC = () => {
     return `${userScope.assignedSubjects.length} Mata Pelajaran Diampu`;
   }, [userScope.isGuruMapel, userScope.assignedSubjects, userScope.primarySubject]);
 
-  // Today's attendance calculation (strictly following hari berjalan)
-  // Untuk Admin Sekolah & Kepala Sekolah: mencakup akumulasi presensi semua kelas di sekolah tersebut
+  // Today's attendance calculation (strictly following hari berjalan / tanggal aktif)
+  // Untuk Admin Sekolah & Kepala Sekolah serta Ruang Kerja Individu: mencakup akumulasi presensi siswa
   const todayRecords = useMemo(() => {
     return attendanceRecords.filter((r) => {
       // Mengikuti hari berjalan secara akurat
       if (r.date !== todayFormatted) return false;
 
-      if (isSchoolAdminOrKS) {
-        // Akumulasi data absensi semua kelas di sekolah tersebut
+      if (isSchoolAdminOrKS || isPersonalWorkspace) {
+        // Akumulasi data absensi semua siswa di sekolah atau ruang kerja individu
         return true;
       }
 
@@ -322,8 +340,12 @@ export const DashboardView: React.FC = () => {
         return scopedStudentIds.has(r.studentId) && r.type !== 'SUBJECT';
       }
       if (userScope.isGuruMapel) {
-        // Hanya siswa dari rombel/kelas yang diajar hari ini
-        if (!todayTaughtStudentIds.has(r.studentId)) return false;
+        // Siswa dari rombel/kelas yang diajar hari ini atau scoped
+        if (todayTaughtStudentIds.size > 0) {
+          if (!todayTaughtStudentIds.has(r.studentId)) return false;
+        } else if (scopedStudentIds.size > 0 && !scopedStudentIds.has(r.studentId)) {
+          return false;
+        }
 
         const assignedSubjectIds = new Set(userScope.assignedSubjectIds);
         if (assignedSubjectIds.size > 0) {
@@ -337,7 +359,7 @@ export const DashboardView: React.FC = () => {
       }
       return r.type !== 'SUBJECT';
     });
-  }, [attendanceRecords, todayFormatted, isSchoolAdminOrKS, userScope, scopedStudentIds, todayTaughtStudentIds]);
+  }, [attendanceRecords, todayFormatted, isSchoolAdminOrKS, isPersonalWorkspace, userScope, scopedStudentIds, todayTaughtStudentIds]);
 
   // Pemetaan status unik per siswa untuk hari berjalan (mencegah duplikasi perhitungan)
   // Prioritaskan presensi harian (DAILY) jika siswa juga memiliki record mapel (SUBJECT)
@@ -349,7 +371,7 @@ export const DashboardView: React.FC = () => {
       return 0;
     });
     for (const r of sorted) {
-      if (!map.has(r.studentId) && r.status) {
+      if (!map.has(r.studentId) && r.status && r.status !== '-') {
         map.set(r.studentId, r.status);
       }
     }
@@ -389,7 +411,7 @@ export const DashboardView: React.FC = () => {
   }, [todayStudentStatusMap]);
 
   // Target total siswa yang harus diinput presensinya hari ini (untuk Guru Mapel disesuaikan dengan rombel yang diajarkan hari ini)
-  const targetTotal = (isSchoolAdminOrKS ? students.length : userScope.isGuruMapel ? todayTaughtStudents.length : scopedTotal) || 0;
+  const targetTotal = (isSchoolAdminOrKS || isPersonalWorkspace ? students.length : userScope.isGuruMapel ? (todayTaughtStudents.length || scopedTotal) : scopedTotal) || 0;
 
   // Jumlah siswa yang datanya telah di-input hari ini
   const totalInputted = todayStudentStatusMap.size;
@@ -425,8 +447,8 @@ export const DashboardView: React.FC = () => {
       const dd = String(d.getDate()).padStart(2, '0');
       const dStr = `${dy}-${dm}-${dd}`;
 
-      if (isSchoolAdminOrKS) {
-        // Akumulasi data absensi semua kelas di sekolah tersebut
+      if (isSchoolAdminOrKS || isPersonalWorkspace) {
+        // Akumulasi data absensi semua siswa di sekolah atau ruang kerja individu
         const dayMap = new Map<string, string>();
         const dayRecs = attendanceRecords.filter((r) => r.date === dStr);
         const sortedDayRecs = [...dayRecs].sort((a, b) => {
@@ -435,7 +457,7 @@ export const DashboardView: React.FC = () => {
           return 0;
         });
         for (const r of sortedDayRecs) {
-          if (!dayMap.has(r.studentId) && r.status) {
+          if (!dayMap.has(r.studentId) && r.status && r.status !== '-') {
             dayMap.set(r.studentId, r.status);
           }
         }
@@ -1017,7 +1039,6 @@ export const DashboardView: React.FC = () => {
                     strokeWidth="12"
                     strokeDasharray={`${(hadirCount / Math.max(targetTotal, 1)) * 238.76} 238.76`}
                     strokeDashoffset="0"
-                    strokeLinecap="round"
                   />
                 )}
 
@@ -1066,10 +1087,10 @@ export const DashboardView: React.FC = () => {
 
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                 <span className="text-lg font-black text-slate-900 tracking-tight leading-none">
-                  {hadirPercent}%
+                  {totalInputted > 0 ? `${hadirPercent}%` : '0%'}
                 </span>
-                <span className="text-[8px] font-bold text-slate-400 tracking-wider uppercase mt-0.5">
-                  HADIR
+                <span className={`text-[8px] font-bold tracking-wider uppercase mt-0.5 ${totalInputted > 0 ? 'text-emerald-600' : 'text-slate-400'}`}>
+                  {totalInputted > 0 ? 'HADIR' : 'BELUM INPUT'}
                 </span>
               </div>
             </div>
@@ -1078,19 +1099,19 @@ export const DashboardView: React.FC = () => {
             <div className="space-y-1 text-[10px] font-semibold text-slate-600">
               <div className="flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block shrink-0" />
-                <span>Hadir: {hadirPercent}%</span>
+                <span className="truncate">Hadir: <strong className="text-slate-900">{hadirCount}</strong> <span className="text-slate-400 font-normal">({targetTotal > 0 ? Math.round((hadirCount / targetTotal) * 100) : 0}%)</span></span>
               </div>
               <div className="flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full bg-sky-500 inline-block shrink-0" />
-                <span>Sakit: {targetTotal > 0 ? Math.round((sakitCount / targetTotal) * 100) : 0}%</span>
+                <span className="truncate">Sakit: <strong className="text-slate-900">{sakitCount}</strong> <span className="text-slate-400 font-normal">({targetTotal > 0 ? Math.round((sakitCount / targetTotal) * 100) : 0}%)</span></span>
               </div>
               <div className="flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full bg-amber-500 inline-block shrink-0" />
-                <span>Izin: {targetTotal > 0 ? Math.round((izinCount / targetTotal) * 100) : 0}%</span>
+                <span className="truncate">Izin: <strong className="text-slate-900">{izinCount}</strong> <span className="text-slate-400 font-normal">({targetTotal > 0 ? Math.round((izinCount / targetTotal) * 100) : 0}%)</span></span>
               </div>
               <div className="flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full bg-rose-500 inline-block shrink-0" />
-                <span>Alfa: {targetTotal > 0 ? Math.round((alfaCount / targetTotal) * 100) : 0}%</span>
+                <span className="truncate">Alfa: <strong className="text-slate-900">{alfaCount}</strong> <span className="text-slate-400 font-normal">({targetTotal > 0 ? Math.round((alfaCount / targetTotal) * 100) : 0}%)</span></span>
               </div>
             </div>
           </div>
@@ -1098,7 +1119,9 @@ export const DashboardView: React.FC = () => {
           {/* Footer */}
           <div className="flex items-center justify-between pt-1 border-t border-slate-100 text-[10px] font-semibold text-slate-500">
             <span>Total: {targetTotal} Siswa</span>
-            <span className="text-indigo-600 font-bold">Akurat</span>
+            <span className={totalInputted > 0 ? "text-indigo-600 font-bold" : "text-slate-400 font-medium"}>
+              {totalInputted > 0 ? `${totalInputted} Terdata (${inputPercent}%)` : 'Belum Ada Input'}
+            </span>
           </div>
         </div>
 
@@ -1170,12 +1193,18 @@ export const DashboardView: React.FC = () => {
 
           {/* Footer */}
           <div className="flex items-center justify-between pt-1 border-t border-slate-100 text-[10px] text-slate-500">
-            <span className="truncate">{isAttendanceFullyInputted ? '✓ Seluruh siswa terdata' : `${totalInputted} terdata • ${totalBelumInput} belum`}</span>
+            <span className="truncate">
+              {totalInputted === 0
+                ? 'Belum ada presensi diinput'
+                : isAttendanceFullyInputted
+                ? '✓ Seluruh siswa terdata'
+                : `${totalInputted} terdata • ${totalBelumInput} belum`}
+            </span>
             <button
               onClick={() => setActiveView('absensi')}
               className="font-bold text-blue-600 hover:text-blue-800 hover:underline shrink-0 ml-1 cursor-pointer"
             >
-              {isAttendanceFullyInputted ? 'Detail' : 'Input'}
+              {totalInputted > 0 && isAttendanceFullyInputted ? 'Lihat Detail' : 'Input Presensi'}
             </button>
           </div>
         </div>
@@ -1299,19 +1328,19 @@ export const DashboardView: React.FC = () => {
 
       </div>
 
-      {/* 5. Menu Navigasi Section (Compact & Single-View Friendly) */}
-      <div className="space-y-1.5 pt-0.5">
+      {/* 5. Menu Navigasi Section (Slightly larger, prominent & easily accessible) */}
+      <div className="space-y-2 pt-1.5">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-1.5">
-            <span className="w-1.5 h-3 bg-blue-600 rounded-full" />
-            <h2 className="text-xs sm:text-sm font-bold text-slate-900">Menu Navigasi</h2>
+          <div className="flex items-center gap-2">
+            <span className="w-1.5 h-4 bg-blue-600 rounded-full" />
+            <h2 className="text-sm sm:text-base font-bold text-slate-900">Menu Navigasi</h2>
           </div>
-          <span className="text-[10px] text-slate-400 font-medium">
-            {allowedMenuItems.length} Modul Akses ({userScope.roleBadgeLabel})
+          <span className="text-xs text-slate-400 font-semibold">
+            {allowedMenuItems.length} Menu Tersedia • {userScope.roleBadgeLabel}
           </span>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-1.5 sm:gap-2">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-6 gap-2.5 sm:gap-3">
           {allowedMenuItems.map((item) => {
             const Icon = item.icon;
             return (
@@ -1319,18 +1348,18 @@ export const DashboardView: React.FC = () => {
                 key={item.id}
                 id={`btn-menu-${item.id}`}
                 onClick={() => setActiveView(item.id as any)}
-                className="bg-white hover:bg-blue-50/70 hover:border-blue-300 border border-slate-200/90 rounded-lg p-2 flex items-center gap-2 shadow-2xs hover:shadow-xs transition-all group cursor-pointer active:scale-98 text-left"
+                className="bg-white hover:bg-blue-50/70 hover:border-blue-400 border border-slate-200/90 rounded-xl p-3 sm:p-3.5 flex items-center gap-3 shadow-2xs hover:shadow-xs transition-all group cursor-pointer active:scale-98 text-left"
               >
                 <div
-                  className={`w-7 h-7 rounded-md ${item.bg} ${item.color} flex items-center justify-center shrink-0 transition-transform group-hover:scale-105 shadow-2xs`}
+                  className={`w-10 h-10 sm:w-11 sm:h-11 rounded-xl ${item.bg} ${item.color} flex items-center justify-center shrink-0 transition-transform group-hover:scale-105 shadow-2xs`}
                 >
-                  <Icon size={14} />
+                  <Icon size={18} />
                 </div>
-                <div className="min-w-0 flex-1 truncate">
-                  <p className="font-bold text-slate-800 text-[11px] group-hover:text-blue-600 transition-colors truncate">
+                <div className="min-w-0 flex-1">
+                  <p className="font-bold text-slate-800 text-xs sm:text-sm group-hover:text-blue-600 transition-colors truncate">
                     {item.title}
                   </p>
-                  <p className="text-[9px] text-slate-400 truncate">
+                  <p className="text-[10px] sm:text-[11px] text-slate-400 truncate mt-0.5">
                     {item.desc}
                   </p>
                 </div>
@@ -1340,8 +1369,8 @@ export const DashboardView: React.FC = () => {
         </div>
       </div>
 
-      {/* 6. Dashboard Footer */}
-      <footer className="pt-2 pb-1 border-t border-slate-200/80 flex items-center justify-center text-center text-[10px] text-slate-400 font-medium">
+      {/* 6. Dashboard Footer (Copyright aligned to bottom right) */}
+      <footer className="pt-3 pb-1 border-t border-slate-200/80 flex items-center justify-end text-right text-[10px] text-slate-400 font-medium">
         <p>
           {systemConfig.footerCopyright || '© 2026 Kawacanaan by Maulana Yusuf. All Rights Reserved.'}
         </p>

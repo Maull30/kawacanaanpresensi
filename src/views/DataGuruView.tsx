@@ -771,7 +771,7 @@ export const DataGuruView: React.FC = () => {
         mataPelajaran: '',
       }));
 
-      await importTeachers(payload);
+      await importTeachers(payload, true);
 
       setImportProgress(100);
       setImportStatusMessage('Selesai! Seluruh data guru berhasil diimpor.');
@@ -1150,6 +1150,14 @@ export const DataGuruView: React.FC = () => {
                     <span>Template</span>
                   </button>
                 </div>
+              </div>
+
+              {/* Notice Mode Sumber Tunggal */}
+              <div className="p-3 bg-amber-50/90 border border-amber-200/80 rounded-xl flex items-start gap-2.5 text-amber-900 text-xs">
+                <span className="font-bold text-amber-800 text-sm leading-none mt-0.5">ℹ️</span>
+                <p className="leading-relaxed text-[11px]">
+                  <strong>Sumber Tunggal (Replace All):</strong> File yang diunggah menjadi sumber data referensi utama guru. Sistem akan otomatis mengganti seluruh data dan menghapus data guru lama yang tidak terdapat dalam file terbaru ini.
+                </p>
               </div>
 
               {/* Step 2: Tab Selector (Upload File vs Tempel Teks) */}

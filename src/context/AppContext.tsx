@@ -3662,7 +3662,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
   };
   const importClasses = async (
     items: Array<Omit<SchoolClass, "id"> & { waliKelasNameInput?: string }>,
-    replaceExisting = false,
+    replaceExisting = true,
   ) => {
     const schoolId = currentUser?.schoolId;
     if (!schoolId) throw new Error("Sekolah aktif tidak ditemukan.");
@@ -3729,6 +3729,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
           .select("id, name")
           .eq("school_id", schoolId);
         const existingMap = new Map<string, string>();
+        const usedClassIds = new Set<string>();
         (existingCls || []).forEach((c: any) => {
           existingMap.set(String(c.name || "").trim().toLowerCase(), c.id);
         });
@@ -3736,6 +3737,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
         for (const p of payload) {
           const matchedId = existingMap.get(p.name.toLowerCase());
           if (matchedId) {
+            usedClassIds.add(matchedId);
             await supabase
               .from("classes")
               .update({
@@ -3746,20 +3748,40 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
               })
               .eq("id", matchedId);
           } else {
-            await supabase.from("classes").insert({
+            const { data: insData } = await supabase.from("classes").insert({
               school_id: schoolId,
               name: p.name,
               grade: p.grade,
               academic_year: p.academic_year,
               wali_kelas_teacher_id: p.wali_kelas_teacher_id,
-            });
+            }).select("id").maybeSingle();
+            if (insData) {
+              usedClassIds.add(insData.id);
+            }
+          }
+        }
+
+        // Mode sumber tunggal: hapus rombel kelas lama yang tidak terdapat dalam file terbaru
+        if (replaceExisting) {
+          const leftovers = (existingCls || []).filter((c: any) => !usedClassIds.has(c.id));
+          for (const l of leftovers) {
+            try {
+              await supabase.from("students").update({ class_id: null }).eq("class_id", l.id).eq("school_id", schoolId);
+              await supabase.from("subject_schedule_days").delete().eq("class_id", l.id);
+              await supabase.from("subject_class_assignments").delete().eq("class_id", l.id).eq("school_id", schoolId);
+              await supabase.from("user_class_assignments").delete().eq("class_id", l.id);
+              await supabase.from("teacher_assignments").delete().eq("class_id", l.id).eq("school_id", schoolId);
+              await supabase.from("teacher_class_assignments").delete().eq("class_id", l.id).eq("school_id", schoolId);
+              await supabase.from("attendance_records").delete().eq("class_id", l.id).eq("school_id", schoolId);
+              await supabase.from("classes").delete().eq("id", l.id).eq("school_id", schoolId);
+            } catch (_) {}
           }
         }
       }
     }
 
     await loadData(currentUser?.id);
-    showToast(`Berhasil mengimpor ${items.length} data kelas.`);
+    showToast(`Berhasil mengimpor ${items.length} data rombel kelas.`);
   };
   const addTeacher = async (t: Omit<Teacher, "id">) => {
     const schoolId = currentUser?.schoolId;
@@ -3901,66 +3923,119 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
   };
   const importTeachers = async (
     items: Omit<Teacher, "id">[],
-    replaceExisting = false,
+    replaceExisting = true,
   ) => {
     const schoolId = currentUser?.schoolId;
     if (!schoolId) throw new Error("Sekolah aktif tidak ditemukan.");
 
-    // Ambil data guru yang sudah ada di sekolah ini
-    const { data: existingTeachersData, error: fetchErr } = await supabase
-      .from("teachers")
-      .select("*")
-      .eq("school_id", schoolId);
-    if (fetchErr) throw fetchErr;
+    const payload = items.map((t) => ({
+      nama: t.nama.trim(),
+      nip: t.nip && t.nip.trim() !== "-" ? t.nip.trim() : null,
+      jenisKelamin: t.jenisKelamin || "L",
+      tugasUtama: (t.tugasUtama || t.tugas_utama || "Belum ditugaskan").trim(),
+    }));
 
-    const existingTeachers = existingTeachersData || [];
-    const usedExistingIds = new Set<string>();
+    // 1. Prioritaskan server API /api/admin-users dengan Service Role untuk keamanan integritas data
+    let apiDone = false;
+    try {
+      const { data: authSession } = await supabase.auth.getSession();
+      const token = authSession.session?.access_token;
+      if (token) {
+        const res = await fetch("/api/admin-users", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            action: "import_teachers",
+            schoolId,
+            items: payload,
+            replaceExisting,
+          }),
+        });
+        const resJson = await res.json().catch(() => ({}));
+        if (res.ok && resJson.ok) {
+          apiDone = true;
+        }
+      }
+    } catch (_) {}
 
-    for (const t of items) {
-      const cleanName = t.nama.trim();
-      const rawTugas = (t.tugasUtama || t.tugas_utama || "Belum ditugaskan").trim();
-      const normalizedName = cleanName.toLowerCase();
-      const normalizedTugas = rawTugas.toLowerCase();
+    if (!apiDone) {
+      // 2. Direct fallback ke Supabase client
+      const { data: existingTeachersData, error: fetchErr } = await supabase
+        .from("teachers")
+        .select("*")
+        .eq("school_id", schoolId);
+      if (fetchErr) throw fetchErr;
 
-      const row = {
-        school_id: schoolId,
-        nama: cleanName,
-        nip: t.nip && t.nip.trim() !== "-" ? t.nip.trim() : null,
-        jenis_kelamin: t.jenisKelamin || "L",
-        tugas_utama: rawTugas,
-      };
+      const existingTeachers = existingTeachersData || [];
+      const usedExistingIds = new Set<string>();
 
-      // Logika otomatis:
-      // Jika terdapat nama dan tugas utama yang sama: sistem otomatis menggantikan data tersebut (update)
-      // Jika hanya nama yang sama dengan tugas utama yang berbeda atau pendidik baru: sistem tetap menambahkan datanya (insert)
-      const matched = existingTeachers.find((ex: any) => {
-        if (usedExistingIds.has(ex.id)) return false;
-        const exName = String(ex.nama || "").trim().toLowerCase();
-        const exTugas = String(ex.tugas_utama || "").trim().toLowerCase();
-        return exName === normalizedName && exTugas === normalizedTugas;
-      });
+      for (const t of payload) {
+        const cleanName = t.nama;
+        const cleanNip = t.nip;
+        const rawTugas = t.tugasUtama;
+        const normalizedName = cleanName.toLowerCase();
 
-      if (matched) {
-        usedExistingIds.add(matched.id);
-        const { error: updateError } = await supabase
-          .from("teachers")
-          .update({
-            nama: row.nama,
-            nip: row.nip || matched.nip || null,
-            jenis_kelamin: row.jenis_kelamin,
-            tugas_utama: row.tugas_utama,
-          })
-          .eq("id", matched.id);
-        if (updateError) throw updateError;
-      } else {
-        const { data: inserted, error: insertError } = await supabase
-          .from("teachers")
-          .insert(row)
-          .select("*")
-          .single();
-        if (insertError) throw insertError;
-        if (inserted) {
-          existingTeachers.push(inserted);
+        let matched: any = null;
+        if (cleanNip) {
+          matched = existingTeachers.find(
+            (ex: any) => !usedExistingIds.has(ex.id) && ex.nip && String(ex.nip).trim() === cleanNip
+          );
+        }
+        if (!matched) {
+          matched = existingTeachers.find((ex: any) => {
+            if (usedExistingIds.has(ex.id)) return false;
+            const exName = String(ex.nama || "").trim().toLowerCase();
+            return exName === normalizedName;
+          });
+        }
+
+        if (matched) {
+          usedExistingIds.add(matched.id);
+          const { error: updateError } = await supabase
+            .from("teachers")
+            .update({
+              nama: cleanName,
+              nip: cleanNip || matched.nip || null,
+              jenis_kelamin: t.jenisKelamin,
+              tugas_utama: rawTugas,
+            })
+            .eq("id", matched.id);
+          if (updateError) throw updateError;
+        } else {
+          const { data: inserted, error: insertError } = await supabase
+            .from("teachers")
+            .insert({
+              school_id: schoolId,
+              nama: cleanName,
+              nip: cleanNip,
+              jenis_kelamin: t.jenisKelamin,
+              tugas_utama: rawTugas,
+            })
+            .select("*")
+            .single();
+          if (insertError) throw insertError;
+          if (inserted) {
+            existingTeachers.push(inserted);
+            usedExistingIds.add(inserted.id);
+          }
+        }
+      }
+
+      // Mode sumber tunggal: hapus guru lama yang tidak terdapat dalam file terbaru
+      if (replaceExisting) {
+        const leftovers = existingTeachers.filter((ex: any) => !usedExistingIds.has(ex.id));
+        for (const l of leftovers) {
+          try {
+            await supabase.from("classes").update({ wali_kelas_teacher_id: null }).eq("wali_kelas_teacher_id", l.id).eq("school_id", schoolId);
+            await supabase.from("subject_teacher_assignments").delete().eq("teacher_id", l.id).eq("school_id", schoolId);
+            await supabase.from("teacher_assignments").delete().eq("teacher_id", l.id).eq("school_id", schoolId);
+            await supabase.from("teacher_class_assignments").delete().eq("teacher_id", l.id).eq("school_id", schoolId);
+            await supabase.from("profiles").update({ teacher_id: null }).eq("teacher_id", l.id).eq("school_id", schoolId);
+            await supabase.from("teachers").delete().eq("id", l.id).eq("school_id", schoolId);
+          } catch (_) {}
         }
       }
     }
@@ -4318,7 +4393,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
   };
   const importStudents = async (
     items: Omit<Student, "id">[],
-    replaceExisting = false,
+    replaceExisting = true,
     targetClassId?: string,
   ) => {
     const schoolId = currentUser?.schoolId;
@@ -4370,7 +4445,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       // 2. Direct fallback matching ke tabel students
       const { data: existingStudentsData, error: fetchErr } = await supabase
         .from("students")
-        .select("id, nama, nisn")
+        .select("id, nama, nisn, class_id")
         .eq("school_id", schoolId);
       if (fetchErr) throw fetchErr;
       const existingList = existingStudentsData || [];
@@ -4410,13 +4485,38 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
                 gender: st.gender,
                 class_id: st.class_id,
               })
-              .select("id, nama, nisn")
+              .select("id, nama, nisn, class_id")
               .single();
             if (insErr) {
               throw new Error(insErr.message || "Gagal mengimpor data siswa.");
             }
             if (insData) {
               existingList.push(insData);
+              usedIds.add(insData.id);
+            }
+          }
+        }
+
+        // Mode sumber tunggal: hapus siswa lama yang tidak terdapat dalam file terbaru
+        if (replaceExisting) {
+          const leftoverStudents = existingList.filter((ex: any) => {
+            if (usedIds.has(ex.id)) return false;
+            if (targetClassId) return ex.class_id === targetClassId;
+            return true;
+          });
+          const leftoverIds = leftoverStudents.map((s: any) => s.id);
+          if (leftoverIds.length > 0) {
+            const CHUNK = 100;
+            for (let i = 0; i < leftoverIds.length; i += CHUNK) {
+              const slice = leftoverIds.slice(i, i + CHUNK);
+              try {
+                await supabase.from("attendance_records").delete().in("student_id", slice).eq("school_id", schoolId);
+                await supabase.from("leave_requests").delete().in("student_id", slice).eq("school_id", schoolId);
+              } catch (_) {}
+              try {
+                await supabase.from("profiles").update({ student_id: null }).in("student_id", slice).eq("school_id", schoolId);
+                await supabase.from("students").delete().in("id", slice).eq("school_id", schoolId);
+              } catch (_) {}
             }
           }
         }

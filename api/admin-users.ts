@@ -165,6 +165,7 @@ export default async function handler(req: any, res: any) {
     'import_classes',
     'save_class',
     'delete_class',
+    'import_teachers',
   ];
   const isStudentOrClassAction = studentAndClassActions.includes(action);
   const isTeacherOrWali = ['WALI KELAS', 'GURU MAPEL', 'KEPALA SEKOLAH'].includes(callerRole);
@@ -775,6 +776,148 @@ export default async function handler(req: any, res: any) {
       return json(res, 200, { ok: true, success: true, message: `Akun pengguna ${target?.name || ''} berhasil dihapus permanen dari database.` });
     }
 
+    if (action === 'import_teachers') {
+      if (!['ADMIN', 'SUPER_ADMIN', 'KEPALA SEKOLAH'].includes(callerRole) && !isPersonalOwner) {
+        return json(res, 403, { error: 'Hanya Admin atau Kepala Sekolah yang berwenang mengimpor data guru.' });
+      }
+      const targetSchoolId = schoolId || callerSchoolId;
+      if (!targetSchoolId) {
+        return json(res, 400, { error: 'ID sekolah wajib disertakan.' });
+      }
+
+      const items = Array.isArray(body.items) ? body.items : [];
+      const replaceExisting = body.replaceExisting !== undefined ? Boolean(body.replaceExisting) : true;
+
+      if (items.length === 0) {
+        return json(res, 400, { error: 'Tidak ada data guru yang valid untuk diimpor.' });
+      }
+
+      // Ambil data guru yang saat ini ada di database sekolah
+      const { data: existingTeachersData, error: fetchErr } = await admin
+        .from('teachers')
+        .select('*')
+        .eq('school_id', targetSchoolId);
+
+      if (fetchErr) {
+        return json(res, 500, { error: `Gagal membaca data guru: ${fetchErr.message}` });
+      }
+
+      const existingTeachers = existingTeachersData || [];
+      const usedExistingIds = new Set<string>();
+      const toUpdate: any[] = [];
+      const toInsert: any[] = [];
+
+      for (const t of items) {
+        const cleanName = String(t.nama || '').trim();
+        if (!cleanName) continue;
+        const cleanNip = t.nip && String(t.nip).trim() !== '-' ? String(t.nip).trim() : null;
+        const rawTugas = String(t.tugasUtama || t.tugas_utama || 'Belum ditugaskan').trim();
+        const gender = t.jenisKelamin === 'P' || t.jenis_kelamin === 'P' ? 'P' : 'L';
+
+        // Pencocokan cerdas guru yang ada:
+        // 1. Berdasarkan NIP jika ada
+        // 2. Berdasarkan nama lengkap
+        let matched: any = null;
+        if (cleanNip) {
+          matched = existingTeachers.find(
+            (ex: any) => !usedExistingIds.has(ex.id) && ex.nip && String(ex.nip).trim() === cleanNip
+          );
+        }
+        if (!matched) {
+          matched = existingTeachers.find(
+            (ex: any) => !usedExistingIds.has(ex.id) && String(ex.nama || '').trim().toLowerCase() === cleanName.toLowerCase()
+          );
+        }
+
+        if (matched) {
+          usedExistingIds.add(matched.id);
+          toUpdate.push({
+            id: matched.id,
+            nama: cleanName,
+            nip: cleanNip || matched.nip || null,
+            jenis_kelamin: gender,
+            tugas_utama: rawTugas,
+          });
+        } else {
+          toInsert.push({
+            school_id: targetSchoolId,
+            nama: cleanName,
+            nip: cleanNip,
+            jenis_kelamin: gender,
+            tugas_utama: rawTugas,
+          });
+        }
+      }
+
+      for (const upd of toUpdate) {
+        await admin
+          .from('teachers')
+          .update({
+            nama: upd.nama,
+            nip: upd.nip,
+            jenis_kelamin: upd.jenis_kelamin,
+            tugas_utama: upd.tugas_utama,
+          })
+          .eq('id', upd.id)
+          .eq('school_id', targetSchoolId);
+      }
+
+      if (toInsert.length > 0) {
+        const { error: insErr } = await admin.from('teachers').insert(toInsert);
+        if (insErr) {
+          return json(res, 500, { error: `Gagal menambahkan guru baru: ${insErr.message}` });
+        }
+      }
+
+      // MODE SUMBER TUNGGAL (REPLACE ALL):
+      // Hapus seluruh data guru lama yang TIDAK ada dalam file Excel terbaru
+      let deletedCount = 0;
+      if (replaceExisting) {
+        const leftovers = existingTeachers.filter((t: any) => !usedExistingIds.has(t.id));
+        deletedCount = leftovers.length;
+        for (const l of leftovers) {
+          try {
+            // 1. Lepas penugasan wali kelas pada tabel classes
+            await admin.from('classes').update({ wali_kelas_teacher_id: null }).eq('wali_kelas_teacher_id', l.id).eq('school_id', targetSchoolId);
+            // 2. Bersihkan relasi penugasan guru
+            await admin.from('subject_teacher_assignments').delete().eq('teacher_id', l.id).eq('school_id', targetSchoolId);
+            await admin.from('teacher_assignments').delete().eq('teacher_id', l.id).eq('school_id', targetSchoolId);
+            await admin.from('teacher_class_assignments').delete().eq('teacher_id', l.id).eq('school_id', targetSchoolId);
+            // 3. Lepaskan tautan profile pengguna
+            await admin.from('profiles').update({ teacher_id: null }).eq('teacher_id', l.id).eq('school_id', targetSchoolId);
+            // 4. Hapus guru lama dari tabel teachers
+            await admin.from('teachers').delete().eq('id', l.id).eq('school_id', targetSchoolId);
+          } catch (delErr: any) {
+            console.warn('[admin-users] Error deleting leftover teacher:', delErr?.message);
+          }
+        }
+      }
+
+      // Catat ke audit log
+      try {
+        await admin.from('audit_logs').insert({
+          actor_id: caller.user.id,
+          actor_name: caller.user.user_metadata?.name || profile?.name || 'Admin',
+          actor_role: callerRole,
+          action: 'IMPORT_TEACHERS',
+          school_id: targetSchoolId,
+          details: {
+            total_imported: toUpdate.length + toInsert.length,
+            deleted_old: deletedCount,
+            replace_existing: replaceExisting,
+          },
+        });
+      } catch (_) {}
+
+      return json(res, 200, {
+        ok: true,
+        success: true,
+        count: toUpdate.length + toInsert.length,
+        deletedCount,
+        message: `Berhasil mengimpor ${toUpdate.length + toInsert.length} data guru.${deletedCount > 0 ? ` Sebanyak ${deletedCount} data guru lama dihapus sesuai isi file terbaru.` : ''}`,
+      });
+    }
+
     if (action === 'delete_teacher') {
       if (!['ADMIN', 'SUPER_ADMIN', 'KEPALA SEKOLAH'].includes(callerRole)) {
         return json(res, 403, { error: 'Hanya Admin atau Kepala Sekolah yang berwenang menghapus data guru.' });
@@ -1142,6 +1285,68 @@ export default async function handler(req: any, res: any) {
           }
         }
 
+        // MODE SUMBER TUNGGAL (REPLACE ALL):
+        // Hapus seluruh siswa lama yang tidak terdapat dalam file Excel terbaru
+        let deletedStudentCount = 0;
+        if (replaceExisting) {
+          const leftoverStudents = existingStudents.filter((st: any) => {
+            if (usedExistingIds.has(st.id)) return false;
+            if (targetClassId) {
+              return st.class_id === targetClassId;
+            }
+            return true;
+          });
+
+          const leftoverIds = leftoverStudents.map((st: any) => st.id);
+          deletedStudentCount = leftoverIds.length;
+
+          if (leftoverIds.length > 0) {
+            // 1. Bersihkan profiles & akun pengguna siswa yang tidak ada di file baru
+            try {
+              const { data: linkedProfiles } = await admin
+                .from('profiles')
+                .select('id')
+                .eq('school_id', schoolId)
+                .in('student_id', leftoverIds);
+
+              for (const lp of linkedProfiles || []) {
+                try {
+                  await admin.from('user_class_assignments').delete().eq('user_id', lp.id);
+                  await admin.from('profiles').delete().eq('id', lp.id);
+                  await admin.auth.admin.deleteUser(lp.id);
+                } catch (_) {}
+              }
+            } catch (_) {}
+
+            // 2. Bersihkan catatan presensi dan izin siswa yang dihapus
+            try {
+              const CHUNK = 100;
+              for (let i = 0; i < leftoverIds.length; i += CHUNK) {
+                const slice = leftoverIds.slice(i, i + CHUNK);
+                await admin.from('attendance_records').delete().in('student_id', slice).eq('school_id', schoolId);
+                try {
+                  await admin.from('leave_requests').delete().in('student_id', slice).eq('school_id', schoolId);
+                } catch (_) {}
+              }
+            } catch (_) {}
+
+            // 3. Lepas referensi student_id di profiles tersisa
+            try {
+              await admin.from('profiles').update({ student_id: null }).in('student_id', leftoverIds).eq('school_id', schoolId);
+            } catch (_) {}
+
+            // 4. Hapus baris siswa dari tabel students
+            const CHUNK = 100;
+            for (let i = 0; i < leftoverIds.length; i += CHUNK) {
+              const slice = leftoverIds.slice(i, i + CHUNK);
+              const { error: delErr } = await admin.from('students').delete().in('id', slice).eq('school_id', schoolId);
+              if (delErr) {
+                console.warn('[admin-users] Error deleting leftover students in replace mode:', delErr.message);
+              }
+            }
+          }
+        }
+
       // Auto-sinkronisasi relasi profil siswa (profiles.student_id) dengan data tabel students
       try {
         const { data: unlinkedProfiles } = await admin
@@ -1183,6 +1388,7 @@ export default async function handler(req: any, res: any) {
           details: {
             count: items.length,
             replaceExisting,
+            deletedCount: deletedStudentCount,
             targetClassId,
           },
         });
@@ -1192,7 +1398,8 @@ export default async function handler(req: any, res: any) {
         ok: true,
         success: true,
         count: items.length,
-        message: `Berhasil mengimpor ${items.length} data siswa.`,
+        deletedCount: deletedStudentCount,
+        message: `Berhasil mengimpor ${items.length} data siswa.${deletedStudentCount > 0 ? ` Sebanyak ${deletedStudentCount} data siswa lama dihapus sesuai isi file terbaru.` : ''}`,
       });
     }
 
@@ -1435,15 +1642,33 @@ export default async function handler(req: any, res: any) {
         }
       }
 
+      let deletedClassCount = 0;
       if (replaceExisting) {
         const leftovers = existingClasses.filter((c: any) => !usedIds.has(c.id));
+        deletedClassCount = leftovers.length;
         for (const l of leftovers) {
-          await admin.from('students').update({ class_id: null }).eq('class_id', l.id).eq('school_id', schoolId);
-          await admin.from('classes').delete().eq('id', l.id).eq('school_id', schoolId);
+          try {
+            await admin.from('students').update({ class_id: null }).eq('class_id', l.id).eq('school_id', schoolId);
+            await admin.from('subject_schedule_days').delete().eq('class_id', l.id);
+            await admin.from('subject_class_assignments').delete().eq('class_id', l.id).eq('school_id', schoolId);
+            await admin.from('user_class_assignments').delete().eq('class_id', l.id);
+            await admin.from('teacher_assignments').delete().eq('class_id', l.id).eq('school_id', schoolId);
+            await admin.from('teacher_class_assignments').delete().eq('class_id', l.id).eq('school_id', schoolId);
+            await admin.from('attendance_records').delete().eq('class_id', l.id).eq('school_id', schoolId);
+            await admin.from('classes').delete().eq('id', l.id).eq('school_id', schoolId);
+          } catch (delErr: any) {
+            console.warn('[admin-users] Error deleting leftover class in replace mode:', delErr?.message);
+          }
         }
       }
 
-      return json(res, 200, { ok: true, success: true, count: toUpdate.length + toInsert.length });
+      return json(res, 200, {
+        ok: true,
+        success: true,
+        count: toUpdate.length + toInsert.length,
+        deletedCount: deletedClassCount,
+        message: `Berhasil mengimpor ${toUpdate.length + toInsert.length} data rombel kelas.${deletedClassCount > 0 ? ` Sebanyak ${deletedClassCount} rombel kelas lama dihapus sesuai isi file terbaru.` : ''}`,
+      });
     }
 
     if (action === 'generate_all_accounts') {

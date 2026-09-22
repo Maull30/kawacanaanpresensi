@@ -142,6 +142,8 @@ export const SystemSection: React.FC<{
   const [savingPassword, setSavingPassword] = useState(false);
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(true);
   const [sessionTimeout, setSessionTimeout] = useState('60');
+  const [superAdminEmail, setSuperAdminEmail] = useState('');
+  const [savingSuperAdminEmail, setSavingSuperAdminEmail] = useState(false);
 
   // Role Management Matrix State
   const [rolesList, setRolesList] = useState([
@@ -351,6 +353,34 @@ export const SystemSection: React.FC<{
       showToast(err.message || 'Gagal memperbarui password.', 'error');
     } finally {
       setSavingPassword(false);
+    }
+  };
+
+  // Update Super Admin Account (Email / Google SSO target)
+  const handleUpdateSuperAdminEmail = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!superAdminEmail || !superAdminEmail.includes('@')) {
+      showToast('Format email tidak valid.', 'error');
+      return;
+    }
+    setSavingSuperAdminEmail(true);
+    try {
+      const res = await fetch('/api/setup-superadmin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'update_superadmin_account', email: superAdminEmail.trim() }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        showToast(data.message || `Akun Super Admin berhasil disinkronkan ke ${superAdminEmail}`, 'success');
+        setActiveModal(null);
+      } else {
+        showToast(data.error || 'Gagal memperbarui email akun Super Admin.', 'error');
+      }
+    } catch (err: any) {
+      showToast(err?.message || 'Gagal memperbarui akun Super Admin.', 'error');
+    } finally {
+      setSavingSuperAdminEmail(false);
     }
   };
 
@@ -1515,6 +1545,38 @@ export const SystemSection: React.FC<{
               >
                 <X size={18} />
               </button>
+            </div>
+
+            <div className="p-3.5 bg-amber-50/70 border border-amber-200/80 rounded-2xl space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="text-xs font-bold text-amber-950 flex items-center gap-1.5">
+                    <UserCheck size={14} className="text-amber-600" />
+                    <span>Akun Super Admin & Google SSO</span>
+                  </h4>
+                  <p className="text-[11px] text-amber-800/80">
+                    Kaitkan akun Super Administrator tunggal dengan email Google SSO
+                  </p>
+                </div>
+              </div>
+              <form onSubmit={handleUpdateSuperAdminEmail} className="flex gap-2">
+                <input
+                  type="email"
+                  required
+                  placeholder="30mey94@gmail.com"
+                  value={superAdminEmail}
+                  onChange={(e) => setSuperAdminEmail(e.target.value)}
+                  className="flex-1 px-3 py-1.5 rounded-xl border border-amber-200 bg-white font-medium text-xs focus:outline-amber-600"
+                />
+                <button
+                  type="submit"
+                  disabled={savingSuperAdminEmail}
+                  className="px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs flex items-center gap-1 shadow-xs cursor-pointer disabled:opacity-60 shrink-0"
+                >
+                  {savingSuperAdminEmail ? <RefreshCw size={12} className="animate-spin" /> : <Save size={12} />}
+                  <span>Simpan Email</span>
+                </button>
+              </form>
             </div>
 
             <form onSubmit={handleChangePassword} className="space-y-4 text-xs">

@@ -520,6 +520,27 @@ export default async function handler(req: any, res: any) {
 
       let { data: profile } = await db.from('profiles').select('*').eq('id', userId).maybeSingle();
 
+      const configuredSuperAdminEmail = (process.env.SUPERADMIN_EMAIL || '30mey94@gmail.com').trim().toLowerCase();
+      // Jika email user cocok dengan SUPERADMIN_EMAIL, pastikan dia memegang peran SUPER_ADMIN tunggal
+      if (userEmail && configuredSuperAdminEmail && userEmail === configuredSuperAdminEmail) {
+        if (!profile || profile.role !== 'SUPER_ADMIN') {
+          // Turunkan akun superadmin lain jika ada agar tetap single superadmin
+          await db.from('profiles').delete().eq('role', 'SUPER_ADMIN').neq('id', userId);
+          const fullName = workspaceAuth.user.user_metadata?.full_name || workspaceAuth.user.user_metadata?.name || 'SUPER ADMIN';
+          const { data: saProfile } = await db.from('profiles').upsert({
+            id: userId,
+            email: userEmail,
+            username: userEmail.split('@')[0],
+            name: fullName,
+            role: 'SUPER_ADMIN',
+            school_id: null,
+            is_active: true,
+            must_change_password: false,
+          }).select().maybeSingle();
+          if (saProfile) profile = saProfile;
+        }
+      }
+
       // Jika profil belum ditemukan berdasarkan ID auth, cari apakah profil telah didaftarkan berdasarkan email
       if (!profile && userEmail) {
         const { data: profileByEmail } = await db.from('profiles').select('*').ilike('email', userEmail).maybeSingle();

@@ -19,16 +19,26 @@ export default async function handler(req: any, res: any) {
   // Handle GET request to check if Super Admin is already configured
   if (req.method === 'GET') {
     try {
-      const { data: superProfiles } = await admin.from('profiles').select('id, username, email, name, is_active').eq('role', 'SUPER_ADMIN').limit(1);
+      const targetSuperAdminEmail = (process.env.SUPERADMIN_EMAIL || '30mey94@gmail.com').trim().toLowerCase();
+      let { data: superProfiles } = await admin.from('profiles').select('id, username, email, name, is_active, role').eq('role', 'SUPER_ADMIN').limit(1);
+      
+      // Jika profil belum ber-role SUPER_ADMIN tetapi ada profil dengan email target superadmin, pastikan role-nya SUPER_ADMIN
+      if ((!superProfiles || superProfiles.length === 0) && targetSuperAdminEmail) {
+        const { data: profileByTargetEmail } = await admin.from('profiles').select('id, username, email, name, is_active, role').ilike('email', targetSuperAdminEmail).maybeSingle();
+        if (profileByTargetEmail) {
+          await admin.from('profiles').update({ role: 'SUPER_ADMIN', is_active: true }).eq('id', profileByTargetEmail.id);
+          superProfiles = [{ ...profileByTargetEmail, role: 'SUPER_ADMIN' }];
+        }
+      }
+
       const isSetup = (superProfiles?.length || 0) > 0;
       const superProfile = superProfiles?.[0];
       return json(res, 200, {
         isSetup,
         requiresSecret: Boolean(setupSecret),
         username: superProfile?.username || 'superadmin',
-        email: superProfile?.email || 'superadmin@login.edushift.local',
+        email: superProfile?.email || targetSuperAdminEmail || 'superadmin@login.edushift.local',
         name: superProfile?.name || 'SUPER ADMIN',
-        defaultPasswordHint: 'SuperAdmin2026!'
       });
     } catch (err: any) {
       return json(res, 500, { error: err.message || 'Gagal memeriksa status setup.' });
@@ -38,6 +48,77 @@ export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') return json(res, 405, { error: 'Method not allowed.' });
 
   const { action, newPassword, setupSecret: suppliedSecret, name, username, email, password } = req.body || {};
+
+  // FITUR UPDATE / MIGRASI AKUN SUPER ADMIN KE GOOGLE / EMAIL LAIN
+  if (action === 'update_superadmin_account') {
+    try {
+      const targetEmail = String(email || '').trim().toLowerCase();
+      if (!targetEmail || !targetEmail.includes('@')) {
+        return json(res, 400, { error: 'Email baru tidak valid.' });
+      }
+
+      // Ambil superadmin tunggal yang ada
+      const { data: currentSAs } = await admin.from('profiles').select('id, username, email, name').eq('role', 'SUPER_ADMIN').limit(1);
+      const sa = currentSAs?.[0];
+
+      // Jika user sudah login di Auth dengan email tersebut (misal via Google Login)
+      const { data: userList } = await admin.auth.admin.listUsers();
+      const authUser = userList?.users?.find(u => u.email?.toLowerCase() === targetEmail);
+
+      if (authUser) {
+        // Pindahkan role SUPER_ADMIN ke akun Auth ini jika berbeda id
+        if (sa && sa.id !== authUser.id) {
+          // Turunkan role akun lama agar tetap hanya ada 1 super admin
+          await admin.from('profiles').delete().eq('id', sa.id);
+        }
+
+        // Pastikan akun auth ini ber-role SUPER_ADMIN di profiles
+        await admin.from('profiles').upsert({
+          id: authUser.id,
+          name: name ? String(name).trim() : (authUser.user_metadata?.full_name || authUser.user_metadata?.name || sa?.name || 'SUPER ADMIN'),
+          username: username ? String(username).trim().toLowerCase() : (sa?.username || targetEmail.split('@')[0]),
+          email: targetEmail,
+          role: 'SUPER_ADMIN',
+          school_id: null,
+          is_active: true,
+          must_change_password: false,
+        });
+
+        await admin.auth.admin.updateUserById(authUser.id, {
+          user_metadata: { ...(authUser.user_metadata || {}), role: 'SUPER_ADMIN' },
+        });
+
+        return json(res, 200, {
+          ok: true,
+          message: `Akun Super Admin berhasil diikat ke email ${targetEmail}.`,
+          email: targetEmail,
+        });
+      } else if (sa) {
+        // Jika akun auth belum ada, update email profil dan auth user yang sudah ada
+        await admin.auth.admin.updateUserById(sa.id, {
+          email: targetEmail,
+          email_confirm: true,
+          user_metadata: { role: 'SUPER_ADMIN' },
+        });
+
+        await admin.from('profiles').update({
+          email: targetEmail,
+          name: name ? String(name).trim() : sa.name,
+          username: username ? String(username).trim().toLowerCase() : sa.username,
+        }).eq('id', sa.id);
+
+        return json(res, 200, {
+          ok: true,
+          message: `Email akun Super Admin diperbarui ke ${targetEmail}.`,
+          email: targetEmail,
+        });
+      }
+
+      return json(res, 404, { error: 'Akun Super Admin tidak ditemukan.' });
+    } catch (err: any) {
+      return json(res, 500, { error: err?.message || 'Gagal memperbarui akun Super Admin.' });
+    }
+  }
 
   // FITUR RESET SANDI SUPER ADMIN
   if (action === 'reset_superadmin_password') {

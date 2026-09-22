@@ -11,10 +11,14 @@ export default async function handler(req: any, res: any) {
   const db = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
 
   // 1. Khusus superadmin alias
-  if (identifier === 'superadmin' || identifier === 'd4rkbarbarian@gmail.com' || identifier === 'd4rkbarbarian') {
+  const targetSuperAdminEmail = (process.env.SUPERADMIN_EMAIL || '30mey94@gmail.com').trim().toLowerCase();
+  if (identifier === 'superadmin' || identifier === targetSuperAdminEmail) {
     const { data: superAdmin } = await db.from('profiles').select('email').eq('role', 'SUPER_ADMIN').eq('is_active', true).maybeSingle();
     if (superAdmin?.email) {
       return json(res, 200, { ok: true, email: superAdmin.email });
+    }
+    if (targetSuperAdminEmail) {
+      return json(res, 200, { ok: true, email: targetSuperAdminEmail });
     }
   }
 

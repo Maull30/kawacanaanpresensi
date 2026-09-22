@@ -21,7 +21,6 @@ import {
   CheckCircle2,
   AlertCircle,
   Building2,
-  ShieldCheck,
 } from 'lucide-react';
 
 interface LoginViewProps {
@@ -76,31 +75,6 @@ export const LoginView: React.FC<LoginViewProps> = ({ onBackToLanding, onEnterDa
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [resetSuccessMessage, setResetSuccessMessage] = useState('');
-  const [isResettingSuperAdmin, setIsResettingSuperAdmin] = useState(false);
-
-  const handleQuickResetSuperadmin = async () => {
-    setIsResettingSuperAdmin(true);
-    try {
-      const res = await fetch('/api/setup-superadmin', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'reset_superadmin_password', newPassword: 'SuperAdmin2026!' }),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setEmailOrUser('superadmin');
-        setPassword('SuperAdmin2026!');
-        setErrorMessage('');
-        showToast('Sandi Super Admin disinkronkan ke SuperAdmin2026!', 'success');
-      } else {
-        showToast(data.error || 'Gagal mereset sandi Super Admin', 'error');
-      }
-    } catch (_) {
-      showToast('Gagal mereset sandi Super Admin', 'error');
-    } finally {
-      setIsResettingSuperAdmin(false);
-    }
-  };
 
   // Auto-detect if current window has auth hash, code, or error on mount
   useEffect(() => {
@@ -443,46 +417,6 @@ export const LoginView: React.FC<LoginViewProps> = ({ onBackToLanding, onEnterDa
                   </div>
                 </div>
 
-                {/* Helper Bantuan Akun Super Admin */}
-                {(emailOrUser.toLowerCase().includes('super') || (errorMessage && (emailOrUser.toLowerCase().includes('admin') || errorMessage.toLowerCase().includes('sandi')))) && (
-                  <div className="p-3.5 bg-indigo-50/90 border border-indigo-200 rounded-xl sm:rounded-2xl text-xs space-y-2.5 animate-in fade-in duration-200">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-1.5 font-bold text-indigo-950">
-                        <ShieldCheck size={16} className="text-indigo-600 shrink-0" />
-                        <span>Bantuan Akun Super Administrator</span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setEmailOrUser('superadmin');
-                          setPassword('SuperAdmin2026!');
-                          setErrorMessage('');
-                        }}
-                        className="text-[11px] font-bold text-indigo-700 bg-white hover:bg-indigo-100/70 px-2.5 py-1 rounded-lg border border-indigo-300 shadow-2xs transition-colors cursor-pointer"
-                      >
-                        Gunakan Kredensial
-                      </button>
-                    </div>
-                    <div className="text-[11px] text-indigo-900 leading-normal bg-white/80 p-2 rounded-lg border border-indigo-100 flex flex-wrap items-center gap-x-3 gap-y-1">
-                      <span>Username: <strong className="font-mono text-indigo-950">superadmin</strong></span>
-                      <span className="text-indigo-300">|</span>
-                      <span>Sandi Aktif: <strong className="font-mono text-indigo-950">SuperAdmin2026!</strong></span>
-                    </div>
-                    <div className="flex items-center justify-between pt-1 border-t border-indigo-200/80 text-[11px]">
-                      <span className="text-slate-600 font-medium">Sandi tidak cocok?</span>
-                      <button
-                        type="button"
-                        onClick={handleQuickResetSuperadmin}
-                        disabled={isResettingSuperAdmin}
-                        className="font-bold text-indigo-700 hover:text-indigo-950 hover:underline cursor-pointer flex items-center gap-1 disabled:opacity-60"
-                      >
-                        {isResettingSuperAdmin && <Loader2 size={12} className="animate-spin" />}
-                        <span>{isResettingSuperAdmin ? 'Menyinkronkan...' : 'Sinkronkan / Reset Sandi Super Admin'}</span>
-                      </button>
-                    </div>
-                  </div>
-                )}
-
                 {/* Primary Login Button */}
                 <button
                   id="btn-submit-masuk"
@@ -554,19 +488,6 @@ export const LoginView: React.FC<LoginViewProps> = ({ onBackToLanding, onEnterDa
                     id="btn-link-buat-akun-gratis"
                   >
                     Buat akun gratis
-                  </button>
-                </div>
-                <div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setEmailOrUser('superadmin');
-                      setPassword('SuperAdmin2026!');
-                      setErrorMessage('');
-                    }}
-                    className="text-[11px] font-semibold text-slate-400 hover:text-indigo-600 transition-colors cursor-pointer"
-                  >
-                    Masuk sebagai Super Administrator?
                   </button>
                 </div>
               </div>

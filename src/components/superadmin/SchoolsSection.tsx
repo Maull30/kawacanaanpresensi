@@ -375,14 +375,14 @@ export const SchoolsSection: React.FC<{
   // Helper avatar generator
   const getSchoolAvatar = (name: string, index: number) => {
     const palette = [
-      { bg: 'bg-blue-100 text-blue-700 border-blue-200', iconBg: '#3B82F6' },
       { bg: 'bg-purple-100 text-purple-700 border-purple-200', iconBg: '#8B5CF6' },
       { bg: 'bg-emerald-100 text-emerald-700 border-emerald-200', iconBg: '#10B981' },
       { bg: 'bg-amber-100 text-amber-700 border-amber-200', iconBg: '#F59E0B' },
+      { bg: 'bg-blue-100 text-blue-700 border-blue-200', iconBg: '#3B82F6' },
       { bg: 'bg-indigo-100 text-indigo-700 border-indigo-200', iconBg: '#6366F1' },
       { bg: 'bg-rose-100 text-rose-700 border-rose-200', iconBg: '#F43F5E' },
     ];
-    const theme = palette[index % palette.length];
+    const theme = palette[(index - 1 + palette.length) % palette.length];
     const cleanName = (name || 'S').trim();
     const initials = cleanName
       .split(' ')
@@ -523,23 +523,23 @@ export const SchoolsSection: React.FC<{
   const endItem = Math.min(currentPage * pageSize, filteredSchools.length);
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       {/* 1. HEADER SECTION MANAJEMEN SEKOLAH */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3.5">
-          <div className="w-11 h-11 rounded-2xl bg-blue-600 text-white flex items-center justify-center shadow-md shadow-blue-500/20 shrink-0">
-            <Building2 size={22} />
+          <div className="w-12 h-12 rounded-2xl bg-blue-600 text-white flex items-center justify-center shadow-sm shrink-0">
+            <Building2 size={24} />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
+              <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
                 Manajemen Sekolah
               </h1>
-              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-blue-50 text-blue-700 border border-blue-200">
+              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-blue-50 text-blue-600 border border-blue-200">
                 Multi-Tenant SaaS
               </span>
             </div>
-            <p className="text-xs text-slate-500 mt-0.5">
+            <p className="text-xs text-slate-500 mt-1">
               Kelola seluruh sekolah, tenant, paket lisensi, dan status operasional instansi.
             </p>
           </div>
@@ -550,375 +550,373 @@ export const SchoolsSection: React.FC<{
           <button
             type="button"
             onClick={() => setIsCreateOpen(true)}
-            className="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-xs flex items-center gap-1.5 cursor-pointer transition shrink-0"
+            className="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-semibold shadow-xs flex items-center gap-1.5 cursor-pointer transition shrink-0"
           >
-            <Plus size={15} />
+            <Plus size={16} />
             <span>Tambah Sekolah</span>
           </button>
         </div>
       </div>
 
-      {/* 2. TABEL DAFTAR SEKOLAH & TENANT (FULL-WIDTH SAAS VIEW) */}
-      <div className="w-full space-y-4">
-        {/* TOOLBAR FILTER CARD */}
-        <div className="bg-white p-3.5 rounded-2xl border border-slate-100 shadow-xs flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
-          {/* Input Pencarian */}
-          <div className="relative flex-1">
-            <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => {
-                setSearch(e.target.value);
-                setCurrentPage(1);
-              }}
-              placeholder="Cari nama sekolah, NPSN, kode akses..."
-              className="w-full pl-9 pr-8 py-2 rounded-xl border border-slate-200 text-xs font-medium focus:outline-blue-600 placeholder:text-slate-400"
-            />
-            {search && (
-              <button
-                type="button"
-                onClick={() => setSearch('')}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
-              >
-                <X size={14} />
-              </button>
-            )}
-          </div>
-
-          {/* Filter Dropdown Status & Paket */}
-          <div className="flex items-center gap-2">
-            <select
-              value={statusFilter}
-              onChange={(e) => {
-                setStatusFilter(e.target.value as any);
-                setCurrentPage(1);
-              }}
-              className="px-3 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 bg-white hover:border-slate-300 focus:outline-blue-600 cursor-pointer"
+      {/* 2. SEARCH & FILTER TOOLBAR (BARIS TUNGGAL BERSIH) */}
+      <div className="flex flex-col sm:flex-row items-center gap-3">
+        {/* Input Pencarian */}
+        <div className="relative flex-1 w-full">
+          <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setCurrentPage(1);
+            }}
+            placeholder="Cari nama sekolah, NPSN, kode akses..."
+            className="w-full bg-white pl-10 pr-9 py-2.5 rounded-xl border border-slate-200 text-xs sm:text-sm font-medium text-slate-800 focus:outline-blue-600 placeholder:text-slate-400 shadow-2xs transition"
+          />
+          {search && (
+            <button
+              type="button"
+              onClick={() => setSearch('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
             >
-              <option value="all">Semua Status</option>
-              <option value="active">Aktif</option>
-              <option value="inactive">Nonaktif</option>
-              <option value="attention">Perlu Perhatian</option>
-            </select>
-
-            <select
-              value={planFilter}
-              onChange={(e) => {
-                setPlanFilter(e.target.value as any);
-                setCurrentPage(1);
-              }}
-              className="px-3 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 bg-white hover:border-slate-300 focus:outline-blue-600 cursor-pointer"
-            >
-              <option value="all">Semua Paket</option>
-              <option value="free">Paket Gratis</option>
-              <option value="basic">Paket Guru</option>
-              <option value="pro">Paket Sekolah</option>
-            </select>
-          </div>
+              <X size={14} />
+            </button>
+          )}
         </div>
 
-          {/* TABEL DIREKTORI SEKOLAH & TENANT */}
-          <div className="bg-white rounded-2xl border border-slate-100 shadow-xs overflow-hidden">
-            {/* Header Card Tabel */}
-            <div className="px-4 py-3.5 border-b border-slate-100 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
-                  <School size={15} />
-                </div>
-                <h2 className="text-sm font-black text-slate-900">
-                  Daftar Sekolah &amp; Tenant
-                </h2>
-              </div>
-              <span className="text-xs font-bold text-slate-500 bg-slate-50 px-2.5 py-1 rounded-full border border-slate-100">
-                {filteredSchools.length} Sekolah
-              </span>
+        {/* Filter Dropdown Status & Paket */}
+        <div className="flex items-center gap-2.5 w-full sm:w-auto shrink-0">
+          <select
+            value={statusFilter}
+            onChange={(e) => {
+              setStatusFilter(e.target.value as any);
+              setCurrentPage(1);
+            }}
+            className="px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs sm:text-sm font-medium text-slate-700 bg-white hover:border-slate-300 focus:outline-blue-600 cursor-pointer shadow-2xs transition appearance-auto"
+          >
+            <option value="all">Semua Status</option>
+            <option value="active">Aktif</option>
+            <option value="inactive">Nonaktif</option>
+            <option value="attention">Perlu Perhatian</option>
+          </select>
+
+          <select
+            value={planFilter}
+            onChange={(e) => {
+              setPlanFilter(e.target.value as any);
+              setCurrentPage(1);
+            }}
+            className="px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs sm:text-sm font-medium text-slate-700 bg-white hover:border-slate-300 focus:outline-blue-600 cursor-pointer shadow-2xs transition appearance-auto"
+          >
+            <option value="all">Semua Paket</option>
+            <option value="free">Semua Paket Gratis</option>
+            <option value="basic">Paket Guru</option>
+            <option value="pro">Paket Sekolah</option>
+          </select>
+        </div>
+      </div>
+
+      {/* 3. TABEL DIREKTORI SEKOLAH & TENANT */}
+      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-2xs overflow-hidden">
+        {/* Header Card Tabel */}
+        <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-white">
+          <div className="flex items-center gap-2.5">
+            <div className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center font-bold shrink-0">
+              <School size={15} />
+            </div>
+            <h2 className="text-sm font-bold text-slate-900">
+              Daftar Sekolah &amp; Tenant
+            </h2>
+          </div>
+          <span className="text-xs font-medium text-slate-600 bg-slate-100/90 px-3 py-1 rounded-full border border-slate-200/60">
+            {filteredSchools.length} Sekolah
+          </span>
+        </div>
+
+        {loading ? (
+          <div className="flex flex-col items-center justify-center py-20 text-slate-400">
+            <RefreshCw size={26} className="animate-spin text-blue-600 mb-2" />
+            <span className="text-xs font-semibold">Memuat data direktori sekolah...</span>
+          </div>
+        ) : filteredSchools.length === 0 ? (
+          <div className="py-16 text-center text-xs text-slate-400 space-y-2">
+            <Building2 size={32} className="mx-auto text-slate-300 mb-2" />
+            <p className="font-semibold text-slate-600">Tidak ada sekolah yang sesuai kriteria pencarian.</p>
+            <p className="text-[11px] text-slate-400">Coba ubah kata kunci atau setel ulang filter.</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead>
+                <tr className="border-b border-slate-100 text-slate-400 font-bold uppercase text-[10px] sm:text-[11px] tracking-wider bg-white">
+                  <th className="py-3.5 px-4 w-12 text-center">NO</th>
+                  <th className="py-3.5 px-4">SEKOLAH &amp; TENANT</th>
+                  <th className="py-3.5 px-4">NPSN</th>
+                  <th className="py-3.5 px-4">KODE AKSES</th>
+                  <th className="py-3.5 px-4">PAKET</th>
+                  <th className="py-3.5 px-4">STATUS LAYANAN</th>
+                  <th className="py-3.5 px-4 text-center">PENGGUNA</th>
+                  <th className="py-3.5 px-4">MASA BERLAKU</th>
+                  <th className="py-3.5 px-4 text-center w-28">AKSI</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {paginatedSchools.map((s, idx) => {
+                  const lifecycle = getTenantLifecycleInfo(s);
+                  const isSuspended = s.status === 'inactive' || lifecycle.isSuspended;
+                  const isAttention = lifecycle.isExpiringSoon || lifecycle.isGracePeriod;
+                  const rawCode = s.code || s.npsn || s.id?.slice(0, 8)?.toUpperCase() || 'SCH-CODE';
+                  const cleanCode = rawCode.replace(/^SCH-?/i, '').trim().toUpperCase();
+                  const rowNumber = (currentPage - 1) * pageSize + idx + 1;
+                  const avatar = getSchoolAvatar(s.name, rowNumber);
+
+                  // Normalisasi Paket Badge
+                  const planStr = (s.plan || 'gratis').toLowerCase();
+                  const isGratis =
+                    planStr.includes('gratis') ||
+                    planStr.includes('free') ||
+                    planStr.includes('mulai') ||
+                    planStr === 'trial' ||
+                    planStr === 'guru_gratis';
+
+                  let planBadge = { label: 'PAKET GRATIS', cls: 'bg-blue-50 text-blue-600 border-blue-200' };
+                  if (isGratis) {
+                    planBadge = { label: 'PAKET GRATIS', cls: 'bg-blue-50 text-blue-600 border-blue-200' };
+                  } else if (planStr.includes('school') || planStr.includes('sekolah') || planStr === 'sekolah_pro') {
+                    planBadge = { label: 'PAKET SEKOLAH', cls: 'bg-purple-50 text-purple-600 border-purple-200' };
+                  } else if (planStr.includes('guru') || planStr.includes('teacher') || planStr.includes('pro') || planStr === 'guru_pro') {
+                    planBadge = { label: 'PAKET GURU', cls: 'bg-sky-50 text-sky-600 border-sky-200' };
+                  }
+
+                  // Format Tanggal Masa Berlaku
+                  let expiryFormatted = '-';
+                  if (s.subscription_expires_at) {
+                    try {
+                      expiryFormatted = new Date(s.subscription_expires_at).toLocaleDateString('id-ID', {
+                        day: 'numeric',
+                        month: 'short',
+                        year: 'numeric',
+                      });
+                    } catch {
+                      expiryFormatted = s.subscription_expires_at;
+                    }
+                  }
+
+                  return (
+                    <tr
+                      key={s.id || s.school_id}
+                      className="hover:bg-slate-50/50 transition-colors group"
+                    >
+                      {/* 1. No */}
+                      <td className="py-3.5 px-4 text-center text-slate-400 font-normal text-xs">
+                        {rowNumber}
+                      </td>
+
+                      {/* 2. Sekolah & Tenant (Avatar + Nama) */}
+                      <td className="py-3.5 px-4">
+                        <div className="flex items-center gap-3">
+                          <div
+                            className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs shrink-0 ${avatar.theme.bg}`}
+                          >
+                            {avatar.initials}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="font-bold text-slate-900 uppercase text-xs tracking-tight truncate max-w-[200px]">
+                              {s.name}
+                            </div>
+                            <div className="text-[11px] text-slate-400 truncate mt-0.5">
+                              {s.workspace_type === 'personal' || s.is_personal
+                                ? 'Ruang Kerja Individu'
+                                : 'Instansi Sekolah'}
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* 3. NPSN */}
+                      <td className="py-3.5 px-4 font-normal text-slate-700 text-xs">
+                        {s.npsn || '-'}
+                      </td>
+
+                      {/* 4. Kode Akses */}
+                      <td className="py-3.5 px-4" onClick={(e) => e.stopPropagation()}>
+                        <div className="inline-flex items-center gap-1.5 font-mono font-medium text-slate-700 text-xs">
+                          <span>{cleanCode}</span>
+                          <button
+                            type="button"
+                            onClick={() => handleCopyCode(cleanCode, s.id)}
+                            className="text-slate-400 hover:text-slate-600 p-0.5 cursor-pointer transition ml-1"
+                            title="Salin Kode Akses"
+                          >
+                            {copiedCodeId === s.id ? (
+                              <Check size={13} className="text-emerald-600" />
+                            ) : (
+                              <Copy size={13} />
+                            )}
+                          </button>
+                        </div>
+                      </td>
+
+                      {/* 5. Paket */}
+                      <td className="py-3.5 px-4">
+                        <span
+                          className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold border tracking-wider uppercase ${planBadge.cls}`}
+                        >
+                          {planBadge.label}
+                        </span>
+                      </td>
+
+                      {/* 6. Status Layanan */}
+                      <td className="py-3.5 px-4">
+                        {isSuspended ? (
+                          <span className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600 border border-slate-200">
+                            <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+                            Nonaktif
+                          </span>
+                        ) : isAttention ? (
+                          <span className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                            Perlu Perhatian
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                            Aktif
+                          </span>
+                        )}
+                      </td>
+
+                      {/* 7. Pengguna */}
+                      <td className="py-3.5 px-4 text-center">
+                        <div className="inline-flex items-center gap-1.5 text-slate-800 font-bold text-xs">
+                          <User size={13} className="text-slate-400" />
+                          <span>{s.teacher_admin_count || s.user_count || 1}</span>
+                        </div>
+                      </td>
+
+                      {/* 8. Masa Berlaku */}
+                      <td className="py-3.5 px-4">
+                        <div className="font-normal text-slate-800 text-xs">
+                          {expiryFormatted}
+                        </div>
+                        {lifecycle.daysRemaining !== null ? (
+                          <div
+                            className={`text-[11px] ${
+                              isSuspended || lifecycle.daysRemaining <= 0
+                                ? 'text-rose-600 font-semibold'
+                                : isAttention
+                                ? 'text-amber-600 font-semibold'
+                                : 'text-slate-400'
+                            }`}
+                          >
+                            {lifecycle.daysRemaining <= 0
+                              ? 'Kedaluwarsa'
+                              : `${lifecycle.daysRemaining} hari lagi`}
+                          </div>
+                        ) : isSuspended ? (
+                          <div className="text-[11px] text-rose-600 font-semibold">
+                            Kedaluwarsa
+                          </div>
+                        ) : null}
+                      </td>
+
+                      {/* 9. Aksi: Ikon Aksi Langsung (Masuk Sesi, Bekukan/Aktifkan, Hapus) */}
+                      <td className="py-3.5 px-4 text-center" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center justify-center gap-1.5">
+                          {/* Aksi 1: Masuk Sesi Sekolah */}
+                          <button
+                            type="button"
+                            onClick={() => handleImpersonate(s)}
+                            className="w-8 h-8 rounded-lg border border-slate-200 hover:border-blue-300 hover:bg-blue-50 text-slate-500 hover:text-blue-600 flex items-center justify-center transition cursor-pointer shadow-2xs"
+                            title="Masuk Sesi Sekolah"
+                          >
+                            <LogIn size={14} />
+                          </button>
+
+                          {/* Aksi 2: Bekukan (kebalikan dari aktifkan) Sekolah */}
+                          <button
+                            type="button"
+                            onClick={() => handleToggleSchoolStatus(s)}
+                            className={`w-8 h-8 rounded-lg border flex items-center justify-center transition cursor-pointer shadow-2xs ${
+                              !isSuspended
+                                ? 'border-slate-200 hover:border-amber-300 hover:bg-amber-50 text-slate-400 hover:text-amber-600'
+                                : 'border-emerald-200 bg-emerald-50/50 hover:bg-emerald-100 text-emerald-600'
+                            }`}
+                            title={!isSuspended ? 'Bekukan Sekolah' : 'Aktifkan Sekolah'}
+                          >
+                            {!isSuspended ? <Ban size={14} /> : <CheckCircle2 size={14} />}
+                          </button>
+
+                          {/* Aksi 3: Hapus Sekolah */}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSchoolToDelete(s);
+                              setDeleteConfirmInput('');
+                            }}
+                            className="w-8 h-8 rounded-lg border border-slate-200 hover:border-rose-300 hover:bg-rose-50 text-slate-400 hover:text-rose-600 flex items-center justify-center transition cursor-pointer shadow-2xs"
+                            title="Hapus Sekolah"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* Footer Tabel: Info Jumlah & Pagination Lengkap */}
+        {filteredSchools.length > 0 && (
+          <div className="px-5 py-4 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+            <div className="text-slate-500 font-normal">
+              Menampilkan <span className="font-semibold text-slate-800">{startItem}–{endItem}</span> dari{' '}
+              <span className="font-semibold text-slate-800">{filteredSchools.length}</span> sekolah
             </div>
 
-            {loading ? (
-              <div className="flex flex-col items-center justify-center py-20 text-slate-400">
-                <RefreshCw size={26} className="animate-spin text-blue-600 mb-2" />
-                <span className="text-xs font-semibold">Memuat data direktori sekolah...</span>
-              </div>
-            ) : filteredSchools.length === 0 ? (
-              <div className="py-16 text-center text-xs text-slate-400 space-y-2">
-                <Building2 size={32} className="mx-auto text-slate-300 mb-2" />
-                <p className="font-semibold text-slate-600">Tidak ada sekolah yang sesuai kriteria pencarian.</p>
-                <p className="text-[11px] text-slate-400">Coba ubah kata kunci atau setel ulang filter.</p>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead>
-                    <tr className="border-b border-slate-100 text-slate-400 font-bold bg-slate-50/60 uppercase text-[10px] tracking-wider">
-                      <th className="py-3 px-3.5 w-10 text-center">No</th>
-                      <th className="py-3 px-3.5">Sekolah &amp; Tenant</th>
-                      <th className="py-3 px-3.5">NPSN</th>
-                      <th className="py-3 px-3.5">Kode Akses</th>
-                      <th className="py-3 px-3.5">Paket</th>
-                      <th className="py-3 px-3.5">Status Layanan</th>
-                      <th className="py-3 px-3.5 text-center">Pengguna</th>
-                      <th className="py-3 px-3.5">Masa Berlaku</th>
-                      <th className="py-3 px-3.5 text-right">Aksi</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {paginatedSchools.map((s, idx) => {
-                      const lifecycle = getTenantLifecycleInfo(s);
-                      const isSuspended = s.status === 'inactive' || lifecycle.isSuspended;
-                      const isAttention = lifecycle.isExpiringSoon || lifecycle.isGracePeriod;
-                      const rawCode = s.code || s.npsn || s.id?.slice(0, 8)?.toUpperCase() || 'SCH-CODE';
-                      const cleanCode = rawCode.replace(/^SCH-?/i, '').trim().toUpperCase();
-                      const isMenuOpen = activeMenuSchoolId === (s.id || s.school_id);
-                      const rowNumber = (currentPage - 1) * pageSize + idx + 1;
-                      const avatar = getSchoolAvatar(s.name, rowNumber);
+            {/* Kontrol Halaman Pagination */}
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                className="p-1 rounded-md text-slate-400 hover:text-slate-600 disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer transition"
+                title="Halaman Sebelumnya"
+              >
+                <ChevronLeft size={16} />
+              </button>
 
-                      // Normalisasi Paket Badge
-                      const planStr = (s.plan || 'gratis').toLowerCase();
-                      const isGratis =
-                        planStr.includes('gratis') ||
-                        planStr.includes('free') ||
-                        planStr.includes('mulai') ||
-                        planStr === 'trial' ||
-                        planStr === 'guru_gratis';
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
+                <button
+                  key={pageNum}
+                  type="button"
+                  onClick={() => setCurrentPage(pageNum)}
+                  className={`w-7 h-7 rounded-lg text-xs font-bold transition cursor-pointer flex items-center justify-center ${
+                    currentPage === pageNum
+                      ? 'bg-blue-600 text-white shadow-xs'
+                      : 'text-slate-600 hover:bg-slate-100'
+                  }`}
+                >
+                  {pageNum}
+                </button>
+              ))}
 
-                      let planBadge = { label: 'PAKET GRATIS', cls: 'bg-sky-50 text-sky-700 border-sky-200' };
-                      if (isGratis) {
-                        planBadge = { label: 'PAKET GRATIS', cls: 'bg-sky-50 text-sky-700 border-sky-200' };
-                      } else if (planStr.includes('school') || planStr.includes('sekolah') || planStr === 'sekolah_pro') {
-                        planBadge = { label: 'PAKET SEKOLAH', cls: 'bg-purple-50 text-purple-700 border-purple-200' };
-                      } else if (planStr.includes('guru') || planStr.includes('teacher') || planStr.includes('pro') || planStr === 'guru_pro') {
-                        planBadge = { label: 'PAKET GURU', cls: 'bg-blue-50 text-blue-700 border-blue-200' };
-                      } else {
-                        planBadge = { label: 'PAKET GRATIS', cls: 'bg-sky-50 text-sky-700 border-sky-200' };
-                      }
-
-                      // Format Tanggal Masa Berlaku
-                      let expiryFormatted = '-';
-                      if (s.subscription_expires_at) {
-                        try {
-                          expiryFormatted = new Date(s.subscription_expires_at).toLocaleDateString('id-ID', {
-                            day: 'numeric',
-                            month: 'short',
-                            year: 'numeric',
-                          });
-                        } catch {
-                          expiryFormatted = s.subscription_expires_at;
-                        }
-                      }
-
-                      return (
-                        <tr
-                          key={s.id || s.school_id}
-                          className="hover:bg-slate-50/80 transition-colors group"
-                        >
-                          {/* 1. No */}
-                          <td className="py-3 px-3.5 text-center text-slate-400 font-mono font-medium">
-                            {rowNumber}
-                          </td>
-
-                          {/* 2. Sekolah & Tenant (Avatar + Nama) */}
-                          <td className="py-3 px-3.5">
-                            <div className="flex items-center gap-2.5">
-                              <div
-                                className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs shrink-0 border ${avatar.theme.bg}`}
-                              >
-                                {avatar.initials}
-                              </div>
-                              <div className="min-w-0">
-                                <div className="font-bold text-slate-900 group-hover:text-blue-600 transition truncate max-w-[200px]">
-                                  {s.name}
-                                </div>
-                                <div className="text-[10px] text-slate-400 truncate">
-                                  {s.workspace_type === 'personal' || s.is_personal
-                                    ? 'Ruang Kerja Individu'
-                                    : 'Instansi Sekolah'}
-                                </div>
-                              </div>
-                            </div>
-                          </td>
-
-                          {/* 3. NPSN */}
-                          <td className="py-3 px-3.5 font-mono text-slate-600 font-medium">
-                            {s.npsn || '-'}
-                          </td>
-
-                          {/* 4. Kode Akses */}
-                          <td className="py-3 px-3.5" onClick={(e) => e.stopPropagation()}>
-                            <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-slate-100 font-mono font-bold text-slate-700 text-[11px]">
-                              <span>{cleanCode}</span>
-                              <button
-                                type="button"
-                                onClick={() => handleCopyCode(cleanCode, s.id)}
-                                className="text-slate-400 hover:text-slate-700 p-0.5 cursor-pointer"
-                                title="Salin Kode Akses"
-                              >
-                                {copiedCodeId === s.id ? (
-                                  <Check size={11} className="text-emerald-600" />
-                                ) : (
-                                  <Copy size={11} />
-                                )}
-                              </button>
-                            </div>
-                          </td>
-
-                          {/* 5. Paket */}
-                          <td className="py-3 px-3.5">
-                            <span
-                              className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold border ${planBadge.cls}`}
-                            >
-                              {planBadge.label}
-                            </span>
-                          </td>
-
-                          {/* 6. Status Layanan */}
-                          <td className="py-3 px-3.5">
-                            {isSuspended ? (
-                              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
-                                <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
-                                Nonaktif
-                              </span>
-                            ) : isAttention ? (
-                              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
-                                <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-                                Perlu Perhatian
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                                Aktif
-                              </span>
-                            )}
-                          </td>
-
-                          {/* 7. Pengguna */}
-                          <td className="py-3 px-3.5 text-center">
-                            <div className="inline-flex items-center gap-1 text-slate-700 font-bold text-xs">
-                              <User size={12} className="text-slate-400" />
-                              <span>{s.teacher_admin_count || s.user_count || 1}</span>
-                            </div>
-                          </td>
-
-                          {/* 8. Masa Berlaku */}
-                          <td className="py-3 px-3.5">
-                            <div className="font-medium text-slate-800 text-xs">
-                              {expiryFormatted}
-                            </div>
-                            {lifecycle.daysRemaining !== null && (
-                              <div
-                                className={`text-[10px] font-semibold ${
-                                  isSuspended
-                                    ? 'text-rose-600'
-                                    : isAttention
-                                    ? 'text-amber-600'
-                                    : 'text-slate-400'
-                                }`}
-                              >
-                                {lifecycle.daysRemaining <= 0
-                                  ? 'Kedaluwarsa'
-                                  : `${lifecycle.daysRemaining} hari lagi`}
-                              </div>
-                            )}
-                          </td>
-
-                          {/* 9. Aksi: Ikon Aksi Langsung (Masuk Sesi, Bekukan/Aktifkan, Hapus) */}
-                          <td className="py-3 px-3.5 text-right" onClick={(e) => e.stopPropagation()}>
-                            <div className="flex items-center justify-end gap-1.5">
-                              {/* Aksi 1: Masuk Sesi Sekolah */}
-                              <button
-                                type="button"
-                                onClick={() => handleImpersonate(s)}
-                                className="p-1.5 rounded-lg border border-slate-200 hover:border-blue-300 hover:bg-blue-50 text-slate-500 hover:text-blue-600 transition cursor-pointer shadow-2xs"
-                                title="Masuk Sesi Sekolah"
-                              >
-                                <LogIn size={14} />
-                              </button>
-
-                              {/* Aksi 2: Bekukan (kebalikan dari aktifkan) Sekolah */}
-                              <button
-                                type="button"
-                                onClick={() => handleToggleSchoolStatus(s)}
-                                className={`p-1.5 rounded-lg border transition cursor-pointer shadow-2xs ${
-                                  !isSuspended
-                                    ? 'border-slate-200 hover:border-amber-300 hover:bg-amber-50 text-slate-500 hover:text-amber-600'
-                                    : 'border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-700'
-                                }`}
-                                title={!isSuspended ? 'Bekukan Sekolah' : 'Aktifkan Sekolah'}
-                              >
-                                {!isSuspended ? <Ban size={14} /> : <CheckCircle2 size={14} />}
-                              </button>
-
-                              {/* Aksi 3: Hapus Sekolah */}
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setSchoolToDelete(s);
-                                  setDeleteConfirmInput('');
-                                }}
-                                className="p-1.5 rounded-lg border border-slate-200 hover:border-rose-300 hover:bg-rose-50 text-slate-500 hover:text-rose-600 transition cursor-pointer shadow-2xs"
-                                title="Hapus Sekolah"
-                              >
-                                <Trash2 size={14} />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-
-            {/* Footer Tabel: Info Jumlah & Pagination Lengkap */}
-            {filteredSchools.length > 0 && (
-              <div className="px-4 py-3 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
-                <div className="text-slate-500 font-medium">
-                  Menampilkan <span className="font-bold text-slate-800">{startItem}–{endItem}</span> dari{' '}
-                  <span className="font-bold text-slate-800">{filteredSchools.length}</span> sekolah
-                </div>
-
-                {/* Kontrol Halaman Pagination */}
-                <div className="flex items-center gap-1">
-                  <button
-                    type="button"
-                    disabled={currentPage === 1}
-                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                    className="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition"
-                    title="Halaman Sebelumnya"
-                  >
-                    <ChevronLeft size={14} />
-                  </button>
-
-                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
-                    <button
-                      key={pageNum}
-                      type="button"
-                      onClick={() => setCurrentPage(pageNum)}
-                      className={`w-7 h-7 rounded-lg text-xs font-bold transition cursor-pointer ${
-                        currentPage === pageNum
-                          ? 'bg-blue-600 text-white shadow-xs'
-                          : 'text-slate-600 hover:bg-slate-100'
-                      }`}
-                    >
-                      {pageNum}
-                    </button>
-                  ))}
-
-                  <button
-                    type="button"
-                    disabled={currentPage === totalPages}
-                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                    className="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition"
-                    title="Halaman Berikutnya"
-                  >
-                    <ChevronRight size={14} />
-                  </button>
-                </div>
-              </div>
-            )}
+              <button
+                type="button"
+                disabled={currentPage === totalPages}
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                className="p-1 rounded-md text-slate-400 hover:text-slate-600 disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer transition"
+                title="Halaman Berikutnya"
+              >
+                <ChevronRight size={16} />
+              </button>
+            </div>
           </div>
-        </div>
+        )}
+      </div>
 
       {/* Modal Import Data Sekolah */}
       {isImportModalOpen && (

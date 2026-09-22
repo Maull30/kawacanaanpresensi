@@ -715,7 +715,16 @@ export const DataKelasView: React.FC = () => {
     if (hasHeader) {
       const headerDelim = lines[0].includes('\t') ? '\t' : lines[0].includes(';') ? ';' : ',';
       const hTokens = lines[0].split(headerDelim).map((t) => t.trim().toLowerCase());
-      if (hTokens[0]?.includes('kelas') || hTokens[0]?.includes('rombel')) {
+      const col0 = hTokens[0] || '';
+      const col1 = hTokens[1] || '';
+
+      if (col0.includes('wali')) {
+        // Kolom 0 adalah NAMA WALI KELAS -> headerWaliFirst = true
+        headerWaliFirst = true;
+      } else if (col1.includes('wali')) {
+        // Kolom 1 adalah Wali Kelas, berarti Kolom 0 adalah Kelas -> headerWaliFirst = false
+        headerWaliFirst = false;
+      } else if (col0.includes('rombel') || col0.includes('kelas')) {
         headerWaliFirst = false;
       }
     }
@@ -739,6 +748,16 @@ export const DataKelasView: React.FC = () => {
         let rawWali = '';
         let gradeNum = 1;
 
+        const isClassFormat = (val: string) =>
+          /^(kelas|rombel)\b/i.test(val) ||
+          /^[1-9][a-z]?$/i.test(val) ||
+          /^[1-9]\s+[a-z]$/i.test(val) ||
+          /^(vi|v|iv|iii|ii|i)[a-z]?$/i.test(val);
+
+        const isTeacherFormat = (val: string) =>
+          teachers.some((tch) => tch.nama.trim().toLowerCase() === val.toLowerCase()) ||
+          /\b(s\.pd|m\.pd|s\.ag|s\.kom|s\.si|m\.si|s\.sos|drs|dra|dr\.|prof)\b/i.test(val);
+
         if (tokens.length >= 3 && !isNaN(parseInt(tokens[1], 10))) {
           // Format 3 kolom legacy: Nama Kelas, Tingkat, Nama Wali
           rawName = tokens[0] || '';
@@ -746,28 +765,57 @@ export const DataKelasView: React.FC = () => {
           rawWali = tokens[2] || '';
         } else if (tokens.length >= 2) {
           // 2 Kolom (Standar Template Baru: Kolom 1 = NAMA WALI KELAS, Kolom 2 = NAMA ROMBEL / KELAS)
-          const t0 = tokens[0] || '';
-          const t1 = tokens[1] || '';
+          const t0 = (tokens[0] || '').trim();
+          const t1 = (tokens[1] || '').trim();
 
-          const t0IsClass = /^(kelas|rombel|\d+[a-z]?|[ivx]+[a-z]?)/i.test(t0);
-          const t1IsClass = /^(kelas|rombel|\d+[a-z]?|[ivx]+[a-z]?)/i.test(t1);
+          const t0IsClass = isClassFormat(t0);
+          const t1IsClass = isClassFormat(t1);
+          const t0IsTeacher = isTeacherFormat(t0);
+          const t1IsTeacher = isTeacherFormat(t1);
 
-          if (!headerWaliFirst) {
-            rawName = t0;
-            rawWali = t1;
-          } else if (t1IsClass && !t0IsClass) {
-            rawWali = t0;
-            rawName = t1;
-          } else if (t0IsClass && !t1IsClass) {
-            rawName = t0;
-            rawWali = t1;
+          if (headerWaliFirst) {
+            // Kolom 0 = NAMA WALI KELAS, Kolom 1 = NAMA ROMBEL / KELAS
+            if (t0IsClass && !t1IsClass) {
+              // Jika baris data terbalik (t0 nama kelas, t1 nama wali)
+              rawName = t0;
+              rawWali = t1;
+            } else {
+              rawWali = t0;
+              rawName = t1 || (t0IsClass ? t0 : '');
+            }
           } else {
-            rawWali = t0;
-            rawName = t1 || t0;
+            // Kolom 0 = NAMA ROMBEL / KELAS, Kolom 1 = NAMA WALI KELAS
+            if (t0IsTeacher && t1IsClass) {
+              rawWali = t0;
+              rawName = t1;
+            } else if (t1IsClass && !t0IsClass) {
+              rawWali = t0;
+              rawName = t1;
+            } else {
+              rawName = t0;
+              rawWali = t1;
+            }
           }
         } else {
-          rawName = tokens[0] || '';
-          rawWali = '';
+          // 1 kolom data
+          const t0 = (tokens[0] || '').trim();
+          if (isClassFormat(t0)) {
+            rawName = t0;
+            rawWali = '';
+          } else {
+            rawWali = t0;
+            rawName = '';
+          }
+        }
+
+        // Sanity check otomatis: pastikan rawName dan rawWali tidak tertukar
+        if (
+          (isTeacherFormat(rawName) && isClassFormat(rawWali)) ||
+          (!isClassFormat(rawName) && isClassFormat(rawWali))
+        ) {
+          const temp = rawName;
+          rawName = rawWali;
+          rawWali = temp;
         }
 
         const matchNum = rawName.match(/\d+/);
@@ -1158,16 +1206,10 @@ export const DataKelasView: React.FC = () => {
                           </td>
                           <td className="py-3.5 px-4 text-center font-extrabold text-slate-900">
                             <span
-                              className={`inline-flex items-center justify-center px-2.5 py-1 rounded-lg text-xs font-black ${
-                                totalCount >= 50
-                                  ? 'bg-rose-100 text-rose-800 border border-rose-300'
-                                  : totalCount >= 40
-                                  ? 'bg-amber-100 text-amber-800 border border-amber-300'
-                                  : 'bg-slate-100 text-slate-900'
-                              }`}
-                              title={`Kapasitas siswa: ${totalCount} dari batas maksimal 50 siswa`}
+                              className="inline-flex items-center justify-center px-2.5 py-1 rounded-lg text-xs font-black bg-slate-100 text-slate-900"
+                              title={`Total ${totalCount} siswa`}
                             >
-                              {totalCount} / 50
+                              {totalCount}
                             </span>
                           </td>
                           <td className="py-3.5 px-4 text-center">

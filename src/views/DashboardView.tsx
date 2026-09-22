@@ -705,18 +705,8 @@ export const DashboardView: React.FC = () => {
       
       {/* 1. Spanduk Hero (Sleek Commercial SaaS Enterprise Banner) */}
       <div className="relative overflow-hidden rounded-xl sm:rounded-2xl border border-slate-200/80 shadow-2xs bg-gradient-to-r from-blue-50/80 via-white to-sky-50/40 flex flex-col md:flex-row items-stretch justify-between min-h-[80px] sm:min-h-[88px] lg:h-[90px]">
-        {/* Left: Greeting Pill + Title + Subtitle */}
+        {/* Left: Title + Subtitle */}
         <div className="p-3 sm:p-3.5 lg:p-4 flex-1 z-10 flex flex-col justify-center space-y-1">
-          <div className="flex items-center gap-2">
-            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-600 border border-blue-200/60 shadow-2xs">
-              <span>👋</span>
-              <span>{isPersonalWorkspace ? 'Ruang Kerja Individu' : 'Ruang Kerja Sekolah'}</span>
-            </span>
-            <span className="text-[10px] text-slate-400 font-semibold hidden sm:inline">
-              • {userScope.roleBadgeLabel}
-            </span>
-          </div>
-
           <h1 className="text-sm sm:text-base lg:text-lg font-black text-slate-900 tracking-tight leading-tight">
             Panel Kontrol Utama
           </h1>
@@ -732,8 +722,8 @@ export const DashboardView: React.FC = () => {
           </p>
         </div>
 
-        {/* Center / Right: School Building Photography + Curved Blue Slogan */}
-        <div className="relative flex items-center justify-end shrink-0 md:w-[42%] lg:w-[45%] overflow-hidden min-h-[55px] md:min-h-auto">
+        {/* Right: School Building Photography */}
+        <div className="relative flex items-center justify-end shrink-0 md:w-[35%] lg:w-[40%] overflow-hidden min-h-[55px] md:min-h-auto">
           {/* Panoramic School Building Photography */}
           <div className="absolute inset-0 z-0">
             <img
@@ -745,19 +735,7 @@ export const DashboardView: React.FC = () => {
               }}
             />
             {/* Smooth gradient blend overlay on the left */}
-            <div className="absolute inset-0 bg-gradient-to-r from-white via-white/70 to-transparent w-2/5" />
-          </div>
-
-          {/* Far Right: Curved Royal Blue Shape with Slogan */}
-          <div className="relative z-10 h-full flex items-center justify-center bg-gradient-to-br from-[#0066FF] via-[#0052CC] to-[#00388F] text-white px-4 sm:px-6 py-2 rounded-l-2xl sm:rounded-l-3xl shadow-md ml-auto min-w-[170px] sm:min-w-[210px] text-right">
-            <div className="flex flex-col items-end">
-              <span className="text-[11px] sm:text-xs lg:text-sm font-extrabold text-white tracking-wide leading-tight drop-shadow-xs">
-                Disiplin Hari Ini
-              </span>
-              <span className="text-[11px] sm:text-xs lg:text-sm font-extrabold text-white tracking-wide border-b border-white/90 pb-0.5 mt-0.5 drop-shadow-xs">
-                Prestasi Esok Nanti
-              </span>
-            </div>
+            <div className="absolute inset-0 bg-gradient-to-r from-white via-white/50 to-transparent w-2/5" />
           </div>
         </div>
       </div>
@@ -1363,20 +1341,8 @@ export const DashboardView: React.FC = () => {
       </div>
 
       {/* 6. Dashboard Footer */}
-      <footer className="pt-2 pb-1 border-t border-slate-200/80 flex flex-col sm:flex-row items-center justify-between gap-1 text-[11px] text-slate-500">
-        <div className="flex items-center gap-2">
-          {/* Badge Ruang Kerja */}
-          <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200/80 shadow-2xs">
-            <Building2 size={12} className="text-blue-600 shrink-0" />
-            <span>{isPersonalWorkspace ? 'Ruang Kerja Individu' : 'Ruang Kerja Sekolah'}</span>
-          </div>
-          {schoolProfile.namaSekolah && (
-            <span className="text-[10px] font-medium text-slate-400 hidden sm:inline">
-              • {schoolProfile.namaSekolah}
-            </span>
-          )}
-        </div>
-        <p className="text-[10px] text-slate-400 font-medium">
+      <footer className="pt-2 pb-1 border-t border-slate-200/80 flex items-center justify-center text-center text-[10px] text-slate-400 font-medium">
+        <p>
           {systemConfig.footerCopyright || '© 2026 Kawacanaan by Maulana Yusuf. All Rights Reserved.'}
         </p>
       </footer>

@@ -636,6 +636,15 @@ export const DataKelasView: React.FC = () => {
       firstLineLower.includes('wali') ||
       firstLineLower.includes('rombel');
 
+    let headerWaliFirst = true; // Template standar baru: Kolom 1 = Wali Kelas, Kolom 2 = Nama Rombel/Kelas
+    if (hasHeader) {
+      const headerDelim = lines[0].includes('\t') ? '\t' : lines[0].includes(';') ? ';' : ',';
+      const hTokens = lines[0].split(headerDelim).map((t) => t.trim().toLowerCase());
+      if (hTokens[0]?.includes('kelas') || hTokens[0]?.includes('rombel')) {
+        headerWaliFirst = false;
+      }
+    }
+
     const dataLines = hasHeader ? lines.slice(1) : lines;
 
     dataLines.forEach((line) => {
@@ -650,32 +659,54 @@ export const DataKelasView: React.FC = () => {
 
       tokens = tokens.map((t) => t.trim().replace(/^["']|["']$/g, ''));
 
-      if (tokens.length >= 1 && tokens[0]) {
-        const rawName = tokens[0] || '';
+      if (tokens.length >= 1 && (tokens[0] || tokens[1])) {
+        let rawName = '';
         let rawWali = '';
         let gradeNum = 1;
 
-        // Jika user menginput 3 kolom (format legacy: Nama Kelas, Tingkat, Nama Wali)
         if (tokens.length >= 3 && !isNaN(parseInt(tokens[1], 10))) {
+          // Format 3 kolom legacy: Nama Kelas, Tingkat, Nama Wali
+          rawName = tokens[0] || '';
           gradeNum = parseInt(tokens[1], 10);
           rawWali = tokens[2] || '';
-        } else {
-          // Format standar: 2 Kolom (Nama Kelas, Nama Wali Kelas)
-          rawWali = tokens[1] || '';
-          const matchNum = rawName.match(/\d+/);
-          if (matchNum) {
-            gradeNum = parseInt(matchNum[0], 10);
+        } else if (tokens.length >= 2) {
+          // 2 Kolom (Standar Template Baru: Kolom 1 = NAMA WALI KELAS, Kolom 2 = NAMA ROMBEL / KELAS)
+          const t0 = tokens[0] || '';
+          const t1 = tokens[1] || '';
+
+          const t0IsClass = /^(kelas|rombel|\d+[a-z]?|[ivx]+[a-z]?)/i.test(t0);
+          const t1IsClass = /^(kelas|rombel|\d+[a-z]?|[ivx]+[a-z]?)/i.test(t1);
+
+          if (!headerWaliFirst) {
+            rawName = t0;
+            rawWali = t1;
+          } else if (t1IsClass && !t0IsClass) {
+            rawWali = t0;
+            rawName = t1;
+          } else if (t0IsClass && !t1IsClass) {
+            rawName = t0;
+            rawWali = t1;
+          } else {
+            rawWali = t0;
+            rawName = t1 || t0;
           }
+        } else {
+          rawName = tokens[0] || '';
+          rawWali = '';
+        }
+
+        const matchNum = rawName.match(/\d+/);
+        if (matchNum) {
+          gradeNum = parseInt(matchNum[0], 10);
         }
 
         if (gradeNum < 1 || gradeNum > 12) {
-          const matchNum = rawName.match(/\d+/);
-          gradeNum = matchNum ? parseInt(matchNum[0], 10) : 1;
+          gradeNum = 1;
         }
 
         const isValid = rawName.trim().length > 0;
         let error = undefined;
-        if (!rawName.trim()) error = 'Nama kelas kosong';
+        if (!rawName.trim()) error = 'Nama rombel / kelas kosong';
 
         results.push({
           name: rawName.trim(),
@@ -1365,7 +1396,7 @@ export const DataKelasView: React.FC = () => {
                 </div>
                 <div>
                   <h3 className="font-bold text-slate-900 text-base">Import Data Rombongan Belajar (Kelas)</h3>
-                  <p className="text-xs text-slate-500">Format: Nama Kelas, Nama Wali Kelas</p>
+                  <p className="text-xs text-slate-500">Format: Nama Wali Kelas, Nama Rombel / Kelas</p>
                 </div>
               </div>
               <button
@@ -1382,7 +1413,7 @@ export const DataKelasView: React.FC = () => {
                 <div className="space-y-0.5">
                   <h4 className="font-bold text-xs text-slate-800">Format Template Standar Kelas</h4>
                   <p className="text-[11px] text-slate-500">
-                    Kolom: <span className="font-semibold text-slate-700">NAMA KELAS, NAMA WALI KELAS</span>
+                    Kolom: <span className="font-semibold text-slate-700">NAMA WALI KELAS, NAMA ROMBEL / KELAS</span>
                   </p>
                 </div>
                 <div className="shrink-0">
@@ -1435,7 +1466,7 @@ export const DataKelasView: React.FC = () => {
                     <span className="text-xs font-extrabold text-slate-700">
                       {fileName ? `File terpilih: ${fileName}` : 'Klik untuk memilih file Excel (.xlsx) / CSV / TXT'}
                     </span>
-                    <span className="text-[11px] text-slate-400">Format: Nama Kelas, Nama Wali Kelas</span>
+                    <span className="text-[11px] text-slate-400">Format: Nama Wali Kelas, Nama Rombel / Kelas</span>
                     <input
                       type="file"
                       accept=".xlsx, .xls, .csv, .txt, text/csv, text/plain, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -1450,7 +1481,7 @@ export const DataKelasView: React.FC = () => {
                     rows={4}
                     value={pasteText}
                     onChange={(e) => handlePasteChange(e.target.value)}
-                    placeholder="Tempel data kelas dari spreadsheet Excel di sini...&#10;Contoh:&#10;Kelas 1A&#9;Budi Santoso, S.Pd.&#10;Kelas 1B&#9;Siti Aminah, M.Pd.&#10;Kelas 2A&#9;Rahmat Hidayat, S.Pd."
+                    placeholder="Tempel data kelas dari spreadsheet Excel di sini...&#10;Contoh:&#10;Budi Santoso, S.Pd.&#9;Kelas 1A&#10;Siti Aminah, M.Pd.&#9;Kelas 1B&#10;Rahmat Hidayat, S.Pd.&#9;Kelas 2A"
                     className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-600 focus:bg-white focus:ring-2 focus:ring-blue-500/10"
                   />
                 </div>
@@ -1473,9 +1504,9 @@ export const DataKelasView: React.FC = () => {
                       <thead className="bg-slate-50 sticky top-0 border-b border-slate-200 text-[10px] font-bold text-slate-500 uppercase">
                         <tr>
                           <th className="p-2 w-8">#</th>
-                          <th className="p-2">Nama Kelas</th>
-                          <th className="p-2 text-center w-20">Tingkat</th>
                           <th className="p-2">Nama Wali Kelas</th>
+                          <th className="p-2">Nama Rombel / Kelas</th>
+                          <th className="p-2 text-center w-20">Tingkat</th>
                           <th className="p-2 text-center w-20">Status</th>
                         </tr>
                       </thead>
@@ -1483,11 +1514,11 @@ export const DataKelasView: React.FC = () => {
                         {parsedClasses.map((item, i) => (
                           <tr key={i} className={item.isValid ? 'hover:bg-slate-50' : 'bg-rose-50/40'}>
                             <td className="p-2 text-slate-400 font-mono text-[11px]">{i + 1}</td>
-                            <td className="p-2 font-bold text-slate-800">{item.name}</td>
-                            <td className="p-2 text-center font-bold text-blue-700">Tingkat {item.grade}</td>
-                            <td className="p-2 text-slate-600 font-medium">
+                            <td className="p-2 text-slate-700 font-medium">
                               {item.waliKelasNameInput || <span className="text-slate-400 italic">Belum ditentukan</span>}
                             </td>
+                            <td className="p-2 font-bold text-slate-800">{item.name}</td>
+                            <td className="p-2 text-center font-bold text-blue-700">Tingkat {item.grade}</td>
                             <td className="p-2 text-center">
                               {item.isValid ? (
                                 <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
@@ -1554,24 +1585,6 @@ export const DataKelasView: React.FC = () => {
             </div>
 
             <form onSubmit={save} className="space-y-4 pt-3 text-xs overflow-y-auto flex-1 pr-1">
-              <div>
-                <label className="block font-bold text-slate-700 mb-1">Nama Rombel / Kelas *</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Contoh: Kelas 1A, Kelas 6B, dll."
-                  value={name}
-                  onChange={(e) => {
-                    setName(e.target.value);
-                    const matchNumber = e.target.value.match(/\d+/);
-                    if (matchNumber) {
-                      setGrade(parseInt(matchNumber[0], 10));
-                    }
-                  }}
-                  className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:bg-white focus:border-blue-600 outline-none"
-                />
-              </div>
-
               {!isPersonalWorkspace && (
                 <div>
                   <label className="block font-bold text-slate-700 mb-1">
@@ -1599,6 +1612,24 @@ export const DataKelasView: React.FC = () => {
                   </p>
                 </div>
               )}
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Nama Rombel / Kelas *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Contoh: Kelas 1A, Kelas 6B, dll."
+                  value={name}
+                  onChange={(e) => {
+                    setName(e.target.value);
+                    const matchNumber = e.target.value.match(/\d+/);
+                    if (matchNumber) {
+                      setGrade(parseInt(matchNumber[0], 10));
+                    }
+                  }}
+                  className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:bg-white focus:border-blue-600 outline-none"
+                />
+              </div>
 
               <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100 shrink-0">
                 <button

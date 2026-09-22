@@ -32,6 +32,7 @@ import {
   ChevronRight,
   ChevronDown,
   Printer,
+  PieChart,
 } from 'lucide-react';
 
 interface SummaryCache {
@@ -787,7 +788,7 @@ export const DashboardView: React.FC = () => {
               {isSchoolAdminOrKS
                 ? `${classes.length} Rombel`
                 : userScope.isWaliKelas
-                ? `Kelas ${userScope.assignedWaliClassName || '6A'}`
+                ? `Rombel ${userScope.assignedWaliClassName || '6A'}`
                 : 'Siswa Aktif'}
             </span>
             <span className="inline-flex items-center text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100/80 shrink-0">
@@ -878,19 +879,19 @@ export const DashboardView: React.FC = () => {
         </div>
       </div>
 
-      {/* 3. Middle Section: Tren Kehadiran (8 Cols) + Status Hari Ini (4 Cols) - Separated & Non-overlapping */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-2 sm:gap-2.5">
+      {/* 3. Three Aligned Widgets: Tren Kehadiran + Grafik Lingkaran + Status Hari Ini */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-2.5 items-stretch">
         
-        {/* Left: Tren Kehadiran Card (8 cols) - 100% Full Width Dedicated to Line Chart */}
-        <div className="lg:col-span-8 bg-white rounded-xl p-3 sm:p-3.5 border border-slate-200/80 shadow-2xs flex flex-col justify-between">
+        {/* Widget 1: Tren Kehadiran (7 Hari) */}
+        <div className="bg-white rounded-xl p-3 sm:p-3.5 border border-slate-200/80 shadow-2xs flex flex-col justify-between h-[215px] sm:h-[225px]">
           {/* Header */}
-          <div className="flex items-center justify-between pb-1.5 mb-1 border-b border-slate-100">
+          <div className="flex items-center justify-between pb-1.5 border-b border-slate-100">
             <div className="flex items-center gap-2">
               <div className="w-6 h-6 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
-                <TrendingUp size={14} />
+                <TrendingUp size={14} className="stroke-[2.2]" />
               </div>
               <h2 className="font-bold text-slate-900 text-xs sm:text-sm">
-                Tren Kehadiran {userScope.isWaliKelas ? `Kelas ${userScope.assignedWaliClassName || '6A'}` : userScope.isGuruMapel ? `Mapel ${userScope.primarySubject?.name || ''}` : isSchoolAdminOrKS ? 'Semua Kelas' : 'Kelas'}
+                Tren Kehadiran ({trendPeriod} Hari)
               </h2>
             </div>
 
@@ -899,13 +900,13 @@ export const DashboardView: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setShowTrendDropdown(!showTrendDropdown)}
-                className="px-2.5 py-0.5 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 text-[11px] font-semibold text-slate-700 inline-flex items-center gap-1.5 transition-colors cursor-pointer select-none"
+                className="px-2 py-0.5 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 text-[10px] font-semibold text-slate-700 inline-flex items-center gap-1 transition-colors cursor-pointer select-none"
               >
-                <span>{trendPeriod} Hari Terakhir</span>
-                <ChevronDown size={11} className="text-slate-400" />
+                <span>{trendPeriod} Hari</span>
+                <ChevronDown size={10} className="text-slate-400" />
               </button>
               {showTrendDropdown && (
-                <div className="absolute right-0 top-full mt-1 w-32 bg-white rounded-lg shadow-lg border border-slate-200 py-1 z-30 animate-in fade-in zoom-in-95 duration-100 text-left">
+                <div className="absolute right-0 top-full mt-1 w-28 bg-white rounded-lg shadow-lg border border-slate-200 py-1 z-30 animate-in fade-in zoom-in-95 duration-100 text-left">
                   {(['7', '14', '30'] as const).map((period) => (
                     <button
                       key={period}
@@ -918,7 +919,7 @@ export const DashboardView: React.FC = () => {
                         trendPeriod === period ? 'text-blue-600 font-bold bg-blue-50/50' : 'text-slate-700'
                       }`}
                     >
-                      {period} Hari Terakhir
+                      {period} Hari
                     </button>
                   ))}
                 </div>
@@ -926,32 +927,25 @@ export const DashboardView: React.FC = () => {
             </div>
           </div>
 
-          {/* Full-width Line Chart with Breathing Room - Zero Overlap */}
-          <div className="w-full h-36 sm:h-40 my-1 relative">
-            <svg viewBox="0 0 540 140" className="w-full h-full overflow-visible">
+          {/* Dedicated Line Chart */}
+          <div className="w-full h-28 sm:h-32 my-auto relative">
+            <svg viewBox="0 0 320 120" className="w-full h-full overflow-visible">
               <defs>
                 <linearGradient id="trendBlueGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#2563EB" stopOpacity="0.22" />
+                  <stop offset="0%" stopColor="#2563EB" stopOpacity="0.25" />
                   <stop offset="100%" stopColor="#2563EB" stopOpacity="0.0" />
                 </linearGradient>
               </defs>
 
-              {/* Horizontal Dotted Gridlines & Y-axis labels */}
+              {/* Gridlines */}
               {(() => {
                 const maxVal = Math.max((isSchoolAdminOrKS ? students.length : scopedTotal) || 24, 10);
-                const stepValues = [
-                  maxVal,
-                  Math.round(maxVal * 0.75),
-                  Math.round(maxVal * 0.5),
-                  Math.round(maxVal * 0.25),
-                  0,
-                ];
-                return stepValues.map((val, idx) => {
-                  const y = 12 + idx * 26;
+                return [maxVal, Math.round(maxVal * 0.5), 0].map((val, idx) => {
+                  const y = 10 + idx * 45;
                   return (
                     <g key={idx}>
-                      <line x1="32" y1={y} x2="530" y2={y} stroke="#F1F5F9" strokeWidth="1" strokeDasharray="3 3" />
-                      <text x="26" y={y + 3} textAnchor="end" fontSize="9" fill="#94A3B8" fontWeight="600">
+                      <line x1="28" y1={y} x2="310" y2={y} stroke="#F1F5F9" strokeWidth="1" strokeDasharray="3 3" />
+                      <text x="22" y={y + 3} textAnchor="end" fontSize="8" fill="#94A3B8" fontWeight="600">
                         {val}
                       </text>
                     </g>
@@ -959,31 +953,28 @@ export const DashboardView: React.FC = () => {
                 });
               })()}
 
-              {/* Connected Smooth Line, Area, and Markers */}
+              {/* Area & Polyline */}
               {(() => {
                 const maxVal = Math.max((isSchoolAdminOrKS ? students.length : scopedTotal) || 24, 10);
                 const countPoints = trendData.length;
-                const stepX = (530 - 45) / Math.max(countPoints - 1, 1);
-                const points = trendData.map((item, idx) => {
-                  const x = 45 + idx * stepX;
-                  const ratio = Math.min(Math.max(item.count / maxVal, 0), 1);
-                  const y = 116 - ratio * 104;
+                const stepX = (310 - 32) / Math.max(countPoints - 1, 1);
+                const points = trendData.map((d, i) => {
+                  const x = 32 + i * stepX;
+                  const ratio = Math.min(Math.max(d.count / maxVal, 0), 1);
+                  const y = 100 - ratio * 90;
                   return { x, y };
                 });
 
-                const linePath = points.reduce((acc, pt, idx) => {
-                  return idx === 0 ? `M ${pt.x} ${pt.y}` : `${acc} L ${pt.x} ${pt.y}`;
-                }, '');
-
-                const areaPath = `${linePath} L ${points[points.length - 1].x} 116 L ${points[0].x} 116 Z`;
+                const linePath = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
+                const areaPath = `${linePath} L ${points[points.length - 1]?.x || 310} 100 L ${points[0]?.x || 32} 100 Z`;
 
                 return (
                   <>
                     <path d={areaPath} fill="url(#trendBlueGradient)" />
-                    <path d={linePath} fill="none" stroke="#2563EB" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d={linePath} fill="none" stroke="#2563EB" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
                     {points.map((pt, idx) => (
                       <g key={idx} className="cursor-pointer group">
-                        <circle cx={pt.x} cy={pt.y} r="4" className="fill-blue-600 stroke-white stroke-2 shadow-xs group-hover:scale-125 transition-transform" />
+                        <circle cx={pt.x} cy={pt.y} r="3.5" className="fill-blue-600 stroke-white stroke-2 group-hover:scale-125 transition-transform" />
                         <title>{`${trendData[idx]?.day}: ${trendData[idx]?.count} Siswa Hadir`}</title>
                       </g>
                     ))}
@@ -991,14 +982,14 @@ export const DashboardView: React.FC = () => {
                 );
               })()}
 
-              {/* X-axis Day labels */}
+              {/* X Labels */}
               {(() => {
                 const countPoints = trendData.length;
-                const stepX = (530 - 45) / Math.max(countPoints - 1, 1);
+                const stepX = (310 - 32) / Math.max(countPoints - 1, 1);
                 return trendData.map((item, idx) => {
-                  const x = 45 + idx * stepX;
+                  const x = 32 + idx * stepX;
                   return (
-                    <text key={item.day} x={x} y="134" textAnchor="middle" fontSize="10" fill="#64748B" fontWeight="600">
+                    <text key={item.day} x={x} y="115" textAnchor="middle" fontSize="8" fill="#64748B" fontWeight="600">
                       {item.day}
                     </text>
                   );
@@ -1007,55 +998,37 @@ export const DashboardView: React.FC = () => {
             </svg>
           </div>
 
-          {/* Bottom Chart Footer with Summary Metrics */}
-          <div className="flex items-center justify-between pt-1.5 border-t border-slate-100 text-[11px] font-semibold">
-            <div className="flex items-center gap-3 text-slate-600">
-              <span className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-blue-600 inline-block" />
-                <span>Kehadiran Terpantau</span>
-              </span>
-              <span className="text-slate-400">•</span>
-              <span className="text-slate-500">
-                Puncak: {Math.max(...trendData.map(d => d.count), 0)} siswa
-              </span>
-            </div>
-            <span className="text-blue-600 font-bold">
-              Tren Terkini: Positif
-            </span>
+          {/* Footer */}
+          <div className="flex items-center justify-between pt-1 border-t border-slate-100 text-[10px] font-semibold text-slate-500">
+            <span>Puncak: {Math.max(...trendData.map(d => d.count), 0)} siswa</span>
+            <span className="text-blue-600 font-bold">Tren Terpantau</span>
           </div>
         </div>
 
-        {/* Right: Status Hari Ini & Donut Chart Card (4 cols) - Integrated Clean SaaS Widget */}
-        <div className="lg:col-span-4 bg-white rounded-xl p-3 sm:p-3.5 border border-slate-200/80 shadow-2xs flex flex-col justify-between">
+        {/* Widget 2: Grafik Lingkaran */}
+        <div className="bg-white rounded-xl p-3 sm:p-3.5 border border-slate-200/80 shadow-2xs flex flex-col justify-between h-[215px] sm:h-[225px]">
           {/* Header */}
-          <div className="flex items-center justify-between pb-1.5 mb-1 border-b border-slate-100">
+          <div className="flex items-center justify-between pb-1.5 border-b border-slate-100">
             <div className="flex items-center gap-2">
-              <div className="w-6 h-6 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
-                <Clock size={14} className="stroke-[2.2]" />
+              <div className="w-6 h-6 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+                <PieChart size={14} className="stroke-[2.2]" />
               </div>
-              <div>
-                <h3 className="font-bold text-slate-900 text-xs sm:text-sm">Status Hari Ini</h3>
-                <p className="text-[10px] text-slate-400 font-medium">{todayFormattedDisplay}</p>
-              </div>
+              <h2 className="font-bold text-slate-900 text-xs sm:text-sm">Grafik Lingkaran</h2>
             </div>
-            <button
-              onClick={() => setActiveView('absensi')}
-              title="Ke Halaman Presensi"
-              className="text-slate-400 hover:text-blue-600 transition-colors p-1"
-            >
-              <ArrowRight size={15} />
-            </button>
+            <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-100">
+              Distribusi
+            </span>
           </div>
 
-          {/* Donut Ring Gauge & Status Metrics in harmonious split */}
-          <div className="flex items-center justify-between gap-3 my-1">
-            {/* Donut Ring Gauge */}
-            <div className="relative w-24 h-24 sm:w-26 sm:h-26 flex items-center justify-center shrink-0">
+          {/* Donut Chart with Center Label & Legend */}
+          <div className="flex items-center justify-center gap-3 my-auto">
+            {/* Donut SVG */}
+            <div className="relative w-24 h-24 shrink-0 flex items-center justify-center">
               <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
                 {/* Track */}
                 <circle cx="50" cy="50" r="38" fill="none" stroke="#F1F5F9" strokeWidth="12" />
 
-                {/* Hadir (Emerald Green) */}
+                {/* Hadir (Emerald) */}
                 {hadirCount > 0 && (
                   <circle
                     cx="50"
@@ -1070,7 +1043,7 @@ export const DashboardView: React.FC = () => {
                   />
                 )}
 
-                {/* Sakit (Sky Blue) */}
+                {/* Sakit (Sky) */}
                 {sakitCount > 0 && (
                   <circle
                     cx="50"
@@ -1084,7 +1057,7 @@ export const DashboardView: React.FC = () => {
                   />
                 )}
 
-                {/* Izin (Amber Yellow) */}
+                {/* Izin (Amber) */}
                 {izinCount > 0 && (
                   <circle
                     cx="50"
@@ -1098,7 +1071,7 @@ export const DashboardView: React.FC = () => {
                   />
                 )}
 
-                {/* Alfa (Rose Red) */}
+                {/* Alfa (Rose) */}
                 {alfaCount > 0 && (
                   <circle
                     cx="50"
@@ -1113,75 +1086,116 @@ export const DashboardView: React.FC = () => {
                 )}
               </svg>
 
-              {/* Center Percentage & Label */}
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                <span className="text-lg sm:text-xl font-black text-slate-900 tracking-tight leading-none">
+                <span className="text-lg font-black text-slate-900 tracking-tight leading-none">
                   {hadirPercent}%
                 </span>
-                <span className="text-[9px] font-bold text-slate-400 tracking-wider uppercase mt-0.5">
+                <span className="text-[8px] font-bold text-slate-400 tracking-wider uppercase mt-0.5">
                   HADIR
                 </span>
               </div>
             </div>
 
-            {/* 4 Status Rows (Grid / Pills) */}
-            <div className="flex-1 grid grid-cols-2 gap-1.5">
-              {/* Hadir */}
-              <div
-                onClick={() => setActiveView('absensi')}
-                className="p-1.5 rounded-lg bg-emerald-50/60 border border-emerald-100 hover:border-emerald-300 transition-colors cursor-pointer text-left"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-bold text-emerald-700">Hadir</span>
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                </div>
-                <p className="text-sm font-black text-slate-900 mt-0.5">{hadirCount}</p>
+            {/* Legend column */}
+            <div className="space-y-1 text-[10px] font-semibold text-slate-600">
+              <div className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block shrink-0" />
+                <span>Hadir: {hadirPercent}%</span>
               </div>
-
-              {/* Sakit */}
-              <div
-                onClick={() => setActiveView('absensi')}
-                className="p-1.5 rounded-lg bg-sky-50/60 border border-sky-100 hover:border-sky-300 transition-colors cursor-pointer text-left"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-bold text-sky-700">Sakit</span>
-                  <span className="w-1.5 h-1.5 rounded-full bg-sky-500" />
-                </div>
-                <p className="text-sm font-black text-slate-900 mt-0.5">{sakitCount}</p>
+              <div className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-sky-500 inline-block shrink-0" />
+                <span>Sakit: {targetTotal > 0 ? Math.round((sakitCount / targetTotal) * 100) : 0}%</span>
               </div>
-
-              {/* Izin */}
-              <div
-                onClick={() => setActiveView('absensi')}
-                className="p-1.5 rounded-lg bg-amber-50/60 border border-amber-100 hover:border-amber-300 transition-colors cursor-pointer text-left"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-bold text-amber-700">Izin</span>
-                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-                </div>
-                <p className="text-sm font-black text-slate-900 mt-0.5">{izinCount}</p>
+              <div className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-amber-500 inline-block shrink-0" />
+                <span>Izin: {targetTotal > 0 ? Math.round((izinCount / targetTotal) * 100) : 0}%</span>
               </div>
-
-              {/* Alfa */}
-              <div
-                onClick={() => setActiveView('absensi')}
-                className="p-1.5 rounded-lg bg-rose-50/60 border border-rose-100 hover:border-rose-300 transition-colors cursor-pointer text-left"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-bold text-rose-700">Alfa</span>
-                  <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
-                </div>
-                <p className="text-sm font-black text-slate-900 mt-0.5">{alfaCount}</p>
+              <div className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-rose-500 inline-block shrink-0" />
+                <span>Alfa: {targetTotal > 0 ? Math.round((alfaCount / targetTotal) * 100) : 0}%</span>
               </div>
             </div>
           </div>
 
-          {/* Quick status alert / input guide */}
-          <div className="pt-1.5 border-t border-slate-100 text-[10px] text-slate-500 flex items-center justify-between">
-            <span className="truncate">{isAttendanceFullyInputted ? '✓ Seluruh siswa telah terdata' : `${totalInputted} terdata • ${totalBelumInput} belum`}</span>
+          {/* Footer */}
+          <div className="flex items-center justify-between pt-1 border-t border-slate-100 text-[10px] font-semibold text-slate-500">
+            <span>Total: {targetTotal} Siswa</span>
+            <span className="text-indigo-600 font-bold">Akurat</span>
+          </div>
+        </div>
+
+        {/* Widget 3: Status Hari Ini */}
+        <div className="bg-white rounded-xl p-3 sm:p-3.5 border border-slate-200/80 shadow-2xs flex flex-col justify-between h-[215px] sm:h-[225px]">
+          {/* Header */}
+          <div className="flex items-center justify-between pb-1.5 border-b border-slate-100">
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                <Clock size={14} className="stroke-[2.2]" />
+              </div>
+              <h2 className="font-bold text-slate-900 text-xs sm:text-sm">Status Hari Ini</h2>
+            </div>
+            <span className="text-[10px] text-slate-500 font-medium truncate max-w-[130px]">
+              {todayFormattedDisplay}
+            </span>
+          </div>
+
+          {/* 4 Status Cards in 2x2 Grid */}
+          <div className="grid grid-cols-2 gap-1.5 my-auto">
+            {/* Hadir */}
+            <div
+              onClick={() => setActiveView('absensi')}
+              className="p-2 rounded-lg bg-emerald-50/70 border border-emerald-100 hover:border-emerald-300 transition-colors cursor-pointer text-left"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold text-emerald-700">Hadir</span>
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+              </div>
+              <p className="text-base font-black text-slate-900 mt-0.5">{hadirCount}</p>
+            </div>
+
+            {/* Sakit */}
+            <div
+              onClick={() => setActiveView('absensi')}
+              className="p-2 rounded-lg bg-sky-50/70 border border-sky-100 hover:border-sky-300 transition-colors cursor-pointer text-left"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold text-sky-700">Sakit</span>
+                <span className="w-1.5 h-1.5 rounded-full bg-sky-500" />
+              </div>
+              <p className="text-base font-black text-slate-900 mt-0.5">{sakitCount}</p>
+            </div>
+
+            {/* Izin */}
+            <div
+              onClick={() => setActiveView('absensi')}
+              className="p-2 rounded-lg bg-amber-50/70 border border-amber-100 hover:border-amber-300 transition-colors cursor-pointer text-left"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold text-amber-700">Izin</span>
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+              </div>
+              <p className="text-base font-black text-slate-900 mt-0.5">{izinCount}</p>
+            </div>
+
+            {/* Alfa */}
+            <div
+              onClick={() => setActiveView('absensi')}
+              className="p-2 rounded-lg bg-rose-50/70 border border-rose-100 hover:border-rose-300 transition-colors cursor-pointer text-left"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold text-rose-700">Alfa</span>
+                <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+              </div>
+              <p className="text-base font-black text-slate-900 mt-0.5">{alfaCount}</p>
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div className="flex items-center justify-between pt-1 border-t border-slate-100 text-[10px] text-slate-500">
+            <span className="truncate">{isAttendanceFullyInputted ? '✓ Seluruh siswa terdata' : `${totalInputted} terdata • ${totalBelumInput} belum`}</span>
             <button
               onClick={() => setActiveView('absensi')}
-              className="font-bold text-blue-600 hover:text-blue-800 hover:underline shrink-0 ml-1"
+              className="font-bold text-blue-600 hover:text-blue-800 hover:underline shrink-0 ml-1 cursor-pointer"
             >
               {isAttendanceFullyInputted ? 'Detail' : 'Input'}
             </button>
@@ -1292,12 +1306,12 @@ export const DashboardView: React.FC = () => {
             </button>
           </div>
 
-          {/* 3D Laptop Illustration on Far Right */}
-          <div className="hidden sm:block absolute right-0 bottom-0 top-0 w-36 md:w-44 lg:w-52 pointer-events-none overflow-hidden select-none">
+          {/* 3D Laptop Illustration on Far Right - Blends seamlessly with gradient mask */}
+          <div className="hidden sm:block absolute right-0 bottom-0 top-0 w-36 md:w-48 lg:w-56 pointer-events-none overflow-hidden select-none [mask-image:linear-gradient(to_left,black_65%,transparent)]">
             <img
               src="/images/laptop_books_plant_3d.jpg"
-              alt="Ilustrasi Laptop"
-              className="w-full h-full object-contain object-right-bottom mix-blend-screen opacity-90"
+              alt="Ilustrasi Administrasi 3D"
+              className="w-full h-full object-contain object-right-bottom mix-blend-screen opacity-95"
               onError={(e) => {
                 (e.target as HTMLImageElement).src = '/images/blog_3d_idea_laptop.jpg';
               }}

@@ -529,7 +529,7 @@ export const LaporanView: React.FC = () => {
               className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-98 text-white font-bold text-xs sm:text-sm shadow-md hover:shadow-lg transition-all cursor-pointer min-h-[44px]"
             >
               <Printer size={18} />
-              <span>CETAK DOKUMEN RESMI (PDF / A4)</span>
+              <span>CETAK DOKUMEN RESMI</span>
             </button>
           </div>
 
@@ -1172,7 +1172,7 @@ export const LaporanView: React.FC = () => {
                   className="w-full py-3.5 px-6 rounded-xl bg-[#1D82F5] hover:bg-blue-600 active:scale-98 text-white font-black text-xs sm:text-sm tracking-wider uppercase transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2 min-h-[46px] cursor-pointer"
                 >
                   <Printer size={18} />
-                  <span>CETAK LAPORAN (PDF / A4)</span>
+                  <span>CETAK LAPORAN</span>
                 </button>
               </div>
             </form>

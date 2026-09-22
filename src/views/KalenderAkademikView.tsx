@@ -415,27 +415,6 @@ export const KalenderAkademikView: React.FC = () => {
           <ArrowLeft size={14} />
           <span>Dashboard</span>
         </button>
-
-        {/* School Profile Year Link Badge */}
-        {canManageCalendar ? (
-          <button
-            onClick={() => setActiveView('profil')}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-50/80 border border-blue-200 text-xs font-semibold text-blue-800 hover:bg-blue-100/70 transition-colors cursor-pointer"
-            title="Klik untuk mengubah Tahun Pelajaran di Identitas Sekolah"
-          >
-            <Building size={14} className="text-blue-600" />
-            <span>Tahun Pelajaran: <b>{schoolProfile.tahunPelajaran || `${startYear}/${endYear}`}</b></span>
-            <ExternalLink size={12} className="text-blue-500 ml-0.5" />
-          </button>
-        ) : (
-          <div
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 border border-slate-200 text-xs font-semibold text-slate-700 shadow-xs"
-            title="Tahun Pelajaran Sekolah"
-          >
-            <Building size={14} className="text-slate-500" />
-            <span>Tahun Pelajaran: <b>{schoolProfile.tahunPelajaran || `${startYear}/${endYear}`}</b></span>
-          </div>
-        )}
       </div>
 
       {/* Main Header */}

@@ -345,13 +345,13 @@ export const Header: React.FC = () => {
                 {/* Compact Permanent Workspace Indicator */}
                 {currentUser.role !== 'SUPER_ADMIN' && currentUser.role !== 'SISWA' && (
                   <div
-                    title={`Ruang Kerja: ${isCurrentlyPersonal ? 'Ruang Kerja Individu' : (schoolProfile.namaSekolah || 'Ruang Kerja Sekolah')}`}
+                    title={`Ruang Kerja: ${isCurrentlyPersonal ? 'Ruang Kerja Individu' : 'Ruang Kerja Sekolah'}${schoolProfile.namaSekolah ? ` (${schoolProfile.namaSekolah})` : ''}`}
                     className="inline-flex items-center gap-1.5 px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-full border text-xs font-bold select-none bg-slate-50 border-slate-200/90 text-slate-700 shadow-2xs"
                     id="header-workspace-indicator"
                   >
                     <Building2 size={13} className={isCurrentlyPersonal ? "text-emerald-600 shrink-0" : "text-indigo-600 shrink-0"} />
                     <span className="hidden sm:inline">
-                      {isCurrentlyPersonal ? 'Ruang Kerja Individu' : (schoolProfile.namaSekolah || 'Ruang Kerja Sekolah')}
+                      {isCurrentlyPersonal ? 'Ruang Kerja Individu' : 'Ruang Kerja Sekolah'}
                     </span>
                     <span className="sm:hidden text-[11px] font-extrabold">
                       {isCurrentlyPersonal ? 'Individu' : 'Sekolah'}

@@ -958,7 +958,7 @@ export const DataPenggunaView: React.FC = () => {
               onClick={() => setShowMainExportMenu((prev) => !prev)}
               disabled={isExportingPdf}
               className="px-3 py-2 bg-white hover:bg-slate-50 active:scale-95 text-slate-700 font-extrabold text-xs rounded-xl border border-slate-200 shadow-xs transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50 min-h-[36px]"
-              title="Export atau Cetak Dokumen PDF / Spreadsheet CSV"
+              title="Export atau Cetak Dokumen PDF Resmi"
               id="btn-main-export-menu"
             >
               {isExportingPdf ? (
@@ -1034,27 +1034,6 @@ export const DataPenggunaView: React.FC = () => {
                       </div>
                       <div className="text-[10px] text-slate-500 font-medium">
                         Kop Surat Resmi ({stats.siswa} akun)
-                      </div>
-                    </div>
-                  </button>
-
-                  <div className="my-1 border-t border-slate-100" />
-
-                  <button
-                    type="button"
-                    onClick={handleExportCSV}
-                    className="w-full px-3 py-2 text-left hover:bg-slate-100 flex items-center gap-2.5 transition-colors cursor-pointer group"
-                    id="btn-main-export-csv"
-                  >
-                    <div className="w-7 h-7 rounded-lg bg-slate-100 text-slate-700 flex items-center justify-center shrink-0 group-hover:bg-slate-700 group-hover:text-white transition-colors shadow-2xs">
-                      <FileText size={14} />
-                    </div>
-                    <div>
-                      <div className="text-xs font-bold text-slate-900 group-hover:text-slate-900">
-                        Download CSV / Spreadsheet
-                      </div>
-                      <div className="text-[10px] text-slate-500 font-medium">
-                        Akun terfilter ({filteredUsers.length} baris)
                       </div>
                     </div>
                   </button>

@@ -65,6 +65,7 @@ export const DashboardView: React.FC = () => {
     getEffectiveDaysForMonth,
     setActiveView,
     schoolProfile,
+    systemConfig,
     currentAttendanceDate,
     isDataLoading,
   } = useApp();
@@ -702,15 +703,6 @@ export const DashboardView: React.FC = () => {
             <h1 className="text-xl sm:text-2xl lg:text-3xl font-black tracking-tight text-white flex items-center gap-2.5">
               <span>Panel Kontrol Utama</span>
             </h1>
-
-            {/* Lencana Ruang Kerja */}
-            {!isPersonalWorkspace && (
-              <span className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full text-xs font-black bg-blue-500/25 text-blue-200 border border-blue-400/35 backdrop-blur-md shadow-xs tracking-tight">
-                <Building2 size={13} className="text-blue-300" />
-                <span>Ruang Kerja Sekolah</span>
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse ml-0.5" />
-              </span>
-            )}
           </div>
 
           <p className="text-xs sm:text-sm text-slate-300 leading-relaxed max-w-3xl">
@@ -1354,6 +1346,25 @@ export const DashboardView: React.FC = () => {
           })}
         </div>
       </div>
+
+      {/* Dashboard Footer */}
+      <footer className="pt-6 pb-2 border-t border-slate-200/80 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500">
+        <div className="flex items-center gap-2">
+          {/* Badge Ruang Kerja */}
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200/80 shadow-2xs">
+            <Building2 size={13} className="text-blue-600 shrink-0" />
+            <span>{isPersonalWorkspace ? 'Ruang Kerja Individu' : 'Ruang Kerja Sekolah'}</span>
+          </div>
+          {schoolProfile.namaSekolah && (
+            <span className="text-xs font-medium text-slate-400 hidden sm:inline">
+              • {schoolProfile.namaSekolah}
+            </span>
+          )}
+        </div>
+        <p className="text-[11px] text-slate-400 font-medium">
+          {systemConfig.footerCopyright || '© 2026 Kawacanaan by Maulana Yusuf. All Rights Reserved.'}
+        </p>
+      </footer>
     </div>
   );
 };

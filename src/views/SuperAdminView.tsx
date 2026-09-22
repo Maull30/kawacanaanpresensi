@@ -102,15 +102,15 @@ const clusters: ClusterConfig[] = [
   {
     id: 'sistem',
     label: 'Sistem',
-    sublabel: 'Audit, Siaran & Cadangan',
+    sublabel: 'Tata Kelola, AI & Integrasi',
     icon: ShieldCheck,
     submenus: [
-      { id: 'keamanan', label: 'Pusat Keamanan & Audit', icon: Shield },
-      { id: 'gateway', label: 'Gateway Pembayaran', icon: CreditCard },
-      { id: 'backup', label: 'Cadangan & Pemulihan', icon: Database },
+      { id: 'platform', label: 'Konfigurasi Platform', icon: SlidersHorizontal },
+      { id: 'koka-ai', label: 'Mesin AI Koka', icon: Sparkles },
+      { id: 'evolution-api', label: 'Gateway WhatsApp', icon: Radio },
       { id: 'siaran', label: 'Siaran Pengumuman', icon: Megaphone },
-      { id: 'role', label: 'Kelola Role & Hak Akses', icon: Lock },
-      { id: 'konfigurasi', label: 'Pengaturan & Identitas', icon: Settings },
+      { id: 'keamanan', label: 'Pusat Keamanan & Audit', icon: Shield },
+      { id: 'database', label: 'Basis Data & Pemeliharaan', icon: Database },
     ],
   },
 ];
@@ -142,7 +142,7 @@ export const SuperAdminView: React.FC = () => {
   const [schoolsSubTab, setSchoolsSubTab] = useState<string>('manajemen');
   const [selectedSchoolId, setSelectedSchoolId] = useState<string | null>(null);
   const [billingSubTab, setBillingSubTab] = useState<string>('dashboard');
-  const [systemSubTab, setSystemSubTab] = useState<string>('keamanan');
+  const [systemSubTab, setSystemSubTab] = useState<string>('platform');
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');

@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { GoogleGenAI } from '@google/genai';
 
 const json = (res:any,status:number,body:unknown)=>res.status(status).setHeader('Content-Type','application/json').end(JSON.stringify(body));
 
@@ -1878,6 +1879,330 @@ export default async function handler(req:any,res:any){
       });
 
       return json(res, 200, { ok: true });
+    }
+
+    if(action==='get_system_settings'){
+      const {data:settings}=await admin.from('platform_settings').select('integrations').eq('id',1).maybeSingle();
+      const integrations = settings?.integrations || {};
+
+      const defaultWorkspaceRules = {
+        join_class_workspace_type: 'school',
+        join_class_label: 'Ruang Kerja Sekolah',
+        manage_own_class_workspace_type: 'personal',
+        manage_own_class_label: 'Ruang Kerja Individu',
+        rule_definition: 'Pilihan bergabung ke kelas termasuk ruang kerja sekolah, sedangkan kelola kelas sendiri termasuk ruang kerja individu.',
+        sdn_cideng_07_type: 'school'
+      };
+
+      const defaultPlatformConfig = {
+        app_name: 'Kawacanaan Presensi',
+        app_url: process.env.VITE_APP_URL || 'https://kawacanaanpresensi.vercel.app',
+        default_academic_year: '2026/2027',
+        default_semester: '1 (Ganjil)',
+        attendance_rules: {
+          checkin_start: '06:00',
+          checkin_late: '07:00',
+          checkout_start: '12:30',
+          active_days_per_week: 6,
+          require_photo_for_leave: true,
+        },
+        maintenance_mode: {
+          enabled: false,
+          message: 'Sistem Kawacanaan Presensi sedang dalam pemeliharaan rutin. Silakan kembali dalam beberapa saat.',
+          estimated_finish: '',
+        },
+        workspace_rules: defaultWorkspaceRules,
+        ...(integrations.platform_config || {}),
+      };
+
+      const defaultKokaConfig = {
+        enabled_landing: true,
+        enabled_dashboard: true,
+        active_model: 'gemini-3.8-flash',
+        temperature: 0.7,
+        system_persona: 'Kamu adalah Koka, asisten virtual cerdas, ramah, dan profesional untuk sistem presensi sekolah dasar Kawacanaan. Bantulah guru, tenaga kependidikan, dan wali murid dengan ramah, berbasis data presensi yang akurat dan sopan.',
+        max_tokens: 1024,
+        daily_limit_per_tenant: 100,
+        has_gemini_key: Boolean(process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.trim().length > 0),
+        ...(integrations.koka_config || {}),
+      };
+
+      const rawEvo = integrations.evolution_api_config || {};
+      const evoApiKey = rawEvo.api_key || '';
+      const defaultEvolutionConfig = {
+        server_url: rawEvo.server_url || '',
+        instance_name: rawEvo.instance_name || 'kawacanaan-notif',
+        is_enabled: rawEvo.is_enabled !== undefined ? Boolean(rawEvo.is_enabled) : false,
+        sender_phone: rawEvo.sender_phone || '',
+        notify_on_present: rawEvo.notify_on_present !== undefined ? Boolean(rawEvo.notify_on_present) : false,
+        notify_on_late: rawEvo.notify_on_late !== undefined ? Boolean(rawEvo.notify_on_late) : true,
+        notify_on_leave_approval: rawEvo.notify_on_leave_approval !== undefined ? Boolean(rawEvo.notify_on_leave_approval) : true,
+        template_present: rawEvo.template_present || 'Halo Bapak/Ibu Wali dari {nama_siswa}, ananda telah terdata HADIR tepat waktu di sekolah ({kelas}) pada {tanggal} pukul {jam}. Terima kasih.',
+        template_late: rawEvo.template_late || 'Pemberitahuan: Ananda {nama_siswa} ({kelas}) terdata HADIR TERLAMBAT pada {tanggal} pukul {jam}. Mohon kerja sama Bapak/Ibu untuk mendampingi ananda berangkat lebih awal.',
+        template_leave_approved: rawEvo.template_leave_approved || 'Surat permohonan izin sakit ananda {nama_siswa} ({kelas}) untuk tanggal {tanggal} telah DISETUJUI oleh Wali Kelas. Semoga lekas pulih dan sehat kembali.',
+        is_api_key_configured: Boolean(evoApiKey && evoApiKey.trim().length > 0),
+      };
+
+      const announcement = integrations.announcement || {
+        message: '',
+        type: 'info',
+        active: false,
+        target_audience: 'all',
+        updatedAt: null,
+      };
+
+      return json(res, 200, {
+        ok: true,
+        settings: {
+          platform_config: defaultPlatformConfig,
+          koka_config: defaultKokaConfig,
+          evolution_api_config: defaultEvolutionConfig,
+          announcement,
+        }
+      });
+    }
+
+    if(action==='update_system_settings'){
+      const section = req.body.section;
+      const data = req.body.data || {};
+      if(!section) return json(res, 400, { error: 'Parameter section wajib diisi.' });
+
+      const {data:settings}=await admin.from('platform_settings').select('integrations').eq('id',1).maybeSingle();
+      const currentIntegrations = settings?.integrations || {};
+      let updatedIntegrations = { ...currentIntegrations };
+
+      if(section==='platform'){
+        const defaultWorkspaceRules = {
+          join_class_workspace_type: 'school',
+          join_class_label: 'Ruang Kerja Sekolah',
+          manage_own_class_workspace_type: 'personal',
+          manage_own_class_label: 'Ruang Kerja Individu',
+          rule_definition: 'Pilihan bergabung ke kelas termasuk ruang kerja sekolah, sedangkan kelola kelas sendiri termasuk ruang kerja individu.',
+          sdn_cideng_07_type: 'school'
+        };
+        updatedIntegrations.platform_config = {
+          ...(currentIntegrations.platform_config || {}),
+          ...data,
+          workspace_rules: currentIntegrations.workspace_rules || defaultWorkspaceRules,
+        };
+      } else if(section==='koka'){
+        updatedIntegrations.koka_config = {
+          ...(currentIntegrations.koka_config || {}),
+          ...data,
+        };
+      } else if(section==='evolution_api'){
+        const currentEvo = currentIntegrations.evolution_api_config || {};
+        const inputKey = typeof data.api_key === 'string' ? data.api_key.trim() : '';
+        const finalApiKey = (inputKey && !inputKey.includes('•••')) ? inputKey : (currentEvo.api_key || '');
+        updatedIntegrations.evolution_api_config = {
+          ...currentEvo,
+          ...data,
+          api_key: finalApiKey,
+        };
+      } else if(section==='announcement'){
+        updatedIntegrations.announcement = {
+          message: String(data.message || ''),
+          type: data.type || 'info',
+          active: Boolean(data.active),
+          target_audience: data.target_audience || 'all',
+          updatedAt: new Date().toISOString(),
+        };
+      } else {
+        return json(res, 400, { error: `Section "${section}" tidak dikenal.` });
+      }
+
+      const { error } = await admin.from('platform_settings').update({ integrations: updatedIntegrations }).eq('id', 1);
+      if(error) throw error;
+
+      await admin.from('audit_logs').insert({
+        actor_id: caller.user.id,
+        actor_name: profile.name || 'Super Admin',
+        actor_role: 'SUPER_ADMIN',
+        action: `UPDATE_SYSTEM_${section.toUpperCase()}`,
+        details: { section, timestamp: new Date().toISOString() }
+      });
+
+      return json(res, 200, { ok: true, message: `Pengaturan ${section} berhasil diperbarui di server.` });
+    }
+
+    if(action==='test_evolution_api'){
+      const {data:settings}=await admin.from('platform_settings').select('integrations').eq('id',1).maybeSingle();
+      const evoConfig = settings?.integrations?.evolution_api_config || {};
+      
+      const serverUrl = (req.body.server_url || evoConfig.server_url || '').trim().replace(/\/+$/, '');
+      const instanceName = (req.body.instance_name || evoConfig.instance_name || '').trim();
+      const inputKey = req.body.api_key;
+      const apiKey = (inputKey && !inputKey.includes('•••')) ? inputKey.trim() : (evoConfig.api_key || '');
+
+      if(!serverUrl) {
+        return json(res, 400, { error: 'Server URL Evolution API belum disetel.' });
+      }
+      if(!instanceName) {
+        return json(res, 400, { error: 'Instance Name Evolution API wajib diisi.' });
+      }
+
+      const t0 = Date.now();
+      try {
+        const pingUrl = `${serverUrl}/instance/connectionState/${instanceName}`;
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 8000);
+
+        const response = await fetch(pingUrl, {
+          method: 'GET',
+          headers: {
+            'apikey': apiKey,
+            'Content-Type': 'application/json',
+          },
+          signal: controller.signal,
+        });
+        clearTimeout(timeoutId);
+        const latencyMs = Date.now() - t0;
+
+        if (response.ok) {
+          const body = await response.json().catch(() => ({}));
+          const state = body?.instance?.state || body?.state || 'connected';
+          return json(res, 200, {
+            ok: true,
+            state,
+            latencyMs,
+            message: `Berhasil terhubung ke Evolution API! Status instance [${instanceName}]: ${state}.`,
+            details: body,
+          });
+        } else if (response.status === 401 || response.status === 403) {
+          return json(res, 400, {
+            ok: false,
+            latencyMs,
+            error: `Otentikasi Evolution API gagal (${response.status}). Periksa kembali API Key / Token Anda.`,
+          });
+        } else if (response.status === 404) {
+          return json(res, 404, {
+            ok: false,
+            latencyMs,
+            error: `Instance "${instanceName}" tidak ditemukan di server Evolution API (${serverUrl}). Pastikan nama instance sudah dibuat.`,
+          });
+        } else {
+          return json(res, 400, {
+            ok: false,
+            latencyMs,
+            error: `Evolution API mengembalikan status HTTP ${response.status}.`,
+          });
+        }
+      } catch (err: any) {
+        const latencyMs = Date.now() - t0;
+        return json(res, 500, {
+          ok: false,
+          latencyMs,
+          error: `Gagal menghubungi Evolution API (${serverUrl}): ${err.message || 'Koneksi waktu habis (timeout)'}`,
+        });
+      }
+    }
+
+    if(action==='test_koka_ai'){
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey) {
+        return json(res, 400, {
+          ok: false,
+          error: 'GEMINI_API_KEY belum disetel di environment server. Fitur Koka AI memerlukan kunci API Gemini.',
+        });
+      }
+
+      const prompt = req.body.prompt || 'Halo Koka, tolong berikan satu salam sapaan singkat dan semangat untuk guru sekolah dasar Indonesia!';
+      const t0 = Date.now();
+      try {
+        const ai = new GoogleGenAI({
+          apiKey,
+          httpOptions: {
+            headers: {
+              'User-Agent': 'aistudio-build',
+            },
+          },
+        });
+        const model = 'gemini-3.8-flash';
+        const response = await ai.models.generateContent({
+          model,
+          contents: prompt,
+        });
+        const latencyMs = Date.now() - t0;
+        const text = response.text || 'Respon berhasil diterima.';
+        return json(res, 200, {
+          ok: true,
+          model,
+          reply: text,
+          latencyMs,
+          message: 'Koneksi server Gemini API berfungsi optimal!',
+        });
+      } catch (err: any) {
+        const latencyMs = Date.now() - t0;
+        return json(res, 500, {
+          ok: false,
+          latencyMs,
+          error: `Gagal menghubungi Gemini API: ${err.message}`,
+        });
+      }
+    }
+
+    if(action==='get_database_stats'){
+      const t0 = Date.now();
+      const [
+        { count: schoolsCount },
+        { count: studentsCount },
+        { count: teachersCount },
+        { count: profilesCount },
+        { count: classesCount },
+        { count: attendanceCount },
+        { count: leaveCount },
+        { count: paymentsCount },
+        { count: auditLogsCount },
+      ] = await Promise.all([
+        admin.from('schools').select('*', { count: 'exact', head: true }),
+        admin.from('students').select('*', { count: 'exact', head: true }),
+        admin.from('teachers').select('*', { count: 'exact', head: true }),
+        admin.from('profiles').select('*', { count: 'exact', head: true }),
+        admin.from('classes').select('*', { count: 'exact', head: true }),
+        admin.from('attendance_records').select('*', { count: 'exact', head: true }),
+        admin.from('leave_requests').select('*', { count: 'exact', head: true }),
+        admin.from('payments').select('*', { count: 'exact', head: true }),
+        admin.from('audit_logs').select('*', { count: 'exact', head: true }),
+      ]);
+      const latencyMs = Date.now() - t0;
+
+      return json(res, 200, {
+        ok: true,
+        latencyMs,
+        counts: {
+          schools: schoolsCount || 0,
+          students: studentsCount || 0,
+          teachers: teachersCount || 0,
+          profiles: profilesCount || 0,
+          classes: classesCount || 0,
+          attendance: attendanceCount || 0,
+          leaveRequests: leaveCount || 0,
+          payments: paymentsCount || 0,
+          auditLogs: auditLogsCount || 0,
+        },
+        database_engine: 'PostgreSQL (Supabase Managed)',
+        schema_version: '2026.09-r1',
+      });
+    }
+
+    if(action==='export_table_data'){
+      const allowedTables = ['schools', 'students', 'teachers', 'payments', 'audit_logs', 'classes', 'leave_requests'];
+      const table = req.body.table;
+      if (!allowedTables.includes(table)) {
+        return json(res, 400, { error: `Tabel "${table}" tidak diizinkan untuk diekspor.` });
+      }
+
+      const limit = Math.min(Number(req.body.limit || 1000), 2000);
+      const { data, error } = await admin.from(table).select('*').limit(limit);
+      if (error) throw error;
+
+      return json(res, 200, {
+        ok: true,
+        table,
+        totalRows: (data || []).length,
+        exportedAt: new Date().toISOString(),
+        rows: data || [],
+      });
     }
 
     return json(res,400,{error:'Aksi tidak didukung.'});

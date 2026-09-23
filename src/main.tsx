@@ -2,6 +2,10 @@ import {StrictMode} from 'react';
 import {createRoot} from 'react-dom/client';
 import App from './App';
 import './index.css';
+import { syncPlatformBrandFromServer } from './utils/platformBranding';
+
+// Inisialisasi sinkronisasi identitas & logo platform dari server database
+syncPlatformBrandFromServer();
 
 // Deteksi jika jendela saat ini adalah jendela popup OAuth Google
 if (typeof window !== 'undefined' && window.opener && window.opener !== window) {

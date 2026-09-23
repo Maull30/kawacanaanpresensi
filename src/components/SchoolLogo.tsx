@@ -1,5 +1,6 @@
 import React from 'react';
 import { useApp } from '../context/AppContext';
+import { usePlatformBrand } from '../utils/platformBranding';
 
 interface SchoolLogoProps {
   className?: string;
@@ -8,12 +9,16 @@ interface SchoolLogoProps {
 
 export const SchoolLogo: React.FC<SchoolLogoProps> = ({ className = '', size = 48 }) => {
   const { systemConfig } = useApp();
+  const { logoUrl } = usePlatformBrand();
 
-  if (systemConfig.schoolLogoUrl) {
+  const activeSrc = systemConfig.schoolLogoUrl || logoUrl;
+
+  if (activeSrc) {
     return (
       <img
-        src={systemConfig.schoolLogoUrl}
-        alt="Logo Sekolah"
+        key={activeSrc}
+        src={activeSrc}
+        alt="Logo"
         className={`object-contain rounded-full shadow-sm ${className}`}
         style={{ width: size, height: size }}
         referrerPolicy="no-referrer"

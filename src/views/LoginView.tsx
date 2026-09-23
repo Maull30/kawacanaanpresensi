@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useApp, isAuthCallbackUrl } from '../context/AppContext';
 import { AppLoginLoadingScreen } from '../components/AppLoginLoadingScreen';
+import { KawacanaanEmblem } from '../components/KawacanaanEmblem';
+import { usePlatformBrand } from '../utils/platformBranding';
 import { FreeStartModal } from '../landing/components/FreeStartModal';
 import { TermsAndLegalModal, LegalTabType } from '../landing/components/TermsAndLegalModal';
 import {
@@ -42,6 +44,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onBackToLanding, onEnterDa
     loginProgressMessage,
     loginStep,
   } = useApp();
+  const { appName } = usePlatformBrand();
 
   // Mode: 'login' | 'forgot-password'
   const [authMode, setAuthMode] = useState<'login' | 'forgot-password'>('login');
@@ -305,11 +308,12 @@ export const LoginView: React.FC<LoginViewProps> = ({ onBackToLanding, onEnterDa
       <div className="w-full max-w-[400px] sm:max-w-[430px] md:max-w-[450px] lg:max-w-[460px] mx-auto my-auto py-5 sm:py-7 z-10">
         <div className="w-full bg-white rounded-2xl sm:rounded-3xl p-6 sm:p-8 md:p-9 shadow-lg sm:shadow-xl shadow-slate-200/80 border border-slate-200/90 transition-all text-slate-800">
           
-          {/* Top Typographic Brand Header (Bersih & Profesional - Tanpa Logo/Gambar) */}
+          {/* Top Brand Header dengan Logo Resmi Kawacanaan yang Terintegrasi */}
           <div className="flex flex-col items-center justify-center mb-5 sm:mb-6 text-center">
+            <KawacanaanEmblem size={52} className="mb-2.5 drop-shadow-sm" />
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 border border-blue-100 text-blue-700 text-[10.5px] sm:text-[11px] font-bold uppercase tracking-wider">
               <span className="w-1.5 h-1.5 rounded-full bg-blue-600 inline-block" />
-              <span>KawaCanaan Presensi</span>
+              <span>{appName || 'Kawacanaan Presensi'}</span>
             </div>
 
             {authMode === 'forgot-password' && (

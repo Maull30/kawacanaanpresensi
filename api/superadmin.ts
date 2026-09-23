@@ -101,6 +101,20 @@ export default async function handler(req:any,res:any){
   const url=process.env.SUPABASE_URL||process.env.VITE_SUPABASE_URL||'';
   const key=process.env.SUPABASE_SERVICE_ROLE_KEY||process.env.SUPABASE_SECRET_KEY||'';
   if(!url||!key) return json(res,500,{error:'SUPABASE_URL dan SUPABASE_SERVICE_ROLE_KEY wajib tersedia di Vercel.'});
+  const {action}=req.body||{};
+
+  // Aksi Publik: Akses logo & nama platform publik tanpa perlu token auth
+  if (action === 'get_public_brand' || action === 'get_public_platform_config') {
+    const admin = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
+    const { data: settings } = await admin.from('platform_settings').select('integrations').eq('id', 1).maybeSingle();
+    const pc = settings?.integrations?.platform_config || {};
+    return json(res, 200, {
+      ok: true,
+      app_name: pc.app_name || 'Kawacanaan Presensi',
+      app_logo_url: pc.app_logo_url || null,
+    });
+  }
+
   const token=(req.headers.authorization||'').replace(/^Bearer\s+/i,'').trim();
   if(!token) return json(res,401,{error:'Unauthorized'});
   const admin=createClient(url,key,{auth:{persistSession:false,autoRefreshToken:false}});
@@ -108,7 +122,6 @@ export default async function handler(req:any,res:any){
   if(callerError||!caller.user) return json(res,401,{error:'Invalid session'});
   const {data:profile}=await admin.from('profiles').select('id,name,username,role,school_id').eq('id',caller.user.id).maybeSingle();
   if(profile?.role!=='SUPER_ADMIN') return json(res,403,{error:'SUPER ADMIN privileges required'});
-  const {action}=req.body||{};
 
   try{
     if(action==='health'||action==='system_health'){
@@ -1917,6 +1930,7 @@ export default async function handler(req:any,res:any){
       const defaultPlatformConfig = {
         app_name: 'Kawacanaan Presensi',
         app_url: process.env.VITE_APP_URL || 'https://kawacanaanpresensi.vercel.app',
+        app_logo_url: integrations.platform_config?.app_logo_url || '',
         default_academic_year: '2026/2027',
         default_semester: '1 (Ganjil)',
         attendance_rules: {

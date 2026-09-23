@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import QRCode from 'qrcode';
 import { KawacanaanEmblem } from '../../components/KawacanaanEmblem';
+import { getPlatformLogo } from '../../utils/platformBranding';
 import { WhatsAppQrModal } from './WhatsAppQrModal';
 
 interface ContactSectionProps {
@@ -180,7 +181,7 @@ export const ContactSection: React.FC<ContactSectionProps> = ({ lang }) => {
           document.body.removeChild(link);
           setIsDownloading(false);
         };
-        emblemImg.src = '/lk.png';
+        emblemImg.src = getPlatformLogo();
       };
       qrImg.src = qrDataUrl;
     } catch (err) {

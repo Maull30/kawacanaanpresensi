@@ -7012,7 +7012,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
         .filter((r) => r.status && r.status !== "-")
         .map((r) => ({
           school_id: currentUser?.schoolId || activeWorkspace?.workspaceId || null,
-          date,
+          date: r.date || date,
           student_id: r.studentId,
           class_id:
             r.classId ||
@@ -7032,6 +7032,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
 
       // Eksekusi penyimpanan: gunakan API backend atomik sebagai jalur utama (bebas pembatasan RLS)
       let savedViaServer = false;
+      let lastErrorMessage = "";
       try {
         const { data: sessionData } = await supabase.auth.getSession();
         const token = sessionData?.session?.access_token || "";
@@ -7056,11 +7057,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
           if (response.ok && resData?.ok) {
             savedViaServer = true;
           } else {
-            console.warn("[saveDailyAttendance] Server API warning:", resData?.error);
+            lastErrorMessage = resData?.error || `Gagal menghubungi server (HTTP ${response.status})`;
+            console.warn("[saveDailyAttendance] Server API warning:", lastErrorMessage);
           }
         }
       } catch (serverErr: any) {
-        console.warn("[saveDailyAttendance] Server API exception, mencoba fallback client:", serverErr?.message);
+        lastErrorMessage = serverErr?.message || "Koneksi ke server terputus";
+        console.warn("[saveDailyAttendance] Server API exception, mencoba fallback client:", lastErrorMessage);
       }
 
       if (!savedViaServer) {
@@ -7079,7 +7082,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
           if (targetType === "SUBJECT" && targetSubjectId) {
             del = del.eq("subject_id", targetSubjectId);
           }
-          await del;
+          const { error: delError } = await del;
+          if (delError) {
+            console.error("[saveDailyAttendance] Client delete error:", delError.message);
+            showToast(`Gagal memperbarui absensi: ${delError.message}`, "error");
+            return { success: false, error: delError.message };
+          }
         }
 
         if (payload.length > 0) {
@@ -7087,8 +7095,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
             .from("attendance_records")
             .insert(payload);
           if (insertError) {
-            console.warn("[saveDailyAttendance] Client insert warning:", insertError.message);
+            console.error("[saveDailyAttendance] Client insert error:", insertError.message);
+            showToast(`Gagal menyimpan absensi ke database: ${insertError.message}`, "error");
+            return { success: false, error: insertError.message };
           }
+        } else if (targetStudentIds.length === 0 && lastErrorMessage) {
+          showToast(`Gagal menyimpan absensi: ${lastErrorMessage}`, "error");
+          return { success: false, error: lastErrorMessage };
         }
       }
 
@@ -7096,6 +7109,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
         .filter((r) => Boolean(r.status && r.status !== "-"))
         .map((r) => ({
           ...r,
+          date: r.date || date,
           type: targetType,
           subjectId: targetSubjectId,
           subjectName: targetSubjectName,

@@ -279,35 +279,55 @@ export async function create_attendance(
     return { success: false, count: 0, error: 'Tidak ada data absensi untuk disimpan.' };
   }
 
-  const date = records[0].date;
+  // 1. Kelompokkan records berdasarkan tanggal agar tidak tertimpa/tercampur
+  const groupedByDate: Record<string, PendingAttendanceRecord[]> = {};
+  for (const record of records) {
+    const d = record.date;
+    if (!groupedByDate[d]) groupedByDate[d] = [];
+    groupedByDate[d].push(record);
+  }
 
-  // Transform ke schema AttendanceRecord
-  const attendancePayload: AttendanceRecord[] = records.map((r) => ({
-    id: r.existingRecordId || `att-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-    date: r.date,
-    studentId: r.studentId,
-    studentName: r.studentName,
-    classId: r.classId || null,
-    status: r.status,
-    checkInTime: r.checkInTime || (r.status === 'Hadir' ? '07:00' : '-'),
-    checkOutTime: r.checkOutTime || '-',
-    notes: r.notes || (r.status === 'Sakit' ? 'Sakit' : r.status === 'Izin' ? 'Izin' : ''),
-    type: 'DAILY',
-  }));
+  let totalSaved = 0;
 
+  // 2. Simpan per tanggal secara sekuensial (menghindari race condition)
   try {
-    const result = await saveDailyAttendanceFn(date, attendancePayload, {
-      type: 'DAILY',
-      classId: records[0]?.classId || null,
-    });
+    for (const [targetDate, dateRecords] of Object.entries(groupedByDate)) {
+      const attendancePayload: AttendanceRecord[] = dateRecords.map((r) => ({
+        id: r.existingRecordId || `att-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+        date: targetDate,
+        studentId: r.studentId,
+        studentName: r.studentName,
+        classId: r.classId || null,
+        status: r.status,
+        checkInTime: r.checkInTime || (r.status === 'Hadir' ? '07:00' : '-'),
+        checkOutTime: r.checkOutTime || '-',
+        notes: r.notes || (r.status === 'Sakit' ? 'Sakit' : r.status === 'Izin' ? 'Izin' : ''),
+        type: 'DAILY',
+      }));
 
-    if (result && result.success === false) {
-      return { success: false, count: 0, error: result.error || 'Gagal menyimpan absensi.' };
+      const result = await saveDailyAttendanceFn(targetDate, attendancePayload, {
+        type: 'DAILY',
+        classId: dateRecords[0]?.classId || null,
+      });
+
+      if (result && result.success === false) {
+        return {
+          success: false,
+          count: totalSaved,
+          error: result.error || `Gagal menyimpan absensi tanggal ${targetDate}.`,
+        };
+      }
+
+      totalSaved += dateRecords.length;
     }
 
-    return { success: true, count: records.length };
+    return { success: true, count: totalSaved };
   } catch (err: any) {
-    return { success: false, count: 0, error: err?.message || 'Absensi belum tersimpan karena terjadi kesalahan pada server.' };
+    return {
+      success: false,
+      count: totalSaved,
+      error: err?.message || 'Absensi belum tersimpan karena terjadi kesalahan pada server.',
+    };
   }
 }
 

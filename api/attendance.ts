@@ -126,7 +126,7 @@ export default async function handler(req: any, res: any) {
         }
       }
 
-      // 2. Simpan record absensi baru
+      // 2. Simpan record absensi baru menggunakan upsert atomik
       if (Array.isArray(payload) && payload.length > 0) {
         const normalizedPayload = payload.map((r: any) => ({
           school_id: targetSchoolId || r.school_id || profile.school_id,
@@ -143,16 +143,44 @@ export default async function handler(req: any, res: any) {
           updated_by: userId,
         }));
 
-        const { data: inserted, error: insertError } = await admin
-          .from('attendance_records')
-          .insert(normalizedPayload)
-          .select('id');
+        // Coba upsert terlebih dahulu jika tabel memiliki unique constraint
+        let saveSuccess = false;
+        let lastInsertError: any = null;
 
-        if (insertError) {
-          return json(res, 500, { error: `Gagal menyimpan data absensi: ${insertError.message}` });
+        try {
+          const { data: upserted, error: upsertErr } = await admin
+            .from('attendance_records')
+            .upsert(normalizedPayload, {
+              onConflict: 'school_id,student_id,date,type,subject_id',
+              ignoreDuplicates: false,
+            })
+            .select('id');
+
+          if (!upsertErr) {
+            saveSuccess = true;
+            return json(res, 200, { ok: true, count: upserted?.length || normalizedPayload.length });
+          } else {
+            lastInsertError = upsertErr;
+          }
+        } catch (e: any) {
+          lastInsertError = e;
         }
 
-        return json(res, 200, { ok: true, count: inserted?.length || normalizedPayload.length });
+        // Jika upsert gagal (misal belum ada constraint unik di DB lama), lakukan insert langsung
+        if (!saveSuccess) {
+          const { data: inserted, error: insertError } = await admin
+            .from('attendance_records')
+            .insert(normalizedPayload)
+            .select('id');
+
+          if (insertError) {
+            return json(res, 500, {
+              error: `Gagal menyimpan data absensi: ${insertError.message || lastInsertError?.message}`,
+            });
+          }
+
+          return json(res, 200, { ok: true, count: inserted?.length || normalizedPayload.length });
+        }
       }
 
       return json(res, 200, { ok: true, count: 0, message: 'Data absensi berhasil direset.' });

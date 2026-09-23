@@ -34,6 +34,7 @@ import {
   Printer,
   PieChart,
 } from 'lucide-react';
+import disneySchoolBuildingBanner from '../assets/images/disney_school_building_1790204694548.jpg';
 
 interface SummaryCache {
   scopedTotal: number;
@@ -744,16 +745,17 @@ export const DashboardView: React.FC = () => {
           </p>
         </div>
 
-        {/* Right: School Building Photography */}
+        {/* Right: Gedung Sekolah Animasi Bergaya Disney */}
         <div className="relative flex items-center justify-end shrink-0 md:w-[35%] lg:w-[40%] overflow-hidden min-h-[55px] md:min-h-auto">
-          {/* Panoramic School Building Photography */}
+          {/* Panoramic Disney Pixar Animation Style School Building */}
           <div className="absolute inset-0 z-0">
             <img
-              src="/images/school_building_banner.jpg"
-              alt="Gedung Sekolah"
+              src={disneySchoolBuildingBanner}
+              alt="Gedung Sekolah Animasi Bergaya Disney"
+              referrerPolicy="no-referrer"
               className="w-full h-full object-cover object-center"
               onError={(e) => {
-                (e.target as HTMLImageElement).src = '/images/hero_school_3d.jpg';
+                (e.target as HTMLImageElement).src = '/images/disney_school_building.jpg';
               }}
             />
             {/* Smooth gradient blend overlay on the left */}

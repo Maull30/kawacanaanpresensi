@@ -1426,7 +1426,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
         .from("attendance_records")
         .select("*")
         .eq("school_id", schoolId)
-        .order("date"),
+        .order("date", { ascending: false })
+        .limit(10000),
       supabase
         .from("profiles")
         .select("*")
@@ -7049,6 +7050,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
               date,
               type: targetType,
               subjectId: targetSubjectId,
+              classId: targetClassId || options?.classId || null,
               targetStudentIds,
               payload,
             }),

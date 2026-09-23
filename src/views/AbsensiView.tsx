@@ -313,6 +313,10 @@ export const AbsensiView: React.FC = () => {
   }, [currentContextKey, draftStorageKey, students, systemConfig, attendanceRecords]);
 
   const handleDateChange = (newDate: string) => {
+    if (isSaving) {
+      showToast('Mohon tunggu hingga proses penyimpanan absensi selesai...', 'error');
+      return;
+    }
     setDate(newDate);
     setCurrentAttendanceDate(newDate);
   };

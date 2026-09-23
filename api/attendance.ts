@@ -102,28 +102,34 @@ export default async function handler(req: any, res: any) {
         return json(res, 403, { error: 'Role pengguna Anda tidak memiliki hak akses mencatat absensi.' });
       }
 
-      const { date, type, subjectId, targetStudentIds, payload } = body;
+      const { date, type, subjectId, classId, targetStudentIds, payload } = body;
       if (!date) return json(res, 400, { error: 'Tanggal absensi wajib disertakan.' });
 
-      // 1. Bersihkan record absensi lama untuk siswa target pada tanggal & moda tersebut
-      if (Array.isArray(targetStudentIds) && targetStudentIds.length > 0) {
-        let del = admin
-          .from('attendance_records')
-          .delete()
-          .eq('date', date)
-          .eq('type', type || 'DAILY')
-          .in('student_id', targetStudentIds);
+      // 1. Bersihkan record absensi lama untuk siswa target atau kelas target pada tanggal & moda tersebut
+      // Jika targetStudentIds diberikan, bersihkan siswa-siswa tersebut.
+      // Jika targetStudentIds kosong tapi classId ada, bersihkan seluruh kelas pada tanggal tersebut.
+      let del = admin
+        .from('attendance_records')
+        .delete()
+        .eq('date', date)
+        .eq('type', type || 'DAILY');
 
-        if (targetSchoolId) {
-          del = del.eq('school_id', targetSchoolId);
-        }
-        if (type === 'SUBJECT' && subjectId) {
-          del = del.eq('subject_id', subjectId);
-        }
-        const { error: delError } = await del;
-        if (delError) {
-          return json(res, 500, { error: `Gagal membersihkan data lama: ${delError.message}` });
-        }
+      if (targetSchoolId) {
+        del = del.eq('school_id', targetSchoolId);
+      }
+      if (type === 'SUBJECT' && subjectId) {
+        del = del.eq('subject_id', subjectId);
+      }
+
+      if (Array.isArray(targetStudentIds) && targetStudentIds.length > 0) {
+        del = del.in('student_id', targetStudentIds);
+      } else if (classId) {
+        del = del.eq('class_id', classId);
+      }
+
+      const { error: delError } = await del;
+      if (delError) {
+        return json(res, 500, { error: `Gagal membersihkan data lama: ${delError.message}` });
       }
 
       // 2. Simpan record absensi baru menggunakan upsert atomik

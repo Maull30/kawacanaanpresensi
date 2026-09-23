@@ -132,13 +132,17 @@ export default async function handler(req: any, res: any) {
         return json(res, 500, { error: `Gagal membersihkan data lama: ${delError.message}` });
       }
 
-      // 2. Simpan record absensi baru menggunakan upsert atomik
+      // 2. Simpan record absensi baru (hanya yang memiliki status presensi valid)
       if (Array.isArray(payload) && payload.length > 0) {
-        const normalizedPayload = payload.map((r: any) => ({
+        const validPayload = payload.filter(
+          (r: any) => Boolean(r && r.status && r.status !== '-' && (r.student_id || r.studentId))
+        );
+
+        const normalizedPayload = validPayload.map((r: any) => ({
           school_id: targetSchoolId || r.school_id || profile.school_id,
           date: r.date || date,
           student_id: r.student_id || r.studentId,
-          class_id: r.class_id || r.classId || null,
+          class_id: r.class_id || r.classId || classId || null,
           type: r.type || type || 'DAILY',
           subject_id: r.subject_id || r.subjectId || (type === 'SUBJECT' ? subjectId : null),
           teacher_id: r.teacher_id || r.teacherId || profile.teacher_id || null,
@@ -149,43 +153,45 @@ export default async function handler(req: any, res: any) {
           updated_by: userId,
         }));
 
-        // Coba upsert terlebih dahulu jika tabel memiliki unique constraint
-        let saveSuccess = false;
-        let lastInsertError: any = null;
+        if (normalizedPayload.length > 0) {
+          // Coba upsert terlebih dahulu jika tabel memiliki unique constraint
+          let saveSuccess = false;
+          let lastInsertError: any = null;
 
-        try {
-          const { data: upserted, error: upsertErr } = await admin
-            .from('attendance_records')
-            .upsert(normalizedPayload, {
-              onConflict: 'school_id,student_id,date,type,subject_id',
-              ignoreDuplicates: false,
-            })
-            .select('id');
+          try {
+            const { data: upserted, error: upsertErr } = await admin
+              .from('attendance_records')
+              .upsert(normalizedPayload, {
+                onConflict: 'school_id,student_id,date,type,subject_id',
+                ignoreDuplicates: false,
+              })
+              .select('id');
 
-          if (!upsertErr) {
-            saveSuccess = true;
-            return json(res, 200, { ok: true, count: upserted?.length || normalizedPayload.length });
-          } else {
-            lastInsertError = upsertErr;
-          }
-        } catch (e: any) {
-          lastInsertError = e;
-        }
-
-        // Jika upsert gagal (misal belum ada constraint unik di DB lama), lakukan insert langsung
-        if (!saveSuccess) {
-          const { data: inserted, error: insertError } = await admin
-            .from('attendance_records')
-            .insert(normalizedPayload)
-            .select('id');
-
-          if (insertError) {
-            return json(res, 500, {
-              error: `Gagal menyimpan data absensi: ${insertError.message || lastInsertError?.message}`,
-            });
+            if (!upsertErr) {
+              saveSuccess = true;
+              return json(res, 200, { ok: true, count: upserted?.length || normalizedPayload.length });
+            } else {
+              lastInsertError = upsertErr;
+            }
+          } catch (e: any) {
+            lastInsertError = e;
           }
 
-          return json(res, 200, { ok: true, count: inserted?.length || normalizedPayload.length });
+          // Jika upsert gagal (misal belum ada constraint unik di DB lama), lakukan insert langsung
+          if (!saveSuccess) {
+            const { data: inserted, error: insertError } = await admin
+              .from('attendance_records')
+              .insert(normalizedPayload)
+              .select('id');
+
+            if (insertError) {
+              return json(res, 500, {
+                error: `Gagal menyimpan data absensi: ${insertError.message || lastInsertError?.message}`,
+              });
+            }
+
+            return json(res, 200, { ok: true, count: inserted?.length || normalizedPayload.length });
+          }
         }
       }
 

@@ -2024,10 +2024,33 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     finalEffective.forEach((x: any) => (ed[x.month_key] = x.days));
     setEffectiveDaysConfig(ed);
 
-    const finalAttendance =
-      attendance.data && attendance.data.length > 0
-        ? attendance.data
-        : (masterJson?.attendanceRecords || []);
+    let finalAttendance =
+      Array.isArray(masterJson?.attendanceRecords) && masterJson.attendanceRecords.length > 0
+        ? masterJson.attendanceRecords
+        : (attendance.data || []);
+
+    if (finalAttendance.length === 1000 && attendance.data && attendance.data.length === 1000) {
+      try {
+        let page = 1;
+        let extraAttendance: any[] = [];
+        while (page < 10) {
+          const { data: nextPage, error: pageErr } = await supabase
+            .from("attendance_records")
+            .select("*")
+            .eq("school_id", schoolId)
+            .order("date", { ascending: false })
+            .range(page * 1000, (page + 1) * 1000 - 1);
+          if (pageErr || !nextPage || nextPage.length === 0) break;
+          extraAttendance = extraAttendance.concat(nextPage);
+          if (nextPage.length < 1000) break;
+          page++;
+        }
+        if (extraAttendance.length > 0) {
+          finalAttendance = [...finalAttendance, ...extraAttendance];
+        }
+      } catch (_) {}
+    }
+
     setAttendanceRecords(
       finalAttendance.map((r: any) => dbAttendance(r, ss)),
     );
@@ -6078,7 +6101,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       if (Array.isArray(json.attendanceRecords)) {
         const currentSchoolStudents = updatedStudents.length > 0 ? updatedStudents : students;
         const mappedAttendance = json.attendanceRecords.map((r: any) => dbAttendance(r, currentSchoolStudents));
-        setAttendanceRecords(mappedAttendance);
+        setAttendanceRecords((prev) => {
+          const map = new Map<string, AttendanceRecord>();
+          prev.forEach((r) => {
+            const key = `${r.studentId}_${r.date}_${r.type || 'DAILY'}_${r.subjectId || 'null'}`;
+            map.set(key, r);
+          });
+          mappedAttendance.forEach((r) => {
+            const key = `${r.studentId}_${r.date}_${r.type || 'DAILY'}_${r.subjectId || 'null'}`;
+            map.set(key, r);
+          });
+          return Array.from(map.values());
+        });
       }
 
       if (Array.isArray(json.subjects) && json.subjects.length > 0) {

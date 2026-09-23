@@ -1382,6 +1382,26 @@ export default async function handler(req: any, res: any) {
         return json(res, 400, { error: 'ID sekolah wajib disertakan.' });
       }
 
+      // Helper untuk mengambil seluruh riwayat absensi sekolah dengan pagination (melewati batas 1000 baris PostgREST)
+      const fetchAllAttendanceForSchool = async (client: any, targetSchoolId: string) => {
+        let all: any[] = [];
+        let page = 0;
+        const pageSize = 1000;
+        while (page < 10) {
+          const { data, error } = await client
+            .from('attendance_records')
+            .select('*')
+            .eq('school_id', targetSchoolId)
+            .order('date', { ascending: false })
+            .range(page * pageSize, (page + 1) * pageSize - 1);
+          if (error || !data || data.length === 0) break;
+          all = all.concat(data);
+          if (data.length < pageSize) break;
+          page++;
+        }
+        return { data: all };
+      };
+
       // Ambil seluruh data master sekolah secara authoritative (Service Role)
       const [
         { data: sp },
@@ -1406,7 +1426,7 @@ export default async function handler(req: any, res: any) {
         db.from('subject_teacher_assignments').select('subject_id, teacher_id, academic_year').eq('school_id', schoolId),
         db.from('subject_class_assignments').select('subject_id, class_id, academic_year').eq('school_id', schoolId),
         db.from('subject_schedule_days').select('subject_id, day_of_week, lesson_period').eq('school_id', schoolId),
-        db.from('attendance_records').select('*').eq('school_id', schoolId),
+        fetchAllAttendanceForSchool(db, schoolId),
         db.from('effective_days').select('*').eq('school_id', schoolId),
         db.from('academic_events').select('*').eq('school_id', schoolId),
       ]);

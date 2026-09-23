@@ -306,8 +306,22 @@ export const AbsensiView: React.FC = () => {
           return [...merged].sort((a, b) => a.studentName.localeCompare(b.studentName, 'id'));
         });
       } else {
-        const sorted = [...loaded].sort((a, b) => a.studentName.localeCompare(b.studentName, 'id'));
-        setRecords(sorted);
+        // Context sama dan data baru tersimpan atau background sync:
+        // Lindungi status presensi yang sudah terisi agar tidak kembali ke awal / kosong
+        setRecords((prev) => {
+          if (prev.length === 0) {
+            return [...loaded].sort((a, b) => a.studentName.localeCompare(b.studentName, 'id'));
+          }
+          const prevMap = new Map<string, AttendanceRecord>(prev.map((r) => [r.studentId, r]));
+          const merged = loaded.map((fresh) => {
+            const existing = prevMap.get(fresh.studentId);
+            if (!fresh.status && existing && existing.status) {
+              return { ...fresh, ...existing };
+            }
+            return fresh;
+          });
+          return [...merged].sort((a, b) => a.studentName.localeCompare(b.studentName, 'id'));
+        });
       }
     }
   }, [currentContextKey, draftStorageKey, students, systemConfig, attendanceRecords]);

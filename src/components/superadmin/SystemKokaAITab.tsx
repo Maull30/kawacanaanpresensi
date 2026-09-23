@@ -109,7 +109,7 @@ export const SystemKokaAITab: React.FC<Props> = ({
     setTesting(true);
     setTestResult(null);
     try {
-      const res = await call('test_koka_ai', { prompt: testPrompt });
+      const res = await call('test_koka_ai', { prompt: testPrompt, model: form.active_model });
       if (res.ok) {
         setTestResult({
           ok: true,
@@ -117,7 +117,7 @@ export const SystemKokaAITab: React.FC<Props> = ({
           model: res.model,
           latencyMs: res.latencyMs,
         });
-        showToast(`Koka AI merespons dalam ${res.latencyMs} ms!`, 'success');
+        showToast(`Koka AI (${res.model}) merespons dalam ${res.latencyMs} ms!`, 'success');
       } else {
         setTestResult({
           ok: false,
@@ -256,8 +256,9 @@ export const SystemKokaAITab: React.FC<Props> = ({
                 onChange={(e) => setForm({ ...form, active_model: e.target.value })}
                 className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:border-violet-500 outline-none bg-white font-medium text-slate-800"
               >
-                <option value="gemini-3.8-flash">gemini-3.8-flash (Standar Cepat & Hemat)</option>
-                <option value="gemini-3.1-flash-lite">gemini-3.1-flash-lite (Ultra Ringan)</option>
+                <option value="gemini-3.6-flash">gemini-3.6-flash (Disarankan - Cepat & Stabil)</option>
+                <option value="gemini-3.8-flash">gemini-3.8-flash (Model Multimodal Terbaru)</option>
+                <option value="gemini-3.1-flash-lite">gemini-3.1-flash-lite (Ultra Ringan & Hemat)</option>
               </select>
             </div>
 

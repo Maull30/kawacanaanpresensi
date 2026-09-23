@@ -34,10 +34,19 @@ interface PlatformConfig {
   workspace_rules?: any;
 }
 
+interface PlatformStats {
+  schoolsCount?: number;
+  studentsCount?: number;
+  teachersCount?: number;
+  classesCount?: number;
+  updatedAt?: string;
+}
+
 interface Props {
   call: (action: string, payload?: any) => Promise<any>;
   showToast: (message: string, type?: 'success' | 'error' | 'info') => void;
   initialConfig?: PlatformConfig;
+  platformStats?: PlatformStats;
   onSaved?: (newConfig: PlatformConfig) => void;
 }
 
@@ -45,6 +54,7 @@ export const SystemPlatformTab: React.FC<Props> = ({
   call,
   showToast,
   initialConfig,
+  platformStats,
   onSaved,
 }) => {
   const [loading, setLoading] = useState(false);
@@ -128,6 +138,39 @@ export const SystemPlatformTab: React.FC<Props> = ({
             <p className="mt-0.5 text-amber-800">
               Pengguna non-superadmin yang membuka aplikasi akan melihat pesan pemeliharaan.
             </p>
+          </div>
+        </div>
+      )}
+
+      {/* Ringkasan Metrik Multi-Tenant Real-Time dari Database */}
+      {platformStats && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
+          <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Total Tenant Sekolah</span>
+            <p className="text-xl font-black text-slate-900 mt-1 font-mono">{platformStats.schoolsCount || 0}</p>
+            <span className="text-[10px] text-emerald-600 font-medium mt-0.5 block flex items-center gap-1">
+              <CheckCircle2 size={11} /> Instansi Terhubung
+            </span>
+          </div>
+
+          <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Total Siswa Terdaftar</span>
+            <p className="text-xl font-black text-slate-900 mt-1 font-mono">{platformStats.studentsCount || 0}</p>
+            <span className="text-[10px] text-indigo-600 font-medium mt-0.5 block">Akun Siswa Multi-Tenant</span>
+          </div>
+
+          <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Guru & Tendik Aktif</span>
+            <p className="text-xl font-black text-slate-900 mt-1 font-mono">{platformStats.teachersCount || 0}</p>
+            <span className="text-[10px] text-blue-600 font-medium mt-0.5 block">Wali Kelas & Mapel</span>
+          </div>
+
+          <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Rombel Kelas</span>
+            <p className="text-xl font-black text-slate-900 mt-1 font-mono">{platformStats.classesCount || 0}</p>
+            <span className="text-[10px] text-slate-500 font-medium mt-0.5 block">
+              {platformStats.updatedAt ? `Update: ${new Date(platformStats.updatedAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })} WIB` : 'Sinkronisasi Otomatis'}
+            </span>
           </div>
         </div>
       )}

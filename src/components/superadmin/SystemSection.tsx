@@ -38,6 +38,7 @@ export const SystemSection: React.FC<SystemSectionProps> = ({
     koka?: any;
     evolution_api?: any;
     announcement?: any;
+    platform_stats?: any;
   }>({});
 
   // Sinkronisasi dengan activeSubTab dari SuperAdmin sidebar
@@ -62,11 +63,13 @@ export const SystemSection: React.FC<SystemSectionProps> = ({
     try {
       const res = await call('get_system_settings');
       if (res.ok) {
+        const s = res.settings || {};
         setSettingsData({
-          platform: res.platform,
-          koka: res.koka,
-          evolution_api: res.evolution_api,
-          announcement: res.announcement,
+          platform: res.platform || s.platform_config,
+          koka: res.koka || s.koka_config,
+          evolution_api: res.evolution_api || s.evolution_api_config,
+          announcement: res.announcement || s.announcement,
+          platform_stats: res.platform_stats || s.platform_stats,
         });
       }
     } catch (err: any) {
@@ -184,6 +187,7 @@ export const SystemSection: React.FC<SystemSectionProps> = ({
                 call={call}
                 showToast={showToast}
                 initialConfig={settingsData.platform}
+                platformStats={settingsData.platform_stats}
                 onSaved={(updated) =>
                   setSettingsData((prev) => ({ ...prev, platform: updated }))
                 }

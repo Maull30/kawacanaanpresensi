@@ -101,6 +101,60 @@ export const SystemEvolutionAPITab: React.FC<Props> = ({
     }
   }, [initialConfig]);
 
+  const [testPhone, setTestPhone] = useState('');
+  const [testMessage, setTestMessage] = useState('Halo! Ini adalah pesan uji coba WhatsApp Gateway dari Sistem Kawacanaan Presensi.');
+  const [sendingTest, setSendingTest] = useState(false);
+  const [testSendResult, setTestSendResult] = useState<{
+    ok: boolean;
+    message?: string;
+    error?: string;
+    latencyMs?: number;
+  } | null>(null);
+
+  const handleSendTest = async () => {
+    if (!testPhone.trim()) {
+      showToast('Nomor WhatsApp tujuan wajib diisi.', 'error');
+      return;
+    }
+    setSendingTest(true);
+    setTestSendResult(null);
+    try {
+      const payload: any = {
+        server_url: form.server_url,
+        instance_name: form.instance_name,
+        phone: testPhone,
+        message: testMessage,
+      };
+      if (form.api_key && !form.api_key.includes('••••')) {
+        payload.api_key = form.api_key;
+      }
+      const res = await call('send_test_whatsapp', payload);
+      if (res.ok) {
+        setTestSendResult({
+          ok: true,
+          message: res.message || 'Pesan berhasil dikirim!',
+          latencyMs: res.latencyMs,
+        });
+        showToast(`Pesan berhasil dikirim ke ${testPhone}!`, 'success');
+      } else {
+        setTestSendResult({
+          ok: false,
+          error: res.error || 'Gagal mengirim pesan',
+          latencyMs: res.latencyMs,
+        });
+        showToast(res.error || 'Gagal mengirim pesan WhatsApp.', 'error');
+      }
+    } catch (err: any) {
+      setTestSendResult({
+        ok: false,
+        error: err.message || 'Koneksi gagal',
+      });
+      showToast(err.message || 'Pengiriman gagal.', 'error');
+    } finally {
+      setSendingTest(false);
+    }
+  };
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
@@ -451,6 +505,83 @@ export const SystemEvolutionAPITab: React.FC<Props> = ({
           </div>
         </div>
       </form>
+
+      {/* Bagian 4: Sandbox Uji Coba Pengiriman Pesan WhatsApp Nyata */}
+      <div className="bg-white rounded-2xl p-5 sm:p-6 border border-slate-200/80 shadow-xs space-y-4">
+        <div className="flex items-center gap-3 pb-3 border-b border-slate-100">
+          <div className="w-9 h-9 rounded-xl bg-teal-50 text-teal-600 flex items-center justify-center font-bold">
+            <Send size={18} />
+          </div>
+          <div>
+            <h3 className="text-sm font-bold text-slate-900">Uji Coba Pengiriman Pesan WhatsApp Langsung</h3>
+            <p className="text-xs text-slate-500">
+              Kirimkan pesan uji coba ke nomor WhatsApp Anda untuk memverifikasi fungsionalitas pengiriman secara nyata.
+            </p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+          <div>
+            <label className="block font-semibold text-slate-700 mb-1.5">Nomor WhatsApp Tujuan</label>
+            <input
+              type="text"
+              value={testPhone}
+              onChange={(e) => setTestPhone(e.target.value)}
+              placeholder="Contoh: 6281234567890"
+              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:border-teal-500 outline-none font-mono text-slate-800"
+            />
+            <span className="text-[10px] text-slate-400 mt-1 block">Gunakan kode negara (628...).</span>
+          </div>
+
+          <div className="md:col-span-2">
+            <label className="block font-semibold text-slate-700 mb-1.5">Isi Pesan Uji Coba</label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={testMessage}
+                onChange={(e) => setTestMessage(e.target.value)}
+                placeholder="Tulis pesan uji coba..."
+                className="flex-1 px-3.5 py-2.5 rounded-xl border border-slate-200 focus:border-teal-500 outline-none text-slate-800 font-medium"
+              />
+              <button
+                type="button"
+                onClick={handleSendTest}
+                disabled={sendingTest || !testPhone.trim() || !form.server_url}
+                className="px-5 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-bold transition flex items-center gap-2 cursor-pointer disabled:opacity-50 shrink-0"
+              >
+                {sendingTest ? <RefreshCw size={14} className="animate-spin" /> : <Send size={14} />}
+                <span>{sendingTest ? 'Mengirim...' : 'Kirim Pesan'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {testSendResult && (
+          <div
+            className={`p-3.5 rounded-xl border text-xs flex items-center justify-between ${
+              testSendResult.ok
+                ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                : 'bg-rose-50 text-rose-800 border-rose-200'
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              {testSendResult.ok ? (
+                <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
+              ) : (
+                <XCircle size={16} className="text-rose-600 shrink-0" />
+              )}
+              <span className="font-semibold">
+                {testSendResult.ok ? testSendResult.message : testSendResult.error}
+              </span>
+            </div>
+            {testSendResult.latencyMs && (
+              <span className="text-[10px] text-slate-500 font-mono ml-3 shrink-0">
+                Latensi: {testSendResult.latencyMs} ms
+              </span>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 };

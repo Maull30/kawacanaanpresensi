@@ -144,15 +144,22 @@ export default async function handler(req:any,res:any){
       });
     }
 
-    if(action==='login_activity'){
+    if(action==='login_activity'||action==='login_history'){
       const limit=Math.min(Number(req.body.limit||100),300);
       const {data,error}=await admin.from('audit_logs').select('*, schools(name)').ilike('action','%LOGIN%').order('created_at',{ascending:false}).limit(limit);
-      if(error) {
+      let rows = data;
+      if(error || !rows || rows.length === 0) {
         // Fallback to recent audit logs if login events not distinct
         const {data:recent} = await admin.from('audit_logs').select('*, schools(name)').order('created_at',{ascending:false}).limit(50);
-        return json(res,200,{ok:true,activities:(recent||[]).map((l:any)=>({...l,school_name:l.schools?.name||null,ip_address:l.details?.ip||'127.0.0.1',device:l.details?.device||'Browser Web'}))});
+        rows = recent || [];
       }
-      return json(res,200,{ok:true,activities:(data||[]).map((l:any)=>({...l,school_name:l.schools?.name||null,ip_address:l.details?.ip||'127.0.0.1',device:l.details?.device||'Browser Web'}))});
+      const formatted = (rows||[]).map((l:any)=>({
+        ...l,
+        school_name: l.schools?.name || null,
+        ip_address: l.details?.ip || '127.0.0.1',
+        device: l.details?.device || 'Browser Web'
+      }));
+      return json(res,200,{ok:true,activities:formatted,history:formatted});
     }
 
     if(action==='critical_actions'){
@@ -1882,8 +1889,21 @@ export default async function handler(req:any,res:any){
     }
 
     if(action==='get_system_settings'){
-      const {data:settings}=await admin.from('platform_settings').select('integrations').eq('id',1).maybeSingle();
-      const integrations = settings?.integrations || {};
+      const [
+        { data: settingsRow },
+        { count: schoolsCount },
+        { count: studentsCount },
+        { count: teachersCount },
+        { count: classesCount },
+      ] = await Promise.all([
+        admin.from('platform_settings').select('*').eq('id', 1).maybeSingle(),
+        admin.from('schools').select('*', { count: 'exact', head: true }),
+        admin.from('students').select('*', { count: 'exact', head: true }),
+        admin.from('teachers').select('*', { count: 'exact', head: true }),
+        admin.from('classes').select('*', { count: 'exact', head: true }),
+      ]);
+
+      const integrations = settingsRow?.integrations || {};
 
       const defaultWorkspaceRules = {
         join_class_workspace_type: 'school',
@@ -1951,13 +1971,27 @@ export default async function handler(req:any,res:any){
         updatedAt: null,
       };
 
+      const platformStats = {
+        schoolsCount: schoolsCount || 0,
+        studentsCount: studentsCount || 0,
+        teachersCount: teachersCount || 0,
+        classesCount: classesCount || 0,
+        updatedAt: settingsRow?.updated_at || null,
+      };
+
       return json(res, 200, {
         ok: true,
+        platform: defaultPlatformConfig,
+        koka: defaultKokaConfig,
+        evolution_api: defaultEvolutionConfig,
+        announcement,
+        platform_stats: platformStats,
         settings: {
           platform_config: defaultPlatformConfig,
           koka_config: defaultKokaConfig,
           evolution_api_config: defaultEvolutionConfig,
           announcement,
+          platform_stats: platformStats,
         }
       });
     }
@@ -2060,7 +2094,7 @@ export default async function handler(req:any,res:any){
 
         if (response.ok) {
           const body = await response.json().catch(() => ({}));
-          const state = body?.instance?.state || body?.state || 'connected';
+          const state = body?.instance?.state || body?.state || 'open';
           return json(res, 200, {
             ok: true,
             state,
@@ -2078,7 +2112,7 @@ export default async function handler(req:any,res:any){
           return json(res, 404, {
             ok: false,
             latencyMs,
-            error: `Instance "${instanceName}" tidak ditemukan di server Evolution API (${serverUrl}). Pastikan nama instance sudah dibuat.`,
+            error: `Instance "${instanceName}" tidak ditemukan di server Evolution API (${serverUrl}). Pastikan instance sudah dibuat.`,
           });
         } else {
           return json(res, 400, {
@@ -2097,6 +2131,80 @@ export default async function handler(req:any,res:any){
       }
     }
 
+    if(action==='send_test_whatsapp'){
+      const {data:settings}=await admin.from('platform_settings').select('integrations').eq('id',1).maybeSingle();
+      const evoConfig = settings?.integrations?.evolution_api_config || {};
+      
+      const serverUrl = (req.body.server_url || evoConfig.server_url || '').trim().replace(/\/+$/, '');
+      const instanceName = (req.body.instance_name || evoConfig.instance_name || '').trim();
+      const inputKey = req.body.api_key;
+      const apiKey = (inputKey && !inputKey.includes('•••')) ? inputKey.trim() : (evoConfig.api_key || '');
+      const targetPhone = String(req.body.phone || req.body.recipient || '').trim().replace(/[^0-9]/g, '');
+      const message = String(req.body.message || 'Halo dari Sistem Kawacanaan Presensi! Ini adalah pesan uji coba integrasi WhatsApp Evolution API.').trim();
+
+      if(!serverUrl) return json(res, 400, { error: 'Server URL Evolution API belum disetel.' });
+      if(!instanceName) return json(res, 400, { error: 'Instance Name Evolution API belum disetel.' });
+      if(!targetPhone) return json(res, 400, { error: 'Nomor telepon tujuan uji coba wajib diisi.' });
+
+      const t0 = Date.now();
+      try {
+        const sendUrl = `${serverUrl}/message/sendText/${instanceName}`;
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+        const response = await fetch(sendUrl, {
+          method: 'POST',
+          headers: {
+            'apikey': apiKey,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            number: targetPhone,
+            text: message,
+            options: {
+              delay: 1000,
+              presence: 'composing',
+              linkPreview: false,
+            }
+          }),
+          signal: controller.signal,
+        });
+        clearTimeout(timeoutId);
+        const latencyMs = Date.now() - t0;
+
+        if (response.ok) {
+          const body = await response.json().catch(() => ({}));
+          await admin.from('audit_logs').insert({
+            actor_id: caller.user.id,
+            actor_name: profile.name || 'Super Admin',
+            actor_role: 'SUPER_ADMIN',
+            action: 'TEST_SEND_WHATSAPP',
+            details: { targetPhone, latencyMs, timestamp: new Date().toISOString() }
+          });
+          return json(res, 200, {
+            ok: true,
+            latencyMs,
+            message: `Pesan uji coba WhatsApp berhasil dikirim ke nomor ${targetPhone}!`,
+            details: body,
+          });
+        } else {
+          const errText = await response.text().catch(() => '');
+          return json(res, 400, {
+            ok: false,
+            latencyMs,
+            error: `Evolution API mengembalikan status ${response.status}: ${errText || 'Gagal mengirim pesan'}`,
+          });
+        }
+      } catch (err: any) {
+        const latencyMs = Date.now() - t0;
+        return json(res, 500, {
+          ok: false,
+          latencyMs,
+          error: `Gagal menghubungi Evolution API: ${err.message || 'Koneksi waktu habis'}`,
+        });
+      }
+    }
+
     if(action==='test_koka_ai'){
       const apiKey = process.env.GEMINI_API_KEY;
       if (!apiKey) {
@@ -2107,6 +2215,7 @@ export default async function handler(req:any,res:any){
       }
 
       const prompt = req.body.prompt || 'Halo Koka, tolong berikan satu salam sapaan singkat dan semangat untuk guru sekolah dasar Indonesia!';
+      const requestedModel = req.body.model || 'gemini-3.8-flash';
       const t0 = Date.now();
       try {
         const ai = new GoogleGenAI({
@@ -2117,19 +2226,38 @@ export default async function handler(req:any,res:any){
             },
           },
         });
-        const model = 'gemini-3.8-flash';
-        const response = await ai.models.generateContent({
-          model,
-          contents: prompt,
-        });
+
+        let response;
+        let usedModel = requestedModel;
+        try {
+          response = await ai.models.generateContent({
+            model: requestedModel,
+            contents: prompt,
+          });
+        } catch (firstErr: any) {
+          try {
+            usedModel = 'gemini-3.6-flash';
+            response = await ai.models.generateContent({
+              model: 'gemini-3.6-flash',
+              contents: prompt,
+            });
+          } catch (secErr: any) {
+            usedModel = 'gemini-3.1-flash-lite';
+            response = await ai.models.generateContent({
+              model: 'gemini-3.1-flash-lite',
+              contents: prompt,
+            });
+          }
+        }
+
         const latencyMs = Date.now() - t0;
         const text = response.text || 'Respon berhasil diterima.';
         return json(res, 200, {
           ok: true,
-          model,
+          model: usedModel,
           reply: text,
           latencyMs,
-          message: 'Koneksi server Gemini API berfungsi optimal!',
+          message: `Koneksi server Gemini API (${usedModel}) berfungsi optimal!`,
         });
       } catch (err: any) {
         const latencyMs = Date.now() - t0;
@@ -2186,7 +2314,7 @@ export default async function handler(req:any,res:any){
     }
 
     if(action==='export_table_data'){
-      const allowedTables = ['schools', 'students', 'teachers', 'payments', 'audit_logs', 'classes', 'leave_requests'];
+      const allowedTables = ['schools', 'students', 'teachers', 'payments', 'audit_logs', 'classes', 'leave_requests', 'attendance_records'];
       const table = req.body.table;
       if (!allowedTables.includes(table)) {
         return json(res, 400, { error: `Tabel "${table}" tidak diizinkan untuk diekspor.` });
@@ -2202,6 +2330,86 @@ export default async function handler(req:any,res:any){
         totalRows: (data || []).length,
         exportedAt: new Date().toISOString(),
         rows: data || [],
+      });
+    }
+
+    if(action==='reconcile_database_integrity'){
+      const t0 = Date.now();
+      // 1. Fetch all schools
+      const { data: schools, error: schoolErr } = await admin.from('schools').select('id, name, plan');
+      if (schoolErr) throw schoolErr;
+      const schoolIds = new Set((schools || []).map((s: any) => s.id));
+
+      // 2. Check students orphaned
+      const { data: allStudents } = await admin.from('students').select('id, name, school_id');
+      const orphanStudents = (allStudents || []).filter((st: any) => st.school_id && !schoolIds.has(st.school_id));
+
+      // 3. Check classes orphaned
+      const { data: allClasses } = await admin.from('classes').select('id, name, school_id');
+      const orphanClasses = (allClasses || []).filter((c: any) => c.school_id && !schoolIds.has(c.school_id));
+      const classIds = new Set((allClasses || []).map((c: any) => c.id));
+
+      // 4. Check teachers orphaned or broken class assignment
+      const { data: allTeachers } = await admin.from('teachers').select('id, name, school_id, assigned_class_id');
+      const orphanTeachers = (allTeachers || []).filter((t: any) => t.school_id && !schoolIds.has(t.school_id));
+      const brokenClassAssignments = (allTeachers || []).filter((t: any) => t.assigned_class_id && !classIds.has(t.assigned_class_id));
+
+      // 5. Clean up broken assignments if any exist
+      let fixedCount = 0;
+      if (brokenClassAssignments.length > 0) {
+        for (const bt of brokenClassAssignments) {
+          await admin.from('teachers').update({ assigned_class_id: null }).eq('id', bt.id);
+          fixedCount++;
+        }
+      }
+
+      // 6. Record audit log
+      await admin.from('audit_logs').insert({
+        actor_id: caller.user.id,
+        actor_name: profile.name || 'Super Admin',
+        actor_role: 'SUPER_ADMIN',
+        action: 'DATABASE_INTEGRITY_RECONCILE',
+        details: {
+          schoolsChecked: schools?.length || 0,
+          studentsChecked: allStudents?.length || 0,
+          classesChecked: allClasses?.length || 0,
+          teachersChecked: allTeachers?.length || 0,
+          orphanStudentsCount: orphanStudents.length,
+          orphanClassesCount: orphanClasses.length,
+          orphanTeachersCount: orphanTeachers.length,
+          fixedCount,
+          timestamp: new Date().toISOString()
+        }
+      });
+
+      const latencyMs = Date.now() - t0;
+      const issuesFound = orphanStudents.length + orphanClasses.length + orphanTeachers.length + brokenClassAssignments.length;
+
+      return json(res, 200, {
+        ok: true,
+        latencyMs,
+        integrityScore: issuesFound === 0 ? 100 : Math.max(70, 100 - issuesFound * 5),
+        checks: {
+          schoolsVerified: schools?.length || 0,
+          studentsVerified: allStudents?.length || 0,
+          classesVerified: allClasses?.length || 0,
+          teachersVerified: allTeachers?.length || 0,
+          orphanStudents: orphanStudents.length,
+          orphanClasses: orphanClasses.length,
+          orphanTeachers: orphanTeachers.length,
+          brokenAssignmentsFixed: fixedCount,
+        },
+        schoolTenantBreakdown: (schools || []).map((s: any) => ({
+          id: s.id,
+          name: s.name,
+          plan: s.plan || 'gratis',
+          studentsCount: (allStudents || []).filter((st: any) => st.school_id === s.id).length,
+          classesCount: (allClasses || []).filter((c: any) => c.school_id === s.id).length,
+          teachersCount: (allTeachers || []).filter((t: any) => t.school_id === s.id).length,
+        })),
+        message: issuesFound === 0
+          ? 'Seluruh relasi tabel multi-tenant terverifikasi normal 100% konsisten!'
+          : `Pemeriksaan selesai. Ditemukan ${issuesFound} inkonsistensi, ${fixedCount} penugasan telah diperbaiki otomatis.`
       });
     }
 

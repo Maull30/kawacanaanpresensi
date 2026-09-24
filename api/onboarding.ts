@@ -524,16 +524,35 @@ export default async function handler(req: any, res: any) {
 
       // Map subject name jika ada
       let subjectName = null;
+      let subjectTeacherId = null;
       if (attType === 'SUBJECT' && subjectId) {
-        const { data: subj } = await db.from('subjects').select('name').eq('id', subjectId).maybeSingle();
+        const { data: subj } = await db.from('subjects').select('name, teacher_id').eq('id', subjectId).maybeSingle();
         subjectName = subj?.name || null;
+        subjectTeacherId = subj?.teacher_id || null;
       }
 
       // Resolve nama wali kelas / guru mapel
-      let teacherName = 'Wali Kelas';
+      let teacherName = '';
       let teacherNip = '';
       if (attType === 'SUBJECT') {
-        teacherName = 'Guru Mata Pelajaran';
+        if (subjectTeacherId) {
+          const st = (teachersList || []).find((t: any) => t.id === subjectTeacherId);
+          if (st) {
+            teacherName = st.nama;
+            teacherNip = st.nip || '';
+          }
+        }
+        if (!teacherName && subjectId) {
+          const { data: subAssign } = await db.from('subject_teacher_assignments').select('teacher_id').eq('subject_id', subjectId).limit(1);
+          const assignedTid = subAssign?.[0]?.teacher_id;
+          if (assignedTid) {
+            const st = (teachersList || []).find((t: any) => t.id === assignedTid);
+            if (st) {
+              teacherName = st.nama;
+              teacherNip = st.nip || '';
+            }
+          }
+        }
       } else if (targetClass.wali_kelas_teacher_id) {
         const wk = (teachersList || []).find((t: any) => t.id === targetClass.wali_kelas_teacher_id);
         if (wk) {
@@ -541,11 +560,17 @@ export default async function handler(req: any, res: any) {
           teacherNip = wk.nip || '';
         }
       } else if (sp?.nama_wali_kelas) {
-        teacherName = sp.nama_wali_kelas;
-        teacherNip = sp.nip_wali_kelas || '';
+        const wk = (teachersList || []).find((t: any) => t.nama && t.nama.trim().toLowerCase() === sp.nama_wali_kelas.trim().toLowerCase());
+        if (wk) {
+          teacherName = wk.nama;
+          teacherNip = wk.nip || '';
+        } else {
+          teacherName = sp.nama_wali_kelas;
+          teacherNip = sp.nip_wali_kelas || '';
+        }
       }
 
-      if (teacherName === 'Wali Kelas' && attRecords.length > 0) {
+      if ((!teacherName || teacherName === 'Wali Kelas' || teacherName === 'Guru Mata Pelajaran') && attRecords.length > 0) {
         const attTeacherId = attRecords.find((r: any) => r.teacher_id)?.teacher_id;
         if (attTeacherId) {
           const tObj = (teachersList || []).find((t: any) => t.id === attTeacherId);
@@ -553,6 +578,15 @@ export default async function handler(req: any, res: any) {
             teacherName = tObj.nama;
             teacherNip = tObj.nip || teacherNip;
           }
+        }
+      }
+
+      let principalName = sp?.nama_kepala_sekolah || 'Kepala Sekolah';
+      let principalNip = sp?.nip_kepala_sekolah || '';
+      if (!principalNip && principalName) {
+        const pt = (teachersList || []).find((t: any) => t.nama && t.nama.trim().toLowerCase() === principalName.trim().toLowerCase());
+        if (pt?.nip) {
+          principalNip = pt.nip;
         }
       }
 
@@ -628,8 +662,8 @@ export default async function handler(req: any, res: any) {
           subjectName,
           teacherName,
           teacherNip,
-          principalName: sp?.nama_kepala_sekolah || 'Kepala Sekolah',
-          principalNip: sp?.nip_kepala_sekolah || '',
+          principalName,
+          principalNip,
           reportPlace: sc?.report_place || 'Jakarta',
           reportDateOfficial: sc?.report_date || reportDate,
           stats: {

@@ -4,6 +4,23 @@ import { SchoolLogo } from './SchoolLogo';
 import { useApp } from '../context/AppContext';
 import { getFaseByClassName } from '../utils/faseKurikulum';
 import { generateSmartReportLink } from '../utils/whatsappBroadcast';
+import { getUserRoleScope } from '../utils/userScope';
+
+const isPlaceholderText = (text: string | null | undefined): boolean => {
+  if (!text) return true;
+  const clean = text.trim().toLowerCase();
+  return (
+    clean === '' ||
+    clean === '-' ||
+    clean === 'guru mata pelajaran' ||
+    clean === 'guru mapel' ||
+    clean === 'wali kelas' ||
+    clean === 'nama guru' ||
+    clean === 'nama pendidik' ||
+    clean === 'pendidik' ||
+    clean.startsWith('wali ')
+  );
+};
 
 export interface PublicDailyReportViewerProps {
   classId?: string;
@@ -42,6 +59,11 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
     teachers: ctxTeachers,
     subjects: ctxSubjects,
   } = useApp();
+
+  const userScope = useMemo(
+    () => getUserRoleScope(currentUser, ctxClasses, ctxSubjects, ctxTeachers),
+    [currentUser, ctxClasses, ctxSubjects, ctxTeachers]
+  );
 
   const isInternalUser = Boolean(currentUser && ctxClasses && ctxClasses.length > 0);
 
@@ -167,18 +189,116 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
   }, [isInternalUser, propClassId, ctxClasses]);
 
   const resolvedSubject = useMemo(() => {
-    if (!isInternalUser || !subjectId) return null;
-    return ctxSubjects.find((s) => s.id === subjectId) || null;
-  }, [isInternalUser, subjectId, ctxSubjects]);
+    if (!isInternalUser) return null;
+    if (subjectId) {
+      const byId = ctxSubjects.find((s) => s.id === subjectId);
+      if (byId) return byId;
+      const byName = ctxSubjects.find((s) => s.name.toLowerCase() === subjectId.toLowerCase());
+      if (byName) return byName;
+    }
+    if (userScope.isGuruMapel) {
+      if (userScope.primarySubject) return userScope.primarySubject;
+      if (userScope.assignedSubjects.length > 0) return userScope.assignedSubjects[0];
+    }
+    return null;
+  }, [isInternalUser, subjectId, ctxSubjects, userScope]);
 
   const resolvedWaliKelas = useMemo(() => {
     if (!isInternalUser || !resolvedClass) return null;
+    // 1. Match by waliKelasTeacherId
     if (resolvedClass.waliKelasTeacherId) {
       const t = ctxTeachers.find((tch) => tch.id === resolvedClass.waliKelasTeacherId);
       if (t) return t;
     }
+    // 2. Match by waliKelasName
+    if (resolvedClass.waliKelasName && !isPlaceholderText(resolvedClass.waliKelasName)) {
+      const cleanName = resolvedClass.waliKelasName.trim().toLowerCase();
+      const t = ctxTeachers.find((tch) => tch.nama.trim().toLowerCase() === cleanName);
+      if (t) return t;
+    }
+    // 3. Fallback: if currentUser is WALI KELAS
+    if (userScope.isWaliKelas || currentUser?.role === 'WALI KELAS') {
+      const userClassIds = [
+        ...(currentUser?.classIds || []),
+        ...((currentUser as any)?.assignedClassIds || []),
+      ];
+      const isAssigned =
+        userClassIds.length === 0 ||
+        userClassIds.includes(resolvedClass.id) ||
+        userScope.assignedWaliClassId === resolvedClass.id;
+      if (isAssigned) {
+        if (userScope.currentTeacher) return userScope.currentTeacher;
+        if (currentUser?.teacherId) {
+          const t = ctxTeachers.find((tch) => tch.id === currentUser.teacherId);
+          if (t) return t;
+        }
+        return {
+          id: currentUser?.teacherId || currentUser?.id || 'wali-kelas',
+          nama: currentUser?.name || '',
+          nip: currentUser?.nip || (currentUser?.username && /^\d{10,}$/.test(currentUser.username) ? currentUser.username : ''),
+          jenisKelamin: (currentUser as any)?.jenisKelamin || (currentUser as any)?.gender || 'L',
+        };
+      }
+    }
+    // 4. Fallback: match by ctxSchoolProfile.namaWaliKelas
+    if (ctxSchoolProfile?.namaWaliKelas && !isPlaceholderText(ctxSchoolProfile.namaWaliKelas)) {
+      const cleanWali = ctxSchoolProfile.namaWaliKelas.trim().toLowerCase();
+      const t = ctxTeachers.find((tch) => tch.nama.trim().toLowerCase() === cleanWali);
+      if (t) return t;
+    }
     return null;
-  }, [isInternalUser, resolvedClass, ctxTeachers]);
+  }, [isInternalUser, resolvedClass, ctxTeachers, currentUser, userScope, ctxSchoolProfile]);
+
+  const resolvedSubjectTeacher = useMemo(() => {
+    // 1. By subject.teacherId
+    if (resolvedSubject?.teacherId) {
+      const t = ctxTeachers.find((tch) => tch.id === resolvedSubject.teacherId);
+      if (t) return t;
+    }
+    // 2. By subject.teacherName
+    if (resolvedSubject?.teacherName && !isPlaceholderText(resolvedSubject.teacherName)) {
+      const cleanName = resolvedSubject.teacherName.trim().toLowerCase();
+      const t = ctxTeachers.find((tch) => tch.nama.trim().toLowerCase() === cleanName);
+      if (t) return t;
+    }
+    // 3. Fallback to currentUser / userScope if user is GURU MAPEL
+    if (userScope.isGuruMapel || currentUser?.role === 'GURU MAPEL') {
+      if (userScope.currentTeacher) return userScope.currentTeacher;
+      if (currentUser?.teacherId) {
+        const t = ctxTeachers.find((tch) => tch.id === currentUser.teacherId);
+        if (t) return t;
+      }
+      return {
+        id: currentUser?.teacherId || currentUser?.id || 'guru-mapel',
+        nama: currentUser?.name || '',
+        nip: currentUser?.nip || (currentUser?.username && /^\d{10,}$/.test(currentUser.username) ? currentUser.username : ''),
+        jenisKelamin: (currentUser as any)?.jenisKelamin || (currentUser as any)?.gender || 'L',
+      };
+    }
+    return null;
+  }, [resolvedSubject, ctxTeachers, currentUser, userScope]);
+
+  const resolvedPrincipalTeacher = useMemo(() => {
+    const pName = ctxSchoolProfile?.namaKepalaSekolah || externalReportData?.principalName || '';
+    if (pName) {
+      const cleanName = pName.trim().toLowerCase();
+      const t = ctxTeachers.find((tch) => tch.nama.trim().toLowerCase() === cleanName);
+      if (t) return t;
+    }
+    if (currentUser?.role === 'KEPALA SEKOLAH') {
+      if (currentUser.teacherId) {
+        const t = ctxTeachers.find((tch) => tch.id === currentUser.teacherId);
+        if (t) return t;
+      }
+      return {
+        id: currentUser.teacherId || currentUser.id,
+        nama: currentUser.name,
+        nip: currentUser.nip || (currentUser.username && /^\d{10,}$/.test(currentUser.username) ? currentUser.username : ''),
+        jenisKelamin: currentUser.jenisKelamin || currentUser.gender || 'L',
+      };
+    }
+    return null;
+  }, [ctxSchoolProfile, externalReportData, ctxTeachers, currentUser]);
 
   // Target students
   const targetStudents = useMemo(() => {
@@ -422,6 +542,9 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
       if (cls.waliKelasTeacherId) {
         const tch = ctxTeachers.find((t) => t.id === cls.waliKelasTeacherId);
         if (tch) waliName = tch.nama;
+      }
+      if (waliName === '-' && cls.waliKelasName) {
+        waliName = cls.waliKelasName;
       }
 
       return {
@@ -696,11 +819,123 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
   const activeClassName = resolvedClass?.name || externalReportData?.className || 'Kelas';
   const activeClassClean = activeClassName.replace(/^kelas\s*/i, '');
   const activeFase = resolvedClass ? getFaseByClassName(resolvedClass.name, resolvedClass.grade) : (externalReportData?.fase || 'Fase A');
-  const principalName = ctxSchoolProfile?.namaKepalaSekolah || externalReportData?.principalName || 'Nama Kepala Sekolah';
-  const principalNip = ctxSchoolProfile?.nipKepalaSekolah || externalReportData?.principalNip || '-';
+  const principalName = ctxSchoolProfile?.namaKepalaSekolah || resolvedPrincipalTeacher?.nama || externalReportData?.principalName || 'Nama Kepala Sekolah';
+  const principalNip = (ctxSchoolProfile?.nipKepalaSekolah && ctxSchoolProfile.nipKepalaSekolah !== '-')
+    ? ctxSchoolProfile.nipKepalaSekolah
+    : (resolvedPrincipalTeacher?.nip || (currentUser?.role === 'KEPALA SEKOLAH' ? (currentUser.nip || (currentUser.username && /^\d{10,}$/.test(currentUser.username) ? currentUser.username : '')) : '') || externalReportData?.principalNip || '-');
 
-  const teacherName = resolvedSubject?.teacherName || resolvedWaliKelas?.nama || ctxSchoolProfile?.namaWaliKelas || externalReportData?.teacherName || 'Wali Kelas';
-  const teacherNip = resolvedSubject ? '' : (resolvedWaliKelas?.nip || ctxSchoolProfile?.nipWaliKelas || externalReportData?.teacherNip || '-');
+  // Penentuan Nama, NIP, dan Jabatan Penandatangan sesuai Role Pengguna & Konteks Dokumen
+  const resolvedTeacherInfo = useMemo(() => {
+    // KASUS 1: USER YANG LOGIN ADALAH GURU MATA PELAJARAN (Role Guru Mapel)
+    if (userScope.isGuruMapel || currentUser?.role === 'GURU MAPEL') {
+      const rawName = userScope.currentTeacher?.nama || currentUser?.name || '';
+      const name = isPlaceholderText(rawName) ? '' : rawName;
+      const nip = userScope.currentTeacher?.nip || currentUser?.nip || (currentUser?.username && /^\d{10,}$/.test(currentUser.username) ? currentUser.username : '') || '-';
+      const subjName = resolvedSubject?.name || currentUser?.subjectName || userScope.primarySubject?.name || '';
+      return {
+        name,
+        nip,
+        title: subjName ? `Guru Mata Pelajaran ${subjName}` : 'Guru Mata Pelajaran',
+      };
+    }
+
+    // KASUS 2: USER YANG LOGIN ADALAH WALI KELAS (Role Wali Kelas)
+    if (userScope.isWaliKelas || currentUser?.role === 'WALI KELAS') {
+      const userClassIds = [
+        ...(currentUser?.classIds || []),
+        ...((currentUser as any)?.assignedClassIds || []),
+      ];
+      const isAssigned =
+        !resolvedClass ||
+        userClassIds.length === 0 ||
+        userClassIds.includes(resolvedClass.id) ||
+        userScope.assignedWaliClassId === resolvedClass.id;
+      if (isAssigned) {
+        const rawName = userScope.currentTeacher?.nama || currentUser?.name || '';
+        const name = isPlaceholderText(rawName) ? '' : rawName;
+        const nip = userScope.currentTeacher?.nip || currentUser?.nip || (currentUser?.username && /^\d{10,}$/.test(currentUser.username) ? currentUser.username : '') || '-';
+        return {
+          name,
+          nip,
+          title: `Wali ${activeClassName}`,
+        };
+      }
+    }
+
+    // KASUS 3: DOKUMEN ADALAH PRESENSI MATA PELAJARAN (dilihat oleh Admin/Kepsek/Tamu/Wali Kelas)
+    if (attendanceType === 'SUBJECT' || resolvedSubject) {
+      let name = '';
+      let nip = '-';
+
+      if (resolvedSubjectTeacher?.nama && !isPlaceholderText(resolvedSubjectTeacher.nama)) {
+        name = resolvedSubjectTeacher.nama;
+        nip = resolvedSubjectTeacher.nip || '-';
+      } else if (resolvedSubject?.teacherName && !isPlaceholderText(resolvedSubject.teacherName)) {
+        name = resolvedSubject.teacherName;
+        const matched = ctxTeachers.find((t) => t.nama.trim().toLowerCase() === resolvedSubject.teacherName!.trim().toLowerCase());
+        if (matched?.nip) nip = matched.nip;
+      } else if (resolvedSubject?.teacherId) {
+        const matched = ctxTeachers.find((t) => t.id === resolvedSubject.teacherId);
+        if (matched) {
+          name = matched.nama;
+          nip = matched.nip || '-';
+        }
+      } else if (externalReportData?.teacherName && !isPlaceholderText(externalReportData.teacherName)) {
+        name = externalReportData.teacherName;
+        nip = externalReportData.teacherNip || '-';
+      }
+
+      const subjName = resolvedSubject?.name || externalReportData?.subjectName || '';
+      return {
+        name: isPlaceholderText(name) ? '' : name,
+        nip,
+        title: subjName ? `Guru Mata Pelajaran ${subjName}` : 'Guru Mata Pelajaran',
+      };
+    }
+
+    // KASUS 4: DOKUMEN ADALAH PRESENSI HARIAN / WALI KELAS (dilihat oleh Admin/Kepsek/Tamu)
+    let name = '';
+    let nip = '-';
+
+    if (resolvedWaliKelas?.nama && !isPlaceholderText(resolvedWaliKelas.nama)) {
+      name = resolvedWaliKelas.nama;
+      nip = resolvedWaliKelas.nip || '-';
+    } else if (resolvedClass?.waliKelasName && !isPlaceholderText(resolvedClass.waliKelasName)) {
+      name = resolvedClass.waliKelasName;
+      const matched = ctxTeachers.find((t) => t.nama.trim().toLowerCase() === resolvedClass.waliKelasName!.trim().toLowerCase());
+      if (matched?.nip) nip = matched.nip;
+    } else if (ctxSchoolProfile?.namaWaliKelas && !isPlaceholderText(ctxSchoolProfile.namaWaliKelas)) {
+      name = ctxSchoolProfile.namaWaliKelas;
+      nip = ctxSchoolProfile.nipWaliKelas || '-';
+    } else if (externalReportData?.teacherName && !isPlaceholderText(externalReportData.teacherName)) {
+      name = externalReportData.teacherName;
+      nip = externalReportData.teacherNip || '-';
+    }
+
+    return {
+      name: isPlaceholderText(name) ? '' : name,
+      nip,
+      title: `Wali ${activeClassName}`,
+    };
+  }, [
+    userScope,
+    currentUser,
+    resolvedClass,
+    resolvedSubject,
+    resolvedSubjectTeacher,
+    resolvedWaliKelas,
+    activeClassName,
+    attendanceType,
+    ctxSchoolProfile,
+    ctxTeachers,
+    externalReportData,
+  ]);
+
+  const teacherName = resolvedTeacherInfo.name || '( ......................................... )';
+  const teacherNip = resolvedTeacherInfo.nip && resolvedTeacherInfo.nip !== '-' ? resolvedTeacherInfo.nip : '-';
+  const teacherSignatureTitle = isKepsekReport
+    ? 'Koordinator Kurikulum / Tim Presensi'
+    : resolvedTeacherInfo.title;
   const reportPlace = ctxSystemConfig?.reportPlace || externalReportData?.reportPlace || 'Jakarta';
   const reportDateOfficial = ctxSystemConfig?.reportDate || externalReportData?.reportDateOfficial || selectedDate;
 
@@ -863,13 +1098,19 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
               ) : (
                 <>
                   <p><span className="font-semibold text-slate-600">Kelas / Fase:</span> {activeClassName} / {activeFase}</p>
-                  {attendanceType === 'SUBJECT' ? (
-                    <p>
-                      <span className="font-semibold text-slate-600">Mata Pelajaran:</span>{' '}
-                      <strong className="text-blue-900">{resolvedSubject?.name || 'Mata Pelajaran Khusus'}</strong>
-                    </p>
+                  {attendanceType === 'SUBJECT' || userScope.isGuruMapel ? (
+                    <>
+                      <p>
+                        <span className="font-semibold text-slate-600">Mata Pelajaran:</span>{' '}
+                        <strong className="text-blue-900">{resolvedSubject?.name || currentUser?.subjectName || 'Mata Pelajaran'}</strong>
+                      </p>
+                      <p>
+                        <span className="font-semibold text-slate-600">Guru Mapel:</span>{' '}
+                        <strong>{teacherName}</strong>
+                      </p>
+                    </>
                   ) : (
-                    <p><span className="font-semibold text-slate-600">Wali Kelas:</span> {teacherName}</p>
+                    <p><span className="font-semibold text-slate-600">Wali Kelas:</span> <strong>{teacherName}</strong></p>
                   )}
                 </>
               )}
@@ -1269,11 +1510,7 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
                 {reportPlace}, {formatReportDateIndo(reportDateOfficial)}
               </p>
               <p className="font-bold">
-                {isKepsekReport
-                  ? 'Koordinator Kurikulum / Tim Presensi'
-                  : attendanceType === 'SUBJECT'
-                  ? `Guru Mata Pelajaran ${resolvedSubject?.name || ''}`
-                  : `Wali ${activeClassName}`}
+                {teacherSignatureTitle}
               </p>
               <div className="h-14 sm:h-20" />
               <p className="font-bold underline text-sm">

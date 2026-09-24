@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { WhatsAppBroadcastModal } from '../components/WhatsAppBroadcastModal';
 import { WhatsAppIcon } from '../components/WhatsAppIcon';
+import { generateSmartReportLink } from '../utils/whatsappBroadcast';
 
 export const LaporanView: React.FC = () => {
   const {
@@ -443,8 +444,50 @@ export const LaporanView: React.FC = () => {
 
   const handlePrintSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // Buka tampilan pratinjau laporan terlebih dahulu, sama seperti pada Rekapitulasi (Cetak Bulanan)
-    setIsPrintModalOpen(true);
+
+    // Tentukan ID kelas target
+    const targetClassId =
+      selectedClassId ||
+      userScope.assignedWaliClassId ||
+      (selectableClasses.length > 0 ? selectableClasses[0].id : '') ||
+      (classes.length > 0 ? classes[0].id : '') ||
+      schoolProfile.kelas ||
+      '';
+
+    // Tentukan tanggal target sesuai jenis/periode laporan yang dipilih
+    let targetDate = selectedDate;
+    if (reportType === 'Laporan Mingguan' && weekDates.length > 0) {
+      targetDate = weekDates[0];
+    } else if (reportType === 'Laporan Bulanan') {
+      const monthPrefix = `${year}-${String(mNum).padStart(2, '0')}`;
+      const today = new Date().toISOString().split('T')[0];
+      if (today.startsWith(monthPrefix)) {
+        targetDate = today;
+      } else {
+        const rec = attendanceRecords.find(
+          (r) =>
+            r.date.startsWith(monthPrefix) &&
+            (!targetClassId || r.classId === targetClassId)
+        );
+        targetDate = rec ? rec.date : `${monthPrefix}-01`;
+      }
+    }
+    if (!targetDate) {
+      targetDate = new Date().toISOString().split('T')[0];
+    }
+
+    const smartUrl = generateSmartReportLink(
+      targetClassId,
+      targetDate,
+      attendanceType,
+      attendanceType === 'SUBJECT' ? (selectedSubjectId || null) : null
+    );
+
+    if (smartUrl) {
+      window.open(smartUrl, '_blank', 'noopener,noreferrer');
+    } else {
+      setIsPrintModalOpen(true);
+    }
   };
 
   const handleKepsekPrint = () => {
@@ -457,7 +500,21 @@ export const LaporanView: React.FC = () => {
     ) {
       return;
     }
-    setIsPrintModalOpen(true);
+
+    const targetClassId =
+      selectedClassId ||
+      (selectableClasses.length > 0 ? selectableClasses[0].id : '') ||
+      (classes.length > 0 ? classes[0].id : '') ||
+      schoolProfile.kelas ||
+      '';
+    const targetDate = selectedDate || new Date().toISOString().split('T')[0];
+    const smartUrl = generateSmartReportLink(targetClassId, targetDate, 'DAILY');
+
+    if (smartUrl) {
+      window.open(smartUrl, '_blank', 'noopener,noreferrer');
+    } else {
+      setIsPrintModalOpen(true);
+    }
   };
 
   return (
@@ -534,7 +591,7 @@ export const LaporanView: React.FC = () => {
               className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-98 text-white font-bold text-xs sm:text-sm shadow-md hover:shadow-lg transition-all cursor-pointer min-h-[44px]"
             >
               <Printer size={18} />
-              <span>CETAK DOKUMEN RESMI</span>
+              <span>CETAK LAPORAN</span>
             </button>
           </div>
 
@@ -1190,11 +1247,11 @@ export const LaporanView: React.FC = () => {
                 <button
                   type="submit"
                   id="btn-cetak-laporan-pdf"
-                  title="Buka pratinjau dokumen laporan untuk dicetak atau disimpan sebagai PDF"
+                  title="Buka dokumen laporan di tab baru untuk dicetak atau disimpan sebagai PDF"
                   className="flex-1 py-3.5 px-6 rounded-xl bg-[#1D82F5] hover:bg-blue-600 active:scale-98 text-white font-black text-xs sm:text-sm tracking-wider uppercase transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2 min-h-[48px] sm:min-h-[50px] cursor-pointer"
                 >
                   <Printer size={18} />
-                  <span>CETAK DOKUMEN PDF</span>
+                  <span>CETAK LAPORAN</span>
                 </button>
               </div>
             </form>

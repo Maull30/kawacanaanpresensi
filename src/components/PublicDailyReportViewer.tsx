@@ -1047,8 +1047,8 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
                 </tbody>
                 <tfoot>
                   <tr className="bg-slate-100 font-bold border-t-2 border-slate-400">
-                    <td colSpan={4} className="border border-slate-400 p-1.5 text-right uppercase">
-                      TOTAL / RATA-RATA:
+                    <td colSpan={4} className="border border-slate-400 p-1.5 text-center uppercase">
+                      TOTAL / RATA-RATA
                     </td>
                     <td className="border border-slate-400 p-1.5 text-center text-emerald-900 font-extrabold">{monthlyTotalHadir}</td>
                     <td className="border border-slate-400 p-1.5 text-center text-sky-900 font-extrabold">{monthlyTotalSakit}</td>
@@ -1109,8 +1109,8 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
                 </tbody>
                 <tfoot>
                   <tr className="bg-slate-100 font-bold border-t-2 border-slate-400">
-                    <td colSpan={4} className="border border-slate-400 p-2 text-right uppercase font-extrabold">
-                      TOTAL / RATA-RATA:
+                    <td colSpan={4} className="border border-slate-400 p-2 text-center uppercase font-extrabold">
+                      TOTAL / RATA-RATA
                     </td>
                     <td className="border border-slate-400 p-1.5 text-center text-emerald-900 font-extrabold">{semesterTotalHadir}</td>
                     <td className="border border-slate-400 p-1.5 text-center text-sky-900 font-extrabold">{semesterTotalSakit}</td>

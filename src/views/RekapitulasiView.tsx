@@ -872,8 +872,7 @@ export const RekapitulasiView: React.FC = () => {
                       </th>
                     ))}
                     <th colSpan={4} className="py-2 px-2 text-center border-r border-slate-200 bg-amber-50/60">Total Semester (Hari)</th>
-                    <th colSpan={4} className="py-2 px-2 text-center border-r border-slate-200 bg-indigo-50/60">Persentase Semester (%)</th>
-                    <th rowSpan={2} className="py-3 px-3 text-center">Predikat</th>
+                    <th colSpan={4} className="py-2 px-2 text-center bg-indigo-50/60">Persentase Semester (%)</th>
                   </tr>
                   <tr className="bg-slate-100/70 text-[9px] text-slate-600 border-t border-slate-200">
                     {semesterMonthList.map((m) => (
@@ -927,20 +926,14 @@ export const RekapitulasiView: React.FC = () => {
                         <td className="py-2 px-1.5 text-center font-bold text-amber-700 bg-amber-50/30">
                           {row.pctIzin}%
                         </td>
-                        <td className="py-2 px-1.5 text-center font-bold text-rose-700 bg-rose-50/30 border-r border-slate-100">
+                        <td className="py-2 px-1.5 text-center font-bold text-rose-700 bg-rose-50/30">
                           {row.pctAlfa}%
-                        </td>
-
-                        <td className="py-2.5 px-3 text-center">
-                          <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold border ${row.predicateBadge}`}>
-                            {row.predicate}
-                          </span>
                         </td>
                       </tr>
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={35} className="py-8 text-center text-slate-400">
+                      <td colSpan={34} className="py-8 text-center text-slate-400">
                         Tidak ada data siswa yang cocok.
                       </td>
                     </tr>
@@ -968,7 +961,6 @@ export const RekapitulasiView: React.FC = () => {
                       <td colSpan={4} className="py-2 px-2 text-center text-blue-900 bg-blue-100/60 font-black">
                         RATA-RATA HADIR: {semesterOverallStats.avgPercentage}%
                       </td>
-                      <td className="py-2 px-3 text-center font-bold text-slate-500">-</td>
                     </tr>
                   </tfoot>
                 )}

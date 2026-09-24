@@ -81,32 +81,52 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
   const effectiveDays = getEffectiveDaysForMonth(effectiveYear, mNum);
   const monthKey = `${effectiveYear}-${String(mNum).padStart(2, '0')}`;
 
-  // Week working days
+  // Week working days - selalu mulai dari hari Senin
   const weekNum = parseInt(selectedWeek.replace(/\D/g, ''), 10) || 1;
   const weekWorkingDays = useMemo(() => {
-    const daysInMonth = new Date(effectiveYear, mNum, 0).getDate();
-    const startDay = (weekNum - 1) * 7 + 1;
-    const endDay = Math.min(daysInMonth, weekNum * 7);
+    // Tentukan hari Senin pertama untuk bulan terpilih
+    const firstOfMonth = new Date(effectiveYear, mNum - 1, 1);
+    const dow = firstOfMonth.getDay(); // 0 = Minggu, 1 = Senin, 2 = Selasa, ..., 6 = Sabtu
+    let firstMonday: Date;
+    if (dow === 1) {
+      firstMonday = new Date(effectiveYear, mNum - 1, 1);
+    } else if (dow === 6) {
+      firstMonday = new Date(effectiveYear, mNum - 1, 3);
+    } else if (dow === 0) {
+      firstMonday = new Date(effectiveYear, mNum - 1, 2);
+    } else {
+      // Selasa(2), Rabu(3), Kamis(4), Jumat(5) -> Mundur ke Senin pada minggu yang sama
+      firstMonday = new Date(effectiveYear, mNum - 1, 1 - (dow - 1));
+    }
+
+    const weekMonday = new Date(firstMonday);
+    weekMonday.setDate(firstMonday.getDate() + (weekNum - 1) * 7);
+
+    const is6Days = ctxSystemConfig?.activeStudyDays?.includes(6);
+    const daysCount = is6Days ? 6 : 5;
 
     const days: { dateStr: string; dayNum: number; dayShort: string; dayName: string }[] = [];
     const dayNamesShort = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
     const dayNamesFull = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
 
-    for (let d = startDay; d <= endDay; d++) {
-      const jsDate = new Date(effectiveYear, mNum - 1, d);
-      const dow = jsDate.getDay();
-      if (dow >= 1 && dow <= 5) {
-        const dateStr = `${effectiveYear}-${String(mNum).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-        days.push({
-          dateStr,
-          dayNum: d,
-          dayShort: dayNamesShort[dow],
-          dayName: dayNamesFull[dow],
-        });
-      }
+    for (let i = 0; i < daysCount; i++) {
+      const d = new Date(weekMonday);
+      d.setDate(weekMonday.getDate() + i);
+      const dowIndex = d.getDay();
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const dayOfMonth = String(d.getDate()).padStart(2, '0');
+      const dateStr = `${y}-${m}-${dayOfMonth}`;
+
+      days.push({
+        dateStr,
+        dayNum: d.getDate(),
+        dayShort: dayNamesShort[dowIndex],
+        dayName: dayNamesFull[dowIndex],
+      });
     }
     return days;
-  }, [effectiveYear, mNum, weekNum]);
+  }, [effectiveYear, mNum, weekNum, ctxSystemConfig?.activeStudyDays]);
 
   // Semester months list
   const semesterMonthList = useMemo(() => {
@@ -1047,54 +1067,59 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
               <table className="w-full text-left border-collapse border border-slate-400 text-xs font-sans min-w-[500px]">
                 <thead>
                   <tr className="bg-slate-100 border-b border-slate-400 text-center font-bold">
-                    <th className="border border-slate-400 p-1.5 w-8">NO</th>
-                    <th className="border border-slate-400 p-1.5 w-24">NISN</th>
-                    <th className="border border-slate-400 p-1.5 text-left">NAMA SISWA</th>
-                    <th className="border border-slate-400 p-1.5 w-8">L/P</th>
-                    <th className="border border-slate-400 p-1.5 w-12 text-emerald-800">H (HARI)</th>
-                    <th className="border border-slate-400 p-1.5 w-12 text-sky-800">S (HARI)</th>
-                    <th className="border border-slate-400 p-1.5 w-12 text-amber-800">I (HARI)</th>
-                    <th className="border border-slate-400 p-1.5 w-12 text-rose-800">A (HARI)</th>
-                    <th className="border border-slate-400 p-1.5 w-12">%H</th>
-                    <th className="border border-slate-400 p-1.5 w-12">%S</th>
-                    <th className="border border-slate-400 p-1.5 w-12">%I</th>
-                    <th className="border border-slate-400 p-1.5 w-12">%A</th>
-                    <th className="border border-slate-400 p-1.5 w-24">PREDIKAT</th>
+                    <th rowSpan={2} className="border border-slate-400 p-2 w-8 text-center">NO</th>
+                    <th rowSpan={2} className="border border-slate-400 p-2 w-28 text-center">NISN</th>
+                    <th rowSpan={2} className="border border-slate-400 p-2 text-left">NAMA SISWA</th>
+                    <th rowSpan={2} className="border border-slate-400 p-2 w-10 text-center">L/P</th>
+                    <th colSpan={4} className="border border-slate-400 p-1.5 text-center bg-slate-200/70 font-extrabold text-[11px]">
+                      REKAP KEHADIRAN (HARI)
+                    </th>
+                    <th colSpan={4} className="border border-slate-400 p-1.5 text-center bg-slate-200/70 font-extrabold text-[11px]">
+                      PERSENTASE KEHADIRAN (%)
+                    </th>
+                  </tr>
+                  <tr className="bg-slate-50 border-b border-slate-400 text-center font-bold text-[11px]">
+                    <th className="border border-slate-400 p-1 text-center w-12 text-emerald-800">H</th>
+                    <th className="border border-slate-400 p-1 text-center w-12 text-sky-800">S</th>
+                    <th className="border border-slate-400 p-1 text-center w-12 text-amber-800">I</th>
+                    <th className="border border-slate-400 p-1 text-center w-12 text-rose-800">A</th>
+                    <th className="border border-slate-400 p-1 text-center w-14 text-emerald-900 font-extrabold">%H</th>
+                    <th className="border border-slate-400 p-1 text-center w-14 text-sky-900 font-extrabold">%S</th>
+                    <th className="border border-slate-400 p-1 text-center w-14 text-amber-900 font-extrabold">%I</th>
+                    <th className="border border-slate-400 p-1 text-center w-14 text-rose-900 font-extrabold">%A</th>
                   </tr>
                 </thead>
                 <tbody>
                   {semesterStudentRows.map((s, idx) => (
-                    <tr key={s.id} className="border-b border-slate-300">
-                      <td className="border border-slate-300 p-1 text-center font-semibold">{idx + 1}</td>
-                      <td className="border border-slate-300 p-1 text-center font-mono">{s.nisn || '-'}</td>
-                      <td className="border border-slate-300 p-1 font-semibold">{s.nama}</td>
-                      <td className="border border-slate-300 p-1 text-center">{s.gender === 'Laki-laki' || s.gender === 'L' ? 'L' : 'P'}</td>
-                      <td className="border border-slate-300 p-1 text-center font-semibold text-emerald-800">{s.hadir}</td>
-                      <td className="border border-slate-300 p-1 text-center font-semibold text-sky-800">{s.sakit}</td>
-                      <td className="border border-slate-300 p-1 text-center font-semibold text-amber-800">{s.izin}</td>
-                      <td className="border border-slate-300 p-1 text-center font-semibold text-rose-800">{s.alfa}</td>
-                      <td className="border border-slate-300 p-1 text-center font-bold text-emerald-900">{s.pctHadir}%</td>
-                      <td className="border border-slate-300 p-1 text-center text-sky-900">{s.pctSakit}%</td>
-                      <td className="border border-slate-300 p-1 text-center text-amber-900">{s.pctIzin}%</td>
-                      <td className="border border-slate-300 p-1 text-center text-rose-900">{s.pctAlfa}%</td>
-                      <td className="border border-slate-300 p-1 text-center font-bold text-[11px]">{s.predicate}</td>
+                    <tr key={s.id} className="border-b border-slate-300 hover:bg-slate-50/50">
+                      <td className="border border-slate-300 p-1.5 text-center font-semibold">{idx + 1}</td>
+                      <td className="border border-slate-300 p-1.5 text-center font-mono">{s.nisn || '-'}</td>
+                      <td className="border border-slate-300 p-1.5 font-semibold">{s.nama}</td>
+                      <td className="border border-slate-300 p-1.5 text-center">{s.gender === 'Laki-laki' || s.gender === 'L' ? 'L' : 'P'}</td>
+                      <td className="border border-slate-300 p-1.5 text-center font-semibold text-emerald-800">{s.hadir}</td>
+                      <td className="border border-slate-300 p-1.5 text-center font-semibold text-sky-800">{s.sakit}</td>
+                      <td className="border border-slate-300 p-1.5 text-center font-semibold text-amber-800">{s.izin}</td>
+                      <td className="border border-slate-300 p-1.5 text-center font-semibold text-rose-800">{s.alfa}</td>
+                      <td className="border border-slate-300 p-1.5 text-center font-bold text-emerald-900 bg-emerald-50/30">{s.pctHadir}%</td>
+                      <td className="border border-slate-300 p-1.5 text-center text-sky-900 bg-sky-50/30">{s.pctSakit}%</td>
+                      <td className="border border-slate-300 p-1.5 text-center text-amber-900 bg-amber-50/30">{s.pctIzin}%</td>
+                      <td className="border border-slate-300 p-1.5 text-center text-rose-900 bg-rose-50/30">{s.pctAlfa}%</td>
                     </tr>
                   ))}
                 </tbody>
                 <tfoot>
                   <tr className="bg-slate-100 font-bold border-t-2 border-slate-400">
-                    <td colSpan={4} className="border border-slate-400 p-1.5 text-right uppercase">
+                    <td colSpan={4} className="border border-slate-400 p-2 text-right uppercase font-extrabold">
                       TOTAL / RATA-RATA:
                     </td>
                     <td className="border border-slate-400 p-1.5 text-center text-emerald-900 font-extrabold">{semesterTotalHadir}</td>
                     <td className="border border-slate-400 p-1.5 text-center text-sky-900 font-extrabold">{semesterTotalSakit}</td>
                     <td className="border border-slate-400 p-1.5 text-center text-amber-900 font-extrabold">{semesterTotalIzin}</td>
                     <td className="border border-slate-400 p-1.5 text-center text-rose-900 font-extrabold">{semesterTotalAlfa}</td>
-                    <td className="border border-slate-400 p-1.5 text-center text-emerald-950 font-black">{formatPct(semesterPctHadir)}%</td>
-                    <td className="border border-slate-400 p-1.5 text-center text-sky-950 font-black">{formatPct(semesterPctSakit)}%</td>
-                    <td className="border border-slate-400 p-1.5 text-center text-amber-950 font-black">{formatPct(semesterPctIzin)}%</td>
-                    <td className="border border-slate-400 p-1.5 text-center text-rose-950 font-black">{formatPct(semesterPctAlfa)}%</td>
-                    <td className="border border-slate-400 p-1.5 text-center text-slate-500">-</td>
+                    <td className="border border-slate-400 p-1.5 text-center text-emerald-950 font-black bg-emerald-100/50">{formatPct(semesterPctHadir)}%</td>
+                    <td className="border border-slate-400 p-1.5 text-center text-sky-950 font-black bg-sky-100/50">{formatPct(semesterPctSakit)}%</td>
+                    <td className="border border-slate-400 p-1.5 text-center text-amber-950 font-black bg-amber-100/50">{formatPct(semesterPctIzin)}%</td>
+                    <td className="border border-slate-400 p-1.5 text-center text-rose-950 font-black bg-rose-100/50">{formatPct(semesterPctAlfa)}%</td>
                   </tr>
                 </tfoot>
               </table>

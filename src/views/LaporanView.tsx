@@ -265,33 +265,52 @@ export const LaporanView: React.FC = () => {
     });
   }, [filteredStudents, relevantRecords, selectedDate]);
 
-  // 2. DATA COMPUTATION: LAPORAN MINGGUAN
+  // 2. DATA COMPUTATION: LAPORAN MINGGUAN - selalu mulai hari Senin
   const weekNum = parseInt(selectedWeek.replace(/\D/g, ''), 10) || 1;
   const weeklyDays = useMemo(() => {
     const yearNum = Number(year) || 2026;
-    const daysInMonth = new Date(yearNum, mNum, 0).getDate();
-    const startDay = (weekNum - 1) * 7 + 1;
-    const endDay = Math.min(daysInMonth, weekNum * 7);
+    const firstOfMonth = new Date(yearNum, mNum - 1, 1);
+    const dow = firstOfMonth.getDay(); // 0 = Minggu, 1 = Senin, 2 = Selasa, ..., 6 = Sabtu
+    let firstMonday: Date;
+    if (dow === 1) {
+      firstMonday = new Date(yearNum, mNum - 1, 1);
+    } else if (dow === 6) {
+      firstMonday = new Date(yearNum, mNum - 1, 3);
+    } else if (dow === 0) {
+      firstMonday = new Date(yearNum, mNum - 1, 2);
+    } else {
+      // Selasa(2), Rabu(3), Kamis(4), Jumat(5) -> Mundur ke Senin pada minggu yang sama
+      firstMonday = new Date(yearNum, mNum - 1, 1 - (dow - 1));
+    }
+
+    const weekMonday = new Date(firstMonday);
+    weekMonday.setDate(firstMonday.getDate() + (weekNum - 1) * 7);
+
+    const is6Days = systemConfig?.activeStudyDays?.includes(6);
+    const daysCount = is6Days ? 6 : 5;
 
     const days: { dateStr: string; dayNum: number; dayShort: string; dayName: string }[] = [];
     const dayNamesShort = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
     const dayNamesFull = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
 
-    for (let d = startDay; d <= endDay; d++) {
-      const jsDate = new Date(yearNum, mNum - 1, d);
-      const dow = jsDate.getDay();
-      if (dow >= 1 && dow <= 5) {
-        const dateStr = `${yearNum}-${String(mNum).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-        days.push({
-          dateStr,
-          dayNum: d,
-          dayShort: dayNamesShort[dow],
-          dayName: dayNamesFull[dow],
-        });
-      }
+    for (let i = 0; i < daysCount; i++) {
+      const d = new Date(weekMonday);
+      d.setDate(weekMonday.getDate() + i);
+      const dowIndex = d.getDay();
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const dayOfMonth = String(d.getDate()).padStart(2, '0');
+      const dateStr = `${y}-${m}-${dayOfMonth}`;
+
+      days.push({
+        dateStr,
+        dayNum: d.getDate(),
+        dayShort: dayNamesShort[dowIndex],
+        dayName: dayNamesFull[dowIndex],
+      });
     }
     return days;
-  }, [year, mNum, weekNum]);
+  }, [year, mNum, weekNum, systemConfig?.activeStudyDays]);
 
   const weekDates = useMemo(() => weeklyDays.map((d) => d.dateStr), [weeklyDays]);
 

@@ -1488,7 +1488,7 @@ export const AbsensiView: React.FC = () => {
                   </span>
                 </div>
                 <p className="text-[11px] sm:text-xs text-emerald-100 font-medium mt-0.5">
-                  Lanjutkan broadcast rekapitulasi ke Grup WhatsApp Paguyuban {activeTargetClass?.name || 'Kelas'}?
+                  Lanjutkan broadcast rekapitulasi ke WhatsApp Group {activeTargetClass?.name || 'Kelas'}?
                 </p>
               </div>
             </div>
@@ -1507,10 +1507,10 @@ export const AbsensiView: React.FC = () => {
                   setJustSavedPrompt(false);
                   setIsBroadcastModalOpen(true);
                 }}
-                className="flex-1 sm:flex-none px-4 py-2 bg-white text-emerald-800 hover:bg-emerald-50 active:scale-95 text-xs font-black rounded-xl shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                className="flex-1 sm:flex-none px-4 py-2 bg-white text-emerald-800 hover:bg-emerald-50 active:scale-95 text-xs font-black rounded-xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
               >
-                <WhatsAppIcon size={15} className="text-emerald-600" />
-                <span>Kirim ke Paguyuban</span>
+                <WhatsAppIcon size={18} />
+                <span>Kirim ke WhatsApp Group</span>
               </button>
             </div>
           </div>
@@ -1538,7 +1538,7 @@ export const AbsensiView: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end">
-          {/* Circular WhatsApp Broadcast Button */}
+          {/* WhatsApp Broadcast Button Matching Uploaded Icon */}
           {systemConfig.whatsappBroadcastEnabled !== false && (
             <button
               type="button"
@@ -1547,12 +1547,12 @@ export const AbsensiView: React.FC = () => {
                 setBroadcastInitialType(nowHour >= 11 ? 'PULANG' : 'MASUK');
                 setIsBroadcastModalOpen(true);
               }}
-              id="btn-broadcast-paguyuban"
-              className="w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-[#25D366] hover:bg-[#20bd5a] text-white flex items-center justify-center shadow-md hover:shadow-lg hover:scale-105 active:scale-95 transition-all cursor-pointer shrink-0 border border-emerald-400/40 ring-2 ring-emerald-500/20"
-              title="Kirim Rekapitulasi ke WhatsApp Paguyuban"
-              aria-label="Kirim ke WhatsApp Paguyuban"
+              id="btn-broadcast-whatsapp-group"
+              className="w-11 h-11 sm:w-12 sm:h-12 p-0 rounded-2xl flex items-center justify-center shadow-md hover:shadow-xl hover:scale-105 active:scale-95 transition-all cursor-pointer shrink-0 border-0 focus:outline-hidden focus:ring-2 focus:ring-emerald-400 focus:ring-offset-2 overflow-hidden"
+              title="Kirim Rekapitulasi ke WhatsApp Group"
+              aria-label="Kirim ke WhatsApp Group"
             >
-              <WhatsAppIcon size={22} className="text-white" />
+              <WhatsAppIcon size="100%" className="w-full h-full" />
             </button>
           )}
 

@@ -1168,7 +1168,7 @@ export const LaporanView: React.FC = () => {
                 </div>
               </div>
 
-              {/* Action Buttons: WhatsApp Broadcast Paguyuban (Circular Button) & Cetak PDF (Side-by-side) */}
+              {/* Action Buttons: WhatsApp Broadcast Group & Cetak PDF (Side-by-side) */}
               <div className="pt-2 flex items-center gap-3">
                 {reportType === 'Laporan Harian' && systemConfig.whatsappBroadcastEnabled !== false && (
                   <button
@@ -1178,11 +1178,12 @@ export const LaporanView: React.FC = () => {
                       setBroadcastInitialType(nowHour >= 11 ? 'PULANG' : 'MASUK');
                       setIsBroadcastModalOpen(true);
                     }}
-                    className="w-12 h-12 sm:w-[50px] sm:h-[50px] rounded-full bg-[#25D366] hover:bg-[#20bd5a] text-white flex items-center justify-center shadow-md hover:shadow-lg hover:scale-105 active:scale-95 transition-all cursor-pointer shrink-0 border border-emerald-400/40 ring-2 ring-emerald-500/20"
-                    title="Kirim Rekapitulasi ke WhatsApp Paguyuban"
-                    aria-label="Kirim ke WhatsApp Paguyuban"
+                    id="btn-broadcast-whatsapp-group"
+                    className="w-12 h-12 sm:w-[50px] sm:h-[50px] p-0 rounded-2xl flex items-center justify-center shadow-md hover:shadow-xl hover:scale-105 active:scale-95 transition-all cursor-pointer shrink-0 border-0 focus:outline-hidden focus:ring-2 focus:ring-emerald-400 focus:ring-offset-2 overflow-hidden"
+                    title="Kirim Rekapitulasi ke WhatsApp Group"
+                    aria-label="Kirim ke WhatsApp Group"
                   >
-                    <WhatsAppIcon size={24} className="text-white" />
+                    <WhatsAppIcon size="100%" className="w-full h-full" />
                   </button>
                 )}
 
@@ -1233,7 +1234,7 @@ export const LaporanView: React.FC = () => {
         className={viewScopeMode === 'KEPSEK' ? null : (selectedClassObj?.name || null)}
       />
 
-      {/* WhatsApp Broadcast Paguyuban Modal */}
+      {/* WhatsApp Broadcast Group Modal */}
       {isBroadcastModalOpen && (
         <WhatsAppBroadcastModal
           isOpen={isBroadcastModalOpen}

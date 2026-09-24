@@ -28,6 +28,7 @@ import {
   Sun,
   Home,
 } from 'lucide-react';
+import { WhatsAppIcon } from '../components/WhatsAppIcon';
 
 // Sample Banner Generator for official Kop Surat
 const generateSampleKopSurat = (
@@ -760,16 +761,16 @@ export const PengaturanView: React.FC = () => {
           </div>
         </div>
 
-        {/* Section 4: Pengaturan WhatsApp Broadcast (Grup Paguyuban Orang Tua) */}
+        {/* Section 4: Pengaturan WhatsApp Broadcast (WhatsApp Group Kelas) */}
         <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200 shadow-sm p-4 sm:p-6 lg:p-8 space-y-4 sm:space-y-6">
           <div className="flex items-center justify-between border-b border-slate-100 pb-3">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-600 flex items-center justify-center shrink-0">
-                <MessageSquare size={20} />
+              <div className="w-10 h-10 rounded-2xl overflow-hidden shadow-xs flex items-center justify-center shrink-0">
+                <WhatsAppIcon size={40} />
               </div>
               <div>
                 <h2 className="text-sm font-bold text-slate-900">
-                  Pengaturan WhatsApp Broadcast (Grup Paguyuban Kelas)
+                  Pengaturan WhatsApp Broadcast (WhatsApp Group Kelas)
                 </h2>
                 <p className="text-xs text-slate-500">
                   Kelola format narasi resmi dan template pesan WhatsApp harian (Masuk & Pulang) beserta Smart Link dokumen rekap.
@@ -777,7 +778,7 @@ export const PengaturanView: React.FC = () => {
               </div>
             </div>
             <span className="hidden sm:inline-block px-2.5 py-1 text-[10px] font-extrabold rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-              PAGUYUBAN ORANG TUA
+              WHATSAPP GROUP
             </span>
           </div>
 

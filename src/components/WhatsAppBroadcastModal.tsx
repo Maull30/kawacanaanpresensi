@@ -226,13 +226,13 @@ export const WhatsAppBroadcastModal: React.FC<WhatsAppBroadcastModalProps> = ({
         {/* Top Modal Header */}
         <div className="px-5 py-4 bg-gradient-to-r from-emerald-600 via-emerald-700 to-teal-700 text-white flex items-center justify-between shadow-xs shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-white/15 border border-white/25 flex items-center justify-center text-white shrink-0 shadow-inner">
-              <MessageSquare size={20} className="text-white" />
+            <div className="w-10 h-10 rounded-2xl overflow-hidden shadow-md shrink-0 flex items-center justify-center">
+              <WhatsAppIcon size={40} />
             </div>
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="text-base sm:text-lg font-black tracking-tight leading-tight">
-                  Broadcast Laporan Paguyuban
+                  Broadcast Laporan WhatsApp Group
                 </h3>
                 <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-500/40 text-emerald-100 border border-emerald-400/40">
                   <Sparkles size={11} /> 1-Klik Otomatis
@@ -328,8 +328,8 @@ export const WhatsAppBroadcastModal: React.FC<WhatsAppBroadcastModalProps> = ({
           <div className="space-y-1.5">
             <div className="flex items-center justify-between text-xs font-bold text-slate-700">
               <span className="flex items-center gap-1.5">
-                <MessageSquare size={14} className="text-emerald-600" />
-                <span>Pratinjau Pesan WhatsApp Paguyuban:</span>
+                <WhatsAppIcon size={16} />
+                <span>Pratinjau Pesan WhatsApp Group:</span>
               </span>
               <span className="text-[11px] text-slate-400 font-medium">
                 Otomatis disesuaikan dengan data presensi

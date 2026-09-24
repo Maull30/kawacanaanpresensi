@@ -20,6 +20,7 @@ import {
   MessageSquare,
 } from 'lucide-react';
 import { WhatsAppBroadcastModal } from '../components/WhatsAppBroadcastModal';
+import { WhatsAppIcon } from '../components/WhatsAppIcon';
 
 export const LaporanView: React.FC = () => {
   const {
@@ -1167,8 +1168,8 @@ export const LaporanView: React.FC = () => {
                 </div>
               </div>
 
-              {/* Action Buttons: WhatsApp Broadcast Paguyuban & Cetak PDF */}
-              <div className="pt-2 space-y-2.5">
+              {/* Action Buttons: WhatsApp Broadcast Paguyuban (Circular Button) & Cetak PDF (Side-by-side) */}
+              <div className="pt-2 flex items-center gap-3">
                 {reportType === 'Laporan Harian' && systemConfig.whatsappBroadcastEnabled !== false && (
                   <button
                     type="button"
@@ -1177,14 +1178,11 @@ export const LaporanView: React.FC = () => {
                       setBroadcastInitialType(nowHour >= 11 ? 'PULANG' : 'MASUK');
                       setIsBroadcastModalOpen(true);
                     }}
-                    className="w-full py-3.5 px-6 rounded-xl bg-gradient-to-r from-emerald-600 via-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 active:scale-98 text-white font-black text-xs sm:text-sm tracking-wide transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2.5 min-h-[46px] cursor-pointer border border-emerald-400/30"
-                    title="Kirim narasi rekapitulasi kehadiran harian resmi ke grup WhatsApp paguyuban orang tua"
+                    className="w-12 h-12 sm:w-[50px] sm:h-[50px] rounded-full bg-[#25D366] hover:bg-[#20bd5a] text-white flex items-center justify-center shadow-md hover:shadow-lg hover:scale-105 active:scale-95 transition-all cursor-pointer shrink-0 border border-emerald-400/40 ring-2 ring-emerald-500/20"
+                    title="Kirim Rekapitulasi ke WhatsApp Paguyuban"
+                    aria-label="Kirim ke WhatsApp Paguyuban"
                   >
-                    <MessageSquare size={18} className="text-white" />
-                    <span>KIRIM KE WHATSAPP PAGUYUBAN</span>
-                    <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-white/20 text-white border border-white/30">
-                      <Sparkles size={11} /> 1-Klik Otomatis
-                    </span>
+                    <WhatsAppIcon size={24} className="text-white" />
                   </button>
                 )}
 
@@ -1192,7 +1190,7 @@ export const LaporanView: React.FC = () => {
                   type="submit"
                   id="btn-cetak-laporan-pdf"
                   title="Buka pratinjau dokumen laporan untuk dicetak atau disimpan sebagai PDF"
-                  className="w-full py-3.5 px-6 rounded-xl bg-[#1D82F5] hover:bg-blue-600 active:scale-98 text-white font-black text-xs sm:text-sm tracking-wider uppercase transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2 min-h-[46px] cursor-pointer"
+                  className="flex-1 py-3.5 px-6 rounded-xl bg-[#1D82F5] hover:bg-blue-600 active:scale-98 text-white font-black text-xs sm:text-sm tracking-wider uppercase transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2 min-h-[48px] sm:min-h-[50px] cursor-pointer"
                 >
                   <Printer size={18} />
                   <span>CETAK DOKUMEN PDF</span>

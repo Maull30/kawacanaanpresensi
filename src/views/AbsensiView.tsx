@@ -33,6 +33,7 @@ import {
 } from 'lucide-react';
 import { ClassQrModal } from '../components/ClassQrModal';
 import { WhatsAppBroadcastModal } from '../components/WhatsAppBroadcastModal';
+import { WhatsAppIcon } from '../components/WhatsAppIcon';
 
 export const AbsensiView: React.FC = () => {
   const {
@@ -1508,7 +1509,7 @@ export const AbsensiView: React.FC = () => {
                 }}
                 className="flex-1 sm:flex-none px-4 py-2 bg-white text-emerald-800 hover:bg-emerald-50 active:scale-95 text-xs font-black rounded-xl shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer"
               >
-                <MessageSquare size={14} className="text-emerald-600" />
+                <WhatsAppIcon size={15} className="text-emerald-600" />
                 <span>Kirim ke Paguyuban</span>
               </button>
             </div>
@@ -1536,8 +1537,8 @@ export const AbsensiView: React.FC = () => {
           </span>
         </div>
 
-        <div className="flex items-center gap-2 w-full sm:w-auto">
-          {/* Commercial WhatsApp Broadcast Button */}
+        <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end">
+          {/* Circular WhatsApp Broadcast Button */}
           {systemConfig.whatsappBroadcastEnabled !== false && (
             <button
               type="button"
@@ -1547,14 +1548,11 @@ export const AbsensiView: React.FC = () => {
                 setIsBroadcastModalOpen(true);
               }}
               id="btn-broadcast-paguyuban"
-              className="flex-1 sm:flex-none px-4 py-2.5 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 active:scale-95 text-white font-extrabold text-xs sm:text-sm rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 min-h-[42px] cursor-pointer"
-              title="Kirim narasi laporan resmi ke grup WhatsApp paguyuban orang tua"
+              className="w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-[#25D366] hover:bg-[#20bd5a] text-white flex items-center justify-center shadow-md hover:shadow-lg hover:scale-105 active:scale-95 transition-all cursor-pointer shrink-0 border border-emerald-400/40 ring-2 ring-emerald-500/20"
+              title="Kirim Rekapitulasi ke WhatsApp Paguyuban"
+              aria-label="Kirim ke WhatsApp Paguyuban"
             >
-              <MessageSquare size={16} />
-              <span>Broadcast Paguyuban</span>
-              <span className="hidden md:inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-extrabold bg-white/20 text-white border border-white/30">
-                WhatsApp
-              </span>
+              <WhatsAppIcon size={22} className="text-white" />
             </button>
           )}
 

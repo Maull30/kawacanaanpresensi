@@ -129,6 +129,27 @@ export const generateSmartReportLink = (
 };
 
 /**
+ * Mempersingkat Smart Link menggunakan layanan shortener agar pesan WhatsApp ringkas & elegan
+ */
+export const shortenReportLink = async (longUrl: string): Promise<string> => {
+  if (!longUrl) return '';
+  try {
+    const res = await fetch('/api/onboarding', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'shorten_url', url: longUrl }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data?.ok && data?.shortUrl) {
+        return data.shortUrl;
+      }
+    }
+  } catch (_) {}
+  return longUrl;
+};
+
+/**
  * Menyusun pesan narasi WhatsApp lengkap sesuai konfigurasi dan standar resmi
  */
 export const generateWhatsAppBroadcastMessage = (

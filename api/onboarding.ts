@@ -571,10 +571,21 @@ export default async function handler(req: any, res: any) {
       const totalStudents = students.length || 1;
       const persentase = Math.round((hadir / totalStudents) * 100);
 
+      let resolvedFase = 'A';
+      const gradeNum = parseInt(String(targetClass.grade).replace(/[^0-9]/g, ''), 10);
+      if (gradeNum >= 1 && gradeNum <= 2) resolvedFase = 'A';
+      else if (gradeNum >= 3 && gradeNum <= 4) resolvedFase = 'B';
+      else if (gradeNum >= 5 && gradeNum <= 6) resolvedFase = 'C';
+      else if (gradeNum >= 7 && gradeNum <= 9) resolvedFase = 'D';
+      else if (gradeNum === 10) resolvedFase = 'E';
+      else if (gradeNum >= 11 && gradeNum <= 12) resolvedFase = 'F';
+
       return json(res, 200, {
         ok: true,
         report: {
-          schoolName: sp?.nama_sekolah || 'SATUAN PENDIDIKAN',
+          schoolName: sp?.nama_sekolah || 'SD NEGERI CONTOH',
+          pemerintahDaerah: sc?.pemerintah_daerah || 'PEMERINTAH PROVINSI DAERAH KHUSUS IBUKOTA JAKARTA',
+          dinasPendidikan: sc?.dinas_pendidikan || 'DINAS PENDIDIKAN',
           npsn: sp?.npsn || '',
           alamat: sp?.alamat || '',
           logoUrl: sc?.school_logo_url || null,
@@ -583,6 +594,9 @@ export default async function handler(req: any, res: any) {
           showLetterhead: sc?.show_letterhead ?? true,
           className: targetClass.name.toLowerCase().startsWith('kelas') ? targetClass.name : `Kelas ${targetClass.name}`,
           grade: targetClass.grade,
+          fase: `Fase ${resolvedFase}`,
+          semester: sp?.semester || 'Ganjil',
+          tahunPelajaran: targetClass.academic_year || sp?.tahun_pelajaran || '2026/2027',
           date: reportDate,
           attendanceType: attType,
           subjectName,
@@ -591,6 +605,7 @@ export default async function handler(req: any, res: any) {
           principalName: sp?.nama_kepala_sekolah || 'Kepala Sekolah',
           principalNip: sp?.nip_kepala_sekolah || '',
           reportPlace: sc?.report_place || 'Jakarta',
+          reportDateOfficial: sc?.report_date || reportDate,
           stats: {
             totalStudents: students.length,
             hadir,
@@ -603,6 +618,51 @@ export default async function handler(req: any, res: any) {
           students: studentList,
         },
       });
+    }
+
+    // -------------------------------------------------------------
+    // 2.2. SHORTEN URL (TINYURL / IS.GD SMART SHORT LINK GENERATOR)
+    // -------------------------------------------------------------
+    if (action === 'shorten_url') {
+      const longUrl = String(body.url || '').trim();
+      if (!longUrl) {
+        return json(res, 400, { error: 'URL wajib diisi.' });
+      }
+
+      // Coba TinyURL terlebih dahulu
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 4000);
+        const resp = await fetch(`https://tinyurl.com/api-create.php?url=${encodeURIComponent(longUrl)}`, {
+          signal: controller.signal,
+        });
+        clearTimeout(timeout);
+        if (resp.ok) {
+          const shortText = (await resp.text()).trim();
+          if (shortText.startsWith('http://') || shortText.startsWith('https://')) {
+            return json(res, 200, { ok: true, shortUrl: shortText });
+          }
+        }
+      } catch (_) {}
+
+      // Fallback ke is.gd
+      try {
+        const controller2 = new AbortController();
+        const timeout2 = setTimeout(() => controller2.abort(), 3500);
+        const resp2 = await fetch(`https://is.gd/create.php?format=simple&url=${encodeURIComponent(longUrl)}`, {
+          signal: controller2.signal,
+        });
+        clearTimeout(timeout2);
+        if (resp2.ok) {
+          const shortText2 = (await resp2.text()).trim();
+          if (shortText2.startsWith('http://') || shortText2.startsWith('https://')) {
+            return json(res, 200, { ok: true, shortUrl: shortText2 });
+          }
+        }
+      } catch (_) {}
+
+      // Jika jaringan eksternal terkendala, kembalikan URL asli
+      return json(res, 200, { ok: true, shortUrl: longUrl });
     }
 
     // -------------------------------------------------------------

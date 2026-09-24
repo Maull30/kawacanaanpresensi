@@ -1,10 +1,11 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { Printer, Share2, CheckCircle2, ArrowLeft, School, FileText, Loader2, AlertCircle } from 'lucide-react';
+import { Printer, Share2, CheckCircle2, ArrowLeft, FileText, Loader2, AlertCircle } from 'lucide-react';
 import { SchoolLogo } from './SchoolLogo';
-import { formatDateToIndoLong } from '../utils/whatsappBroadcast';
 
 interface PublicDailyReportData {
   schoolName: string;
+  pemerintahDaerah?: string;
+  dinasPendidikan?: string;
   npsn?: string;
   alamat?: string;
   logoUrl?: string;
@@ -13,6 +14,9 @@ interface PublicDailyReportData {
   showLetterhead?: boolean;
   className: string;
   grade?: string | number;
+  fase?: string;
+  semester?: string;
+  tahunPelajaran?: string;
   date: string;
   attendanceType: 'DAILY' | 'SUBJECT';
   subjectName?: string | null;
@@ -21,6 +25,7 @@ interface PublicDailyReportData {
   principalName: string;
   principalNip?: string;
   reportPlace?: string;
+  reportDateOfficial?: string;
   stats: {
     totalStudents: number;
     hadir: number;
@@ -123,6 +128,42 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
     }
   };
 
+  // Helper formatting for dates & days
+  const formatReportDateIndo = (dateStr: string): string => {
+    if (!dateStr) return '';
+    try {
+      const parts = dateStr.split('-');
+      if (parts.length === 3) {
+        const months = [
+          'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+          'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember',
+        ];
+        const day = parseInt(parts[2], 10);
+        const monthIdx = parseInt(parts[1], 10) - 1;
+        const year = parts[0];
+        return `${day} ${months[monthIdx]} ${year}`;
+      }
+      return dateStr;
+    } catch (_) {
+      return dateStr;
+    }
+  };
+
+  const getDayNameIndo = (dateStr: string): string => {
+    if (!dateStr) return '';
+    try {
+      const parts = dateStr.split('-');
+      if (parts.length === 3) {
+        const d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+        const days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+        return days[d.getDay()] || '';
+      }
+      return '';
+    } catch (_) {
+      return '';
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 text-center">
@@ -167,12 +208,19 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
   }
 
   const { stats, students } = reportData;
-  const formattedDate = formatDateToIndoLong(reportData.date);
+  const total = stats.totalStudents || students.length || 1;
+  const pctHadir = ((stats.hadir / total) * 100).toFixed(1).replace('.0', '');
+  const pctSakit = ((stats.sakit / total) * 100).toFixed(1).replace('.0', '');
+  const pctIzin = ((stats.izin / total) * 100).toFixed(1).replace('.0', '');
+  const pctAlfa = ((stats.alfa / total) * 100).toFixed(1).replace('.0', '');
+
+  const activeClassClean = reportData.className.replace(/^kelas\s+/i, '');
+  const activeFase = reportData.fase || 'Fase A';
 
   return (
-    <div className="min-h-screen bg-slate-100 text-slate-900 antialiased print:bg-white print:p-0">
+    <div className="min-h-screen bg-slate-200/70 text-slate-900 antialiased print:bg-white print:p-0 font-sans">
       {/* Non-Printable Floating Top Action Bar */}
-      <header className="print:hidden sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-xs px-4 py-3">
+      <header className="print:hidden sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-300 shadow-xs px-4 py-3">
         <div className="max-w-4xl mx-auto flex items-center justify-between gap-3">
           <div className="flex items-center gap-2.5">
             {onBackToApp && (
@@ -188,10 +236,10 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
             <div>
               <div className="flex items-center gap-2">
                 <span className="text-xs font-black text-slate-900 tracking-tight">
-                  Dokumen Rekap Resmi Kehadiran
+                  Dokumen Rekap Resmi Kehadiran Siswa
                 </span>
                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-extrabold bg-emerald-100 text-emerald-800">
-                  <CheckCircle2 size={11} /> Terverifikasi
+                  <CheckCircle2 size={11} /> Sah & Terverifikasi
                 </span>
               </div>
               <p className="text-[11px] text-slate-500 font-medium">
@@ -205,7 +253,7 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
               type="button"
               onClick={handleShare}
               className="p-2 sm:px-3 sm:py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
-              title="Bagikan Tautan Laporan"
+              title="Bagikan Tautan Dokumen"
             >
               <Share2 size={15} />
               <span className="hidden sm:inline">Bagikan</span>
@@ -214,7 +262,7 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
             <button
               type="button"
               onClick={handlePrint}
-              className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-black transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
+              className="px-4 py-2 rounded-xl bg-[#1D82F5] hover:bg-blue-600 text-white text-xs font-black transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
             >
               <Printer size={15} />
               <span>Cetak / Unduh PDF</span>
@@ -223,160 +271,161 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
         </div>
       </header>
 
-      {/* Main Document Body (A4 Paper Container) */}
-      <main className="max-w-4xl mx-auto p-4 sm:p-8 print:p-0 print:max-w-none">
-        <div className="bg-white rounded-2xl sm:rounded-3xl shadow-lg border border-slate-200 p-6 sm:p-10 print:p-4 print:shadow-none print:border-none print:rounded-none">
-          {/* 1. KOP SURAT RESMI SEKOLAH */}
-          {reportData.showLetterhead !== false && (
-            <div className="border-b-2 border-slate-900 pb-4 mb-6">
+      {/* Main Printable Document Sheet (Exact Official PDF Layout) */}
+      <main className="max-w-4xl mx-auto p-3 sm:p-6 md:p-8 print:p-0 print:max-w-none">
+        <div
+          id="printable-report"
+          className="bg-white rounded-xl shadow-xl border border-slate-300 p-5 sm:p-8 md:p-12 font-serif text-slate-900 leading-normal print:p-4 print:shadow-none print:border-none print:rounded-none"
+        >
+          {/* Formal Indonesian School Letterhead (Kop Surat) */}
+          {(reportData.showLetterhead ?? true) && (
+            <>
               {reportData.letterheadType === 'custom_image' && reportData.letterheadImageUrl ? (
-                <div className="w-full flex justify-center mb-2">
+                /* 1. Custom Image Letterhead */
+                <div className="kop-surat-a4-container w-full mb-5 pb-2 border-b-2 border-slate-900 break-inside-avoid print:mb-4 print:pb-1 flex justify-center items-center">
                   <img
                     src={reportData.letterheadImageUrl}
-                    alt="Kop Surat Resmi"
-                    className="max-h-28 w-full object-contain"
+                    alt="Kop Surat Resmi Sekolah"
+                    className="kop-surat-a4-img w-full max-w-full h-auto object-contain mx-auto block max-h-[140px] print:max-h-[155px]"
                   />
                 </div>
               ) : (
-                <div className="flex items-center gap-4 text-center justify-center">
+                /* 2. Standard Text Letterhead with School Logo & Double Lines */
+                <div className="flex flex-col sm:flex-row items-center gap-3 sm:gap-6 pb-3 border-b-4 border-double border-slate-900 mb-6 text-center sm:text-left break-inside-avoid">
                   {reportData.logoUrl ? (
-                    <img
-                      src={reportData.logoUrl}
-                      alt="Logo Sekolah"
-                      className="w-16 h-16 object-contain shrink-0"
-                    />
+                    <div className="w-16 h-16 sm:w-[74px] sm:h-[74px] shrink-0 flex items-center justify-center">
+                      <img
+                        src={reportData.logoUrl}
+                        alt="Logo Sekolah"
+                        className="w-full h-full object-contain"
+                      />
+                    </div>
                   ) : (
-                    <SchoolLogo className="w-16 h-16 shrink-0" />
+                    <SchoolLogo size={60} className="sm:w-[74px] sm:h-[74px] shrink-0" />
                   )}
-                  <div>
-                    <h1 className="text-lg sm:text-xl font-black uppercase text-slate-900 tracking-wider">
-                      {reportData.schoolName}
-                    </h1>
-                    {reportData.npsn && (
-                      <p className="text-xs font-bold text-slate-700">NPSN: {reportData.npsn}</p>
-                    )}
-                    {reportData.alamat && (
-                      <p className="text-xs text-slate-600 max-w-xl mx-auto">{reportData.alamat}</p>
-                    )}
+                  <div className="flex-1 text-center font-sans">
+                    <h4 className="text-[10px] sm:text-xs font-bold tracking-wider uppercase text-slate-700 leading-tight">
+                      {reportData.pemerintahDaerah || 'PEMERINTAH PROVINSI DAERAH KHUSUS IBUKOTA JAKARTA'}
+                    </h4>
+                    <h4 className="text-[10px] sm:text-xs font-bold tracking-wider uppercase text-slate-700 leading-tight">
+                      {reportData.dinasPendidikan || 'DINAS PENDIDIKAN'}
+                    </h4>
+                    <h2 className="text-lg sm:text-2xl font-black tracking-tight text-slate-900 uppercase my-0.5">
+                      {reportData.schoolName || 'SD NEGERI CONTOH'}
+                    </h2>
+                    <p className="text-[10px] sm:text-[11px] text-slate-600 font-normal">
+                      {reportData.alamat || 'Jl. Pendidikan No. 123, Kel. Merdeka, Kec. Nusantara, Kota Jakarta'}
+                    </p>
+                    <p className="text-[10px] sm:text-[11px] text-slate-600 font-semibold">
+                      NPSN: {reportData.npsn || '20104501'} | KELAS: {activeClassClean} | FASE: {activeFase.toUpperCase()}
+                    </p>
                   </div>
+                  <div className="w-16 hidden sm:block" />
                 </div>
               )}
-            </div>
+            </>
           )}
 
-          {/* 2. JUDUL DOKUMEN & IDENTITAS */}
-          <div className="text-center space-y-1 mb-6">
-            <h2 className="text-base sm:text-lg font-black uppercase text-slate-900 tracking-wide underline">
-              REKAPITULASI KEHADIRAN HARIAN SISWA
-            </h2>
-            <p className="text-xs font-semibold text-slate-600">
-              Hari/Tanggal: <strong className="text-slate-900">{formattedDate}</strong>
+          {/* Report Document Title based on Official Laporan Harian */}
+          <div className="text-center mb-5 sm:mb-6 font-sans">
+            <h3 className="text-sm sm:text-lg font-extrabold uppercase underline tracking-wide">
+              LAPORAN KEHADIRAN HARIAN SISWA
+            </h3>
+            <p className="text-[11px] sm:text-xs text-slate-600 font-bold mt-1 uppercase">
+              HARI/TANGGAL: {getDayNameIndo(reportData.date).toUpperCase()},{' '}
+              {formatReportDateIndo(reportData.date).toUpperCase()} | SEMESTER:{' '}
+              {(reportData.semester || 'GANJIL').toUpperCase()} (TP:{' '}
+              {reportData.tahunPelajaran || '2026/2027'})
             </p>
           </div>
 
-          {/* 3. METADATA ROMBEL & PENGAJAR */}
-          <div className="grid grid-cols-2 gap-3 text-xs bg-slate-50 p-3.5 rounded-xl border border-slate-200 mb-6 font-medium">
+          {/* School Attributes Matrix */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-4 text-xs font-sans mb-4 border border-slate-200 p-3 rounded-lg bg-slate-50/50">
             <div>
-              <span className="text-slate-500 block text-[10px] uppercase font-bold">Rombel Kelas:</span>
-              <span className="font-extrabold text-slate-900">{reportData.className}</span>
+              <p>
+                <span className="font-semibold text-slate-600">Satuan Pendidikan:</span>{' '}
+                {reportData.schoolName}
+              </p>
+              <p>
+                <span className="font-semibold text-slate-600">Kelas / Fase:</span>{' '}
+                {reportData.className} / {activeFase}
+              </p>
+              {reportData.attendanceType === 'SUBJECT' ? (
+                <p>
+                  <span className="font-semibold text-slate-600">Mata Pelajaran:</span>{' '}
+                  <strong className="text-blue-900">
+                    {reportData.subjectName || 'Mata Pelajaran Khusus'}
+                  </strong>
+                </p>
+              ) : (
+                <p>
+                  <span className="font-semibold text-slate-600">Wali Kelas:</span>{' '}
+                  {reportData.teacherName}
+                </p>
+              )}
             </div>
             <div>
-              <span className="text-slate-500 block text-[10px] uppercase font-bold">
-                {reportData.attendanceType === 'SUBJECT' ? 'Mata Pelajaran & Pengajar:' : 'Wali Kelas:'}
-              </span>
-              <span className="font-extrabold text-slate-900">
-                {reportData.attendanceType === 'SUBJECT' && reportData.subjectName
-                  ? `${reportData.subjectName} • ${reportData.teacherName}`
-                  : reportData.teacherName}
-              </span>
+              <p>
+                <span className="font-semibold text-slate-600">Tanggal Presensi:</span>{' '}
+                {formatReportDateIndo(reportData.date)}
+              </p>
+              <p>
+                <span className="font-semibold text-slate-600">Total Siswa:</span>{' '}
+                {students.length} Siswa
+              </p>
+              <p>
+                <span className="font-semibold text-slate-600">Tahun Pelajaran:</span>{' '}
+                {reportData.tahunPelajaran || '2026/2027'}
+              </p>
             </div>
           </div>
 
-          {/* 4. REKAPITULASI ANGKA (KPI CARDS) */}
-          <div className="grid grid-cols-5 gap-2 text-center mb-6">
-            <div className="p-2 sm:p-2.5 rounded-xl bg-emerald-50 border border-emerald-200">
-              <span className="text-[10px] font-bold text-emerald-800 block uppercase">Hadir</span>
-              <span className="text-base sm:text-lg font-black text-emerald-950 leading-tight">
-                {stats.hadir}
-              </span>
-            </div>
-            <div className="p-2 sm:p-2.5 rounded-xl bg-sky-50 border border-sky-200">
-              <span className="text-[10px] font-bold text-sky-800 block uppercase">Sakit</span>
-              <span className="text-base sm:text-lg font-black text-sky-950 leading-tight">
-                {stats.sakit}
-              </span>
-            </div>
-            <div className="p-2 sm:p-2.5 rounded-xl bg-amber-50 border border-amber-200">
-              <span className="text-[10px] font-bold text-amber-800 block uppercase">Izin</span>
-              <span className="text-base sm:text-lg font-black text-amber-950 leading-tight">
-                {stats.izin}
-              </span>
-            </div>
-            <div className="p-2 sm:p-2.5 rounded-xl bg-rose-50 border border-rose-200">
-              <span className="text-[10px] font-bold text-rose-800 block uppercase">Alfa</span>
-              <span className="text-base sm:text-lg font-black text-rose-950 leading-tight">
-                {stats.alfa}
-              </span>
-            </div>
-            <div className="p-2 sm:p-2.5 rounded-xl bg-indigo-50 border border-indigo-200">
-              <span className="text-[10px] font-bold text-indigo-800 block uppercase">Kehadiran</span>
-              <span className="text-base sm:text-lg font-black text-indigo-950 leading-tight">
-                {stats.persentase}%
-              </span>
-            </div>
-          </div>
-
-          {/* 5. TABEL DAFTAR SISWA RESMI */}
-          <div className="overflow-x-auto mb-8 border border-slate-300 rounded-xl">
-            <table className="w-full text-xs text-left border-collapse">
+          {/* Tabel Kehadiran Harian Siswa (Identik Laporan PDF) */}
+          <div className="overflow-x-auto mb-6 sm:mb-8">
+            <table className="w-full text-left border-collapse border border-slate-400 text-xs font-sans min-w-[500px]">
               <thead>
-                <tr className="bg-slate-100 text-slate-800 font-extrabold uppercase text-[10px] border-b border-slate-300 text-center">
-                  <th className="py-2.5 px-2 border-r border-slate-200 w-10">No</th>
-                  <th className="py-2.5 px-3 border-r border-slate-200 text-left">Nama Siswa</th>
-                  <th className="py-2.5 px-2 border-r border-slate-200 w-12">L/P</th>
-                  <th className="py-2.5 px-3 border-r border-slate-200 w-24">Status</th>
-                  <th className="py-2.5 px-2 border-r border-slate-200 w-20">Masuk</th>
-                  <th className="py-2.5 px-2 border-r border-slate-200 w-20">Pulang</th>
-                  <th className="py-2.5 px-3 text-left">Keterangan</th>
+                <tr className="bg-slate-100 border-b border-slate-400 text-center font-bold">
+                  <th className="border border-slate-400 p-1.5 w-8">NO</th>
+                  <th className="border border-slate-400 p-1.5 w-24 sm:w-28">NISN</th>
+                  <th className="border border-slate-400 p-1.5 text-left">NAMA SISWA</th>
+                  <th className="border border-slate-400 p-1.5 w-10">L/P</th>
+                  <th className="border border-slate-400 p-1.5 w-20">STATUS</th>
+                  <th className="border border-slate-400 p-1.5 w-20">MASUK</th>
+                  <th className="border border-slate-400 p-1.5 w-20">PULANG</th>
+                  <th className="border border-slate-400 p-1.5 text-left">KETERANGAN</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-200 font-medium">
+              <tbody>
                 {students.map((s, idx) => (
-                  <tr key={idx} className={idx % 2 === 1 ? 'bg-slate-50/50' : 'bg-white'}>
-                    <td className="py-2 px-2 text-center text-slate-500 border-r border-slate-200">
-                      {s.no}
-                    </td>
-                    <td className="py-2 px-3 font-semibold text-slate-900 border-r border-slate-200">
-                      {s.nama}
-                      {s.nisn && <span className="block text-[9px] text-slate-400 font-normal">NISN: {s.nisn}</span>}
-                    </td>
-                    <td className="py-2 px-2 text-center text-slate-600 border-r border-slate-200">
-                      {s.gender || '-'}
-                    </td>
-                    <td className="py-2 px-3 text-center border-r border-slate-200">
+                  <tr key={idx} className="border-b border-slate-300">
+                    <td className="border border-slate-300 p-1 text-center font-semibold">{s.no}</td>
+                    <td className="border border-slate-300 p-1 text-center font-mono">{s.nisn || '-'}</td>
+                    <td className="border border-slate-300 p-1 font-semibold">{s.nama}</td>
+                    <td className="border border-slate-300 p-1 text-center">{s.gender || '-'}</td>
+                    <td className="border border-slate-300 p-1 text-center font-bold">
                       <span
-                        className={`inline-block px-2 py-0.5 rounded text-[10px] font-extrabold ${
+                        className={
                           s.status === 'Hadir'
-                            ? 'bg-emerald-100 text-emerald-800'
+                            ? 'text-emerald-700'
                             : s.status === 'Sakit'
-                            ? 'bg-sky-100 text-sky-800'
+                            ? 'text-sky-700'
                             : s.status === 'Izin'
-                            ? 'bg-amber-100 text-amber-800'
+                            ? 'text-amber-700'
                             : s.status === 'Alfa'
-                            ? 'bg-rose-100 text-rose-800'
-                            : 'bg-slate-100 text-slate-600'
-                        }`}
+                            ? 'text-rose-700'
+                            : 'text-slate-500'
+                        }
                       >
-                        {s.status || 'Belum'}
+                        {s.status || '-'}
                       </span>
                     </td>
-                    <td className="py-2 px-2 text-center text-slate-600 border-r border-slate-200 font-mono text-[11px]">
+                    <td className="border border-slate-300 p-1 text-center font-mono text-[11px]">
                       {s.checkInTime || '-'}
                     </td>
-                    <td className="py-2 px-2 text-center text-slate-600 border-r border-slate-200 font-mono text-[11px]">
+                    <td className="border border-slate-300 p-1 text-center font-mono text-[11px]">
                       {s.checkOutTime || '-'}
                     </td>
-                    <td className="py-2 px-3 text-slate-600 text-[11px]">
+                    <td className="border border-slate-300 p-1 text-slate-600 italic text-[11px]">
                       {s.notes || '-'}
                     </td>
                   </tr>
@@ -385,39 +434,107 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
             </table>
           </div>
 
-          {/* 6. LEMBAR PENGESAHAN RESMI (TANDA TANGAN) */}
-          <div className="pt-4 grid grid-cols-2 gap-8 text-xs text-center font-medium">
-            <div className="space-y-16">
-              <p className="font-semibold text-slate-800">Mengetahui,<br />Kepala Sekolah</p>
-              <div>
-                <p className="font-extrabold text-slate-900 underline uppercase">
-                  {reportData.principalName || 'Kepala Sekolah'}
-                </p>
-                <p className="text-[11px] text-slate-500">
-                  NIP. {reportData.principalNip || '................................'}
-                </p>
+          {/* Ringkasan & Kesimpulan Kehadiran (Summary Box) */}
+          <div className="border border-slate-400 bg-slate-50/70 p-3.5 sm:p-4 rounded-lg font-sans mb-6 text-xs break-inside-avoid">
+            <h4 className="font-bold text-slate-900 uppercase text-[11px] sm:text-xs mb-2 border-b border-slate-300 pb-1 flex items-center justify-between">
+              <span>KESIMPULAN & RINGKASAN REKAPITULASI KEHADIRAN</span>
+              <span className="text-[10px] text-slate-500 font-normal">
+                Tanggal: {formatReportDateIndo(reportData.date)}
+              </span>
+            </h4>
+
+            {/* Metrics Row - Persentase Saja Sesuai Standar PDF */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 text-center my-2.5">
+              <div className="p-2.5 bg-emerald-50/90 border border-emerald-300 rounded-lg text-emerald-950">
+                <span className="text-[10px] block font-bold uppercase text-emerald-700">Hadir (H)</span>
+                <span className="text-lg sm:text-xl font-black text-emerald-800 tracking-tight">
+                  {pctHadir}%
+                </span>
+                <span className="block text-[9px] font-semibold text-emerald-600 uppercase">
+                  Persentase Kehadiran
+                </span>
+              </div>
+              <div className="p-2.5 bg-sky-50/90 border border-sky-300 rounded-lg text-sky-950">
+                <span className="text-[10px] block font-bold uppercase text-sky-700">Sakit (S)</span>
+                <span className="text-lg sm:text-xl font-black text-sky-800 tracking-tight">
+                  {pctSakit}%
+                </span>
+                <span className="block text-[9px] font-semibold text-sky-600 uppercase">
+                  Persentase Sakit
+                </span>
+              </div>
+              <div className="p-2.5 bg-amber-50/90 border border-amber-300 rounded-lg text-amber-950">
+                <span className="text-[10px] block font-bold uppercase text-amber-700">Izin (I)</span>
+                <span className="text-lg sm:text-xl font-black text-amber-800 tracking-tight">
+                  {pctIzin}%
+                </span>
+                <span className="block text-[9px] font-semibold text-amber-600 uppercase">
+                  Persentase Izin
+                </span>
+              </div>
+              <div className="p-2.5 bg-rose-50/90 border border-rose-300 rounded-lg text-rose-950">
+                <span className="text-[10px] block font-bold uppercase text-rose-700">Alfa (A)</span>
+                <span className="text-lg sm:text-xl font-black text-rose-800 tracking-tight">
+                  {pctAlfa}%
+                </span>
+                <span className="block text-[9px] font-semibold text-rose-600 uppercase">
+                  Persentase Tanpa Keterangan
+                </span>
               </div>
             </div>
 
-            <div className="space-y-16">
-              <p className="font-semibold text-slate-800">
-                {reportData.reportPlace || 'Jakarta'}, {formattedDate}<br />
-                {reportData.attendanceType === 'SUBJECT' ? 'Guru Mata Pelajaran' : 'Wali Kelas'}
+            <div className="text-[11px] text-slate-700 pt-1.5 border-t border-slate-200 leading-relaxed">
+              <p>
+                <strong>Catatan Evaluasi:</strong> Tingkat kehadiran siswa {reportData.className} pada tanggal{' '}
+                {formatReportDateIndo(reportData.date)} tercatat sebesar{' '}
+                <span className="font-extrabold text-blue-900 bg-blue-50 px-1 py-0.5 rounded border border-blue-200">
+                  {pctHadir}%
+                </span>.
               </p>
-              <div>
-                <p className="font-extrabold text-slate-900 underline uppercase">
-                  {reportData.teacherName}
-                </p>
-                <p className="text-[11px] text-slate-500">
-                  NIP. {reportData.teacherNip || '................................'}
-                </p>
-              </div>
             </div>
           </div>
 
-          {/* Footer watermark & verification notice */}
-          <div className="mt-12 pt-4 border-t border-slate-200 text-center text-[10px] text-slate-400">
-            Dokumen ini di-generate secara otomatis oleh Sistem KawaCanaan Presensi Sekolah • Sah dan terverifikasi digital.
+          {/* Lembar Pengesahan Tanda Tangan Resmi (Identik Laporan PDF) */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 sm:gap-8 text-xs font-sans pt-4 break-inside-avoid">
+            <div className="text-center">
+              <p>Mengetahui,</p>
+              <p className="font-bold">Kepala {reportData.schoolName || 'Sekolah'}</p>
+              <div className="h-14 sm:h-20" />
+              <p className="font-bold underline text-sm">
+                {reportData.principalName || 'Nama Kepala Sekolah'}
+              </p>
+              <p className="text-slate-600 font-mono">
+                {reportData.principalNip && reportData.principalNip !== '-'
+                  ? `NIP. ${reportData.principalNip}`
+                  : 'NIP. -'}
+              </p>
+            </div>
+
+            <div className="text-center">
+              <p>
+                {reportData.reportPlace || 'Jakarta'},{' '}
+                {formatReportDateIndo(reportData.reportDateOfficial || reportData.date)}
+              </p>
+              <p className="font-bold">
+                {reportData.attendanceType === 'SUBJECT'
+                  ? `Guru Mata Pelajaran ${reportData.subjectName || ''}`
+                  : `Wali ${reportData.className}`}
+              </p>
+              <div className="h-14 sm:h-20" />
+              <p className="font-bold underline text-sm">
+                {reportData.teacherName}
+              </p>
+              <p className="text-slate-600 font-mono">
+                {reportData.teacherNip && reportData.teacherNip !== '-'
+                  ? `NIP. ${reportData.teacherNip}`
+                  : 'NIP. -'}
+              </p>
+            </div>
+          </div>
+
+          {/* Footer Verifikasi Digital */}
+          <div className="mt-10 pt-4 border-t border-slate-300 text-center text-[10px] text-slate-500 font-sans">
+            Dokumen Rekapitulasi Presensi Resmi Terverifikasi • Diterbitkan oleh Sistem Kawacanaan Presensi
           </div>
         </div>
       </main>

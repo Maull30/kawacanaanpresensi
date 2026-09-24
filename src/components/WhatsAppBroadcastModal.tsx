@@ -1,13 +1,15 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { AttendanceRecord, Student, AttendanceType } from '../types';
 import {
   generateWhatsAppBroadcastMessage,
   generateSmartReportLink,
+  shortenReportLink,
   calculateAttendanceStats,
   formatDateToIndoLong,
   openWhatsAppBroadcast,
 } from '../utils/whatsappBroadcast';
+import { WhatsAppIcon } from './WhatsAppIcon';
 import {
   X,
   Send,
@@ -22,6 +24,7 @@ import {
   MessageSquare,
   AlertCircle,
   HelpCircle,
+  Loader2,
 } from 'lucide-react';
 
 interface WhatsAppBroadcastModalProps {
@@ -111,9 +114,35 @@ export const WhatsAppBroadcastModal: React.FC<WhatsAppBroadcastModalProps> = ({
     );
   }, [currentUser, attendanceType, teachers, schoolProfile.namaWaliKelas]);
 
-  // Dynamic Smart Short Link
-  const smartLinkUrl = useMemo(() => {
+  // Dynamic Smart Short Link (Base long URL)
+  const baseSmartLinkUrl = useMemo(() => {
     return generateSmartReportLink(classId, date, attendanceType, subjectId);
+  }, [classId, date, attendanceType, subjectId]);
+
+  // Actual shortened URL state (e.g. tinyurl / is.gd short link)
+  const [shortLinkUrl, setShortLinkUrl] = useState<string>(baseSmartLinkUrl);
+  const [isShortening, setIsShortening] = useState<boolean>(false);
+
+  useEffect(() => {
+    let active = true;
+    const base = generateSmartReportLink(classId, date, attendanceType, subjectId);
+    setShortLinkUrl(base);
+    setIsShortening(true);
+
+    shortenReportLink(base)
+      .then((res) => {
+        if (active && res) {
+          setShortLinkUrl(res);
+        }
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (active) setIsShortening(false);
+      });
+
+    return () => {
+      active = false;
+    };
   }, [classId, date, attendanceType, subjectId]);
 
   // Computed summary statistics
@@ -121,7 +150,7 @@ export const WhatsAppBroadcastModal: React.FC<WhatsAppBroadcastModalProps> = ({
     return calculateAttendanceStats(targetRecords, targetStudents);
   }, [targetRecords, targetStudents]);
 
-  // Generated WhatsApp message text
+  // Generated WhatsApp message text with real short link
   const messageText = useMemo(() => {
     return generateWhatsAppBroadcastMessage({
       type: broadcastType,
@@ -138,7 +167,7 @@ export const WhatsAppBroadcastModal: React.FC<WhatsAppBroadcastModalProps> = ({
       customNote,
       includeStudentList,
       includeSmartLink,
-      smartLinkUrl,
+      smartLinkUrl: shortLinkUrl || baseSmartLinkUrl,
     });
   }, [
     broadcastType,
@@ -156,7 +185,8 @@ export const WhatsAppBroadcastModal: React.FC<WhatsAppBroadcastModalProps> = ({
     customNote,
     includeStudentList,
     includeSmartLink,
-    smartLinkUrl,
+    shortLinkUrl,
+    baseSmartLinkUrl,
   ]);
 
   if (!isOpen) return null;
@@ -392,9 +422,9 @@ export const WhatsAppBroadcastModal: React.FC<WhatsAppBroadcastModalProps> = ({
             <button
               type="button"
               onClick={handleSendWhatsApp}
-              className="w-full sm:w-auto px-6 py-2.5 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 active:scale-95 text-white font-black text-xs sm:text-sm rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 min-h-[42px] cursor-pointer"
+              className="w-full sm:w-auto px-6 py-2.5 bg-gradient-to-r from-emerald-600 via-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 active:scale-95 text-white font-black text-xs sm:text-sm rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2.5 min-h-[42px] cursor-pointer"
             >
-              <Send size={16} />
+              <WhatsAppIcon size={18} />
               <span>Buka WhatsApp & Kirim Sekarang</span>
               <ExternalLink size={14} className="opacity-80" />
             </button>

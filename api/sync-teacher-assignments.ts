@@ -162,6 +162,13 @@ export default async function handler(req: any, res: any) {
     return json(res, 403, { error: 'Akses ke data sekolah tersebut tidak diizinkan.' });
   }
 
+  const { data: sch } = await admin.from('schools').select('id, owner_id, workspace_type, is_personal').eq('id', schoolId).maybeSingle();
+  if (sch && (sch.workspace_type === 'personal' || sch.workspace_type === 'individu' || sch.is_personal === true)) {
+    if (sch.owner_id !== authData.user.id && profile.role !== 'SUPER_ADMIN') {
+      return json(res, 403, { error: 'Akses ditolak: Anda bukan pemilik ruang kerja individu ini.' });
+    }
+  }
+
   const academicYear = String(body.academicYear || body.academic_year || '2026/2027').trim();
 
   // 1. Simpan Mata Pelajaran & Jadwal

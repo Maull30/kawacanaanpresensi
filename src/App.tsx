@@ -17,7 +17,6 @@ import { LandingPageView } from './views/LandingPageView';
 import { SuperAdminView } from './views/SuperAdminView';
 import { SetupSuperAdminView } from './views/SetupSuperAdminView';
 import { OnboardingView } from './views/OnboardingView';
-import { WorkspaceSelectorView } from './views/WorkspaceSelectorView';
 import { AppLoginLoadingScreen } from './components/AppLoginLoadingScreen';
 import { AppAuthLoadingSkeleton } from './components/DashboardSkeleton';
 import { BookLoadingModal } from './components/BookLoader';
@@ -25,6 +24,8 @@ import { AIChatWidget } from './components/AIChatWidget';
 import { UpgradePromptModal } from './components/UpgradePromptModal';
 import { TeacherUpgradeModal } from './components/TeacherUpgradeModal';
 import { SchoolUpgradeModal } from './components/SchoolUpgradeModal';
+import { PublicDailyReportViewer } from './components/PublicDailyReportViewer';
+import { PublicSmartInvoiceViewer } from './components/PublicSmartInvoiceViewer';
 import { CheckCircle2, AlertCircle, Info, X } from 'lucide-react';
 import type { ActiveView, UserRole } from './types';
 
@@ -137,8 +138,6 @@ const MainAppContent: React.FC = () => {
     showToast, 
     passwordRecovery, 
     isOnboarding, 
-    isSelectingWorkspace, 
-    selectWorkspace, 
     openOnboarding, 
     loadUserDataAfterOnboarding,
     isAuthChecking,
@@ -176,11 +175,54 @@ const MainAppContent: React.FC = () => {
     return params.get('page') !== 'login' && params.get('page') !== 'setup';
   });
 
-  // Pastikan landing page tertutup jika user sudah login, sedang onboarding, memilih workspace, recovery password, atau OAuth pending
+  // Check if public smart report link is accessed (e.g. by parents/supervisors clicking link from WhatsApp)
+  const [publicReportParams, setPublicReportParams] = React.useState(() => {
+    if (typeof window === 'undefined') return null;
+    const p = new URLSearchParams(window.location.search);
+    const r = p.get('r') || p.get('class') || p.get('classId');
+    const d = p.get('d') || p.get('date');
+    const periodParam = (p.get('p') || p.get('period') || '').toLowerCase();
+    if (r || periodParam === 'kepsek') {
+      let resolvedReportType: 'Laporan Harian' | 'Laporan Mingguan' | 'Laporan Bulanan' | 'Laporan Semester' | 'Laporan Kepala Sekolah (Bulanan)' | 'Laporan Kepala Sekolah (Semester)' = 'Laporan Harian';
+      if (periodParam === 'kepsek' || periodParam === 'kepsek_monthly') {
+        resolvedReportType = 'Laporan Kepala Sekolah (Bulanan)';
+      } else if (periodParam === 'kepsek_semester') {
+        resolvedReportType = 'Laporan Kepala Sekolah (Semester)';
+      } else if (periodParam === 'weekly') {
+        resolvedReportType = 'Laporan Mingguan';
+      } else if (periodParam === 'monthly') {
+        resolvedReportType = 'Laporan Bulanan';
+      } else if (periodParam === 'semester') {
+        resolvedReportType = 'Laporan Semester';
+      }
+
+      return {
+        classId: r || '',
+        date: d || new Date().toISOString().split('T')[0],
+        attendanceType: (p.get('m') === 'subject' || p.get('type') === 'subject') ? ('SUBJECT' as const) : ('DAILY' as const),
+        subjectId: p.get('s') || p.get('subjectId') || null,
+        reportType: resolvedReportType,
+        selectedWeek: p.get('w') || p.get('week') || 'Minggu Ke-1',
+        month: p.get('mo') || p.get('month') || 'Juli',
+        year: p.get('y') || p.get('year') || '2026',
+        semester: (p.get('sem') === 'Genap' || p.get('semester') === 'Genap') ? ('Genap' as const) : ('Ganjil' as const),
+        academicYear: p.get('ay') || p.get('academicYear') || '2025/2026',
+      };
+    }
+    return null;
+  });
+
+  // Check if public Smart Link PDF Invoice is accessed
+  const [smartInvoiceNumber, setSmartInvoiceNumber] = React.useState<string | null>(() => {
+    if (typeof window === 'undefined') return null;
+    const p = new URLSearchParams(window.location.search);
+    return p.get('smart_invoice') || p.get('invoice') || null;
+  });
+
+  // Pastikan landing page tertutup jika user sudah login, sedang onboarding, recovery password, atau OAuth pending
   React.useEffect(() => {
     if (
       isOnboarding ||
-      isSelectingWorkspace ||
       currentUser ||
       passwordRecovery ||
       isAuthCallbackUrl() ||
@@ -193,7 +235,7 @@ const MainAppContent: React.FC = () => {
     ) {
       setShowLanding(false);
     }
-  }, [isOnboarding, isSelectingWorkspace, currentUser, passwordRecovery, isAuthChecking, isLoginPreparing]);
+  }, [isOnboarding, currentUser, passwordRecovery, isAuthChecking, isLoginPreparing]);
 
   // Handle browser back / forward navigation (PopState)
   React.useEffect(() => {
@@ -223,6 +265,23 @@ const MainAppContent: React.FC = () => {
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
   }, [currentUser, isAuthChecking, isLoginPreparing]);
+
+  React.useEffect(() => {
+    if (currentUser) {
+      if (activeView === 'login') {
+        const targetView = defaultViewForRole(currentUser.role);
+        setActiveView(targetView);
+      }
+      setShowLanding(false);
+      try {
+        const url = new URL(window.location.href);
+        if (url.searchParams.get('page') === 'login') {
+          url.searchParams.delete('page');
+          window.history.pushState(null, '', url.pathname + (url.search ? url.search : ''));
+        }
+      } catch (_) {}
+    }
+  }, [currentUser, activeView, setActiveView]);
 
   const handleEnterSystem = () => {
     setShowLanding(false);
@@ -274,25 +333,13 @@ const MainAppContent: React.FC = () => {
     );
   }
 
-  // 2. Jika user memiliki multi-workspace dan perlu memilih ruang kerja aktif (Ruang Kerja Sekolah / Ruang Kerja Individu)
-  if (isSelectingWorkspace) {
-    return (
-      <div className="min-h-screen bg-[#F8FAFC]">
-        <WorkspaceSelectorView
-          onSelectWorkspace={(ws) => void selectWorkspace(ws)}
-        />
-        <ToastContainer />
-      </div>
-    );
-  }
-
-  // 3. Jika sedang dalam proses login awal (kredensial / Google OAuth) dan profil belum ter-hydrate,
+  // 2. Jika sedang dalam proses login awal (kredensial / Google OAuth) dan profil belum ter-hydrate,
   // tampilkan LoginView dengan overlay loading screen di tengah sehingga background halaman login tetap terlihat dengan blur ringan.
   // BUKAN saat reload dashboard biasa.
   if ((isLoginPreparing || isAuthCallbackUrl()) && !currentUser) {
     return (
       <>
-        <LoginView onBackToLanding={handleBackToLanding} />
+        <LoginView onBackToLanding={handleBackToLanding} onEnterDashboard={handleEnterDashboard} />
         <ToastContainer />
       </>
     );
@@ -301,6 +348,61 @@ const MainAppContent: React.FC = () => {
   // 4. Jika sedang memeriksa sesi auth saat reload halaman tanpa data cache sesi
   if (isAuthChecking && !currentUser && hasPersistedAuthToken()) {
     return <AppAuthLoadingSkeleton />;
+  }
+
+  // Public Report Viewer (Smart Link accessed by parents/teachers/supervisors)
+  if (publicReportParams) {
+    return (
+      <PublicDailyReportViewer
+        classId={publicReportParams.classId}
+        date={publicReportParams.date}
+        attendanceType={publicReportParams.attendanceType}
+        subjectId={publicReportParams.subjectId}
+        reportType={publicReportParams.reportType}
+        selectedWeek={publicReportParams.selectedWeek}
+        month={publicReportParams.month}
+        year={publicReportParams.year}
+        semester={publicReportParams.semester}
+        academicYear={publicReportParams.academicYear}
+        onBackToApp={() => {
+          setPublicReportParams(null);
+          try {
+            const url = new URL(window.location.href);
+            url.searchParams.delete('r');
+            url.searchParams.delete('d');
+            url.searchParams.delete('s');
+            url.searchParams.delete('m');
+            url.searchParams.delete('p');
+            url.searchParams.delete('w');
+            url.searchParams.delete('mo');
+            url.searchParams.delete('y');
+            url.searchParams.delete('sem');
+            url.searchParams.delete('ay');
+            url.searchParams.delete('class');
+            url.searchParams.delete('date');
+            window.history.pushState(null, '', url.pathname + (url.search ? url.search : ''));
+          } catch (_) {}
+        }}
+      />
+    );
+  }
+
+  // Smart Link PDF Invoice Viewer (Bisa diakses langsung oleh sekolah, guru, atau auditor via link)
+  if (smartInvoiceNumber) {
+    return (
+      <PublicSmartInvoiceViewer
+        invoiceNumber={smartInvoiceNumber}
+        onBackToApp={() => {
+          setSmartInvoiceNumber(null);
+          try {
+            const url = new URL(window.location.href);
+            url.searchParams.delete('smart_invoice');
+            url.searchParams.delete('invoice');
+            window.history.pushState(null, '', url.pathname + (url.search ? url.search : ''));
+          } catch (_) {}
+        }}
+      />
+    );
   }
 
   // Tampilan landing page sebagai layar awal SAAT pengguna memang belum login sama sekali
@@ -316,7 +418,7 @@ const MainAppContent: React.FC = () => {
   if (!currentUser || activeView === 'login') {
     return (
       <>
-        <LoginView onBackToLanding={handleBackToLanding} />
+        <LoginView onBackToLanding={handleBackToLanding} onEnterDashboard={handleEnterDashboard} />
         <ToastContainer />
       </>
     );

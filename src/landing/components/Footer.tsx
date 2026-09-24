@@ -11,6 +11,7 @@ import {
   BookOpen
 } from 'lucide-react';
 import { LegalTabType } from './TermsAndLegalModal';
+import { KawacanaanEmblem } from '../../components/KawacanaanEmblem';
 
 interface FooterProps {
   lang: 'ID' | 'EN';
@@ -43,9 +44,7 @@ export const Footer: React.FC<FooterProps> = ({ lang, onOpenLegal }) => {
           {/* Column 1: Brand Info & Description & Socials */}
           <div className="lg:col-span-5 space-y-6">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center text-white font-black text-base shadow-lg shadow-blue-600/30">
-                K
-              </div>
+              <KawacanaanEmblem size={44} />
               <div>
                 <span className="text-lg font-black text-white uppercase tracking-tight block">
                   Kawacanaan

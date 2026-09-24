@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useApp, isAuthCallbackUrl } from '../context/AppContext';
 import { AppLoginLoadingScreen } from '../components/AppLoginLoadingScreen';
+import { KawacanaanEmblem } from '../components/KawacanaanEmblem';
+import { usePlatformBrand } from '../utils/platformBranding';
 import { FreeStartModal } from '../landing/components/FreeStartModal';
 import { TermsAndLegalModal, LegalTabType } from '../landing/components/TermsAndLegalModal';
 import {
@@ -25,9 +27,10 @@ import {
 
 interface LoginViewProps {
   onBackToLanding?: () => void;
+  onEnterDashboard?: () => void;
 }
 
-export const LoginView: React.FC<LoginViewProps> = ({ onBackToLanding }) => {
+export const LoginView: React.FC<LoginViewProps> = ({ onBackToLanding, onEnterDashboard }) => {
   const {
     showToast,
     schoolProfile,
@@ -35,10 +38,13 @@ export const LoginView: React.FC<LoginViewProps> = ({ onBackToLanding }) => {
     openOnboarding,
     loadData,
     loginWithCredentials,
+    currentUser,
+    setActiveView,
     isLoginPreparing,
     loginProgressMessage,
     loginStep,
   } = useApp();
+  const { appName } = usePlatformBrand();
 
   // Mode: 'login' | 'forgot-password'
   const [authMode, setAuthMode] = useState<'login' | 'forgot-password'>('login');
@@ -127,6 +133,21 @@ export const LoginView: React.FC<LoginViewProps> = ({ onBackToLanding }) => {
     }
   }, [registrationRequired, openOnboarding]);
 
+  useEffect(() => {
+    if (currentUser) {
+      if (onEnterDashboard) {
+        onEnterDashboard();
+      } else {
+        setActiveView('dashboard');
+        try {
+          const url = new URL(window.location.href);
+          url.searchParams.delete('page');
+          window.history.pushState(null, '', url.pathname + (url.search ? url.search : ''));
+        } catch (_) {}
+      }
+    }
+  }, [currentUser, onEnterDashboard, setActiveView]);
+
   // Handle standard login through Supabase Auth.
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -158,6 +179,16 @@ export const LoginView: React.FC<LoginViewProps> = ({ onBackToLanding }) => {
 
       showToast('Login berhasil. Selamat datang!', 'success');
       // Transisi ke dashboard ditangani langsung dengan data yang sudah 100% siap
+      if (onEnterDashboard) {
+        onEnterDashboard();
+      } else {
+        setActiveView('dashboard');
+        try {
+          const url = new URL(window.location.href);
+          url.searchParams.delete('page');
+          window.history.pushState(null, '', url.pathname + (url.search ? url.search : ''));
+        } catch (_) {}
+      }
     } catch (err: any) {
       console.error('Login error:', err);
       setErrorMessage(err?.message || 'Terjadi kendala saat proses autentikasi. Silakan coba lagi.');
@@ -277,11 +308,12 @@ export const LoginView: React.FC<LoginViewProps> = ({ onBackToLanding }) => {
       <div className="w-full max-w-[400px] sm:max-w-[430px] md:max-w-[450px] lg:max-w-[460px] mx-auto my-auto py-5 sm:py-7 z-10">
         <div className="w-full bg-white rounded-2xl sm:rounded-3xl p-6 sm:p-8 md:p-9 shadow-lg sm:shadow-xl shadow-slate-200/80 border border-slate-200/90 transition-all text-slate-800">
           
-          {/* Top Typographic Brand Header (Bersih & Profesional - Tanpa Logo/Gambar) */}
+          {/* Top Brand Header dengan Logo Resmi Kawacanaan yang Terintegrasi */}
           <div className="flex flex-col items-center justify-center mb-5 sm:mb-6 text-center">
+            <KawacanaanEmblem size={52} className="mb-2.5 drop-shadow-sm" />
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 border border-blue-100 text-blue-700 text-[10.5px] sm:text-[11px] font-bold uppercase tracking-wider">
               <span className="w-1.5 h-1.5 rounded-full bg-blue-600 inline-block" />
-              <span>KawaCanaan Presensi</span>
+              <span>{appName || 'Kawacanaan Presensi'}</span>
             </div>
 
             {authMode === 'forgot-password' && (
@@ -450,16 +482,18 @@ export const LoginView: React.FC<LoginViewProps> = ({ onBackToLanding }) => {
               </button>
 
               {/* Footer registration note inside card */}
-              <div className="text-center mt-6 text-xs text-slate-500 font-medium">
-                Belum punya akun?{' '}
-                <button
-                  type="button"
-                  onClick={() => setIsFreeStartOpen(true)}
-                  className="font-bold text-blue-700 hover:underline cursor-pointer"
-                  id="btn-link-buat-akun-gratis"
-                >
-                  Buat akun gratis
-                </button>
+              <div className="text-center mt-6 text-xs text-slate-500 font-medium space-y-2">
+                <div>
+                  Belum punya akun?{' '}
+                  <button
+                    type="button"
+                    onClick={() => setIsFreeStartOpen(true)}
+                    className="font-bold text-blue-700 hover:underline cursor-pointer"
+                    id="btn-link-buat-akun-gratis"
+                  >
+                    Buat akun gratis
+                  </button>
+                </div>
               </div>
             </div>
           )}
@@ -575,8 +609,33 @@ export const LoginView: React.FC<LoginViewProps> = ({ onBackToLanding }) => {
       <FreeStartModal
         isOpen={isFreeStartOpen}
         onClose={() => setIsFreeStartOpen(false)}
-        onOpenLogin={() => setIsFreeStartOpen(false)}
-        onEnterSystem={() => setIsFreeStartOpen(false)}
+        onOpenLogin={(prefill) => {
+          setIsFreeStartOpen(false);
+          if (prefill?.username) {
+            setEmailOrUser(prefill.username);
+            if (prefill.password) {
+              setPassword(prefill.password);
+            }
+            setErrorMessage('');
+            setResetSuccessMessage('Akun baru berhasil dibuat. Silakan klik Masuk untuk mulai menggunakan sistem.');
+          }
+        }}
+        onEnterSystem={() => {
+          setIsFreeStartOpen(false);
+          if (onEnterDashboard) {
+            onEnterDashboard();
+          } else {
+            setActiveView('dashboard');
+          }
+        }}
+        onEnterDashboard={() => {
+          setIsFreeStartOpen(false);
+          if (onEnterDashboard) {
+            onEnterDashboard();
+          } else {
+            setActiveView('dashboard');
+          }
+        }}
         lang="ID"
       />
     </div>

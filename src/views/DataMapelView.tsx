@@ -404,7 +404,7 @@ export const DataMapelView: React.FC = () => {
               {isWaliKelas && assignedWaliClass
                 ? `Menampilkan daftar mata pelajaran yang diinput dan diajar oleh Guru Mapel untuk kelas ${assignedWaliClass.name}.`
                 : isGuruMapel
-                ? 'Kelola mata pelajaran yang Anda ampu, tentukan rombel kelas binaan/sasaran (1A - 6B), dan atur hari jadwal KBM.'
+                ? 'Kelola mata pelajaran yang Anda ampu, tentukan rombel kelas binaan/sasaran yang diajar, dan atur hari jadwal KBM.'
                 : 'Kelola mata pelajaran, penetapan guru pengajar mapel, pembagian rombel kelas yang diajar, dan jadwal KBM.'}
             </p>
           </div>
@@ -439,7 +439,7 @@ export const DataMapelView: React.FC = () => {
                 )}
               </div>
               <p className="text-slate-600 leading-relaxed max-w-3xl">
-                Sebagai Guru Mata Pelajaran, Anda dapat mengelola data mata pelajaran yang Anda ajar, mengatur rombongan belajar (lintas kelas dari 1A sampai 6B), serta menentukan hari jadwal KBM mingguan.
+                Sebagai Guru Mata Pelajaran, Anda dapat mengelola data mata pelajaran yang Anda ajar, mengatur rombongan belajar (lintas rombel yang tersedia), serta menentukan hari jadwal KBM mingguan.
               </p>
             </div>
           </div>

@@ -37,8 +37,8 @@ export default async function handler(req: any, res: any) {
   const targetSchoolId = body.schoolId || profile.school_id;
   const userRole = String(profile.role || '').toUpperCase().trim();
 
-  // Verifikasi otorisasi sekolah: izinkan jika super admin, atau jika school_id cocok dan valid
-  let isAuthorizedForSchool = userRole === 'SUPER_ADMIN' || Boolean(targetSchoolId && profile.school_id === targetSchoolId);
+  // Verifikasi otorisasi sekolah secara ketat
+  let isAuthorizedForSchool = userRole === 'SUPER_ADMIN';
 
   if (!isAuthorizedForSchool && targetSchoolId) {
     try {
@@ -48,30 +48,44 @@ export default async function handler(req: any, res: any) {
         .eq('id', targetSchoolId)
         .maybeSingle();
 
-      if (
-        targetSchool &&
-        (targetSchool.owner_id === userId ||
+      if (targetSchool) {
+        const isPersonalWorkspace =
           targetSchool.workspace_type === 'personal' ||
           targetSchool.workspace_type === 'individu' ||
-          targetSchool.is_personal === true)
-      ) {
-        isAuthorizedForSchool = true;
-      } else {
-        // Cek apakah guru terdaftar di sekolah target
-        const { data: teacherRow } = await admin
-          .from('teachers')
-          .select('id')
-          .eq('school_id', targetSchoolId)
-          .eq('id', profile.teacher_id || '')
-          .maybeSingle();
-        if (teacherRow) {
-          isAuthorizedForSchool = true;
-        }
-      }
+          targetSchool.is_personal === true;
 
-      // Sinkronkan school_id pada profil jika terverifikasi memiliki akses
-      if (isAuthorizedForSchool && profile.school_id !== targetSchoolId) {
-        await admin.from('profiles').update({ school_id: targetSchoolId }).eq('id', userId);
+        if (isPersonalWorkspace) {
+          // RUANG KERJA INDIVIDU: HANYA pemilik sah (owner_id === userId) yang boleh mengakses & mencatat absensi
+          if (targetSchool.owner_id === userId) {
+            isAuthorizedForSchool = true;
+          }
+        } else {
+          // RUANG KERJA SEKOLAH / INSTANSI:
+          // Boleh diakses jika:
+          // 1. Pemilik sekolah (owner_id === userId)
+          // 2. Atau pengguna aktif terdaftar di sekolah ini (profile.school_id === targetSchoolId)
+          // 3. Atau guru yang terdaftar resmi di tabel teachers untuk sekolah ini
+          if (targetSchool.owner_id === userId) {
+            isAuthorizedForSchool = true;
+          } else if (profile.school_id === targetSchoolId) {
+            isAuthorizedForSchool = true;
+          } else if (profile.teacher_id) {
+            const { data: teacherRow } = await admin
+              .from('teachers')
+              .select('id')
+              .eq('school_id', targetSchoolId)
+              .eq('id', profile.teacher_id)
+              .maybeSingle();
+            if (teacherRow) {
+              isAuthorizedForSchool = true;
+            }
+          }
+        }
+
+        // Sinkronkan school_id pada profil HANYA jika terverifikasi sah
+        if (isAuthorizedForSchool && profile.school_id !== targetSchoolId) {
+          await admin.from('profiles').update({ school_id: targetSchoolId }).eq('id', userId);
+        }
       }
     } catch (authCheckErr: any) {
       console.warn('[attendance API] auth check warning:', authCheckErr?.message);
@@ -88,37 +102,47 @@ export default async function handler(req: any, res: any) {
         return json(res, 403, { error: 'Role pengguna Anda tidak memiliki hak akses mencatat absensi.' });
       }
 
-      const { date, type, subjectId, targetStudentIds, payload } = body;
+      const { date, type, subjectId, classId, targetStudentIds, payload } = body;
       if (!date) return json(res, 400, { error: 'Tanggal absensi wajib disertakan.' });
 
-      // 1. Bersihkan record absensi lama untuk siswa target pada tanggal & moda tersebut
-      if (Array.isArray(targetStudentIds) && targetStudentIds.length > 0) {
-        let del = admin
-          .from('attendance_records')
-          .delete()
-          .eq('date', date)
-          .eq('type', type || 'DAILY')
-          .in('student_id', targetStudentIds);
+      // 1. Bersihkan record absensi lama untuk siswa target atau kelas target pada tanggal & moda tersebut
+      // Jika targetStudentIds diberikan, bersihkan siswa-siswa tersebut.
+      // Jika targetStudentIds kosong tapi classId ada, bersihkan seluruh kelas pada tanggal tersebut.
+      let del = admin
+        .from('attendance_records')
+        .delete()
+        .eq('date', date)
+        .eq('type', type || 'DAILY');
 
-        if (targetSchoolId) {
-          del = del.eq('school_id', targetSchoolId);
-        }
-        if (type === 'SUBJECT' && subjectId) {
-          del = del.eq('subject_id', subjectId);
-        }
-        const { error: delError } = await del;
-        if (delError) {
-          return json(res, 500, { error: `Gagal membersihkan data lama: ${delError.message}` });
-        }
+      if (targetSchoolId) {
+        del = del.eq('school_id', targetSchoolId);
+      }
+      if (type === 'SUBJECT' && subjectId) {
+        del = del.eq('subject_id', subjectId);
       }
 
-      // 2. Simpan record absensi baru
+      if (Array.isArray(targetStudentIds) && targetStudentIds.length > 0) {
+        del = del.in('student_id', targetStudentIds);
+      } else if (classId) {
+        del = del.eq('class_id', classId);
+      }
+
+      const { error: delError } = await del;
+      if (delError) {
+        return json(res, 500, { error: `Gagal membersihkan data lama: ${delError.message}` });
+      }
+
+      // 2. Simpan record absensi baru (hanya yang memiliki status presensi valid)
       if (Array.isArray(payload) && payload.length > 0) {
-        const normalizedPayload = payload.map((r: any) => ({
+        const validPayload = payload.filter(
+          (r: any) => Boolean(r && r.status && r.status !== '-' && (r.student_id || r.studentId))
+        );
+
+        const normalizedPayload = validPayload.map((r: any) => ({
           school_id: targetSchoolId || r.school_id || profile.school_id,
           date: r.date || date,
           student_id: r.student_id || r.studentId,
-          class_id: r.class_id || r.classId || null,
+          class_id: r.class_id || r.classId || classId || null,
           type: r.type || type || 'DAILY',
           subject_id: r.subject_id || r.subjectId || (type === 'SUBJECT' ? subjectId : null),
           teacher_id: r.teacher_id || r.teacherId || profile.teacher_id || null,
@@ -129,16 +153,46 @@ export default async function handler(req: any, res: any) {
           updated_by: userId,
         }));
 
-        const { data: inserted, error: insertError } = await admin
-          .from('attendance_records')
-          .insert(normalizedPayload)
-          .select('id');
+        if (normalizedPayload.length > 0) {
+          // Coba upsert terlebih dahulu jika tabel memiliki unique constraint
+          let saveSuccess = false;
+          let lastInsertError: any = null;
 
-        if (insertError) {
-          return json(res, 500, { error: `Gagal menyimpan data absensi: ${insertError.message}` });
+          try {
+            const { data: upserted, error: upsertErr } = await admin
+              .from('attendance_records')
+              .upsert(normalizedPayload, {
+                onConflict: 'school_id,student_id,date,type,subject_id',
+                ignoreDuplicates: false,
+              })
+              .select('id');
+
+            if (!upsertErr) {
+              saveSuccess = true;
+              return json(res, 200, { ok: true, count: upserted?.length || normalizedPayload.length });
+            } else {
+              lastInsertError = upsertErr;
+            }
+          } catch (e: any) {
+            lastInsertError = e;
+          }
+
+          // Jika upsert gagal (misal belum ada constraint unik di DB lama), lakukan insert langsung
+          if (!saveSuccess) {
+            const { data: inserted, error: insertError } = await admin
+              .from('attendance_records')
+              .insert(normalizedPayload)
+              .select('id');
+
+            if (insertError) {
+              return json(res, 500, {
+                error: `Gagal menyimpan data absensi: ${insertError.message || lastInsertError?.message}`,
+              });
+            }
+
+            return json(res, 200, { ok: true, count: inserted?.length || normalizedPayload.length });
+          }
         }
-
-        return json(res, 200, { ok: true, count: inserted?.length || normalizedPayload.length });
       }
 
       return json(res, 200, { ok: true, count: 0, message: 'Data absensi berhasil direset.' });

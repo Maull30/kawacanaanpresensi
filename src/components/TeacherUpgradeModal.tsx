@@ -24,6 +24,7 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import { InvoiceModal } from './InvoiceModal';
 
 interface TeacherUpgradeModalProps {
   isOpen: boolean;
@@ -75,6 +76,7 @@ export const TeacherUpgradeModal: React.FC<TeacherUpgradeModalProps> = ({
   const [isCheckingPayment, setIsCheckingPayment] = useState(false);
   const [paymentCheckMessage, setPaymentCheckMessage] = useState<string | null>(null);
   const [copiedInvoice, setCopiedInvoice] = useState(false);
+  const [showInvoiceModal, setShowInvoiceModal] = useState(false);
 
   const pollingRef = useRef<any>(null);
 
@@ -309,15 +311,15 @@ export const TeacherUpgradeModal: React.FC<TeacherUpgradeModalProps> = ({
             <div className="flex items-center gap-2 mb-2">
               <span className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-emerald-500/20 text-emerald-200 border border-emerald-400/30 text-[11px] font-bold tracking-wide uppercase">
                 <ShieldCheck size={13} />
-                Paket Sekolah Pro Aktif
+                Paket Sekolah Aktif
               </span>
             </div>
 
             <h3 className="text-lg sm:text-xl font-black leading-snug">
-              Sekolah Anda Telah Berlangganan Paket Sekolah Pro
+              Sekolah Anda Telah Berlangganan Paket Sekolah
             </h3>
             <p className="text-xs sm:text-sm text-blue-100 mt-1 leading-relaxed">
-              Ruang kerja satuan pendidikan <strong>{schoolName}</strong> saat ini aktif berlangganan Paket Sekolah Pro.
+              Ruang kerja satuan pendidikan <strong>{schoolName}</strong> saat ini aktif berlangganan Paket Sekolah.
             </p>
           </div>
 
@@ -330,7 +332,7 @@ export const TeacherUpgradeModal: React.FC<TeacherUpgradeModalProps> = ({
                 </div>
                 <div className="space-y-1">
                   <h4 className="text-xs sm:text-sm font-black text-slate-900">
-                    Akses Fitur Guru Pro Telah Otomatis Terbuka Penuh
+                    Akses Fitur Paket Guru Telah Otomatis Terbuka Penuh
                   </h4>
                   <p className="text-xs text-slate-600 leading-relaxed">
                     Akun Anda (<strong>{teacherName}</strong>) bersama seluruh Kepala Sekolah, Wali Kelas, dan Guru Mapel di sekolah ini telah mendapatkan akses penuh tanpa batasan.
@@ -415,7 +417,7 @@ export const TeacherUpgradeModal: React.FC<TeacherUpgradeModalProps> = ({
             {step === 1 && 'Konfirmasi Profil & Penugasan Pendidik'}
             {step === 2 && 'Pilih Opsi Langganan atau Uji Coba 14 Hari'}
             {step === 3 && 'Pembayaran Payment Gateway Midtrans'}
-            {step === 4 && 'Selamat Datang di Paket Guru Pro!'}
+            {step === 4 && 'Selamat Datang di Paket Guru!'}
           </h3>
           <p className="text-xs sm:text-sm text-emerald-100 mt-1">
             {step === 1 && 'Akun Anda sudah terdaftar. Konfirmasi tugas mengajar Anda untuk menyesuaikan kapasitas.'}
@@ -582,7 +584,7 @@ export const TeacherUpgradeModal: React.FC<TeacherUpgradeModalProps> = ({
                       <p className="text-xs text-slate-600 mt-0.5">
                         {hasUsedTeacherTrial
                           ? 'Kesempatan uji coba 14 hari telah digunakan. Silakan pilih paket langganan resmi di bawah ini.'
-                          : 'Coba seluruh fitur Guru Pro selama 14 hari penuh tanpa biaya dan tanpa kartu kredit.'}
+                          : 'Coba seluruh fitur Paket Guru selama 14 hari penuh tanpa biaya dan tanpa kartu kredit.'}
                       </p>
                     </div>
                   </div>
@@ -767,7 +769,7 @@ export const TeacherUpgradeModal: React.FC<TeacherUpgradeModalProps> = ({
                   <div className="flex justify-between">
                     <span>Paket:</span>
                     <span className="font-bold text-slate-800">
-                      Paket Guru Pro ({billingCycle === 'yearly' ? '1 Tahun' : '1 Bulan'})
+                      Paket Guru ({billingCycle === 'yearly' ? '1 Tahun' : '1 Bulan'})
                     </span>
                   </div>
                   <div className="flex justify-between">
@@ -778,6 +780,17 @@ export const TeacherUpgradeModal: React.FC<TeacherUpgradeModalProps> = ({
                     <span>Total Tagihan:</span>
                     <span className="text-emerald-700">Rp {paymentSession.amount.toLocaleString('id-ID')}</span>
                   </div>
+                </div>
+
+                <div className="pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setShowInvoiceModal(true)}
+                    className="w-full py-2.5 px-3 rounded-xl border border-emerald-300 bg-emerald-50/70 hover:bg-emerald-100 text-emerald-800 text-xs font-bold flex items-center justify-center gap-1.5 transition cursor-pointer"
+                  >
+                    <FileText size={14} />
+                    <span>Lihat & Cetak Faktur / Tagihan Resmi</span>
+                  </button>
                 </div>
               </div>
 
@@ -837,7 +850,7 @@ export const TeacherUpgradeModal: React.FC<TeacherUpgradeModalProps> = ({
               </div>
               <div>
                 <h4 className="text-xl font-black text-slate-800">
-                  Selamat, Akun Anda Kini Guru Pro!
+                  Selamat, Akun Anda Kini Paket Guru!
                 </h4>
                 <p className="text-xs sm:text-sm text-slate-600 mt-1.5 max-w-md mx-auto">
                   Paket Guru pada Ruang Kerja Individu <strong>{teacherName}</strong> telah aktif. Seluruh fitur profesional siap digunakan.
@@ -861,6 +874,19 @@ export const TeacherUpgradeModal: React.FC<TeacherUpgradeModalProps> = ({
                   <span>Cetak dokumen <strong>Laporan Resmi PDF A4</strong> siap penandatanganan.</span>
                 </div>
               </div>
+
+              {paymentSession && (
+                <div className="pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowInvoiceModal(true)}
+                    className="py-2.5 px-4 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-slate-800 text-xs font-bold inline-flex items-center gap-2 shadow-xs transition cursor-pointer"
+                  >
+                    <Printer size={15} className="text-emerald-600" />
+                    <span>Cetak Bukti Pembayaran / Invoice Lunas</span>
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -932,6 +958,44 @@ export const TeacherUpgradeModal: React.FC<TeacherUpgradeModalProps> = ({
           </div>
         </div>
       </div>
+
+      {showInvoiceModal && paymentSession && (
+        <InvoiceModal
+          isOpen={showInvoiceModal}
+          onClose={() => setShowInvoiceModal(false)}
+          data={{
+            invoiceNumber: paymentSession.orderId,
+            orderId: paymentSession.orderId,
+            schoolName: schoolProfile?.name || 'Ruang Kerja Pendidik Mandiri',
+            customerName: teacherName,
+            customerEmail: teacherEmail,
+            customerPhone: currentUser?.phone,
+            planName: `Paket Guru (${billingCycle === 'yearly' ? '1 Tahun' : '1 Bulan'})`,
+            amount: paymentSession.amount,
+            issueDate: new Date().toLocaleDateString('id-ID', {
+              day: '2-digit',
+              month: 'long',
+              year: 'numeric',
+            }),
+            dueDate: new Date(Date.now() + 24 * 3600 * 1000).toLocaleDateString('id-ID', {
+              day: '2-digit',
+              month: 'long',
+              year: 'numeric',
+            }),
+            paidAt:
+              step === 4
+                ? new Date().toLocaleDateString('id-ID', {
+                    day: '2-digit',
+                    month: 'long',
+                    year: 'numeric',
+                  })
+                : undefined,
+            paymentMethod: 'Midtrans Payment Gateway (QRIS / Virtual Account)',
+            status: step === 4 ? 'settled' : 'pending',
+            notes: `Lisensi Pendidik Profesional Kawacanaan (${billingCycle === 'yearly' ? 'Tahunan' : 'Bulanan'}) - Akses pengampu hingga 5 Rombel dan Presensi Guru Mapel.`,
+          }}
+        />
+      )}
     </div>
   );
 };

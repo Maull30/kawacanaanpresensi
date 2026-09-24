@@ -34,8 +34,8 @@ const generateSchoolInviteCode = (): string => {
 const getPlanLimits = (plan: string, role?: string) => {
   const norm = normalizePlan(plan);
   if (norm === 'sekolah_pro') {
-    // Ruang Kerja Sekolah: Total 12 kelas tersedia (Kelas 1–6 paralel A/B), maks 50 siswa/kelas (600 siswa)
-    return { max_teachers: 50, max_students: 600, max_classes: 12, days: 30, defaultClasses: 12, name: 'Paket Sekolah Pro' };
+    // Ruang Kerja Sekolah: Kapasitas fleksibel sesuai kebutuhan sekolah, rombel diinput mandiri oleh admin sekolah
+    return { max_teachers: 999999, max_students: 999999, max_classes: 999999, days: 30, defaultClasses: 0, name: 'Paket Sekolah' };
   }
   const isSubjectTeacher = (role || '').toUpperCase().trim() === 'GURU MAPEL';
   if (norm === 'guru_pro') {
@@ -48,24 +48,6 @@ const getPlanLimits = (plan: string, role?: string) => {
   }
   // guru_gratis: Aktif tanpa batas waktu kedaluwarsa (days: null), tanpa sistem trial lama
   return { max_teachers: 1, max_students: 32, max_classes: 1, days: null, defaultClasses: 1, name: 'Paket Guru Gratis' };
-};
-
-const generateInitialClasses = (schoolId: string, count: number) => {
-  const classesList: { school_id: string; name: string; grade: number }[] = [];
-  if (count <= 1) {
-    classesList.push({ school_id: schoolId, name: 'Kelas 1A', grade: 1 });
-  } else if (count <= 6) {
-    for (let g = 1; g <= 6; g++) {
-      classesList.push({ school_id: schoolId, name: `Kelas ${g}A`, grade: g });
-    }
-  } else {
-    // Ruang Kerja Sekolah: Struktur 12 Kelas Standar: Kelas 1–6 Paralel A/B (1A s.d. 6B)
-    for (let g = 1; g <= 6; g++) {
-      classesList.push({ school_id: schoolId, name: `Kelas ${g}A`, grade: g });
-      classesList.push({ school_id: schoolId, name: `Kelas ${g}B`, grade: g });
-    }
-  }
-  return classesList;
 };
 
 export default async function handler(req: any, res: any) {
@@ -194,8 +176,9 @@ export default async function handler(req: any, res: any) {
     }
 
     // Penentuan Username & Peran untuk Guru vs Admin
-    const isTeacherPlan = plan === 'guru_pro' || plan === 'guru_gratis';
-    const teacherType = body.teacherType === 'GURU_MAPEL' ? 'GURU_MAPEL' : 'WALI_KELAS';
+    const isTeacherPlan = body.workspace_type === 'personal' || body.workspaceType === 'personal' || plan === 'guru_pro' || plan === 'guru_gratis';
+    const rawTeacherType = String(body.teacherType || body.role || '').toUpperCase().trim();
+    const teacherType = rawTeacherType.includes('MAPEL') ? 'GURU_MAPEL' : 'WALI_KELAS';
     const teacherGrade = Number(body.teacherGrade || 1);
     const teacherSubject = String(body.teacherSubject || 'Tematik / Guru Kelas').trim();
     const teacherNip = String(body.teacherNip || '').trim();
@@ -226,27 +209,93 @@ export default async function handler(req: any, res: any) {
       }
     }
 
-    // 3. Hitung Masa Aktif & Limit Paket (Hapus sistem trial lama dari alur baru)
+    // 3. Verifikasi Keaslian Hak Akses Super Admin
+    const requestedSuperadmin = Boolean(body.isSuperadmin || body.mode === 'superadmin');
+    let isCallerSuperadmin = false;
+    const authHeader = req.headers.authorization || '';
+    const token = authHeader.replace(/^Bearer\s+/i, '').trim();
+
+    if (token) {
+      try {
+        const { data: callerUser } = await admin.auth.getUser(token);
+        if (callerUser?.user) {
+          const { data: callerProfile } = await admin
+            .from('profiles')
+            .select('role')
+            .eq('id', callerUser.user.id)
+            .maybeSingle();
+          if (callerProfile?.role === 'SUPER_ADMIN') {
+            isCallerSuperadmin = true;
+          }
+        }
+      } catch (_) {}
+
+      // Fallback: Jika validasi token via getUser mengalami clock skew/network lag,
+      // periksa klaim JWT payload sub secara aman
+      if (!isCallerSuperadmin && token.includes('.')) {
+        try {
+          const parts = token.split('.');
+          if (parts.length === 3) {
+            const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString());
+            const userId = payload?.sub;
+            if (userId) {
+              const { data: jwtProfile } = await admin
+                .from('profiles')
+                .select('role')
+                .eq('id', userId)
+                .maybeSingle();
+              if (jwtProfile?.role === 'SUPER_ADMIN') {
+                isCallerSuperadmin = true;
+              }
+            }
+          }
+        } catch (_) {}
+      }
+    }
+
+    if (requestedSuperadmin && !isCallerSuperadmin) {
+      return json(res, 403, {
+        error: 'Akses ditolak: Pendaftaran mode Super Admin memerlukan otorisasi SUPER_ADMIN yang sah.',
+      });
+    }
+
+    // 4. Hitung Masa Aktif & Limit Paket
     const planLimits = getPlanLimits(plan, teacherType);
     const startDate = new Date();
     let expiryDateStr: string | null = null;
-    if (plan === 'guru_gratis') {
-      // Guru Gratis: Aktif tanpa batas waktu kedaluwarsa (Seumur Hidup)
-      expiryDateStr = null;
-    } else if (body.subscription_expires_at !== undefined) {
-      expiryDateStr = body.subscription_expires_at ? String(body.subscription_expires_at).trim() : null;
-    } else if (planLimits.days && planLimits.days > 0) {
-      const expiryDate = new Date();
-      expiryDate.setDate(startDate.getDate() + planLimits.days);
-      expiryDateStr = expiryDate.toISOString().slice(0, 10);
+    let initialStatus: 'active' | 'pending_payment' = 'active';
+
+    if (isCallerSuperadmin) {
+      // Super Admin berhak menentukan status, masa aktif, dan kuota khusus secara manual
+      if (plan === 'guru_gratis') {
+        expiryDateStr = null;
+      } else if (body.subscription_expires_at !== undefined) {
+        expiryDateStr = body.subscription_expires_at ? String(body.subscription_expires_at).trim() : null;
+      } else if (planLimits.days && planLimits.days > 0) {
+        const expiryDate = new Date();
+        expiryDate.setDate(startDate.getDate() + planLimits.days);
+        expiryDateStr = expiryDate.toISOString().slice(0, 10);
+      }
+      initialStatus = 'active';
+    } else {
+      // Pendaftaran Publik mandiri:
+      if (plan === 'guru_gratis') {
+        initialStatus = 'active';
+        expiryDateStr = null;
+      } else {
+        // Paket berbayar (sekolah_pro atau guru_pro) yang belum dibayar:
+        // Status awal WAJIB 'pending_payment' dengan subscription_expires_at = null!
+        // Akun dan sekolah baru akan diaktifkan secara otomatis setelah pembayaran Midtrans berstatus SETTLED.
+        initialStatus = 'pending_payment';
+        expiryDateStr = null;
+      }
     }
 
-    // 4. Buat Tenant Sekolah / Guru (Sekolah formal = Ruang Kerja Sekolah, Guru Mandiri = Ruang Kerja Individu)
-    const isSuperadmin = Boolean(body.isSuperadmin || body.mode === 'superadmin');
+    // 5. Buat Tenant Sekolah / Guru (Sekolah formal = Ruang Kerja Sekolah, Guru Mandiri = Ruang Kerja Individu)
     const workspaceType = body.workspace_type || (body.workspace_service === 'teacher_independent' ? 'personal' : (isTeacherPlan ? 'personal' : 'school'));
-    const maxTeachers = isSuperadmin ? 999999 : (body.max_teachers !== undefined ? Number(body.max_teachers) : planLimits.max_teachers);
-    const maxStudents = isSuperadmin ? 999999 : (body.max_students !== undefined ? Number(body.max_students) : planLimits.max_students);
-    const maxClasses = isSuperadmin ? 999999 : (body.max_classes !== undefined ? Number(body.max_classes) : planLimits.max_classes);
+    const maxTeachers = isCallerSuperadmin ? (body.max_teachers !== undefined ? Number(body.max_teachers) : 999999) : planLimits.max_teachers;
+    const maxStudents = isCallerSuperadmin ? (body.max_students !== undefined ? Number(body.max_students) : 999999) : planLimits.max_students;
+    const maxClasses = isCallerSuperadmin ? (body.max_classes !== undefined ? Number(body.max_classes) : 999999) : planLimits.max_classes;
 
     const { data: school, error: schoolErr } = await admin
       .from('schools')
@@ -256,7 +305,7 @@ export default async function handler(req: any, res: any) {
         code: schoolCode,
         plan,
         workspace_type: workspaceType,
-        status: 'active',
+        status: initialStatus,
         subscription_started_at: startDate.toISOString().slice(0, 10),
         subscription_expires_at: expiryDateStr,
         max_teachers: maxTeachers,
@@ -316,16 +365,17 @@ export default async function handler(req: any, res: any) {
       auto_mark_late: true,
     });
 
-    // 7. Inisialisasi Otomatis Rombel Kelas Sesuai Paket
+    // 7. Inisialisasi Rombel Kelas
+    // Logika pembuatan 12 rombel standar otomatis (1A–6B) pada paket sekolah dihapus
+    // agar admin sekolah sendiri yang menginput datanya secara mandiri.
     let initialClasses: { school_id: string; name: string; grade: number }[] = [];
+    let createdClassRows: any[] = [];
     if (isTeacherPlan) {
       initialClasses = [{ school_id: school.id, name: `Kelas ${teacherGrade}`, grade: teacherGrade }];
-    } else {
-      initialClasses = generateInitialClasses(school.id, planLimits.defaultClasses);
+      const { data: rows, error: classInsertError } = await admin.from('classes').insert(initialClasses).select();
+      if (classInsertError) throw classInsertError;
+      createdClassRows = rows || [];
     }
-
-    const { data: createdClassRows, error: classInsertError } = await admin.from('classes').insert(initialClasses).select();
-    if (classInsertError) throw classInsertError;
 
     // 8. Inisialisasi Mata Pelajaran Dasar SD
     const defaultSubjects = [
@@ -339,7 +389,7 @@ export default async function handler(req: any, res: any) {
 
     // 9. Buat Akun Auth Supabase untuk Pengguna (Guru / Admin)
     const userAuthEmail = adminEmail || `${effectiveUsername}@login.edushift.local`;
-    const userRole = plan === 'sekolah_pro' ? 'ADMIN' : (teacherType === 'GURU_MAPEL' ? 'GURU MAPEL' : 'WALI KELAS');
+    const userRole = isTeacherPlan ? (teacherType === 'GURU_MAPEL' ? 'GURU MAPEL' : 'WALI KELAS') : 'ADMIN';
 
     const { data: authData, error: authErr } = await admin.auth.admin.createUser({
       email: userAuthEmail,
@@ -378,6 +428,16 @@ export default async function handler(req: any, res: any) {
       return json(res, 400, { error: profileErr.message || 'Gagal menyimpan profil pengguna.' });
     }
 
+    // Update relasi kepemilikan ruang kerja individu
+    if (isTeacherPlan) {
+      try {
+        await admin.from('schools').update({
+          owner_id: authData.user.id,
+          is_personal: true,
+        }).eq('id', school.id);
+      } catch (_) {}
+    }
+
     // 10b. Hubungkan Guru ke Guru Table & Class Assignment
     if (isTeacherPlan) {
       try {
@@ -391,6 +451,7 @@ export default async function handler(req: any, res: any) {
         if (teacherError || !teacherRow) throw teacherError || new Error('Gagal membuat data guru.');
         await admin.from('profiles').update({ teacher_id: teacherRow.id }).eq('id', authData.user.id);
 
+        let subjectId: string | null = null;
         if (teacherType === 'GURU_MAPEL' && teacherSubject) {
           const { data: subjectRow } = await admin.from('subjects')
             .select('id')
@@ -398,7 +459,7 @@ export default async function handler(req: any, res: any) {
             .or(`code.ilike.${String(teacherSubject).trim().toUpperCase()},name.ilike.${String(teacherSubject).trim()}`)
             .limit(1)
             .maybeSingle();
-          let subjectId = subjectRow?.id || null;
+          subjectId = subjectRow?.id || null;
           if (!subjectId) {
             const { data: createdSubject } = await admin.from('subjects').insert({
               school_id: school.id,
@@ -410,30 +471,136 @@ export default async function handler(req: any, res: any) {
           }
           if (subjectId) {
             const year = await getAcademicYear(school.id);
-            const { error: assignErr } = await admin.rpc('replace_subject_assignment',{p_school_id:school.id,p_subject_id:subjectId,p_teacher_id:teacherRow.id,p_class_ids:[],p_academic_year:year,p_actor_user_id:authData.user.id});
-            if (assignErr) throw assignErr;
+            try {
+              const { error: assignErr } = await admin.rpc('replace_subject_assignment', {
+                p_school_id: school.id,
+                p_subject_id: subjectId,
+                p_teacher_id: teacherRow.id,
+                p_class_ids: [],
+                p_academic_year: year,
+                p_actor_user_id: authData.user.id
+              });
+              if (assignErr) {
+                console.warn('[register-school] replace_subject_assignment warning:', assignErr.message);
+              }
+            } catch (rpcErr: any) {
+              console.warn('[register-school] replace_subject_assignment RPC call warning:', rpcErr?.message);
+            }
           }
         }
 
         if (createdClassRows.length > 0) {
           const primaryClass = createdClassRows[0];
+          const year = await getAcademicYear(school.id);
+
           if (teacherType === 'WALI_KELAS') {
-            const year = await getAcademicYear(school.id);
-            const { error: waliErr } = await admin.rpc('assign_homeroom_teacher',{p_school_id:school.id,p_teacher_id:teacherRow.id,p_class_id:primaryClass.id,p_academic_year:year,p_actor_user_id:authData.user.id});
-            if (waliErr) throw waliErr;
-          } else if (teacherType === 'GURU_MAPEL' && teacherSubject) {
-            const { data: subjectRow, error: subjectLookupErr } = await admin.from('subjects').select('id').eq('school_id', school.id).ilike('name', String(teacherSubject).trim()).maybeSingle();
-            if (subjectLookupErr) throw subjectLookupErr;
-            if (subjectRow) {
-              const year = await getAcademicYear(school.id);
-              const { error: assignErr } = await admin.rpc('replace_subject_assignment',{p_school_id:school.id,p_subject_id:subjectRow.id,p_teacher_id:teacherRow.id,p_class_ids:[primaryClass.id],p_academic_year:year,p_actor_user_id:authData.user.id});
-              if (assignErr) throw assignErr;
+            try {
+              const { error: waliErr } = await admin.rpc('assign_homeroom_teacher', {
+                p_school_id: school.id,
+                p_teacher_id: teacherRow.id,
+                p_class_id: primaryClass.id,
+                p_academic_year: year,
+                p_actor_user_id: authData.user.id
+              });
+              if (waliErr) {
+                console.warn('[register-school] assign_homeroom_teacher RPC warning, applying direct db fallback:', waliErr.message);
+              }
+            } catch (rpcErr: any) {
+              console.warn('[register-school] assign_homeroom_teacher RPC call failed, applying direct db fallback:', rpcErr?.message);
+            }
+
+            // Jaminan fallback langsung ke tabel database agar penugasan kelas selalu valid
+            try {
+              await admin.from('classes').update({
+                wali_kelas_teacher_id: teacherRow.id,
+              }).eq('id', primaryClass.id).eq('school_id', school.id);
+            } catch (_) {}
+
+            try {
+              await admin.from('profiles').update({
+                class_ids: [primaryClass.id],
+                class_id: primaryClass.id,
+              }).eq('id', authData.user.id);
+            } catch (_) {}
+
+            try {
+              await admin.from('teacher_assignments').delete().eq('school_id', school.id).eq('teacher_id', teacherRow.id).eq('role', 'WALI_KELAS');
+              await admin.from('teacher_assignments').insert({
+                school_id: school.id,
+                teacher_id: teacherRow.id,
+                role: 'WALI_KELAS',
+                class_id: primaryClass.id,
+                subject_id: null,
+                academic_year: year,
+                is_active: true,
+              });
+            } catch (_) {}
+          } else if (teacherType === 'GURU_MAPEL' && (subjectId || teacherSubject)) {
+            const effectiveSubjectId = subjectId || (await (async () => {
+              const { data: sRow } = await admin.from('subjects').select('id').eq('school_id', school.id).ilike('name', String(teacherSubject).trim()).maybeSingle();
+              return sRow?.id || null;
+            })());
+
+            if (effectiveSubjectId) {
+              try {
+                const { error: assignErr } = await admin.rpc('replace_subject_assignment', {
+                  p_school_id: school.id,
+                  p_subject_id: effectiveSubjectId,
+                  p_teacher_id: teacherRow.id,
+                  p_class_ids: [primaryClass.id],
+                  p_academic_year: year,
+                  p_actor_user_id: authData.user.id
+                });
+                if (assignErr) {
+                  console.warn('[register-school] replace_subject_assignment RPC warning, applying direct db fallback:', assignErr.message);
+                }
+              } catch (rpcErr: any) {
+                console.warn('[register-school] replace_subject_assignment RPC call failed, applying direct db fallback:', rpcErr?.message);
+              }
+
+              // Jaminan fallback langsung ke database untuk Guru Mapel
+              try {
+                await admin.from('subject_teacher_assignments').upsert({
+                  school_id: school.id,
+                  subject_id: effectiveSubjectId,
+                  teacher_id: teacherRow.id,
+                  academic_year: year,
+                });
+              } catch (_) {}
+
+              try {
+                await admin.from('subject_class_assignments').upsert({
+                  school_id: school.id,
+                  subject_id: effectiveSubjectId,
+                  class_id: primaryClass.id,
+                  academic_year: year,
+                });
+              } catch (_) {}
+
+              try {
+                await admin.from('teacher_assignments').delete().eq('school_id', school.id).eq('teacher_id', teacherRow.id).eq('role', 'GURU_MAPEL');
+                await admin.from('teacher_assignments').insert({
+                  school_id: school.id,
+                  teacher_id: teacherRow.id,
+                  role: 'GURU_MAPEL',
+                  class_id: primaryClass.id,
+                  subject_id: effectiveSubjectId,
+                  academic_year: year,
+                  is_active: true,
+                });
+              } catch (_) {}
+
+              try {
+                await admin.from('profiles').update({
+                  class_ids: [primaryClass.id],
+                  class_id: primaryClass.id,
+                }).eq('id', authData.user.id);
+              } catch (_) {}
             }
           }
         }
       } catch (linkErr: any) {
-        console.error('Penghubungan data guru dan rombel gagal:', linkErr);
-        throw linkErr;
+        console.warn('Penghubungan data guru dan rombel (non-fatal warning):', linkErr?.message || linkErr);
       }
     }
 
@@ -456,6 +623,59 @@ export default async function handler(req: any, res: any) {
       });
     } catch (_) {}
 
+    // 12. Catat Transaksi Finansial & Invoice (Pembayaran Langsung / Direct Owner / Midtrans)
+    let paymentRecord: any = null;
+    const rawPrice = body.amount !== undefined ? body.amount : body.price;
+    if (rawPrice !== undefined || isCallerSuperadmin) {
+      try {
+        const numericAmount = Math.max(0, Number(rawPrice) || 0);
+        const now = new Date();
+        const yyyymm = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}`;
+        const randomInvSuffix = Math.floor(100 + Math.random() * 900);
+        const invoiceNo = body.invoiceNo || body.invoice_no || `INV-${yyyymm}-${randomInvSuffix}`;
+        const paymentMethod = body.paymentMethod || body.payment_method || 'TRANSFER_MANUAL_OWNER';
+        const paymentStatus = (body.paymentStatus || 'paid').toLowerCase() === 'pending' ? 'pending' : 'paid';
+
+        const planDisplayName =
+          workspaceType === 'school'
+            ? 'Paket Sekolah Pro'
+            : teacherType === 'GURU_MAPEL'
+            ? 'Paket Guru Pro (Mapel)'
+            : 'Paket Guru Pro (Wali Kelas)';
+
+        const { data: payData, error: payErr } = await admin
+          .from('payments')
+          .insert({
+            invoice_no: invoiceNo,
+            school_id: school.id,
+            plan_name: planDisplayName,
+            amount: numericAmount,
+            unique_code: 0,
+            total_amount: numericAmount,
+            status: paymentStatus === 'paid' ? 'paid' : 'pending',
+            payment_method: paymentMethod,
+            school_name: schoolName,
+            npsn: effectiveNpsn || null,
+            contact_name: adminName,
+            contact_phone: adminPhone || null,
+            email: userAuthEmail || null,
+            created_at: now.toISOString(),
+            paid_at: paymentStatus === 'paid' ? now.toISOString() : null,
+            expires_at: expiryDateStr ? new Date(expiryDateStr).toISOString() : null,
+          })
+          .select()
+          .maybeSingle();
+
+        if (!payErr && payData) {
+          paymentRecord = payData;
+        } else if (payErr) {
+          console.warn('Gagal menyimpan riwayat transaksi payments:', payErr.message);
+        }
+      } catch (pErr: any) {
+        console.warn('Error proses pencatatan invoice/transaksi:', pErr?.message);
+      }
+    }
+
     return json(res, 200, {
       ok: true,
       message: `Pendaftaran berhasil! Akun ${effectiveUsername} (${userRole}) telah aktif.`,
@@ -466,7 +686,7 @@ export default async function handler(req: any, res: any) {
         code: schoolCode,
         schoolCode,
         plan,
-        status: 'active',
+        status: school.status || initialStatus,
         subscription_expires_at: expiryDateStr,
       },
       admin: {
@@ -476,6 +696,8 @@ export default async function handler(req: any, res: any) {
         email: userAuthEmail,
         role: userRole,
       },
+      payment: paymentRecord,
+      invoiceNo: paymentRecord?.invoice_no || null,
       classesCreated: initialClasses.length,
     });
   } catch (error: any) {

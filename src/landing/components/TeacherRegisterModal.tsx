@@ -28,6 +28,8 @@ import {
 import { useApp } from '../../context/AppContext';
 import waliKelasWanitaImg from '../../assets/images/wali_kelas_wanita_1789830539387.jpg';
 import guruMapelPriaImg from '../../assets/images/guru_mapel_pria_1789830556851.jpg';
+import { LoginCredentialCard, LoginCredentialCardData } from './LoginCredentialCard';
+import { KawacanaanEmblem } from '../../components/KawacanaanEmblem';
 
 interface TeacherRegisterModalProps {
   isOpen: boolean;
@@ -49,6 +51,7 @@ interface PaymentSessionData {
   planTitle: string;
   billingCycle: BillingCycle;
   teacherFullName: string;
+  schoolName?: string;
   username: string;
   role: string;
   schoolId?: string;
@@ -58,6 +61,7 @@ interface PaymentSessionData {
 
 interface RegistrationSuccessData {
   teacherName: string;
+  schoolName?: string;
   username: string;
   password?: string;
   email?: string;
@@ -88,6 +92,7 @@ export const TeacherRegisterModal: React.FC<TeacherRegisterModalProps> = ({
   const [selectedRole, setSelectedRole] = useState<RoleType>('homeroom');
 
   // Form Fields (Pendaftaran)
+  const [schoolName, setSchoolName] = useState('');
   const [fullName, setFullName] = useState('');
   const [username, setUsername] = useState('');
   const [usernameManuallyEdited, setUsernameManuallyEdited] = useState(false);
@@ -222,9 +227,14 @@ export const TeacherRegisterModal: React.FC<TeacherRegisterModalProps> = ({
     e.preventDefault();
     setFormError('');
 
+    const cleanSchool = schoolName.trim();
     const cleanName = fullName.trim();
     const cleanUsername = username.trim().toLowerCase();
 
+    if (!cleanSchool) {
+      setFormError(lang === 'ID' ? 'Nama satuan pendidikan wajib diisi.' : 'Educational unit / school name is required.');
+      return;
+    }
     if (!cleanName) {
       setFormError(lang === 'ID' ? 'Nama lengkap wajib diisi.' : 'Full name is required.');
       return;
@@ -276,13 +286,13 @@ export const TeacherRegisterModal: React.FC<TeacherRegisterModalProps> = ({
           password: password,
           role: payloadRole,
           mode: 'personal',
-          plan: 'guru_pro',
+          plan: 'guru_gratis',
           nip: '-',
           gender: 'L',
           grade: 1,
           className: 'Kelas 1',
           subjectName: selectedRole === 'subject' ? 'Guru Mata Pelajaran' : undefined,
-          workspaceName: 'Ruang Kerja Individu',
+          workspaceName: cleanSchool,
           schoolId: null,
         }),
       });
@@ -307,7 +317,7 @@ export const TeacherRegisterModal: React.FC<TeacherRegisterModalProps> = ({
           plan_id: 'teacher',
           billing_cycle: billingCycle,
           school_id: createdSchoolId || null,
-          school_name: `Ruang Kerja ${cleanName}`,
+          school_name: cleanSchool,
           contact_name: cleanName,
           email: cleanEmail,
           npsn: null,
@@ -331,6 +341,7 @@ export const TeacherRegisterModal: React.FC<TeacherRegisterModalProps> = ({
         planTitle: midtransData.plan_title || `Paket Guru (${billingCycle === 'yearly' ? '1 Tahun' : '1 Bulan'})`,
         billingCycle,
         teacherFullName: cleanName,
+        schoolName: cleanSchool,
         username: cleanUsername,
         role: payloadRole,
         schoolId: createdSchoolId,
@@ -402,25 +413,6 @@ export const TeacherRegisterModal: React.FC<TeacherRegisterModalProps> = ({
     }
   };
 
-  // Simulate Instant Settlement (Sandbox)
-  const handleSimulatePayment = async (orderId: string) => {
-    setIsCheckingPayment(true);
-    try {
-      const res = await fetch('/api/midtrans', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'simulate_settlement', order_id: orderId }),
-      });
-      const body = await res.json();
-      if (!res.ok || !body.ok) throw new Error(body.error || 'Gagal simulasi pembayaran.');
-      handleCompleteActivation(paymentSession);
-    } catch (e: any) {
-      setPaymentCheckMessage(e.message || 'Gagal simulasi pembayaran.');
-    } finally {
-      setIsCheckingPayment(false);
-    }
-  };
-
   // Final Transition to Step 4 (Paket Guru Aktif & Kredensial)
   const handleCompleteActivation = (session: PaymentSessionData | null) => {
     if (pollingRef.current) {
@@ -429,17 +421,19 @@ export const TeacherRegisterModal: React.FC<TeacherRegisterModalProps> = ({
     }
 
     const tName = session?.teacherFullName || fullName.trim();
+    const sName = session?.schoolName || schoolName.trim() || `Ruang Kerja ${tName}`;
     const uName = session?.username || username.trim();
     const rName = session?.role || (selectedRole === 'homeroom' ? 'WALI KELAS' : 'GURU MAPEL');
     const isYr = billingCycle === 'yearly' || session?.billingCycle === 'yearly';
 
     setRegistrationSuccessData({
       teacherName: tName,
+      schoolName: sName,
       username: uName,
       password: password,
       email: email.trim() || `${uName}@guru.kawacanaan.sch.id`,
       role: rName,
-      workspaceName: 'Ruang Kerja Individu Pro',
+      workspaceName: sName,
       invoiceNo: session?.orderId,
       billingCycle: isYr ? 'yearly' : 'monthly',
       amount: session?.amount || (isYr ? yearlyPrice : monthlyPrice),
@@ -501,9 +495,7 @@ export const TeacherRegisterModal: React.FC<TeacherRegisterModalProps> = ({
         <div className="flex items-center justify-between px-3.5 sm:px-6 py-2.5 sm:py-3.5 border-b border-slate-100 bg-white shrink-0">
           {/* Brand / Logo Kawacanaan SD */}
           <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
-            <div className="w-8 h-8 sm:w-9 sm:h-9 bg-gradient-to-br from-blue-700 via-blue-800 to-indigo-900 rounded-xl flex items-center justify-center text-white font-black text-sm sm:text-base shadow-sm shadow-blue-700/25 shrink-0 border border-blue-500/40 relative">
-              <span className="relative z-10">K</span>
-            </div>
+            <KawacanaanEmblem size={36} />
             <div className="flex items-center gap-1.5">
               <span className="font-black text-slate-900 text-sm sm:text-base tracking-tight uppercase">
                 Kawacanaan
@@ -847,7 +839,7 @@ export const TeacherRegisterModal: React.FC<TeacherRegisterModalProps> = ({
               {/* Title Header */}
               <div className="mb-4 sm:mb-5">
                 <h3 className="text-lg sm:text-2xl font-black text-slate-900 tracking-tight">
-                  {lang === 'ID' ? 'Pendaftaran Akun Guru Pro' : 'Teacher Pro Registration'}
+                  {lang === 'ID' ? 'Pendaftaran Akun Paket Guru' : 'Teacher Plan Registration'}
                 </h3>
                 <p className="text-xs text-slate-500 mt-1">
                   {lang === 'ID'
@@ -865,22 +857,44 @@ export const TeacherRegisterModal: React.FC<TeacherRegisterModalProps> = ({
               )}
 
               <form onSubmit={handleSubmitAndProceedPayment} className="space-y-3.5">
-                {/* 1. Nama Lengkap Guru */}
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                    {lang === 'ID' ? 'Nama Lengkap Guru' : 'Full Name'} <span className="text-rose-500">*</span>
-                  </label>
-                  <div className="relative">
-                    <User className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                    <input
-                      type="text"
-                      required
-                      value={fullName}
-                      onChange={(e) => handleFullNameChange(e.target.value)}
-                      placeholder="Contoh: Dra. Sri Wahyuni, M.Pd"
-                      className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm font-medium text-slate-900 bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-600/20 outline-none transition-all h-11"
-                      id="input-teacher-fullname"
-                    />
+                {/* 1. Nama Satuan Pendidikan & Nama Lengkap Guru (Berdampingan 2 Kolom) */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* Nama Satuan Pendidikan */}
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                      {lang === 'ID' ? 'Nama Satuan Pendidikan' : 'Educational Unit / School Name'} <span className="text-rose-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <Building2 className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="text"
+                        required
+                        value={schoolName}
+                        onChange={(e) => setSchoolName(e.target.value)}
+                        placeholder={lang === 'ID' ? 'Contoh: SDN 1 Kawacanaan' : 'e.g. Kawacanaan Elementary School'}
+                        className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm font-medium text-slate-900 bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-600/20 outline-none transition-all h-11"
+                        id="input-teacher-schoolname"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Nama Lengkap Guru */}
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                      {lang === 'ID' ? 'Nama Lengkap Guru' : 'Full Name'} <span className="text-rose-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <User className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="text"
+                        required
+                        value={fullName}
+                        onChange={(e) => handleFullNameChange(e.target.value)}
+                        placeholder="Contoh: Dra. Sri Wahyuni, M.Pd"
+                        className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm font-medium text-slate-900 bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-600/20 outline-none transition-all h-11"
+                        id="input-teacher-fullname"
+                      />
+                    </div>
                   </div>
                 </div>
 
@@ -1065,7 +1079,7 @@ export const TeacherRegisterModal: React.FC<TeacherRegisterModalProps> = ({
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <span className="text-[10px] font-bold text-blue-700 uppercase tracking-wider block">
-                      Paket Guru Pro
+                      Paket Guru
                     </span>
                     <h4 className="text-sm sm:text-base font-extrabold text-slate-900 mt-0.5">
                       {paymentSession.planTitle}
@@ -1183,22 +1197,10 @@ export const TeacherRegisterModal: React.FC<TeacherRegisterModalProps> = ({
                   )}
                   <span>Cek Status Pembayaran</span>
                 </button>
-
-                {/* 3. Tombol Simulasi Pembayaran Instan (Sandbox / Preview Demo) */}
-                <button
-                  type="button"
-                  id="btn-teacher-simulate-settlement"
-                  disabled={isCheckingPayment}
-                  onClick={() => handleSimulatePayment(paymentSession.orderId)}
-                  className="w-full py-2 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-800 active:scale-[0.99] text-xs font-bold uppercase tracking-wider rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-60"
-                >
-                  <Zap className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>Verifikasi Instan (Simulasi Sandbox)</span>
-                </button>
               </div>
 
               <div className="text-center text-[10px] text-slate-400">
-                Gunakan tombol <strong>Verifikasi Instan</strong> untuk aktivasi instan pada pengujian demo.
+                Terhubung langsung ke sistem verifikasi pembayaran Midtrans resmi.
               </div>
             </div>
           )}
@@ -1207,136 +1209,43 @@ export const TeacherRegisterModal: React.FC<TeacherRegisterModalProps> = ({
           {/* LANGKAH 4: AKTIF (URUTAN 4 - SUKSES AKTIVASI & KREDENSIAL AKUN)            */}
           {/* ========================================================================= */}
           {step === 4 && registrationSuccessData && (
-            <div className="max-w-lg mx-auto space-y-3.5 animate-in fade-in zoom-in-95 duration-200">
+            <div className="space-y-4 py-2 animate-in fade-in zoom-in-95 duration-200">
               {/* Badge Sukses */}
-              <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl text-center space-y-1.5">
-                <div className="w-12 h-12 bg-emerald-600 text-white rounded-full flex items-center justify-center mx-auto shadow-md shadow-emerald-600/20">
-                  <CheckCircle2 className="w-7 h-7" />
+              <div className="text-center space-y-1.5 max-w-md mx-auto">
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold">
+                  <CheckCircle2 size={14} className="text-emerald-600" />
+                  <span>
+                    {lang === 'ID'
+                      ? `Paket Guru (${billingCycle === 'yearly' ? 'Tahunan' : 'Bulanan'}) Aktif!`
+                      : 'Teacher Workspace Activated!'}
+                  </span>
                 </div>
-                <h3 className="text-base font-extrabold text-emerald-950">
-                  {lang === 'ID' ? 'Paket Guru Pro Berhasil Diaktifkan!' : 'Teacher Pro Workspace Activated!'}
+                <h3 className="text-base sm:text-lg font-black text-slate-900">
+                  {lang === 'ID' ? 'Kartu Kredensial Ruang Kerja Anda' : 'Your Workspace Credential Card'}
                 </h3>
-                <p className="text-xs text-emerald-700 max-w-md mx-auto">
+                <p className="text-xs text-slate-500 leading-relaxed">
                   {lang === 'ID'
-                    ? `Selamat! Ruang Kerja Individu Pro Anda telah aktif selama ${registrationSuccessData.expiresInDays} hari. Pembayaran Midtrans telah lunas dan terverifikasi.`
-                    : `Congratulations! Your Teacher Workspace is now active for ${registrationSuccessData.expiresInDays} days.`}
+                    ? `Selamat! Ruang Kerja Individu Paket Guru Anda telah aktif selama ${registrationSuccessData.expiresInDays} hari. Silakan unduh atau salin kredensial login Anda di bawah ini.`
+                    : `Congratulations! Your Teacher Workspace is now active for ${registrationSuccessData.expiresInDays} days. Please download your card below.`}
                 </p>
               </div>
 
-              {/* Rincian Kredensial Akun Guru */}
-              <div className="p-3.5 sm:p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
-                <div className="flex items-center justify-between border-b border-slate-200 pb-2.5">
-                  <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                    <User className="w-4 h-4 text-blue-600" />
-                    <span>Kredensial Akun Guru Pro</span>
-                  </span>
-                  <span className="px-2 py-0.5 rounded bg-blue-100 text-blue-800 text-[10px] font-bold uppercase">
-                    {registrationSuccessData.role}
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
-                  {/* Username */}
-                  <div className="p-2.5 bg-white border border-slate-200 rounded-xl">
-                    <span className="text-[10px] text-slate-400 uppercase font-mono block">Username Login:</span>
-                    <div className="flex items-center justify-between mt-0.5">
-                      <span className="font-bold text-slate-900 font-mono text-xs">
-                        {registrationSuccessData.username}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => copyToClipboard(registrationSuccessData.username, 'cred_user')}
-                        className="text-blue-600 hover:text-blue-700 cursor-pointer"
-                      >
-                        {copiedField === 'cred_user' ? (
-                          <Check className="w-3.5 h-3.5 text-emerald-600" />
-                        ) : (
-                          <Copy className="w-3.5 h-3.5" />
-                        )}
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Kata Sandi */}
-                  <div className="p-2.5 bg-white border border-slate-200 rounded-xl">
-                    <span className="text-[10px] text-slate-400 uppercase font-mono block">Kata Sandi:</span>
-                    <div className="flex items-center justify-between mt-0.5">
-                      <span className="font-bold text-slate-900 font-mono text-xs">
-                        {registrationSuccessData.password || '••••••••'}
-                      </span>
-                      {registrationSuccessData.password && (
-                        <button
-                          type="button"
-                          onClick={() => copyToClipboard(registrationSuccessData.password!, 'cred_pwd')}
-                          className="text-blue-600 hover:text-blue-700 cursor-pointer"
-                        >
-                          {copiedField === 'cred_pwd' ? (
-                            <Check className="w-3.5 h-3.5 text-emerald-600" />
-                          ) : (
-                            <Copy className="w-3.5 h-3.5" />
-                          )}
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Nama Guru */}
-                  <div className="p-2.5 bg-white border border-slate-200 rounded-xl">
-                    <span className="text-[10px] text-slate-400 uppercase font-mono block">Nama Guru:</span>
-                    <span className="font-bold text-slate-800 text-xs block truncate mt-0.5">
-                      {registrationSuccessData.teacherName}
-                    </span>
-                  </div>
-
-                  {/* Status Pembayaran */}
-                  <div className="p-2.5 bg-white border border-slate-200 rounded-xl">
-                    <span className="text-[10px] text-slate-400 uppercase font-mono block">Status Pembayaran:</span>
-                    <span className="font-bold text-emerald-700 text-xs block mt-0.5">
-                      LUNAS (SETTLED) • Midtrans
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="space-y-2 pt-1">
-                <button
-                  type="button"
-                  id="btn-teacher-enter-workspace"
-                  disabled={isSubmitting}
-                  onClick={handleEnterDashboard}
-                  className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 active:scale-[0.99] text-white text-xs font-bold uppercase tracking-wider rounded-2xl shadow-md shadow-blue-600/20 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
-                >
-                  {isSubmitting ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      <span>{lang === 'ID' ? 'Memasuki Ruang Kerja...' : 'Entering Workspace...'}</span>
-                    </>
-                  ) : (
-                    <>
-                      <span>{lang === 'ID' ? 'Masuk ke Ruang Kerja Saya' : 'Enter My Workspace'}</span>
-                      <ArrowRight className="w-4 h-4" />
-                    </>
-                  )}
-                </button>
-
-                <button
-                  type="button"
-                  id="btn-teacher-copy-all"
-                  onClick={() => {
-                    const text = `KREDENSIAL GURU PRO KAWACANAAN\nNama: ${registrationSuccessData.teacherName}\nPeran: ${registrationSuccessData.role}\nUsername: ${registrationSuccessData.username}\nPassword: ${registrationSuccessData.password}\nInvoice: ${registrationSuccessData.invoiceNo || '-'}\nRuang Kerja: Ruang Kerja Individu Pro (Aktif ${registrationSuccessData.expiresInDays} Hari)`;
-                    copyToClipboard(text, 'all');
-                  }}
-                  className="w-full py-2.5 border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-                >
-                  {copiedField === 'all' ? (
-                    <Check className="w-3.5 h-3.5 text-emerald-600" />
-                  ) : (
-                    <Copy className="w-3.5 h-3.5" />
-                  )}
-                  <span>{copiedField === 'all' ? 'Seluruh Kredensial Disalin!' : 'Salin Seluruh Kredensial'}</span>
-                </button>
-              </div>
+              {/* Komponen Kartu Kredensial Login 480 × 300 px Sesuai Format Referensi */}
+              <LoginCredentialCard
+                data={{
+                  workspaceType: 'personal',
+                  schoolName: registrationSuccessData.schoolName || schoolName.trim() || `Ruang Kerja Pro - ${registrationSuccessData.teacherName}`,
+                  personInCharge: `${registrationSuccessData.teacherName} (${registrationSuccessData.role === 'homeroom' ? 'Wali Kelas' : 'Guru Mapel'})`,
+                  username: registrationSuccessData.username,
+                  password: registrationSuccessData.password || '••••••••',
+                  schoolCode: 'MANDIRI-PRO',
+                  expiryDateText: `${registrationSuccessData.expiresInDays} Hari (${billingCycle === 'yearly' ? 'Tahunan' : 'Bulanan'})`,
+                  invoiceNo: registrationSuccessData.invoiceNo || `INV-TCH-${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, '0')}-${Math.floor(1000 + Math.random() * 9000)}`,
+                  nominalText: `Rp ${Number(registrationSuccessData.amount || currentPrice).toLocaleString('id-ID')} (LUNAS)`,
+                  paymentMethodText: 'Gateway Midtrans Terverifikasi',
+                }}
+                onEnterSystem={handleEnterDashboard}
+              />
             </div>
           )}
         </div>

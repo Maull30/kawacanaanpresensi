@@ -47,6 +47,15 @@ export const INITIAL_SYSTEM_CONFIG: SystemConfig = {
   checkInDeadlineTime: '07:00',
   checkOutStartTime: '12:30',
   autoMarkLate: true,
+  whatsappBroadcastEnabled: true,
+  broadcastMasukHeader: '*LAPORAN KEHADIRAN PAGI*',
+  broadcastMasukOpening: 'Assalamu’alaikum Wr. Wb. & Selamat Pagi Bapak/Ibu Wali Murid,\nBerikut kami sampaikan rekapitulasi kehadiran ananda pada hari ini:',
+  broadcastMasukClosing: 'Terima kasih atas perhatian dan kerja sama Bapak/Ibu sekalian. Semoga anak-anak selalu sehat dan semangat belajar! 🙏✨',
+  broadcastPulangHeader: '*LAPORAN KEPULANGAN SISWA*',
+  broadcastPulangOpening: 'Assalamu’alaikum Wr. Wb. & Selamat Siang Bapak/Ibu Wali Murid,\nAlhamdulillah seluruh rangkaian kegiatan pembelajaran hari ini telah selesai:',
+  broadcastPulangClosing: 'Mohon dipantau kepulangan ananda agar dapat tiba di rumah dengan selamat dan tertib. Terima kasih. 🏠🎒✨',
+  broadcastIncludeStudentList: true,
+  broadcastIncludeSmartLink: true,
 };
 
 // Authentication is managed exclusively by Supabase Auth. No local/default password is stored here.

@@ -39,12 +39,16 @@ function apiDevMiddleware(): Plugin {
             if (req.body !== undefined && typeof req.body === 'object' && Object.keys(req.body).length > 0) {
               return resolve(JSON.stringify(req.body));
             }
+            if ((req as any).readableEnded) {
+              return resolve('');
+            }
             let bodyStr = '';
             req.on('data', (chunk: Buffer) => {
               bodyStr += chunk;
             });
             req.on('end', () => resolve(bodyStr));
             req.on('error', (err: any) => reject(err));
+            req.resume();
           });
 
           try {
@@ -196,6 +200,7 @@ export default defineConfig(() => {
     preview: {
       host: '0.0.0.0',
       port: 3000,
+      allowedHosts: true as const,
     },
   };
 });

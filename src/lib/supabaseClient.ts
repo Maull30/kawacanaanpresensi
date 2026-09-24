@@ -10,7 +10,23 @@ export const isSupabaseConfigured = () => {
 
 export const signInWithEmail = async (identifier: string, password: string) => {
   const value = identifier.trim().toLowerCase();
-  if (value.includes('@')) return supabase.auth.signInWithPassword({ email: value, password });
+  if (value.includes('@')) {
+    const direct = await supabase.auth.signInWithPassword({ email: value, password });
+    if (!direct.error) return direct;
+    try {
+      const resolved = await fetch('/api/resolve-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: value }),
+      });
+      const body = await resolved.json();
+      if (resolved.ok && body.email && body.email !== value) {
+        const fallback = await supabase.auth.signInWithPassword({ email: body.email, password });
+        if (!fallback.error) return fallback;
+      }
+    } catch (_) {}
+    return direct;
+  }
   const first = await supabase.auth.signInWithPassword({ email: usernameToEmail(value), password });
   if (!first.error) return first;
   try {

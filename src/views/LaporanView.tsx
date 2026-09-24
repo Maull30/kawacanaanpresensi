@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
-import { ReportPrintModal } from '../components/ReportPrintModal';
+import { PublicDailyReportViewer } from '../components/PublicDailyReportViewer';
 import { getUserRoleScope } from '../utils/userScope';
 import { getFaseByClassName, formatClassDisplay } from '../utils/faseKurikulum';
 import {
@@ -17,7 +17,10 @@ import {
   Sparkles,
   Users,
   Check,
+  MessageSquare,
 } from 'lucide-react';
+import { WhatsAppBroadcastModal } from '../components/WhatsAppBroadcastModal';
+import { WhatsAppIcon } from '../components/WhatsAppIcon';
 
 export const LaporanView: React.FC = () => {
   const {
@@ -65,6 +68,8 @@ export const LaporanView: React.FC = () => {
 
   // Class/Standard report state
   const [reportType, setReportType] = useState('Laporan Bulanan');
+  const [isBroadcastModalOpen, setIsBroadcastModalOpen] = useState(false);
+  const [broadcastInitialType, setBroadcastInitialType] = useState<'MASUK' | 'PULANG'>('MASUK');
   const [attendanceType, setAttendanceType] = useState<'DAILY' | 'SUBJECT'>(
     userScope.isGuruMapel ? 'SUBJECT' : 'DAILY'
   );
@@ -193,81 +198,285 @@ export const LaporanView: React.FC = () => {
     return students.filter((s) => s.classId === selectedClassId);
   }, [students, selectedClassId]);
 
-  // Calculate week dates helper
-  const weekNum = parseInt(selectedWeek.replace(/\D/g, ''), 10) || 1;
-  const weekDates = useMemo(() => {
-    const yearNum = Number(year) || 2026;
-    const daysInMonth = new Date(yearNum, mNum, 0).getDate();
-    const startDay = (weekNum - 1) * 7 + 1;
-    const endDay = Math.min(daysInMonth, weekNum * 7);
+  // Semester calculation for Class View
+  const isSemesterGenap = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni'].includes(month);
+  const classSemester: 'Ganjil' | 'Genap' = isSemesterGenap ? 'Genap' : 'Ganjil';
+  const semYear = isSemesterGenap ? endYear : startYear;
 
-    const dates: string[] = [];
-    for (let d = startDay; d <= endDay; d++) {
-      const jsDate = new Date(yearNum, mNum - 1, d);
-      const dayOfWeek = jsDate.getDay();
-      if (dayOfWeek >= 1 && dayOfWeek <= 5) {
-        dates.push(`${yearNum}-${String(mNum).padStart(2, '0')}-${String(d).padStart(2, '0')}`);
-      }
+  const semesterMonths = useMemo(() => {
+    if (isSemesterGenap) {
+      return [
+        { code: '01', name: 'Januari', mNum: 1, key: `${endYear}-01` },
+        { code: '02', name: 'Februari', mNum: 2, key: `${endYear}-02` },
+        { code: '03', name: 'Maret', mNum: 3, key: `${endYear}-03` },
+        { code: '04', name: 'April', mNum: 4, key: `${endYear}-04` },
+        { code: '05', name: 'Mei', mNum: 5, key: `${endYear}-05` },
+        { code: '06', name: 'Juni', mNum: 6, key: `${endYear}-06` },
+      ];
+    } else {
+      return [
+        { code: '07', name: 'Juli', mNum: 7, key: `${startYear}-07` },
+        { code: '08', name: 'Agustus', mNum: 8, key: `${startYear}-08` },
+        { code: '09', name: 'September', mNum: 9, key: `${startYear}-09` },
+        { code: '10', name: 'Oktober', mNum: 10, key: `${startYear}-10` },
+        { code: '11', name: 'November', mNum: 11, key: `${startYear}-11` },
+        { code: '12', name: 'Desember', mNum: 12, key: `${startYear}-12` },
+      ];
     }
-    return dates;
-  }, [year, mNum, weekNum]);
+  }, [isSemesterGenap, startYear, endYear]);
 
-  // Live Summary Stats for single-class preview
-  const liveSummary = useMemo(() => {
-    let relevantRecords = attendanceRecords.filter((r) => {
+  const semesterEffectiveDays = useMemo(() => {
+    return semesterMonths.reduce(
+      (acc, m) => acc + (getEffectiveDaysForMonth(semYear, m.mNum) || 20),
+      0
+    );
+  }, [semesterMonths, semYear, getEffectiveDaysForMonth]);
+
+  // Filter attendance records based on selected class, subject, and students
+  const relevantRecords = useMemo(() => {
+    const studentIds = new Set(filteredStudents.map((s) => s.id));
+    return attendanceRecords.filter((r) => {
       if (attendanceType === 'SUBJECT') {
         if (r.type !== 'SUBJECT') return false;
         if (selectedSubjectId && r.subjectId !== selectedSubjectId) return false;
       } else {
         if (r.type === 'SUBJECT') return false;
       }
-      if (selectedClassId && r.classId && r.classId !== selectedClassId) return false;
+      if (selectedClassId) {
+        if (r.classId && r.classId === selectedClassId) return true;
+        if (studentIds.has(r.studentId)) return true;
+        return false;
+      }
       return true;
     });
+  }, [attendanceRecords, attendanceType, selectedSubjectId, selectedClassId, filteredStudents]);
 
-    if (reportType === 'Laporan Harian') {
-      relevantRecords = relevantRecords.filter((r) => r.date === selectedDate);
-    } else if (reportType === 'Laporan Mingguan') {
-      relevantRecords = relevantRecords.filter((r) => weekDates.includes(r.date));
-    } else if (reportType === 'Laporan Bulanan') {
-      relevantRecords = relevantRecords.filter((r) => r.date.startsWith(monthKey));
-    }
+  // 1. DATA COMPUTATION: LAPORAN HARIAN
+  const dailyRows = useMemo(() => {
+    return filteredStudents.map((s) => {
+      const rec = relevantRecords.find((r) => r.studentId === s.id && r.date === selectedDate);
+      return {
+        ...s,
+        status: rec?.status || 'Belum Diabsen',
+        timeIn: rec?.checkInTime || '-',
+        timeOut: rec?.checkOutTime || '-',
+        notes: rec?.notes || '-',
+      };
+    });
+  }, [filteredStudents, relevantRecords, selectedDate]);
 
-    const hadir = relevantRecords.filter((r) => r.status === 'Hadir').length;
-    const sakit = relevantRecords.filter((r) => r.status === 'Sakit').length;
-    const izin = relevantRecords.filter((r) => r.status === 'Izin').length;
-    const alfa = relevantRecords.filter((r) => r.status === 'Alfa').length;
-    const total = hadir + sakit + izin + alfa;
-
-    const baseCount = filteredStudents.length || 1;
-    let denominator = total;
-    if (reportType === 'Laporan Harian') {
-      denominator = baseCount;
-    } else if (reportType === 'Laporan Mingguan') {
-      denominator = (baseCount * (weekDates.length || 1)) || 1;
+  // 2. DATA COMPUTATION: LAPORAN MINGGUAN - selalu mulai hari Senin
+  const weekNum = parseInt(selectedWeek.replace(/\D/g, ''), 10) || 1;
+  const weeklyDays = useMemo(() => {
+    const yearNum = Number(year) || 2026;
+    const firstOfMonth = new Date(yearNum, mNum - 1, 1);
+    const dow = firstOfMonth.getDay(); // 0 = Minggu, 1 = Senin, 2 = Selasa, ..., 6 = Sabtu
+    let firstMonday: Date;
+    if (dow === 1) {
+      firstMonday = new Date(yearNum, mNum - 1, 1);
+    } else if (dow === 6) {
+      firstMonday = new Date(yearNum, mNum - 1, 3);
+    } else if (dow === 0) {
+      firstMonday = new Date(yearNum, mNum - 1, 2);
     } else {
-      denominator = total > 0 ? total : (baseCount * (effectiveDays || 1)) || 1;
+      // Selasa(2), Rabu(3), Kamis(4), Jumat(5) -> Mundur ke Senin pada minggu yang sama
+      firstMonday = new Date(yearNum, mNum - 1, 1 - (dow - 1));
     }
 
-    const pctHadir = denominator > 0 ? (hadir / denominator) * 100 : 0;
-    const pctSakit = denominator > 0 ? (sakit / denominator) * 100 : 0;
-    const pctIzin = denominator > 0 ? (izin / denominator) * 100 : 0;
-    const pctAlfa = denominator > 0 ? (alfa / denominator) * 100 : 0;
+    const weekMonday = new Date(firstMonday);
+    weekMonday.setDate(firstMonday.getDate() + (weekNum - 1) * 7);
 
+    const is6Days = systemConfig?.activeStudyDays?.includes(6);
+    const daysCount = is6Days ? 6 : 5;
+
+    const days: { dateStr: string; dayNum: number; dayShort: string; dayName: string }[] = [];
+    const dayNamesShort = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
+    const dayNamesFull = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+
+    for (let i = 0; i < daysCount; i++) {
+      const d = new Date(weekMonday);
+      d.setDate(weekMonday.getDate() + i);
+      const dowIndex = d.getDay();
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const dayOfMonth = String(d.getDate()).padStart(2, '0');
+      const dateStr = `${y}-${m}-${dayOfMonth}`;
+
+      days.push({
+        dateStr,
+        dayNum: d.getDate(),
+        dayShort: dayNamesShort[dowIndex],
+        dayName: dayNamesFull[dowIndex],
+      });
+    }
+    return days;
+  }, [year, mNum, weekNum, systemConfig?.activeStudyDays]);
+
+  const weekDates = useMemo(() => weeklyDays.map((d) => d.dateStr), [weeklyDays]);
+
+  const weeklyRows = useMemo(() => {
+    return filteredStudents.map((s) => {
+      const recs = relevantRecords.filter((r) => r.studentId === s.id && weekDates.includes(r.date));
+      const dayMap: { [dateStr: string]: string } = {};
+      weeklyDays.forEach((d) => {
+        const found = recs.find((r) => r.date === d.dateStr);
+        dayMap[d.dateStr] = found
+          ? found.status === 'Hadir'
+            ? 'H'
+            : found.status === 'Sakit'
+            ? 'S'
+            : found.status === 'Izin'
+            ? 'I'
+            : 'A'
+          : '-';
+      });
+      const hadir = recs.filter((r) => r.status === 'Hadir').length;
+      const sakit = recs.filter((r) => r.status === 'Sakit').length;
+      const izin = recs.filter((r) => r.status === 'Izin').length;
+      const alfa = recs.filter((r) => r.status === 'Alfa').length;
+      const totalDays = weeklyDays.length || 1;
+      const pct = Math.round((hadir / totalDays) * 100);
+      return { ...s, dayMap, hadir, sakit, izin, alfa, pct };
+    });
+  }, [filteredStudents, relevantRecords, weeklyDays, weekDates]);
+
+  // 3. DATA COMPUTATION: LAPORAN BULANAN
+  const monthlyRows = useMemo(() => {
+    return filteredStudents.map((s) => {
+      const recs = relevantRecords.filter((r) => r.studentId === s.id && r.date.startsWith(monthKey));
+      const hadir = recs.filter((r) => r.status === 'Hadir').length;
+      const sakit = recs.filter((r) => r.status === 'Sakit').length;
+      const izin = recs.filter((r) => r.status === 'Izin').length;
+      const alfa = recs.filter((r) => r.status === 'Alfa').length;
+      const totalRecorded = hadir + sakit + izin + alfa;
+      const baseDenom = effectiveDays || totalRecorded || 1;
+      const pct = Math.min(100, Math.round((hadir / baseDenom) * 100));
+      return { ...s, hadir, sakit, izin, alfa, totalRecorded, pct };
+    });
+  }, [filteredStudents, relevantRecords, monthKey, effectiveDays]);
+
+  // 4. DATA COMPUTATION: LAPORAN SEMESTER
+  const semesterRows = useMemo(() => {
+    const denom = semesterEffectiveDays || 1;
+    return filteredStudents.map((s) => {
+      const recs = relevantRecords.filter(
+        (r) => r.studentId === s.id && semesterMonths.some((m) => r.date.startsWith(m.key))
+      );
+      const hadir = recs.filter((r) => r.status === 'Hadir').length;
+      const sakit = recs.filter((r) => r.status === 'Sakit').length;
+      const izin = recs.filter((r) => r.status === 'Izin').length;
+      const alfa = recs.filter((r) => r.status === 'Alfa').length;
+      const totalRecorded = hadir + sakit + izin + alfa;
+
+      const pctHadir = Math.min(100, Math.round((hadir / denom) * 100));
+      const pctSakit = Math.round((sakit / denom) * 100 * 10) / 10;
+      const pctIzin = Math.round((izin / denom) * 100 * 10) / 10;
+      const pctAlfa = Math.round((alfa / denom) * 100 * 10) / 10;
+
+      let predicate = 'Sangat Baik';
+      if (pctHadir < 75) predicate = 'Perlu Pembinaan';
+      else if (pctHadir < 85) predicate = 'Cukup';
+      else if (pctHadir < 95) predicate = 'Baik';
+
+      return {
+        ...s,
+        hadir,
+        sakit,
+        izin,
+        alfa,
+        totalRecorded,
+        pctHadir,
+        pctSakit,
+        pctIzin,
+        pctAlfa,
+        predicate,
+      };
+    });
+  }, [filteredStudents, relevantRecords, semesterMonths, semesterEffectiveDays]);
+
+  // Live Summary Stats for single-class preview according to selected period
+  const liveSummary = useMemo(() => {
     const formatPct = (val: number) => (val % 1 === 0 ? val.toFixed(0) : val.toFixed(1));
 
+    if (reportType === 'Laporan Harian') {
+      const hadir = dailyRows.filter((r) => r.status === 'Hadir').length;
+      const sakit = dailyRows.filter((r) => r.status === 'Sakit').length;
+      const izin = dailyRows.filter((r) => r.status === 'Izin').length;
+      const alfa = dailyRows.filter((r) => r.status === 'Alfa').length;
+      const total = hadir + sakit + izin + alfa;
+      const denom = filteredStudents.length || total || 1;
+      return {
+        hadir,
+        sakit,
+        izin,
+        alfa,
+        total,
+        pctHadir: formatPct((hadir / denom) * 100),
+        pctSakit: formatPct((sakit / denom) * 100),
+        pctIzin: formatPct((izin / denom) * 100),
+        pctAlfa: formatPct((alfa / denom) * 100),
+      };
+    }
+
+    if (reportType === 'Laporan Mingguan') {
+      const hadir = weeklyRows.reduce((acc, r) => acc + r.hadir, 0);
+      const sakit = weeklyRows.reduce((acc, r) => acc + r.sakit, 0);
+      const izin = weeklyRows.reduce((acc, r) => acc + r.izin, 0);
+      const alfa = weeklyRows.reduce((acc, r) => acc + r.alfa, 0);
+      const total = hadir + sakit + izin + alfa;
+      const denom = (filteredStudents.length * (weeklyDays.length || 1)) || total || 1;
+      return {
+        hadir,
+        sakit,
+        izin,
+        alfa,
+        total,
+        pctHadir: formatPct((hadir / denom) * 100),
+        pctSakit: formatPct((sakit / denom) * 100),
+        pctIzin: formatPct((izin / denom) * 100),
+        pctAlfa: formatPct((alfa / denom) * 100),
+      };
+    }
+
+    if (reportType === 'Laporan Bulanan') {
+      const hadir = monthlyRows.reduce((acc, r) => acc + r.hadir, 0);
+      const sakit = monthlyRows.reduce((acc, r) => acc + r.sakit, 0);
+      const izin = monthlyRows.reduce((acc, r) => acc + r.izin, 0);
+      const alfa = monthlyRows.reduce((acc, r) => acc + r.alfa, 0);
+      const total = hadir + sakit + izin + alfa;
+      const denom = (filteredStudents.length * (effectiveDays || 20)) || total || 1;
+      return {
+        hadir,
+        sakit,
+        izin,
+        alfa,
+        total,
+        pctHadir: formatPct((hadir / denom) * 100),
+        pctSakit: formatPct((sakit / denom) * 100),
+        pctIzin: formatPct((izin / denom) * 100),
+        pctAlfa: formatPct((alfa / denom) * 100),
+      };
+    }
+
+    // Laporan Semester
+    const hadir = semesterRows.reduce((acc, r) => acc + r.hadir, 0);
+    const sakit = semesterRows.reduce((acc, r) => acc + r.sakit, 0);
+    const izin = semesterRows.reduce((acc, r) => acc + r.izin, 0);
+    const alfa = semesterRows.reduce((acc, r) => acc + r.alfa, 0);
+    const total = hadir + sakit + izin + alfa;
+    const denom = (filteredStudents.length * (semesterEffectiveDays || 1)) || total || 1;
     return {
       hadir,
       sakit,
       izin,
       alfa,
       total,
-      pctHadir: formatPct(pctHadir),
-      pctSakit: formatPct(pctSakit),
-      pctIzin: formatPct(pctIzin),
-      pctAlfa: formatPct(pctAlfa),
+      pctHadir: formatPct((hadir / denom) * 100),
+      pctSakit: formatPct((sakit / denom) * 100),
+      pctIzin: formatPct((izin / denom) * 100),
+      pctAlfa: formatPct((alfa / denom) * 100),
     };
-  }, [attendanceRecords, attendanceType, selectedSubjectId, selectedClassId, reportType, selectedDate, weekDates, monthKey, filteredStudents.length, effectiveDays]);
+  }, [reportType, dailyRows, weeklyRows, monthlyRows, semesterRows, filteredStudents.length, weeklyDays.length, effectiveDays, semesterEffectiveDays]);
 
   // =========================================================================
   // KEPALA SEKOLAH COMPUTED DATA (AUTO AGGREGATION FROM WALI KELAS INPUTS)
@@ -438,7 +647,6 @@ export const LaporanView: React.FC = () => {
 
   const handlePrintSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // Buka tampilan pratinjau laporan terlebih dahulu, sama seperti pada Rekapitulasi (Cetak Bulanan)
     setIsPrintModalOpen(true);
   };
 
@@ -454,6 +662,25 @@ export const LaporanView: React.FC = () => {
     }
     setIsPrintModalOpen(true);
   };
+
+  // Render Smart Link Document Viewer langsung menggantikan modal popup lama
+  if (isPrintModalOpen) {
+    return (
+      <PublicDailyReportViewer
+        classId={viewScopeMode === 'KEPSEK' ? (classes[0]?.id || '') : (selectedClassId || '')}
+        date={selectedDate}
+        attendanceType={viewScopeMode === 'KEPSEK' ? 'DAILY' : attendanceType}
+        subjectId={viewScopeMode === 'KEPSEK' ? null : (selectedSubjectId || null)}
+        reportType={viewScopeMode === 'KEPSEK' ? kepsekPeriodData.reportTypeModal : reportType}
+        selectedWeek={selectedWeek}
+        month={month}
+        year={year}
+        semester={viewScopeMode === 'KEPSEK' ? kepsekSemester : classSemester}
+        academicYear={viewScopeMode === 'KEPSEK' ? kepsekAcademicYear : (schoolProfile.tahunPelajaran || `${startYear}/${endYear}`)}
+        onBackToApp={() => setIsPrintModalOpen(false)}
+      />
+    );
+  }
 
   return (
     <div className="w-full max-w-6xl 2xl:max-w-7xl mx-auto px-3.5 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-5 sm:space-y-6 animate-in fade-in duration-200 pb-20">
@@ -529,7 +756,7 @@ export const LaporanView: React.FC = () => {
               className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-98 text-white font-bold text-xs sm:text-sm shadow-md hover:shadow-lg transition-all cursor-pointer min-h-[44px]"
             >
               <Printer size={18} />
-              <span>CETAK DOKUMEN RESMI (PDF / A4)</span>
+              <span>CETAK LAPORAN</span>
             </button>
           </div>
 
@@ -1109,8 +1336,17 @@ export const LaporanView: React.FC = () => {
                       SEMESTER
                     </label>
                     <select
-                      value={month === 'Januari' ? 'Genap' : 'Ganjil'}
-                      onChange={(e) => setMonth(e.target.value === 'Ganjil' ? 'Juli' : 'Januari')}
+                      value={classSemester}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val === 'Ganjil') {
+                          setMonth('Juli');
+                          setYear(String(startYear));
+                        } else {
+                          setMonth('Januari');
+                          setYear(String(endYear));
+                        }
+                      }}
                       className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-xs sm:text-sm font-semibold text-slate-900 focus:border-blue-600 focus:ring-2 focus:ring-blue-500/10 outline-none cursor-pointer min-h-[44px]"
                     >
                       <option value="Ganjil">Semester 1 (Ganjil)</option>
@@ -1124,7 +1360,7 @@ export const LaporanView: React.FC = () => {
                     </label>
                     <input
                       type="text"
-                      value={`${year}/${Number(year) + 1}`}
+                      value={schoolProfile.tahunPelajaran || `${startYear}/${endYear}`}
                       readOnly
                       className="w-full px-4 py-3 bg-slate-100 border border-slate-200 rounded-xl text-xs sm:text-sm font-semibold text-slate-700 outline-none min-h-[44px] cursor-not-allowed"
                     />
@@ -1135,12 +1371,12 @@ export const LaporanView: React.FC = () => {
               {/* Ringkasan & Kesimpulan Cepat */}
               <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl space-y-2">
                 <div className="flex items-center justify-between text-[11px] font-bold text-slate-700">
-                  <span className="uppercase tracking-wider">Ringkasan Persentase:</span>
+                  <span className="uppercase tracking-wider">Ringkasan Persentase ({reportType}):</span>
                   <span className="text-blue-700 font-extrabold">
                     {reportType === 'Laporan Harian' && formatReportDateIndo(selectedDate)}
                     {reportType === 'Laporan Mingguan' && `${selectedWeek} (${month} ${year})`}
                     {reportType === 'Laporan Bulanan' && `${month} ${year}`}
-                    {reportType === 'Laporan Semester' && `Semester ${month === 'Januari' ? 'Genap' : 'Ganjil'} ${year}`}
+                    {reportType === 'Laporan Semester' && `Semester ${classSemester === 'Genap' ? '2 (Genap)' : '1 (Ganjil)'} (${schoolProfile.tahunPelajaran || `${startYear}/${endYear}`})`}
                   </span>
                 </div>
                 <div className="grid grid-cols-4 gap-2 text-center">
@@ -1163,16 +1399,33 @@ export const LaporanView: React.FC = () => {
                 </div>
               </div>
 
-              {/* Cetak Button */}
-              <div className="pt-2">
+              {/* Action Buttons: WhatsApp Broadcast Group & Cetak PDF (Side-by-side) */}
+              <div className="pt-2 flex items-center gap-3">
+                {reportType === 'Laporan Harian' && systemConfig.whatsappBroadcastEnabled !== false && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const nowHour = new Date().getHours();
+                      setBroadcastInitialType(nowHour >= 11 ? 'PULANG' : 'MASUK');
+                      setIsBroadcastModalOpen(true);
+                    }}
+                    id="btn-broadcast-whatsapp-group"
+                    className="w-12 h-12 sm:w-[50px] sm:h-[50px] p-0 rounded-2xl flex items-center justify-center shadow-md hover:shadow-xl hover:scale-105 active:scale-95 transition-all cursor-pointer shrink-0 border-0 focus:outline-hidden focus:ring-2 focus:ring-emerald-400 focus:ring-offset-2 overflow-hidden"
+                    title="Kirim Rekapitulasi ke WhatsApp Group"
+                    aria-label="Kirim ke WhatsApp Group"
+                  >
+                    <WhatsAppIcon size="100%" className="w-full h-full" />
+                  </button>
+                )}
+
                 <button
                   type="submit"
                   id="btn-cetak-laporan-pdf"
-                  title="Buka pratinjau dokumen laporan untuk dicetak atau disimpan sebagai PDF"
-                  className="w-full py-3.5 px-6 rounded-xl bg-[#1D82F5] hover:bg-blue-600 active:scale-98 text-white font-black text-xs sm:text-sm tracking-wider uppercase transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2 min-h-[46px] cursor-pointer"
+                  title="Buka dokumen resmi laporan untuk dicetak atau disimpan sebagai PDF"
+                  className="flex-1 py-3.5 px-6 rounded-xl bg-[#1D82F5] hover:bg-blue-600 active:scale-98 text-white font-black text-xs sm:text-sm tracking-wider uppercase transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2 min-h-[48px] sm:min-h-[50px] cursor-pointer"
                 >
                   <Printer size={18} />
-                  <span>CETAK LAPORAN (PDF / A4)</span>
+                  <span>CETAK LAPORAN</span>
                 </button>
               </div>
             </form>
@@ -1190,27 +1443,29 @@ export const LaporanView: React.FC = () => {
                 sesuai pengaturan sistem.
               </div>
             </div>
+
           </div>
         </div>
       )}
 
-      {/* PDF / Print Document Preview Modal */}
-      <ReportPrintModal
-        isOpen={isPrintModalOpen}
-        onClose={() => setIsPrintModalOpen(false)}
-        reportType={viewScopeMode === 'KEPSEK' ? kepsekPeriodData.reportTypeModal : reportType}
-        selectedDate={selectedDate}
-        selectedWeek={selectedWeek}
-        month={month}
-        year={year}
-        semester={kepsekSemester}
-        academicYear={kepsekAcademicYear}
-        attendanceType={viewScopeMode === 'KEPSEK' ? 'DAILY' : attendanceType}
-        subjectId={viewScopeMode === 'KEPSEK' ? null : (selectedSubjectId || null)}
-        subjectName={viewScopeMode === 'KEPSEK' ? null : (selectedSubjectObj?.name || null)}
-        classId={viewScopeMode === 'KEPSEK' ? null : (selectedClassId || null)}
-        className={viewScopeMode === 'KEPSEK' ? null : (selectedClassObj?.name || null)}
-      />
+      {/* WhatsApp Broadcast Group Modal */}
+      {isBroadcastModalOpen && (
+        <WhatsAppBroadcastModal
+          isOpen={isBroadcastModalOpen}
+          onClose={() => setIsBroadcastModalOpen(false)}
+          date={selectedDate}
+          classId={selectedClassId}
+          className={selectedClassObj?.name || 'Kelas'}
+          attendanceType={attendanceType}
+          subjectId={attendanceType === 'SUBJECT' ? selectedSubjectId : null}
+          subjectName={selectedSubjectObj?.name || null}
+          initialType={broadcastInitialType}
+          onOpenPdfPreview={() => {
+            setIsBroadcastModalOpen(false);
+            setIsPrintModalOpen(true);
+          }}
+        />
+      )}
     </div>
   );
 };

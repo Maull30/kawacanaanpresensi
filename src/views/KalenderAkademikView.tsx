@@ -57,8 +57,6 @@ export const KalenderAkademikView: React.FC = () => {
     effectiveDaysConfig,
     getBaseStudyDaysForMonth,
     setActiveView,
-    switchToPersonalWorkspace,
-    switchToSchoolWorkspace,
     showToast,
     isSchoolPro,
   } = useApp();
@@ -417,27 +415,6 @@ export const KalenderAkademikView: React.FC = () => {
           <ArrowLeft size={14} />
           <span>Dashboard</span>
         </button>
-
-        {/* School Profile Year Link Badge */}
-        {canManageCalendar ? (
-          <button
-            onClick={() => setActiveView('profil')}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-50/80 border border-blue-200 text-xs font-semibold text-blue-800 hover:bg-blue-100/70 transition-colors cursor-pointer"
-            title="Klik untuk mengubah Tahun Pelajaran di Identitas Sekolah"
-          >
-            <Building size={14} className="text-blue-600" />
-            <span>Tahun Pelajaran: <b>{schoolProfile.tahunPelajaran || `${startYear}/${endYear}`}</b></span>
-            <ExternalLink size={12} className="text-blue-500 ml-0.5" />
-          </button>
-        ) : (
-          <div
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 border border-slate-200 text-xs font-semibold text-slate-700 shadow-xs"
-            title="Tahun Pelajaran Sekolah"
-          >
-            <Building size={14} className="text-slate-500" />
-            <span>Tahun Pelajaran: <b>{schoolProfile.tahunPelajaran || `${startYear}/${endYear}`}</b></span>
-          </div>
-        )}
       </div>
 
       {/* Main Header */}
@@ -472,24 +449,10 @@ export const KalenderAkademikView: React.FC = () => {
                 </span>
               </div>
               <p className="text-[11px] sm:text-xs text-amber-800 leading-relaxed">
-                {isSchoolPro
-                  ? `Di ruang kerja sekolah, jadwal hari efektif belajar (${activeStudyDays.length} hari: ${activeStudyDaysText}) dan agenda dikelola terpusat oleh Admin Sekolah.`
-                  : `Di ruang kerja sekolah, jadwal hari efektif belajar (${activeStudyDays.length} hari: ${activeStudyDaysText}) dan agenda dikelola oleh Admin Sekolah. Untuk mengatur hari belajar efektif mandiri, silakan beralih ke Ruang Kerja Individu.`}
+                Di ruang kerja sekolah, jadwal hari efektif belajar ({activeStudyDays.length} hari: {activeStudyDaysText}) dan agenda dikelola terpusat oleh Admin Sekolah.
               </p>
             </div>
           </div>
-          {!isSchoolPro && (
-            <button
-              type="button"
-              onClick={switchToPersonalWorkspace}
-              id="btn-switch-to-personal-ws-from-calendar"
-              className="px-3.5 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 active:scale-95 text-white font-extrabold text-xs shadow-xs transition-all flex items-center justify-center gap-1.5 shrink-0 cursor-pointer"
-            >
-              <User size={13} />
-              <span>Beralih ke Ruang Kerja Individu</span>
-              <ArrowRight size={13} />
-            </button>
-          )}
         </div>
       )}
 
@@ -906,18 +869,6 @@ export const KalenderAkademikView: React.FC = () => {
                     <p className="text-[11px] text-slate-600 leading-relaxed">
                       Jadwal sekolah: <b>{activeStudyDaysText}</b> (diatur oleh Admin Sekolah).
                     </p>
-                    {!isSchoolPro && (
-                      <button
-                        type="button"
-                        onClick={switchToPersonalWorkspace}
-                        id="btn-switch-ws-from-card"
-                        className="w-full mt-1 px-3 py-1.5 rounded-xl bg-amber-100 hover:bg-amber-200 text-amber-900 text-xs font-bold transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
-                      >
-                        <User size={12} />
-                        <span>Atur Mandiri di Ruang Kerja Individu</span>
-                        <ArrowRight size={12} />
-                      </button>
-                    )}
                   </div>
                 )}
               </div>

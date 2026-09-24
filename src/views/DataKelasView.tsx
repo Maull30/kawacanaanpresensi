@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { useApp } from '../context/AppContext';
-import { SchoolClass, Student } from '../types';
+import { SchoolClass, Student, Teacher } from '../types';
 import {
   Plus,
   Edit2,
@@ -34,7 +34,7 @@ import { validateTeacherRoleAssignment } from '../utils/packageSystem';
 import { getFaseByClassName, getFaseByGrade, getFaseBadgeColor, getGradeFromClassName, formatClassDisplay } from '../utils/faseKurikulum';
 import { BookLoadingModal } from '../components/BookLoader';
 import { normalizeTeacherName, normalizeNip } from '../utils/userScope';
-import { normalizeClassToken } from '../utils/documentParser';
+import { normalizeClassToken, downloadClassTemplateFile, parseImportDocument } from '../utils/documentParser';
 
 // Helper sinkronisasi jenis kelamin & pencocokan rombel siswa
 const isGenderL = (g: any): boolean => {
@@ -52,6 +52,79 @@ const isStudentInClass = (s: Student, targetClass: { id: string; name: string })
   if (s.className && normalizeClassToken(s.className) === normalizeClassToken(targetClass.name)) return true;
   return false;
 };
+
+// Helper resolver cerdas: mendeteksi dan menyelesaikan data rombel kelas & wali kelas jika sempat tertukar
+export function resolveClassData(
+  c: SchoolClass,
+  teachersList: Teacher[],
+  currentUser?: any,
+  isPersonalWorkspace?: boolean,
+) {
+  let className = (c.name || '').trim();
+  let waliName = (c.waliKelasName || '').trim();
+  let waliTeacherId = c.waliKelasTeacherId || null;
+
+  // 1. Cek apakah className sebenarnya nama guru
+  const matchedTeacherByName = teachersList.find(
+    (t) => t.nama.trim().toLowerCase() === className.toLowerCase(),
+  );
+  const isNameTeacher =
+    !!matchedTeacherByName ||
+    /\b(s\.pd|m\.pd|s\.ag|s\.kom|s\.si|m\.si|s\.sos|drs|dra|dr\.|prof)\b/i.test(className);
+
+  // 2. Cek apakah waliName sebenarnya nama rombel/kelas
+  const isWaliClass =
+    /^(kelas|rombel|\d+[a-z]?|[ivx]+[a-z]?)/i.test(waliName) ||
+    /^\d+$/i.test(waliName);
+
+  // 3. Jika terdeteksi tertukar (misal nama kelas terisi nama guru, dan wali terisi nama kelas)
+  if (isNameTeacher && isWaliClass) {
+    const temp = className;
+    className = waliName;
+    waliName = temp;
+    if (matchedTeacherByName && !waliTeacherId) {
+      waliTeacherId = matchedTeacherByName.id;
+    }
+  } else if (isNameTeacher && !waliName && matchedTeacherByName) {
+    if (!waliTeacherId) {
+      waliTeacherId = matchedTeacherByName.id;
+    }
+    waliName = matchedTeacherByName.nama;
+  }
+
+  // 4. Cari guru definitif dari ID atau Nama
+  const definitiveTeacher = teachersList.find(
+    (t) =>
+      (waliTeacherId && t.id === waliTeacherId) ||
+      (waliName && t.nama.trim().toLowerCase() === waliName.toLowerCase()) ||
+      (c.waliKelasName && t.nama.trim().toLowerCase() === c.waliKelasName.trim().toLowerCase()),
+  );
+
+  const effectiveWali = definitiveTeacher
+    ? definitiveTeacher.nama
+    : isPersonalWorkspace
+    ? currentUser?.name || 'Pendidik Mandiri'
+    : (waliName && !/^(kelas|rombel)/i.test(waliName))
+    ? waliName
+    : 'Belum Ditugaskan';
+
+  const matchNum = className.match(/\d+/);
+  const effectiveGrade = c.grade || (matchNum ? parseInt(matchNum[0], 10) : 1);
+
+  return {
+    resolvedClass: {
+      ...c,
+      name: className,
+      grade: effectiveGrade,
+      waliKelasTeacherId: definitiveTeacher?.id || waliTeacherId,
+      waliKelasName: effectiveWali !== 'Belum Ditugaskan' ? effectiveWali : null,
+    },
+    effectiveClassName: className,
+    effectiveWaliName: effectiveWali,
+    effectiveGrade,
+    isSwapped: isNameTeacher && isWaliClass,
+  };
+}
 
 interface ParsedClassItem {
   name: string;
@@ -278,50 +351,6 @@ export const DataKelasView: React.FC = () => {
 
   // Import Kelas Modal State
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
-  const [isApplying12, setIsApplying12] = useState(false);
-
-  // Terapkan Struktur 12 Kelas Paralel (1A–6B) untuk Ruang Kerja Sekolah
-  const handleApply12ParallelClasses = async () => {
-    if (isApplying12) return;
-    setIsApplying12(true);
-    try {
-      const standard12 = [
-        { name: 'Kelas 1A', grade: 1 },
-        { name: 'Kelas 1B', grade: 1 },
-        { name: 'Kelas 2A', grade: 2 },
-        { name: 'Kelas 2B', grade: 2 },
-        { name: 'Kelas 3A', grade: 3 },
-        { name: 'Kelas 3B', grade: 3 },
-        { name: 'Kelas 4A', grade: 4 },
-        { name: 'Kelas 4B', grade: 4 },
-        { name: 'Kelas 5A', grade: 5 },
-        { name: 'Kelas 5B', grade: 5 },
-        { name: 'Kelas 6A', grade: 6 },
-        { name: 'Kelas 6B', grade: 6 },
-      ];
-      const existingNames = new Set(classes.map((c) => c.name.trim().toLowerCase()));
-      let added = 0;
-      for (const item of standard12) {
-        if (!existingNames.has(item.name.toLowerCase()) && classes.length + added < 12) {
-          await addClass({
-            name: item.name,
-            grade: item.grade,
-            academicYear: schoolProfile?.tahunPelajaran || '2026/2027',
-          });
-          added++;
-        }
-      }
-      if (added > 0) {
-        showToast(`Berhasil menerapkan struktur ${added} rombel paralel (1A–6B).`, 'success');
-      } else {
-        showToast('Seluruh struktur 12 rombel paralel (1A–6B) sudah lengkap.', 'info');
-      }
-    } catch (err: any) {
-      showToast(err?.message || 'Gagal menerapkan struktur rombel paralel.', 'error');
-    } finally {
-      setIsApplying12(false);
-    }
-  };
 
   // Notifikasi batas kelas untuk Wali Kelas (cukup 1 kelas yang dibina)
   const [waliLimitNoticeOpen, setWaliLimitNoticeOpen] = useState(false);
@@ -463,12 +492,6 @@ export const DataKelasView: React.FC = () => {
         showToast('Kapasitas Guru Mapel di Ruang Kerja Individu maksimal 6 kelas. Batas kuota rombel telah tercapai.', 'warning');
         return;
       }
-    } else {
-      // Ruang Kerja Sekolah: Total 12 kelas tersedia (1A–6B)
-      if (classes.length >= 12) {
-        showToast('Kapasitas Ruang Kerja Sekolah maksimal 12 kelas (Struktur Kelas 1–6 Paralel A/B). Batas kuota kelas telah tercapai.', 'warning');
-        return;
-      }
     }
 
     if (isFreePlan && classes.length >= 1 && !isPersonalWorkspace) {
@@ -491,14 +514,15 @@ export const DataKelasView: React.FC = () => {
   };
 
   const openEdit = (c: SchoolClass) => {
-    setEditing(c);
-    setName(c.name);
-    setGrade(c.grade);
-    setWaliKelasTeacherId(c.waliKelasTeacherId || '');
+    const { resolvedClass } = resolveClassData(c, teachers, currentUser, isPersonalWorkspace);
+    setEditing(resolvedClass);
+    setName(resolvedClass.name);
+    setGrade(resolvedClass.grade);
+    setWaliKelasTeacherId(resolvedClass.waliKelasTeacherId || '');
     
     // Guru Mapel yang saat ini ditugaskan mengajar kelas ini
     const assignedTeachers = subjects
-      .filter((s) => s.targetClassIds && s.targetClassIds.includes(c.id) && s.teacherId)
+      .filter((s) => s.targetClassIds && s.targetClassIds.includes(resolvedClass.id) && s.teacherId)
       .map((s) => s.teacherId as string);
     setEditingClassMapelIds(assignedTeachers);
     setOpen(true);
@@ -517,11 +541,6 @@ export const DataKelasView: React.FC = () => {
         }
         if (isGuruMapel && classes.length >= 6) {
           showToast('Kapasitas Guru Mapel di Ruang Kerja Individu maksimal 6 kelas. Batas kuota kelas telah tercapai.', 'warning');
-          return;
-        }
-      } else {
-        if (classes.length >= 12) {
-          showToast('Kapasitas Ruang Kerja Sekolah maksimal 12 kelas (Struktur Kelas 1–6 Paralel A/B).', 'warning');
           return;
         }
       }
@@ -575,8 +594,9 @@ export const DataKelasView: React.FC = () => {
   };
 
   const openQuickWaliModal = (c: SchoolClass) => {
-    setAssignWaliModal(c);
-    setQuickWaliId(c.waliKelasTeacherId || '');
+    const { resolvedClass } = resolveClassData(c, teachers, currentUser, isPersonalWorkspace);
+    setAssignWaliModal(resolvedClass);
+    setQuickWaliId(resolvedClass.waliKelasTeacherId || '');
   };
 
   const saveQuickWali = async (e: React.FormEvent) => {
@@ -664,30 +684,10 @@ export const DataKelasView: React.FC = () => {
     showToast(`Siswa ${student.nama} dikeluarkan dari kelas`, 'info');
   };
 
-  // Download Template CSV Kelas (Format: NAMA KELAS, NAMA WALI KELAS)
+  // Download Template Excel (.xlsx) Kelas (Format: NAMA KELAS, NAMA WALI KELAS)
   const handleDownloadTemplate = () => {
-    const header = 'NAMA KELAS,NAMA WALI KELAS\n';
-    const sampleRows = [
-      'Kelas 1A,Budi Santoso, S.Pd.',
-      'Kelas 1B,Siti Aminah, M.Pd.',
-      'Kelas 2A,Rahmat Hidayat, S.Pd.',
-      'Kelas 3A,Dewi Lestari, S.Pd.',
-      'Kelas 4A,',
-      'Kelas 5A,',
-      'Kelas 6A,',
-    ].join('\n');
-
-    const csvContent = '\uFEFF' + header + sampleRows;
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', 'Template_Import_Data_Kelas.csv');
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-    showToast('Template file CSV Kelas berhasil diunduh (Format: Nama Kelas, Nama Wali Kelas).', 'success');
+    downloadClassTemplateFile('xlsx');
+    showToast('Template file Excel (.xlsx) Kelas berhasil diunduh. Silakan lengkapi dan unggah kembali.', 'success');
   };
 
   // Parser helper function for CSV / TSV text for Classes (Format: Nama Kelas, Nama Wali Kelas)
@@ -711,6 +711,24 @@ export const DataKelasView: React.FC = () => {
       firstLineLower.includes('wali') ||
       firstLineLower.includes('rombel');
 
+    let headerWaliFirst = true; // Template standar baru: Kolom 1 = Wali Kelas, Kolom 2 = Nama Rombel/Kelas
+    if (hasHeader) {
+      const headerDelim = lines[0].includes('\t') ? '\t' : lines[0].includes(';') ? ';' : ',';
+      const hTokens = lines[0].split(headerDelim).map((t) => t.trim().toLowerCase());
+      const col0 = hTokens[0] || '';
+      const col1 = hTokens[1] || '';
+
+      if (col0.includes('wali')) {
+        // Kolom 0 adalah NAMA WALI KELAS -> headerWaliFirst = true
+        headerWaliFirst = true;
+      } else if (col1.includes('wali')) {
+        // Kolom 1 adalah Wali Kelas, berarti Kolom 0 adalah Kelas -> headerWaliFirst = false
+        headerWaliFirst = false;
+      } else if (col0.includes('rombel') || col0.includes('kelas')) {
+        headerWaliFirst = false;
+      }
+    }
+
     const dataLines = hasHeader ? lines.slice(1) : lines;
 
     dataLines.forEach((line) => {
@@ -725,32 +743,93 @@ export const DataKelasView: React.FC = () => {
 
       tokens = tokens.map((t) => t.trim().replace(/^["']|["']$/g, ''));
 
-      if (tokens.length >= 1 && tokens[0]) {
-        const rawName = tokens[0] || '';
+      if (tokens.length >= 1 && (tokens[0] || tokens[1])) {
+        let rawName = '';
         let rawWali = '';
         let gradeNum = 1;
 
-        // Jika user menginput 3 kolom (format legacy: Nama Kelas, Tingkat, Nama Wali)
+        const isClassFormat = (val: string) =>
+          /^(kelas|rombel)\b/i.test(val) ||
+          /^[1-9][a-z]?$/i.test(val) ||
+          /^[1-9]\s+[a-z]$/i.test(val) ||
+          /^(vi|v|iv|iii|ii|i)[a-z]?$/i.test(val);
+
+        const isTeacherFormat = (val: string) =>
+          teachers.some((tch) => tch.nama.trim().toLowerCase() === val.toLowerCase()) ||
+          /\b(s\.pd|m\.pd|s\.ag|s\.kom|s\.si|m\.si|s\.sos|drs|dra|dr\.|prof)\b/i.test(val);
+
         if (tokens.length >= 3 && !isNaN(parseInt(tokens[1], 10))) {
+          // Format 3 kolom legacy: Nama Kelas, Tingkat, Nama Wali
+          rawName = tokens[0] || '';
           gradeNum = parseInt(tokens[1], 10);
           rawWali = tokens[2] || '';
+        } else if (tokens.length >= 2) {
+          // 2 Kolom (Standar Template Baru: Kolom 1 = NAMA WALI KELAS, Kolom 2 = NAMA ROMBEL / KELAS)
+          const t0 = (tokens[0] || '').trim();
+          const t1 = (tokens[1] || '').trim();
+
+          const t0IsClass = isClassFormat(t0);
+          const t1IsClass = isClassFormat(t1);
+          const t0IsTeacher = isTeacherFormat(t0);
+          const t1IsTeacher = isTeacherFormat(t1);
+
+          if (headerWaliFirst) {
+            // Kolom 0 = NAMA WALI KELAS, Kolom 1 = NAMA ROMBEL / KELAS
+            if (t0IsClass && !t1IsClass) {
+              // Jika baris data terbalik (t0 nama kelas, t1 nama wali)
+              rawName = t0;
+              rawWali = t1;
+            } else {
+              rawWali = t0;
+              rawName = t1 || (t0IsClass ? t0 : '');
+            }
+          } else {
+            // Kolom 0 = NAMA ROMBEL / KELAS, Kolom 1 = NAMA WALI KELAS
+            if (t0IsTeacher && t1IsClass) {
+              rawWali = t0;
+              rawName = t1;
+            } else if (t1IsClass && !t0IsClass) {
+              rawWali = t0;
+              rawName = t1;
+            } else {
+              rawName = t0;
+              rawWali = t1;
+            }
+          }
         } else {
-          // Format standar: 2 Kolom (Nama Kelas, Nama Wali Kelas)
-          rawWali = tokens[1] || '';
-          const matchNum = rawName.match(/\d+/);
-          if (matchNum) {
-            gradeNum = parseInt(matchNum[0], 10);
+          // 1 kolom data
+          const t0 = (tokens[0] || '').trim();
+          if (isClassFormat(t0)) {
+            rawName = t0;
+            rawWali = '';
+          } else {
+            rawWali = t0;
+            rawName = '';
           }
         }
 
+        // Sanity check otomatis: pastikan rawName dan rawWali tidak tertukar
+        if (
+          (isTeacherFormat(rawName) && isClassFormat(rawWali)) ||
+          (!isClassFormat(rawName) && isClassFormat(rawWali))
+        ) {
+          const temp = rawName;
+          rawName = rawWali;
+          rawWali = temp;
+        }
+
+        const matchNum = rawName.match(/\d+/);
+        if (matchNum) {
+          gradeNum = parseInt(matchNum[0], 10);
+        }
+
         if (gradeNum < 1 || gradeNum > 12) {
-          const matchNum = rawName.match(/\d+/);
-          gradeNum = matchNum ? parseInt(matchNum[0], 10) : 1;
+          gradeNum = 1;
         }
 
         const isValid = rawName.trim().length > 0;
         let error = undefined;
-        if (!rawName.trim()) error = 'Nama kelas kosong';
+        if (!rawName.trim()) error = 'Nama rombel / kelas kosong';
 
         results.push({
           name: rawName.trim(),
@@ -765,23 +844,41 @@ export const DataKelasView: React.FC = () => {
     return results;
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     setFileName(file.name);
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const content = event.target?.result as string;
-      const parsed = parseRawTextToClasses(content);
-      setParsedClasses(parsed);
-      if (parsed.length === 0) {
-        showToast('Tidak ada data kelas yang dapat dibaca dari file ini', 'error');
+    try {
+      const isExcel = file.name.endsWith('.xlsx') || file.name.endsWith('.xls');
+      if (isExcel) {
+        const docResult = await parseImportDocument(file);
+        const rawText = docResult.rawText || docResult.rows.map((r) => r.join('\t')).join('\n');
+        const parsed = parseRawTextToClasses(rawText);
+        setParsedClasses(parsed);
+        if (parsed.length === 0) {
+          showToast('Tidak ada data kelas yang dapat dibaca dari file Excel ini', 'error');
+        } else {
+          showToast(`Berhasil membaca ${parsed.length} baris data kelas dari ${file.name}`);
+        }
       } else {
-        showToast(`Berhasil membaca ${parsed.length} baris data kelas dari ${file.name}`);
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const content = event.target?.result as string;
+          const parsed = parseRawTextToClasses(content);
+          setParsedClasses(parsed);
+          if (parsed.length === 0) {
+            showToast('Tidak ada data kelas yang dapat dibaca dari file ini', 'error');
+          } else {
+            showToast(`Berhasil membaca ${parsed.length} baris data kelas dari ${file.name}`);
+          }
+        };
+        reader.readAsText(file);
       }
-    };
-    reader.readAsText(file);
+    } catch (err: any) {
+      console.error('Error reading file:', err);
+      showToast('Gagal membaca file. Pastikan file dalam format Excel (.xlsx), CSV, atau teks yang valid.', 'error');
+    }
   };
 
   const handlePasteChange = (text: string) => {
@@ -812,7 +909,7 @@ export const DataKelasView: React.FC = () => {
         waliKelasNameInput: c.waliKelasNameInput,
       }));
 
-      await importClasses(payload);
+      await importClasses(payload, true);
 
       setImportProgress(100);
       setImportStatusMessage('Selesai! Seluruh data rombongan belajar berhasil diimpor.');
@@ -863,40 +960,20 @@ export const DataKelasView: React.FC = () => {
                   </div>
                 )
               ) : (
-                <div className="flex flex-wrap items-center gap-2 mt-2">
-                  <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-800 border border-indigo-200 text-[11px] font-bold">
-                    <ShieldCheck size={13} className="text-indigo-600" />
-                    <span>
-                      Ruang Kerja Sekolah: {classes.length}/12 Kelas Tersedia (Struktur Paralel 1A–6B, Maks. 50 Siswa/Kelas)
-                    </span>
-                  </div>
-                  {!isAdmin && (isWaliKelas || isGuru) && (
+                !isAdmin && (isWaliKelas || isGuru) ? (
+                  <div className="flex flex-wrap items-center gap-2 mt-2">
                     <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 border border-slate-200 text-[11px] font-bold">
                       {isWaliKelas
                         ? `Binaan: ${accessibleClasses.map((c) => c.name).join(', ') || 'Belum ditugaskan'}`
                         : `Diajar: ${accessibleClasses.map((c) => c.name).join(', ') || 'Belum ditugaskan'}`}
                     </span>
-                  )}
-                </div>
+                  </div>
+                ) : null
               )}
             </div>
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
-            {canAddClass && !isPersonalWorkspace && classes.length < 12 && (
-              <button
-                type="button"
-                onClick={handleApply12ParallelClasses}
-                disabled={isApplying12}
-                id="btn-apply-12-classes"
-                className="inline-flex items-center gap-1.5 px-3.5 py-2.5 bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-bold rounded-xl border border-blue-200 transition-all cursor-pointer shadow-xs disabled:opacity-50"
-                title="Lengkapi Struktur 12 Kelas Paralel SD (1A sampai 6B)"
-              >
-                <Layers size={15} />
-                <span>{isApplying12 ? 'Menyiapkan 12 Rombel...' : 'Struktur 12 Rombel (1A–6B)'}</span>
-              </button>
-            )}
-
             {canAddClass && !isPersonalWorkspace && (
               <button
                 onClick={() => {
@@ -1044,7 +1121,7 @@ export const DataKelasView: React.FC = () => {
                   <tr>
                     <th className="py-3.5 px-4 text-center w-12">No</th>
                     <th className="py-3.5 px-4">Nama Wali Kelas</th>
-                    <th className="py-3.5 px-4 font-black">Kelas & Fase</th>
+                    <th className="py-3.5 px-4 font-black">Nama Rombel / Kelas</th>
                     <th className="py-3.5 px-4 text-center text-blue-700">Jml L</th>
                     <th className="py-3.5 px-4 text-center text-pink-700">Jml P</th>
                     <th className="py-3.5 px-4 text-center text-slate-800">Total Siswa</th>
@@ -1054,25 +1131,24 @@ export const DataKelasView: React.FC = () => {
                 <tbody className="divide-y divide-slate-100">
                   {currentClasses.length > 0 ? (
                     currentClasses.map((c, idx) => {
+                      const {
+                        resolvedClass,
+                        effectiveClassName,
+                        effectiveWaliName,
+                        effectiveGrade,
+                      } = resolveClassData(c, teachers, currentUser, isPersonalWorkspace);
+
                       const classStudentList = students.filter(
                         (s) =>
-                          isStudentInClass(s, c) ||
+                          isStudentInClass(s, { id: c.id, name: effectiveClassName }) ||
                           (isPersonalWorkspace &&
                             (!s.classId || s.classId === 'onboarding-class-default' || accessibleClasses.length === 1))
                       );
                       const countL = classStudentList.filter((s) => isGenderL(s.gender)).length;
                       const countP = classStudentList.filter((s) => isGenderP(s.gender)).length;
                       const totalCount = classStudentList.length;
-                      const matchedTeacher = teachers.find(
-                        (t) => t.id === c.waliKelasTeacherId || (c.waliKelasName && t.nama.trim().toLowerCase() === c.waliKelasName.trim().toLowerCase())
-                      );
-                      const effectiveWaliName = matchedTeacher
-                        ? matchedTeacher.nama
-                        : isPersonalWorkspace
-                        ? currentUser?.name || 'Pendidik Mandiri'
-                        : c.waliKelasName || 'Belum Ditugaskan';
 
-                      const fase = getFaseByClassName(c.name, c.grade);
+                      const fase = getFaseByClassName(effectiveClassName, effectiveGrade);
                       const faseBadgeClass = getFaseBadgeColor(fase);
 
                       return (
@@ -1094,7 +1170,7 @@ export const DataKelasView: React.FC = () => {
                               {isAdmin && (
                                 <button
                                   type="button"
-                                  onClick={() => openQuickWaliModal(c)}
+                                  onClick={() => openQuickWaliModal(resolvedClass)}
                                   className="p-1 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
                                   title="Ganti / Tetapkan Wali Kelas"
                                 >
@@ -1106,10 +1182,10 @@ export const DataKelasView: React.FC = () => {
                           <td className="py-3.5 px-4">
                             <div className="flex items-center gap-2">
                               <span className="font-extrabold text-blue-700 text-sm">
-                                {formatClassDisplay(c.name, c.grade)}
+                                {formatClassDisplay(effectiveClassName)}
                               </span>
                               <span
-                                className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold border ${faseBadgeClass}`}
+                                className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold border ${faseBadgeClass.bg}`}
                               >
                                 {fase}
                               </span>
@@ -1130,16 +1206,10 @@ export const DataKelasView: React.FC = () => {
                           </td>
                           <td className="py-3.5 px-4 text-center font-extrabold text-slate-900">
                             <span
-                              className={`inline-flex items-center justify-center px-2.5 py-1 rounded-lg text-xs font-black ${
-                                totalCount >= 50
-                                  ? 'bg-rose-100 text-rose-800 border border-rose-300'
-                                  : totalCount >= 40
-                                  ? 'bg-amber-100 text-amber-800 border border-amber-300'
-                                  : 'bg-slate-100 text-slate-900'
-                              }`}
-                              title={`Kapasitas siswa: ${totalCount} dari batas maksimal 50 siswa`}
+                              className="inline-flex items-center justify-center px-2.5 py-1 rounded-lg text-xs font-black bg-slate-100 text-slate-900"
+                              title={`Total ${totalCount} siswa`}
                             >
-                              {totalCount} / 50
+                              {totalCount}
                             </span>
                           </td>
                           <td className="py-3.5 px-4 text-center">
@@ -1147,16 +1217,16 @@ export const DataKelasView: React.FC = () => {
                               <button
                                 type="button"
                                 id={`btn-qr-class-${c.id}`}
-                                onClick={() => setQrModalClass(c)}
+                                onClick={() => setQrModalClass(resolvedClass)}
                                 className="p-1.5 text-indigo-700 bg-indigo-50/80 hover:bg-indigo-100 rounded-lg transition-colors cursor-pointer border border-indigo-200/60 shadow-2xs"
-                                title={`QR Code Presensi ${c.name} (Cetak / Tampilkan)`}
+                                title={`QR Code Presensi ${effectiveClassName} (Cetak / Tampilkan)`}
                               >
                                 <QrCode size={15} />
                               </button>
                               {canEditClass && (
                                 <button
                                   type="button"
-                                  onClick={() => openEdit(c)}
+                                  onClick={() => openEdit(resolvedClass)}
                                   className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
                                   title="Edit Rombel"
                                 >
@@ -1166,7 +1236,7 @@ export const DataKelasView: React.FC = () => {
                               {!canEditClass && !canDeleteClass && (
                                 <button
                                   type="button"
-                                  onClick={() => setViewingClass(c)}
+                                  onClick={() => setViewingClass(resolvedClass)}
                                   className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors cursor-pointer"
                                   title="Lihat Daftar Siswa"
                                 >
@@ -1177,7 +1247,7 @@ export const DataKelasView: React.FC = () => {
                               {isAdmin && totalCount > 0 && (
                                 <button
                                   type="button"
-                                  onClick={() => setPurgeClassModal(c)}
+                                  onClick={() => setPurgeClassModal(resolvedClass)}
                                   className="p-1.5 text-amber-600 hover:bg-amber-50 rounded-lg transition-colors cursor-pointer"
                                   title="Hapus Semua Siswa di Kelas Ini"
                                 >
@@ -1187,7 +1257,7 @@ export const DataKelasView: React.FC = () => {
                               {canDeleteClass && (
                                 <button
                                   type="button"
-                                  onClick={() => setDeleting(c)}
+                                  onClick={() => setDeleting(resolvedClass)}
                                   className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
                                   title="Hapus Kelas"
                                 >
@@ -1442,7 +1512,7 @@ export const DataKelasView: React.FC = () => {
                 </div>
                 <div>
                   <h3 className="font-bold text-slate-900 text-base">Import Data Rombongan Belajar (Kelas)</h3>
-                  <p className="text-xs text-slate-500">Format: Nama Kelas, Nama Wali Kelas</p>
+                  <p className="text-xs text-slate-500">Format: Nama Wali Kelas, Nama Rombel / Kelas</p>
                 </div>
               </div>
               <button
@@ -1455,21 +1525,32 @@ export const DataKelasView: React.FC = () => {
 
             <div className="space-y-4 py-4 overflow-y-auto flex-1 pr-1">
               {/* Step 1: Download Template */}
-              <div className="p-3.5 bg-emerald-50/50 rounded-2xl border border-emerald-100 flex items-center justify-between gap-3">
-                <div>
-                  <h4 className="font-extrabold text-xs text-emerald-950">Gunakan Template Standar Kelas</h4>
-                  <p className="text-[11px] text-emerald-800 mt-0.5">
-                    Format: <strong>NAMA KELAS, NAMA WALI KELAS</strong> (Tingkat kelas otomatis ditentukan dari nama kelas)
+              <div className="p-3.5 bg-slate-50 border border-slate-200/80 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <div className="space-y-0.5">
+                  <h4 className="font-bold text-xs text-slate-800">Format Template Standar Kelas</h4>
+                  <p className="text-[11px] text-slate-500">
+                    Kolom: <span className="font-semibold text-slate-700">NAMA WALI KELAS, NAMA ROMBEL / KELAS</span>
                   </p>
                 </div>
-                <button
-                  type="button"
-                  onClick={handleDownloadTemplate}
-                  className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl shadow-xs transition-all flex items-center gap-1.5 shrink-0 cursor-pointer"
-                >
-                  <Download size={13} />
-                  <span>Unduh Template CSV</span>
-                </button>
+                <div className="shrink-0">
+                  <button
+                    type="button"
+                    onClick={handleDownloadTemplate}
+                    className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold text-xs rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
+                    title="Unduh format template Excel (.xlsx)"
+                  >
+                    <Download size={14} />
+                    <span>Template</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Notice Mode Sumber Tunggal */}
+              <div className="p-3 bg-amber-50/90 border border-amber-200/80 rounded-xl flex items-start gap-2.5 text-amber-900 text-xs">
+                <span className="font-bold text-amber-800 text-sm leading-none mt-0.5">ℹ️</span>
+                <p className="leading-relaxed text-[11px]">
+                  <strong>Sumber Tunggal (Replace All):</strong> File yang diunggah menjadi sumber data referensi utama rombel kelas. Sistem akan otomatis mengganti seluruh data dan menghapus rombel kelas lama yang tidak terdapat dalam file terbaru ini.
+                </p>
               </div>
 
               {/* Step 2: Tab Selector (Upload File vs Tempel Teks) */}
@@ -1482,21 +1563,21 @@ export const DataKelasView: React.FC = () => {
                     type="button"
                     onClick={() => setImportTab('upload')}
                     className={`flex-1 py-2 rounded-lg flex items-center justify-center gap-2 transition cursor-pointer ${
-                      importTab === 'upload' ? 'bg-white text-blue-600 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                      importTab === 'upload' ? 'bg-white text-emerald-700 shadow-xs' : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
                     <UploadCloud size={14} />
-                    <span>Unggah File (.csv / .txt)</span>
+                    <span>Unggah File (Excel / CSV / TXT)</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => setImportTab('paste')}
                     className={`flex-1 py-2 rounded-lg flex items-center justify-center gap-2 transition cursor-pointer ${
-                      importTab === 'paste' ? 'bg-white text-blue-600 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                      importTab === 'paste' ? 'bg-white text-emerald-700 shadow-xs' : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
                     <FileText size={14} />
-                    <span>Tempel Data (Salin dari Excel)</span>
+                    <span>Tempel Data (Salin dari Spreadsheet)</span>
                   </button>
                 </div>
               </div>
@@ -1504,15 +1585,15 @@ export const DataKelasView: React.FC = () => {
               {/* Upload File Body */}
               {importTab === 'upload' ? (
                 <div>
-                  <label className="border-2 border-dashed border-slate-200 hover:border-blue-500 rounded-2xl p-6 flex flex-col items-center justify-center gap-2 cursor-pointer bg-slate-50 hover:bg-blue-50/20 transition-all">
+                  <label className="border-2 border-dashed border-slate-200 hover:border-emerald-500 rounded-2xl p-6 flex flex-col items-center justify-center gap-2 cursor-pointer bg-slate-50 hover:bg-emerald-50/20 transition-all">
                     <UploadCloud size={28} className="text-slate-400" />
                     <span className="text-xs font-extrabold text-slate-700">
-                      {fileName ? `File terpilih: ${fileName}` : 'Klik untuk memilih file CSV / TXT'}
+                      {fileName ? `File terpilih: ${fileName}` : 'Klik untuk memilih file Excel (.xlsx) / CSV / TXT'}
                     </span>
-                    <span className="text-[11px] text-slate-400">Format: Nama Kelas, Nama Wali Kelas (Pemisah koma, titik koma, atau tab)</span>
+                    <span className="text-[11px] text-slate-400">Format: Nama Wali Kelas, Nama Rombel / Kelas</span>
                     <input
                       type="file"
-                      accept=".csv, .txt, text/csv, text/plain"
+                      accept=".xlsx, .xls, .csv, .txt, text/csv, text/plain, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                       onChange={handleFileUpload}
                       className="hidden"
                     />
@@ -1524,7 +1605,7 @@ export const DataKelasView: React.FC = () => {
                     rows={4}
                     value={pasteText}
                     onChange={(e) => handlePasteChange(e.target.value)}
-                    placeholder="Tempel data kelas dari spreadsheet Excel di sini...&#10;Contoh:&#10;Kelas 1A&#9;Budi Santoso, S.Pd.&#10;Kelas 1B&#9;Siti Aminah, M.Pd.&#10;Kelas 2A&#9;Rahmat Hidayat, S.Pd."
+                    placeholder="Tempel data kelas dari spreadsheet Excel di sini...&#10;Contoh:&#10;Budi Santoso, S.Pd.&#9;Kelas 1A&#10;Siti Aminah, M.Pd.&#9;Kelas 1B&#10;Rahmat Hidayat, S.Pd.&#9;Kelas 2A"
                     className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-600 focus:bg-white focus:ring-2 focus:ring-blue-500/10"
                   />
                 </div>
@@ -1547,9 +1628,9 @@ export const DataKelasView: React.FC = () => {
                       <thead className="bg-slate-50 sticky top-0 border-b border-slate-200 text-[10px] font-bold text-slate-500 uppercase">
                         <tr>
                           <th className="p-2 w-8">#</th>
-                          <th className="p-2">Nama Kelas</th>
-                          <th className="p-2 text-center w-20">Tingkat</th>
                           <th className="p-2">Nama Wali Kelas</th>
+                          <th className="p-2">Nama Rombel / Kelas</th>
+                          <th className="p-2 text-center w-20">Tingkat</th>
                           <th className="p-2 text-center w-20">Status</th>
                         </tr>
                       </thead>
@@ -1557,11 +1638,11 @@ export const DataKelasView: React.FC = () => {
                         {parsedClasses.map((item, i) => (
                           <tr key={i} className={item.isValid ? 'hover:bg-slate-50' : 'bg-rose-50/40'}>
                             <td className="p-2 text-slate-400 font-mono text-[11px]">{i + 1}</td>
-                            <td className="p-2 font-bold text-slate-800">{item.name}</td>
-                            <td className="p-2 text-center font-bold text-blue-700">Tingkat {item.grade}</td>
-                            <td className="p-2 text-slate-600 font-medium">
+                            <td className="p-2 text-slate-700 font-medium">
                               {item.waliKelasNameInput || <span className="text-slate-400 italic">Belum ditentukan</span>}
                             </td>
+                            <td className="p-2 font-bold text-slate-800">{item.name}</td>
+                            <td className="p-2 text-center font-bold text-blue-700">Tingkat {item.grade}</td>
                             <td className="p-2 text-center">
                               {item.isValid ? (
                                 <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
@@ -1628,24 +1709,6 @@ export const DataKelasView: React.FC = () => {
             </div>
 
             <form onSubmit={save} className="space-y-4 pt-3 text-xs overflow-y-auto flex-1 pr-1">
-              <div>
-                <label className="block font-bold text-slate-700 mb-1">Nama Rombel / Kelas *</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Contoh: Kelas 1A, Kelas 6B, dll."
-                  value={name}
-                  onChange={(e) => {
-                    setName(e.target.value);
-                    const matchNumber = e.target.value.match(/\d+/);
-                    if (matchNumber) {
-                      setGrade(parseInt(matchNumber[0], 10));
-                    }
-                  }}
-                  className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:bg-white focus:border-blue-600 outline-none"
-                />
-              </div>
-
               {!isPersonalWorkspace && (
                 <div>
                   <label className="block font-bold text-slate-700 mb-1">
@@ -1673,6 +1736,24 @@ export const DataKelasView: React.FC = () => {
                   </p>
                 </div>
               )}
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Nama Rombel / Kelas *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Contoh: Kelas 1A, Kelas 6B, dll."
+                  value={name}
+                  onChange={(e) => {
+                    setName(e.target.value);
+                    const matchNumber = e.target.value.match(/\d+/);
+                    if (matchNumber) {
+                      setGrade(parseInt(matchNumber[0], 10));
+                    }
+                  }}
+                  className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:bg-white focus:border-blue-600 outline-none"
+                />
+              </div>
 
               <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100 shrink-0">
                 <button

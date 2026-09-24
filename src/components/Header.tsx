@@ -2,9 +2,9 @@ import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
 import { supabase } from '../lib/supabase';
 import { SchoolLogo } from './SchoolLogo';
+import { KawacanaanEmblem } from './KawacanaanEmblem';
 import { UserProfileModal } from './UserProfileModal';
 import { ChangePasswordModal } from './ChangePasswordModal';
-import { JoinSchoolModal } from './JoinSchoolModal';
 import { 
   LogOut, 
   UserCircle, 
@@ -21,7 +21,8 @@ import {
   Layers,
   PlusCircle,
   Building2,
-  UserCheck
+  UserCheck,
+  ChevronDown
 } from 'lucide-react';
 import { getTenantLifecycleInfo } from '../utils/tenantLifecycle';
 
@@ -38,11 +39,6 @@ export const Header: React.FC = () => {
     academicEvents,
     userWorkspaces,
     activeWorkspace,
-    isJoinSchoolModalOpen,
-    setIsJoinSchoolModalOpen,
-    switchToSchoolWorkspace,
-    switchToPersonalWorkspace,
-    setIsSelectingWorkspace,
     openOnboarding,
     logout,
     isSchoolPro
@@ -56,30 +52,23 @@ export const Header: React.FC = () => {
   const dropdownRef = useRef<HTMLDivElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
 
+  const roleLabel = useMemo(() => {
+    if (!currentUser) return '';
+    if (currentUser.role === 'SUPER_ADMIN') return 'Super Admin';
+    if (currentUser.role === 'ADMIN') return 'Admin';
+    if (currentUser.role === 'KEPALA SEKOLAH') return 'Kepala Sekolah';
+    if (currentUser.role === 'WALI KELAS') return 'Wali Kelas';
+    if (currentUser.role === 'GURU MAPEL') return 'Guru Mapel';
+    if (currentUser.role === 'SISWA') return 'Siswa';
+    return currentUser.role;
+  }, [currentUser]);
+
   const isPersonalWorkspace =
     activeWorkspace?.workspaceType === 'personal' ||
     activeWorkspace?.workspaceType === 'individu' ||
     (currentUser?.subscriptionPlan === 'mulai' && !currentUser?.schoolId);
 
   const isCurrentlyPersonal = isPersonalWorkspace;
-
-  // Aturan Opsi B: Pendidik pada sekolah yang aktif Paket Sekolah Pro dikunci 100% pada Ruang Kerja Sekolah
-  const canSwitchWorkspace =
-    currentUser &&
-    (currentUser.role === 'WALI KELAS' || currentUser.role === 'GURU MAPEL') &&
-    currentUser.role !== 'ADMIN' &&
-    currentUser.role !== 'KEPALA SEKOLAH' &&
-    currentUser.role !== 'SUPER_ADMIN' &&
-    currentUser.role !== 'SISWA' &&
-    (!isSchoolPro || isCurrentlyPersonal);
-
-  const existingSchoolWs = userWorkspaces.find(
-    (ws) => ws.workspaceType !== 'personal' && ws.workspaceType !== 'individu'
-  );
-
-  const existingPersonalWs = userWorkspaces.find(
-    (ws) => ws.workspaceType === 'personal' || ws.workspaceType === 'individu'
-  );
 
   const notifStorageKey = useMemo(() => {
     const userId = currentUser?.id || currentUser?.username || 'guest';
@@ -342,7 +331,11 @@ export const Header: React.FC = () => {
             id="header-school-brand"
           >
             <div className="flex-shrink-0">
-              <SchoolLogo size={36} className="sm:w-[40px] sm:h-[40px]" />
+              {currentUser?.role === 'SUPER_ADMIN' ? (
+                <KawacanaanEmblem size={36} className="sm:w-[40px] sm:h-[40px]" />
+              ) : (
+                <SchoolLogo size={36} className="sm:w-[40px] sm:h-[40px]" />
+              )}
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-2">
@@ -361,39 +354,25 @@ export const Header: React.FC = () => {
             {currentUser ? (
               <div className="flex items-center gap-1.5 sm:gap-2.5">
 
-                {/* Compact Workspace Indicator & Switcher Button (Only in School Workspace) */}
-                {currentUser.role !== 'SUPER_ADMIN' && currentUser.role !== 'SISWA' && !isCurrentlyPersonal && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (canSwitchWorkspace) {
-                        setIsSelectingWorkspace(true);
-                      }
-                    }}
-                    disabled={!canSwitchWorkspace}
-                    title={
-                      canSwitchWorkspace
-                        ? `Klik untuk beralih ruang kerja (Saat ini: Ruang Kerja Sekolah)`
-                        : `Ruang Kerja: ${schoolProfile.namaSekolah || 'Ruang Kerja Sekolah'}`
-                    }
-                    className="inline-flex items-center gap-1.5 px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-full border text-xs font-bold transition-all select-none bg-indigo-50 hover:bg-indigo-100 border-indigo-200 text-indigo-800 cursor-pointer active:scale-95 shadow-2xs"
-                    id="btn-header-workspace-indicator"
+                {/* Compact Permanent Workspace Indicator */}
+                {currentUser.role !== 'SUPER_ADMIN' && currentUser.role !== 'SISWA' && (
+                  <div
+                    title={`Ruang Kerja: ${isCurrentlyPersonal ? 'Ruang Kerja Individu' : 'Ruang Kerja Sekolah'}${schoolProfile.namaSekolah ? ` (${schoolProfile.namaSekolah})` : ''}`}
+                    className="hidden xl:inline-flex items-center gap-1.5 px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-full border text-xs font-bold select-none bg-slate-50 border-slate-200/90 text-slate-700 shadow-2xs"
+                    id="header-workspace-indicator"
                   >
-                    <Building2 size={13} className="text-indigo-600 shrink-0" />
-                    <span className="hidden sm:inline">Ruang Kerja Sekolah</span>
-                    <span className="sm:hidden text-[11px] font-extrabold">Sekolah</span>
-                    {canSwitchWorkspace && (
-                      <span className="text-[9px] px-1 py-0.5 rounded font-black uppercase bg-indigo-200/80 text-indigo-900">
-                        Ganti
-                      </span>
-                    )}
-                  </button>
+                    <Building2 size={13} className={isCurrentlyPersonal ? "text-emerald-600 shrink-0" : "text-indigo-600 shrink-0"} />
+                    <span>
+                      {isCurrentlyPersonal ? 'Ruang Kerja Individu' : 'Ruang Kerja Sekolah'}
+                    </span>
+                  </div>
                 )}
                 
                 {/* Date Pill (Desktop & Tablet) */}
                 <div className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-slate-200/90 bg-slate-50/90 text-slate-700 text-xs font-semibold select-none shadow-2xs">
-                  <Calendar size={13} className="text-slate-400" />
+                  <Calendar size={13} className="text-slate-500" />
                   <span>{getFormattedDate()}</span>
+                  <ChevronDown size={11} className="text-slate-400 ml-0.5" />
                 </div>
 
                 {/* Notification Bell */}
@@ -512,11 +491,21 @@ export const Header: React.FC = () => {
                       setShowProfileDropdown(!showProfileDropdown);
                       setShowNotificationDropdown(false);
                     }}
-                    className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-[#0095FF] hover:bg-[#0080FF] text-white flex items-center justify-center font-black text-sm tracking-wider shadow-sm transition-all cursor-pointer active:scale-95 select-none ring-2 ring-transparent hover:ring-sky-200"
+                    className="flex items-center gap-2 p-0.5 sm:pr-2.5 rounded-full hover:bg-slate-100/80 transition-all cursor-pointer active:scale-95 select-none"
                     title={`Profil: ${currentUser.name || currentUser.username}`}
                     id="btn-header-profile-avatar"
                   >
-                    {userInitials}
+                    <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-[#0095FF] hover:bg-[#0080FF] text-white flex items-center justify-center font-black text-xs sm:text-sm tracking-wider shadow-xs">
+                      {userInitials}
+                    </div>
+                    <div className="hidden sm:flex flex-col text-left">
+                      <span className="text-xs font-extrabold text-slate-800 leading-tight truncate max-w-[90px]">
+                        {userInitials}
+                      </span>
+                      <span className="text-[10px] text-slate-500 font-semibold leading-none flex items-center gap-0.5">
+                        {roleLabel} <ChevronDown size={10} className="text-slate-400 shrink-0" />
+                      </span>
+                    </div>
                   </button>
 
                   {/* Profile Dropdown Popup - Matching user's uploaded mockup */}
@@ -537,50 +526,6 @@ export const Header: React.FC = () => {
 
                       {/* Menu List */}
                       <div className="mt-4 space-y-1">
-                        {/* Workspace Info & Switcher between Ruang Kerja Sekolah and Ruang Kerja Individu */}
-                        {canSwitchWorkspace && (
-                          <>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setShowProfileDropdown(false);
-                                if (isCurrentlyPersonal) {
-                                  setIsJoinSchoolModalOpen(true);
-                                } else {
-                                  void switchToPersonalWorkspace();
-                                }
-                              }}
-                              className="w-full flex items-center justify-between px-3 py-2.5 rounded-2xl text-sm font-medium text-slate-700 hover:text-blue-600 hover:bg-blue-50/60 transition-colors group cursor-pointer"
-                              id="btn-menu-ganti-workspace"
-                            >
-                              <div className="flex items-center gap-3.5 min-w-0">
-                                {isCurrentlyPersonal ? (
-                                  <Building2 className="w-5 h-5 text-indigo-500 group-hover:text-blue-600 transition-colors stroke-[1.75] shrink-0" />
-                                ) : (
-                                  <UserCheck className="w-5 h-5 text-emerald-500 group-hover:text-emerald-600 transition-colors stroke-[1.75] shrink-0" />
-                                )}
-                                <div className="text-left min-w-0">
-                                  <div className="font-semibold truncate">
-                                    {isCurrentlyPersonal ? 'Ruang Kerja Sekolah' : 'Ruang Kerja Individu'}
-                                  </div>
-                                  <div className="text-[10px] text-slate-500 font-normal truncate">
-                                    {isCurrentlyPersonal 
-                                      ? 'Onboarding dengan kode sekolah' 
-                                      : (existingPersonalWs ? 'Kembali ke Ruang Kerja Individu' : 'Buka Ruang Kerja Individu')}
-                                  </div>
-                                </div>
-                              </div>
-                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-black shrink-0 ${
-                                isCurrentlyPersonal ? 'bg-indigo-100 text-indigo-800' : 'bg-emerald-100 text-emerald-800'
-                              }`}>
-                                {isCurrentlyPersonal ? 'Sekolah' : 'Individu'}
-                              </span>
-                            </button>
-                            
-                            <div className="border-t border-slate-100 my-1.5" />
-                          </>
-                        )}
-
                         {/* 1. Profil Pengguna */}
                         <button
                           type="button"
@@ -658,12 +603,6 @@ export const Header: React.FC = () => {
       <ChangePasswordModal
         isOpen={showPasswordModal}
         onClose={() => setShowPasswordModal(false)}
-      />
-
-      {/* Join School Modal */}
-      <JoinSchoolModal
-        isOpen={isJoinSchoolModalOpen}
-        onClose={() => setIsJoinSchoolModalOpen(false)}
       />
     </>
   );

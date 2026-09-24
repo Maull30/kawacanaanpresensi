@@ -69,7 +69,7 @@ export const BlogSection: React.FC<BlogSectionProps> = ({ lang }) => {
   return (
     <section 
       id="blog" 
-      className="scroll-mt-16 sm:scroll-mt-20 pt-16 sm:pt-20 pb-16 sm:pb-24 bg-gradient-to-b from-[#F3F8FF] via-[#E9F3FE] to-[#DCEBFE] text-slate-900 relative antialiased overflow-hidden"
+      className="scroll-mt-16 sm:scroll-mt-20 pt-16 sm:pt-20 pb-16 sm:pb-24 lg:py-0 lg:min-h-screen lg:h-screen lg:max-h-screen lg:flex lg:flex-col lg:justify-center bg-gradient-to-b from-[#F3F8FF] via-[#E9F3FE] to-[#DCEBFE] text-slate-900 relative antialiased overflow-hidden"
     >
       {/* Background Soft Glows & Ambient Orbs */}
       <div className="absolute top-10 left-10 w-96 h-96 bg-blue-200/30 rounded-full blur-3xl pointer-events-none" />
@@ -94,9 +94,9 @@ export const BlogSection: React.FC<BlogSectionProps> = ({ lang }) => {
       <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
         
         {/* ========================================================================= */}
-        {/* SECTION HEADER: Pill Badge, Main Title, Subtitle, Doodle & 3D Idea Laptop */}
+        {/* SECTION HEADER: Main Title, Subtitle, Doodle & 3D Idea Laptop            */}
         {/* ========================================================================= */}
-        <div className="relative text-center mb-12 sm:mb-16">
+        <div className="relative text-center mb-6 sm:mb-8 lg:mb-3 xl:mb-5">
           
           {/* Top-Left Playful Handwritten Doodle Note (as in screenshot) */}
           <div className="hidden lg:block absolute -top-2 left-6 xl:left-14 pointer-events-none select-none text-left">
@@ -109,7 +109,7 @@ export const BlogSection: React.FC<BlogSectionProps> = ({ lang }) => {
               </div>
               
               {/* Handwritten Blue Note */}
-              <p className="font-sans font-bold text-base xl:text-lg text-blue-600 -rotate-8 leading-snug tracking-tight">
+              <p className="font-sans font-bold text-sm xl:text-base text-blue-600 -rotate-8 leading-snug tracking-tight">
                 {isId ? 'Wawasan Baru' : 'New Insights'}
                 <br />
                 <span className="text-blue-500 font-medium">
@@ -122,14 +122,14 @@ export const BlogSection: React.FC<BlogSectionProps> = ({ lang }) => {
               </p>
 
               {/* Curved Underline Arrow */}
-              <svg className="w-20 h-5 text-blue-400 mt-1 -rotate-6" viewBox="0 0 100 24" fill="none">
+              <svg className="w-16 h-4 text-blue-400 mt-0.5 -rotate-6" viewBox="0 0 100 24" fill="none">
                 <path d="M5 12 Q 50 24 95 6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
               </svg>
             </div>
           </div>
 
           {/* Top-Right 3D Stylized Laptop, Glowing Bulb & Books Illustration */}
-          <div className="hidden lg:block absolute -top-12 right-4 xl:right-10 pointer-events-none select-none w-48 xl:w-56">
+          <div className="hidden xl:block absolute -top-8 right-4 xl:right-10 pointer-events-none select-none w-32 xl:w-40">
             <img 
               src="/images/blog_3d_idea_laptop.jpg" 
               alt="Digital School 3D Illustration with Light Bulb and Laptop" 
@@ -138,37 +138,24 @@ export const BlogSection: React.FC<BlogSectionProps> = ({ lang }) => {
             />
           </div>
 
-          {/* Center Pill Badge with BookOpen Icon */}
-          <div className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-blue-100/90 border border-blue-200 text-blue-800 text-xs font-bold tracking-wide shadow-2xs mb-3.5">
-            <BookOpen className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-            <span>{isId ? 'Blog & Informasi Sekolah' : 'Blog & School Insights'}</span>
-          </div>
-
           {/* High-Contrast Main Title */}
-          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-slate-900 tracking-tight leading-tight max-w-3xl mx-auto">
+          <h2 className="text-2xl sm:text-3xl lg:text-3xl xl:text-4xl font-black text-slate-900 tracking-tight leading-tight max-w-3xl mx-auto">
             <span>{isId ? 'Tips & Digitalisasi' : 'Tips & Digitalization'}</span>
-            <span className="block text-blue-600 mt-1">{isId ? 'Sekolah Dasar' : 'for Primary Schools'}</span>
+            <span className="block text-blue-600 mt-0.5">{isId ? 'Sekolah Dasar' : 'for Primary Schools'}</span>
           </h2>
 
           {/* Subtitle Description */}
-          <p className="mt-3 text-slate-600 text-xs sm:text-sm md:text-base leading-relaxed max-w-xl mx-auto font-normal">
+          <p className="mt-1.5 lg:mt-1 text-slate-600 text-xs sm:text-sm lg:text-xs xl:text-sm leading-relaxed max-w-xl mx-auto font-normal">
             {isId
               ? 'Edukasi dan panduan praktis pengelolaan presensi serta administrasi sekolah dasar.'
               : 'Actionable guidance and practical insights for primary school attendance administration.'}
           </p>
-
-          {/* Small Center Capsule Indicator (as in screenshot under subtitle) */}
-          <div className="flex items-center justify-center gap-1.5 mt-5">
-            <div className="w-8 h-1.5 bg-blue-600 rounded-full" />
-            <div className="w-1.5 h-1.5 bg-blue-300 rounded-full" />
-            <div className="w-1.5 h-1.5 bg-blue-200 rounded-full" />
-          </div>
         </div>
 
         {/* ========================================================================= */}
         {/* 3 BLOG POST CARDS: 3 Columns Grid                                         */}
         {/* ========================================================================= */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-7">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-3.5 xl:gap-5">
           {posts.map((post) => (
             <article
               key={post.id}
@@ -177,7 +164,7 @@ export const BlogSection: React.FC<BlogSectionProps> = ({ lang }) => {
             >
               <div>
                 {/* Thumbnail Image with Category Badge */}
-                <div className="relative h-48 sm:h-52 overflow-hidden bg-slate-100 block">
+                <div className="relative h-40 sm:h-44 lg:h-28 xl:h-36 overflow-hidden bg-slate-100 block">
                   <img 
                     src={post.image} 
                     alt={post.title} 
@@ -186,39 +173,39 @@ export const BlogSection: React.FC<BlogSectionProps> = ({ lang }) => {
                     loading="lazy"
                   />
                   {/* Category Pill Tag */}
-                  <span className="absolute top-4 left-4 bg-[#144CB3]/90 backdrop-blur-xs text-white px-3.5 py-1 rounded-lg text-xs font-bold tracking-wide shadow-sm">
+                  <span className="absolute top-2.5 left-2.5 bg-[#144CB3]/90 backdrop-blur-xs text-white px-2.5 py-0.5 rounded-md text-[10.5px] font-bold tracking-wide shadow-xs">
                     {post.category}
                   </span>
                 </div>
 
                 {/* Card Content */}
-                <div className="p-6 pb-2 space-y-3">
+                <div className="p-4 sm:p-5 lg:p-3 xl:p-4 pb-1 space-y-2">
                   {/* Date & Read Time */}
-                  <div className="flex items-center gap-3 text-xs font-semibold text-slate-500">
-                    <span className="flex items-center gap-1.5">
-                      <Calendar className="w-3.5 h-3.5 text-slate-400" /> {post.date}
+                  <div className="flex items-center gap-2.5 text-[11px] font-semibold text-slate-500">
+                    <span className="flex items-center gap-1">
+                      <Calendar className="w-3 h-3 text-slate-400" /> {post.date}
                     </span>
                     <span>•</span>
-                    <span className="flex items-center gap-1.5">
-                      <Clock className="w-3.5 h-3.5 text-slate-400" /> {post.readTime}
+                    <span className="flex items-center gap-1">
+                      <Clock className="w-3 h-3 text-slate-400" /> {post.readTime}
                     </span>
                   </div>
 
                   {/* Title */}
-                  <h3 className="text-base sm:text-lg font-black text-slate-900 group-hover:text-blue-600 transition-colors leading-snug">
+                  <h3 className="text-sm sm:text-base lg:text-xs xl:text-sm font-black text-slate-900 group-hover:text-blue-600 transition-colors leading-snug line-clamp-2">
                     {post.title}
                   </h3>
 
                   {/* Snippet */}
-                  <p className="text-xs sm:text-[13px] text-slate-600 leading-relaxed font-normal">
+                  <p className="text-xs lg:text-[11px] xl:text-xs text-slate-600 leading-relaxed font-normal line-clamp-2">
                     {post.snippet}
                   </p>
                 </div>
               </div>
 
               {/* Read More Link */}
-              <div className="p-6 pt-3">
-                <span className="text-xs sm:text-sm font-bold uppercase tracking-wider text-blue-600 group-hover:text-blue-700 inline-flex items-center gap-1.5 transition-colors cursor-pointer">
+              <div className="p-4 pt-1 lg:p-3 lg:pt-1">
+                <span className="text-xs lg:text-[11px] xl:text-xs font-bold uppercase tracking-wider text-blue-600 group-hover:text-blue-700 inline-flex items-center gap-1 transition-colors cursor-pointer">
                   {isId ? 'BACA SELENGKAPNYA →' : 'READ MORE →'}
                 </span>
               </div>
@@ -227,14 +214,14 @@ export const BlogSection: React.FC<BlogSectionProps> = ({ lang }) => {
         </div>
 
         {/* Bottom CTA Button: "Lihat Semua Artikel →" */}
-        <div className="text-center mt-12 sm:mt-14">
+        <div className="text-center mt-4 sm:mt-6 lg:mt-3 xl:mt-5">
           <button
             type="button"
-            className="inline-flex items-center gap-2.5 px-6 py-3.5 rounded-full bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold shadow-lg shadow-blue-600/25 hover:shadow-blue-600/35 transition-all duration-200 cursor-pointer"
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-bold shadow-md shadow-blue-600/20 hover:shadow-blue-600/30 transition-all duration-200 cursor-pointer"
           >
-            <BookOpen className="w-4 h-4 text-white" />
+            <BookOpen className="w-3.5 h-3.5 text-white" />
             <span>{isId ? 'Lihat Semua Artikel' : 'View All Articles'}</span>
-            <ArrowRight className="w-4 h-4" />
+            <ArrowRight className="w-3.5 h-3.5" />
           </button>
         </div>
 

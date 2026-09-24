@@ -1,12 +1,11 @@
-import React, { useState } from 'react';
-import { School, CheckCircle2, Star, Quote } from 'lucide-react';
+import React from 'react';
+import { School, CheckCircle2, Star } from 'lucide-react';
 
 interface TestimonialSectionProps {
   lang: 'ID' | 'EN';
 }
 
 export const TestimonialSection: React.FC<TestimonialSectionProps> = ({ lang }) => {
-  const [activePage, setActivePage] = useState(0);
   const isId = lang === 'ID';
 
   const testimonials = isId ? [
@@ -128,7 +127,7 @@ export const TestimonialSection: React.FC<TestimonialSectionProps> = ({ lang }) 
   return (
     <section 
       id="testimoni" 
-      className="scroll-mt-16 sm:scroll-mt-20 pt-16 sm:pt-20 pb-16 sm:pb-24 bg-gradient-to-b from-[#F3F8FF] via-[#E9F3FE] to-[#DCEBFE] text-slate-900 relative antialiased overflow-hidden"
+      className="scroll-mt-16 sm:scroll-mt-20 pt-16 sm:pt-20 pb-16 sm:pb-24 lg:py-0 lg:min-h-screen lg:h-screen lg:max-h-screen lg:flex lg:flex-col lg:justify-center bg-gradient-to-b from-[#F3F8FF] via-[#E9F3FE] to-[#DCEBFE] text-slate-900 relative antialiased overflow-hidden"
     >
       {/* Soft Ambient Background Glows */}
       <div className="absolute top-10 left-10 w-96 h-96 bg-blue-200/30 rounded-full blur-3xl pointer-events-none" />
@@ -153,13 +152,13 @@ export const TestimonialSection: React.FC<TestimonialSectionProps> = ({ lang }) 
       <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
         
         {/* ========================================================================= */}
-        {/* SECTION HEADER: Pill Badge, Main Title, Subtitle, Airplane & 3D School    */}
+        {/* SECTION HEADER: Main Title, Subtitle, Airplane & 3D School                */}
         {/* ========================================================================= */}
-        <div className="relative text-center mb-12 sm:mb-16">
+        <div className="relative text-center mb-6 sm:mb-8 lg:mb-3 xl:mb-5">
           
           {/* Top-Left Playful Paper Airplane with Trajectory Dashes */}
           <div className="hidden lg:block absolute -top-4 left-6 xl:left-12 pointer-events-none select-none">
-            <div className="relative w-36 h-28">
+            <div className="relative w-28 h-20">
               {/* Paper Airplane Dashed Flight Path */}
               <svg className="absolute inset-0 w-full h-full text-blue-400/80" viewBox="0 0 140 100" fill="none">
                 <path 
@@ -167,12 +166,12 @@ export const TestimonialSection: React.FC<TestimonialSectionProps> = ({ lang }) 
                   stroke="currentColor" 
                   strokeWidth="2" 
                   strokeDasharray="4 4" 
-                  strokeLinecap="round"
+                  strokeLinecap="round" 
                 />
               </svg>
               {/* Airplane Icon / Graphic */}
               <div className="absolute right-0 top-1 rotate-[15deg]">
-                <svg className="w-10 h-10 text-blue-500 fill-blue-500/90 drop-shadow-md" viewBox="0 0 24 24">
+                <svg className="w-8 h-8 text-blue-500 fill-blue-500/90 drop-shadow-md" viewBox="0 0 24 24">
                   <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
                 </svg>
               </div>
@@ -180,7 +179,7 @@ export const TestimonialSection: React.FC<TestimonialSectionProps> = ({ lang }) 
           </div>
 
           {/* Top-Right 3D Illustration of School with Flag & Bell Tower */}
-          <div className="hidden lg:block absolute -top-12 right-2 xl:right-6 pointer-events-none select-none w-48 xl:w-56">
+          <div className="hidden xl:block absolute -top-8 right-2 xl:right-6 pointer-events-none select-none w-32 xl:w-40 opacity-80">
             <img 
               src="/images/pricing_school_3d.jpg" 
               alt="Indonesian School 3D Illustration" 
@@ -189,42 +188,29 @@ export const TestimonialSection: React.FC<TestimonialSectionProps> = ({ lang }) 
             />
           </div>
 
-          {/* Center Pill Badge with Star Icon */}
-          <div className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-blue-100/90 border border-blue-200 text-blue-800 text-xs font-bold tracking-wide shadow-2xs mb-3.5">
-            <Star className="w-3.5 h-3.5 text-blue-600 fill-blue-600/30 shrink-0" />
-            <span>{isId ? 'TESTIMONI RESMI PENGGUNA' : 'OFFICIAL USER TESTIMONIALS'}</span>
-          </div>
-
           {/* High-Contrast Main Title */}
-          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-slate-900 tracking-tight leading-tight max-w-3xl mx-auto">
+          <h2 className="text-2xl sm:text-3xl lg:text-3xl xl:text-4xl font-black text-slate-900 tracking-tight leading-tight max-w-3xl mx-auto">
             <span>{isId ? 'Kepercayaan Sekolah' : 'Trusted by Schools'}</span>
-            <span className="block text-blue-600 mt-1">{isId ? 'di Seluruh Indonesia' : 'Across Indonesia'}</span>
+            <span className="block text-blue-600 mt-0.5">{isId ? 'di Seluruh Indonesia' : 'Across Indonesia'}</span>
           </h2>
 
           {/* Subtitle Description */}
-          <p className="mt-3 text-slate-600 text-xs sm:text-sm md:text-base leading-relaxed max-w-xl mx-auto font-normal">
+          <p className="mt-1.5 lg:mt-1 text-slate-600 text-xs sm:text-sm lg:text-xs xl:text-sm leading-relaxed max-w-xl mx-auto font-normal">
             {isId
               ? 'Kisah nyata dari kepala sekolah, wali kelas, guru, dan tata usaha yang telah merasakan manfaat sistem presensi ini.'
               : 'True stories from principals, homeroom teachers, subject instructors, and administrative staff who rely on our platform.'}
           </p>
-
-          {/* Small Center Capsule Indicator (as in screenshot under subtitle) */}
-          <div className="flex items-center justify-center gap-1.5 mt-5">
-            <div className="w-8 h-1.5 bg-blue-600 rounded-full" />
-            <div className="w-1.5 h-1.5 bg-blue-300 rounded-full" />
-            <div className="w-1.5 h-1.5 bg-blue-200 rounded-full" />
-          </div>
         </div>
 
         {/* ========================================================================= */}
         {/* 4 TESTIMONIAL CARDS GRID: 4 Columns (Responsive: 1 Mobile, 2 Tablet, 4 PC) */}
         {/* ========================================================================= */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 sm:gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-3 xl:gap-4">
           {testimonials.map((t) => (
             <div
               key={t.id}
               id={`testimonial-card-${t.id}`}
-              className="bg-white rounded-3xl p-6 shadow-[0_8px_24px_-8px_rgba(37,99,235,0.08)] border border-blue-100/80 hover:border-blue-300 hover:shadow-xl hover:shadow-blue-500/10 transition-all duration-300 flex flex-col justify-between relative overflow-hidden group min-h-[310px]"
+              className="bg-white rounded-3xl p-4 sm:p-5 lg:p-3 xl:p-4 shadow-[0_8px_24px_-8px_rgba(37,99,235,0.08)] border border-blue-100/80 hover:border-blue-300 hover:shadow-xl hover:shadow-blue-500/10 transition-all duration-300 flex flex-col justify-between relative overflow-hidden group min-h-[220px] lg:min-h-[175px] xl:min-h-[210px]"
             >
               {/* Bottom-right subtle corner organic blob */}
               <div className={`absolute -bottom-8 -right-8 w-28 h-28 ${t.cornerBlob} rounded-tl-full pointer-events-none transition-transform group-hover:scale-110`} />
@@ -320,42 +306,6 @@ export const TestimonialSection: React.FC<TestimonialSectionProps> = ({ lang }) 
 
             </div>
           ))}
-        </div>
-
-        {/* Bottom Pagination Dots Indicator (Matching Bottom of Screenshot) */}
-        <div className="flex items-center justify-center gap-2 mt-8 sm:mt-10">
-          <button
-            type="button"
-            onClick={() => setActivePage(0)}
-            className={`w-2.5 h-2.5 rounded-full transition-all cursor-pointer ${
-              activePage === 0 ? 'bg-blue-600 w-6' : 'bg-blue-300'
-            }`}
-            aria-label="Testimonial page 1"
-          />
-          <button
-            type="button"
-            onClick={() => setActivePage(1)}
-            className={`w-2.5 h-2.5 rounded-full transition-all cursor-pointer ${
-              activePage === 1 ? 'bg-blue-600 w-6' : 'bg-blue-300'
-            }`}
-            aria-label="Testimonial page 2"
-          />
-          <button
-            type="button"
-            onClick={() => setActivePage(2)}
-            className={`w-2.5 h-2.5 rounded-full transition-all cursor-pointer ${
-              activePage === 2 ? 'bg-blue-600 w-6' : 'bg-blue-300'
-            }`}
-            aria-label="Testimonial page 3"
-          />
-          <button
-            type="button"
-            onClick={() => setActivePage(3)}
-            className={`w-2.5 h-2.5 rounded-full transition-all cursor-pointer ${
-              activePage === 3 ? 'bg-blue-600 w-6' : 'bg-blue-300'
-            }`}
-            aria-label="Testimonial page 4"
-          />
         </div>
 
       </div>

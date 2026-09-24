@@ -6,7 +6,14 @@ function getGeminiClient(): GoogleGenAI | null {
   const key = process.env.GEMINI_API_KEY;
   if (!key) return null;
   if (!geminiClient) {
-    geminiClient = new GoogleGenAI({ apiKey: key });
+    geminiClient = new GoogleGenAI({
+      apiKey: key,
+      httpOptions: {
+        headers: {
+          'User-Agent': 'aistudio-build',
+        },
+      },
+    });
   }
   return geminiClient;
 }
@@ -276,24 +283,42 @@ ${dynamicContextBlock}
    - Jawaban harus lebih relevan, singkat, padat, ramah, dan membantu pengunjung menemukan langkah berikutnya dengan cepat.
    - Jangan menyebut section secara kaku jika tidak relevan.`;
 
-    // 1. Try Gemini first via @google/genai SDK (gemini-3.8-flash)
+    // 1. Try Gemini first via @google/genai SDK (gemini-3.6-flash / gemini-3.8-flash)
     const ai = getGeminiClient();
     if (ai) {
       try {
-        const response = await ai.models.generateContent({
-          model: 'gemini-3.8-flash',
-          contents: [
-            ...historyMessages,
-            {
-              role: 'user',
-              parts: [{ text: sanitizedQuestion }],
+        let response;
+        try {
+          response = await ai.models.generateContent({
+            model: 'gemini-3.6-flash',
+            contents: [
+              ...historyMessages,
+              {
+                role: 'user',
+                parts: [{ text: sanitizedQuestion }],
+              },
+            ],
+            config: {
+              systemInstruction: landingInstructionText,
+              temperature: 0.65,
             },
-          ],
-          config: {
-            systemInstruction: landingInstructionText,
-            temperature: 0.65,
-          },
-        });
+          });
+        } catch (mErr: any) {
+          response = await ai.models.generateContent({
+            model: 'gemini-3.1-flash-lite',
+            contents: [
+              ...historyMessages,
+              {
+                role: 'user',
+                parts: [{ text: sanitizedQuestion }],
+              },
+            ],
+            config: {
+              systemInstruction: landingInstructionText,
+              temperature: 0.65,
+            },
+          });
+        }
 
         const rawText = response.text || '';
         if (rawText && rawText.trim()) {
@@ -461,14 +486,26 @@ ${dynamicContextBlock}
           },
         ];
 
-        const response = await ai.models.generateContent({
-          model: 'gemini-3.8-flash',
-          contents: geminiContents,
-          config: {
-            systemInstruction: systemInstructionText,
-            temperature: 0.2,
-          },
-        });
+        let response;
+        try {
+          response = await ai.models.generateContent({
+            model: 'gemini-3.6-flash',
+            contents: geminiContents,
+            config: {
+              systemInstruction: systemInstructionText,
+              temperature: 0.2,
+            },
+          });
+        } catch (mErr: any) {
+          response = await ai.models.generateContent({
+            model: 'gemini-3.1-flash-lite',
+            contents: geminiContents,
+            config: {
+              systemInstruction: systemInstructionText,
+              temperature: 0.2,
+            },
+          });
+        }
 
         rawAnswer = response.text || null;
       }

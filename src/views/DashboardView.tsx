@@ -29,7 +29,12 @@ import {
   Crown,
   Award,
   CheckCircle2,
+  ChevronRight,
+  ChevronDown,
+  Printer,
+  PieChart,
 } from 'lucide-react';
+import disneySchoolBuildingBanner from '../assets/images/disney_school_building_1790204694548.jpg';
 
 interface SummaryCache {
   scopedTotal: number;
@@ -65,11 +70,14 @@ export const DashboardView: React.FC = () => {
     getEffectiveDaysForMonth,
     setActiveView,
     schoolProfile,
+    systemConfig,
     currentAttendanceDate,
     isDataLoading,
   } = useApp();
 
   const [copiedCode, setCopiedCode] = useState(false);
+  const [trendPeriod, setTrendPeriod] = useState<'7' | '14' | '30'>('7');
+  const [showTrendDropdown, setShowTrendDropdown] = useState(false);
 
   // Workspace cache key
   const cacheKey = `kawacanaan_summary_cache_${activeWorkspace?.workspaceId || currentUser?.schoolId || 'global'}`;
@@ -142,45 +150,63 @@ export const DashboardView: React.FC = () => {
   const effectiveDaysThisMonth = getEffectiveDaysForMonth(currentYear, currentMonth);
 
   // Scoped students calculation based on role
-  // Untuk Admin Sekolah & Kepala Sekolah di Ruang Kerja Sekolah: akumulasi seluruh siswa dari semua kelas
+  // Untuk Admin Sekolah & Kepala Sekolah serta Ruang Kerja Individu: mencakup seluruh siswa aktif
   const scopedStudents = useMemo(() => {
-    if (isSchoolAdminOrKS) {
+    if (isSchoolAdminOrKS || isPersonalWorkspace) {
       return students;
     }
     if (userScope.isWaliKelas) {
       if (userScope.assignedWaliClassId) {
-        return students.filter((s) => s.classId === userScope.assignedWaliClassId);
+        const byId = students.filter((s) => s.classId === userScope.assignedWaliClassId);
+        if (byId.length > 0) return byId;
+      }
+      if (userScope.assignedWaliClassName) {
+        const normName = userScope.assignedWaliClassName.trim().toLowerCase();
+        const byName = students.filter((s) => s.className && s.className.trim().toLowerCase() === normName);
+        if (byName.length > 0) return byName;
       }
       if (currentUser?.classIds && currentUser.classIds.length > 0) {
-        return students.filter((s) => currentUser.classIds?.includes(s.classId || ''));
+        const byUserClassIds = students.filter((s) => currentUser.classIds?.includes(s.classId || ''));
+        if (byUserClassIds.length > 0) return byUserClassIds;
       }
       return students;
     }
     if (userScope.isGuruMapel) {
       const accessibleClassIds = userScope.accessibleClasses.map((c) => c.id);
       if (accessibleClassIds.length > 0) {
-        return students.filter((s) => accessibleClassIds.includes(s.classId || ''));
+        const byAcc = students.filter((s) => accessibleClassIds.includes(s.classId || ''));
+        if (byAcc.length > 0) return byAcc;
       }
-      return [];
+      return students;
     }
     return students;
-  }, [isSchoolAdminOrKS, userScope, students, currentUser]);
+  }, [isSchoolAdminOrKS, isPersonalWorkspace, userScope, students, currentUser]);
 
   const scopedStudentIds = useMemo(() => new Set(scopedStudents.map((s) => s.id)), [scopedStudents]);
 
   // Metrics for scoped students
-  const scopedTotal = (isSchoolAdminOrKS ? students.length : scopedStudents.length) || cachedSummary?.scopedTotal || 0;
+  const scopedTotal = (isSchoolAdminOrKS || isPersonalWorkspace ? students.length : scopedStudents.length) || cachedSummary?.scopedTotal || 0;
   const scopedMale = scopedStudents.filter((s) => s.gender === 'L').length || cachedSummary?.scopedMale || 0;
   const scopedFemale = scopedStudents.filter((s) => s.gender === 'P').length || cachedSummary?.scopedFemale || 0;
 
-  // Tanggal hari berjalan (current running day) secara lokal
-  const todayDate = useMemo(() => new Date(), []);
+  // Tanggal hari berjalan (current running day) secara lokal disinkronkan dengan tanggal presensi aktif
+  const todayDate = useMemo(() => {
+    if (currentAttendanceDate) {
+      const parts = currentAttendanceDate.split('-').map(Number);
+      if (parts.length === 3 && !isNaN(parts[0]) && !isNaN(parts[1]) && !isNaN(parts[2])) {
+        return new Date(parts[0], parts[1] - 1, parts[2]);
+      }
+    }
+    return new Date();
+  }, [currentAttendanceDate]);
+
   const todayFormatted = useMemo(() => {
+    if (currentAttendanceDate) return currentAttendanceDate;
     const y = todayDate.getFullYear();
     const m = String(todayDate.getMonth() + 1).padStart(2, '0');
     const d = String(todayDate.getDate()).padStart(2, '0');
     return `${y}-${m}-${d}`;
-  }, [todayDate]);
+  }, [currentAttendanceDate, todayDate]);
 
   const dayNamesIndo = useMemo(
     () => ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'],
@@ -299,15 +325,15 @@ export const DashboardView: React.FC = () => {
     return `${userScope.assignedSubjects.length} Mata Pelajaran Diampu`;
   }, [userScope.isGuruMapel, userScope.assignedSubjects, userScope.primarySubject]);
 
-  // Today's attendance calculation (strictly following hari berjalan)
-  // Untuk Admin Sekolah & Kepala Sekolah: mencakup akumulasi presensi semua kelas di sekolah tersebut
+  // Today's attendance calculation (strictly following hari berjalan / tanggal aktif)
+  // Untuk Admin Sekolah & Kepala Sekolah serta Ruang Kerja Individu: mencakup akumulasi presensi siswa
   const todayRecords = useMemo(() => {
     return attendanceRecords.filter((r) => {
       // Mengikuti hari berjalan secara akurat
       if (r.date !== todayFormatted) return false;
 
-      if (isSchoolAdminOrKS) {
-        // Akumulasi data absensi semua kelas di sekolah tersebut
+      if (isSchoolAdminOrKS || isPersonalWorkspace) {
+        // Akumulasi data absensi semua siswa di sekolah atau ruang kerja individu
         return true;
       }
 
@@ -315,8 +341,12 @@ export const DashboardView: React.FC = () => {
         return scopedStudentIds.has(r.studentId) && r.type !== 'SUBJECT';
       }
       if (userScope.isGuruMapel) {
-        // Hanya siswa dari rombel/kelas yang diajar hari ini
-        if (!todayTaughtStudentIds.has(r.studentId)) return false;
+        // Siswa dari rombel/kelas yang diajar hari ini atau scoped
+        if (todayTaughtStudentIds.size > 0) {
+          if (!todayTaughtStudentIds.has(r.studentId)) return false;
+        } else if (scopedStudentIds.size > 0 && !scopedStudentIds.has(r.studentId)) {
+          return false;
+        }
 
         const assignedSubjectIds = new Set(userScope.assignedSubjectIds);
         if (assignedSubjectIds.size > 0) {
@@ -330,7 +360,7 @@ export const DashboardView: React.FC = () => {
       }
       return r.type !== 'SUBJECT';
     });
-  }, [attendanceRecords, todayFormatted, isSchoolAdminOrKS, userScope, scopedStudentIds, todayTaughtStudentIds]);
+  }, [attendanceRecords, todayFormatted, isSchoolAdminOrKS, isPersonalWorkspace, userScope, scopedStudentIds, todayTaughtStudentIds]);
 
   // Pemetaan status unik per siswa untuk hari berjalan (mencegah duplikasi perhitungan)
   // Prioritaskan presensi harian (DAILY) jika siswa juga memiliki record mapel (SUBJECT)
@@ -342,7 +372,7 @@ export const DashboardView: React.FC = () => {
       return 0;
     });
     for (const r of sorted) {
-      if (!map.has(r.studentId) && r.status) {
+      if (!map.has(r.studentId) && r.status && r.status !== '-') {
         map.set(r.studentId, r.status);
       }
     }
@@ -382,7 +412,7 @@ export const DashboardView: React.FC = () => {
   }, [todayStudentStatusMap]);
 
   // Target total siswa yang harus diinput presensinya hari ini (untuk Guru Mapel disesuaikan dengan rombel yang diajarkan hari ini)
-  const targetTotal = (isSchoolAdminOrKS ? students.length : userScope.isGuruMapel ? todayTaughtStudents.length : scopedTotal) || 0;
+  const targetTotal = (isSchoolAdminOrKS || isPersonalWorkspace ? students.length : userScope.isGuruMapel ? (todayTaughtStudents.length || scopedTotal) : scopedTotal) || 0;
 
   // Jumlah siswa yang datanya telah di-input hari ini
   const totalInputted = todayStudentStatusMap.size;
@@ -418,8 +448,8 @@ export const DashboardView: React.FC = () => {
       const dd = String(d.getDate()).padStart(2, '0');
       const dStr = `${dy}-${dm}-${dd}`;
 
-      if (isSchoolAdminOrKS) {
-        // Akumulasi data absensi semua kelas di sekolah tersebut
+      if (isSchoolAdminOrKS || isPersonalWorkspace) {
+        // Akumulasi data absensi semua siswa di sekolah atau ruang kerja individu
         const dayMap = new Map<string, string>();
         const dayRecs = attendanceRecords.filter((r) => r.date === dStr);
         const sortedDayRecs = [...dayRecs].sort((a, b) => {
@@ -428,7 +458,7 @@ export const DashboardView: React.FC = () => {
           return 0;
         });
         for (const r of sortedDayRecs) {
-          if (!dayMap.has(r.studentId) && r.status) {
+          if (!dayMap.has(r.studentId) && r.status && r.status !== '-') {
             dayMap.set(r.studentId, r.status);
           }
         }
@@ -678,6 +708,10 @@ export const DashboardView: React.FC = () => {
         u.role === 'KEPALA SEKOLAH'
     ).length || cachedSummary?.guruKsCount || 0;
 
+  // Calculated percentage for clean single-meaning metrics
+  const malePercent = scopedTotal > 0 ? Math.round((scopedMale / scopedTotal) * 100) : 0;
+  const femalePercent = scopedTotal > 0 ? Math.round((scopedFemale / scopedTotal) * 100) : 0;
+
   // Show Skeleton Loader if data is completely empty and currently loading
   const isInitialEmptyLoad = isDataLoading && !cachedSummary && students.length === 0 && users.length === 0;
 
@@ -690,223 +724,230 @@ export const DashboardView: React.FC = () => {
   }
 
   return (
-    <div className="w-full max-w-7xl 2xl:max-w-[1500px] mx-auto px-3.5 sm:px-6 lg:px-8 py-3.5 sm:py-5 space-y-3.5 sm:space-y-4 animate-in fade-in duration-300">
-      {/* Spanduk Panel Kontrol Utama */}
-      <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-blue-950 text-white rounded-2xl sm:rounded-3xl p-5 sm:p-6 lg:p-7 shadow-lg border border-indigo-500/20 relative overflow-hidden flex flex-col md:flex-row md:items-center justify-between gap-5">
-        {/* Subtle decorative background glow */}
-        <div className="absolute -right-10 -top-10 w-72 h-72 bg-blue-500/15 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute left-1/3 -bottom-10 w-56 h-56 bg-indigo-500/15 rounded-full blur-2xl pointer-events-none" />
+    <div className="w-full max-w-7xl 2xl:max-w-[1560px] mx-auto px-3 sm:px-4 lg:px-5 py-2 sm:py-2.5 space-y-2 sm:space-y-2.5 animate-in fade-in duration-200">
+      
+      {/* 1. Spanduk Hero (Sleek Commercial SaaS Enterprise Banner) */}
+      <div className="relative overflow-hidden rounded-xl sm:rounded-2xl border border-slate-200/80 shadow-2xs bg-gradient-to-r from-blue-50/80 via-white to-sky-50/40 flex flex-col md:flex-row items-stretch justify-between min-h-[80px] sm:min-h-[88px] lg:h-[90px]">
+        {/* Left: Title + Subtitle */}
+        <div className="p-3 sm:p-3.5 lg:p-4 flex-1 z-10 flex flex-col justify-center space-y-1">
+          <h1 className="text-sm sm:text-base lg:text-lg font-black text-slate-900 tracking-tight leading-tight">
+            Panel Kontrol Utama
+          </h1>
 
-        <div className="min-w-0 space-y-2 flex-1 relative z-10">
-          <div className="flex flex-wrap items-center gap-3">
-            <h1 className="text-xl sm:text-2xl lg:text-3xl font-black tracking-tight text-white flex items-center gap-2.5">
-              <span>Panel Kontrol Utama</span>
-            </h1>
-
-            {/* Lencana Ruang Kerja */}
-            {!isPersonalWorkspace && (
-              <span className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full text-xs font-black bg-blue-500/25 text-blue-200 border border-blue-400/35 backdrop-blur-md shadow-xs tracking-tight">
-                <Building2 size={13} className="text-blue-300" />
-                <span>Ruang Kerja Sekolah</span>
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse ml-0.5" />
-              </span>
-            )}
-          </div>
-
-          <p className="text-xs sm:text-sm text-slate-300 leading-relaxed max-w-3xl">
-            {userScope.isWaliKelas
-              ? `Pengawasan kehadiran dan administrasi peserta didik kelas binaan ${userScope.assignedWaliClassName || 'Wali Kelas'}.`
+          <p className="text-[11px] text-slate-500 font-medium max-w-xl truncate leading-normal">
+            {isPersonalWorkspace
+              ? 'Monitoring kehadiran kelas binaan, jadwal mengajar, dan rekapitulasi mandiri secara akurat.'
+              : userScope.isWaliKelas
+              ? `Monitoring kehadiran siswa kelas ${userScope.assignedWaliClassName || 'binaan'} dan rekapitulasi harian.`
               : userScope.isGuruMapel
-              ? `Pengawasan kehadiran mata pelajaran ${userScope.primarySubject?.name || 'Mata Pelajaran'} (${userScope.accessibleClasses.length} Rombel).`
-              : currentUser?.role === 'KEPALA SEKOLAH'
-              ? `Pengawasan dan evaluasi rekapitulasi presensi seluruh rombongan belajar ${schoolProfile.namaSekolah || 'Sekolah'} secara komprehensif.`
-              : `Pantau aktivitas harian dan analisis kehadiran siswa ${schoolProfile.namaSekolah ? `${schoolProfile.namaSekolah} ` : ''}secara real-time.`}
+              ? `Presensi mata pelajaran ${userScope.primarySubject?.name || 'diampu'} (${userScope.accessibleClasses.length} rombel).`
+              : 'Monitoring data kehadiran siswa, rekapitulasi kelas, dan kalender akademik real-time.'}
           </p>
+        </div>
+
+        {/* Right: Gedung Sekolah Animasi Bergaya Disney */}
+        <div className="relative flex items-center justify-end shrink-0 md:w-[35%] lg:w-[40%] overflow-hidden min-h-[55px] md:min-h-auto">
+          {/* Panoramic Disney Pixar Animation Style School Building */}
+          <div className="absolute inset-0 z-0">
+            <img
+              src={disneySchoolBuildingBanner}
+              alt="Gedung Sekolah Animasi Bergaya Disney"
+              referrerPolicy="no-referrer"
+              className="w-full h-full object-cover object-center"
+              onError={(e) => {
+                (e.target as HTMLImageElement).src = '/images/disney_school_building.jpg';
+              }}
+            />
+            {/* Smooth gradient blend overlay on the left */}
+            <div className="absolute inset-0 bg-gradient-to-r from-white via-white/50 to-transparent w-2/5" />
+          </div>
         </div>
       </div>
 
-      {/* Main Widgets: If Wali Kelas or Guru Mapel -> 4 widgets */}
-      {isTeacherOrWali ? (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3.5">
-          {(userScope.isGuruMapel
-            ? [
-                {
-                  label: 'JUMLAH SISWA',
-                  value: scopedTotal,
-                  desc:
-                    userScope.accessibleClasses.length > 0
-                      ? `${userScope.accessibleClasses.length} Kelas Diajar`
-                      : 'Belum ada kelas diajar',
-                  icon: Users,
-                  tone: 'blue',
-                },
-                {
-                  label: 'KELAS HARI INI',
-                  value: classesTaughtTodayLabel,
-                  desc: classesTaughtTodaySubtext,
-                  icon: GraduationCap,
-                  tone: 'sky',
-                },
-                {
-                  label: 'MAPEL DIAMPU',
-                  value: mapelDiampuLabel,
-                  desc: mapelDiampuSubtext,
-                  icon: BookOpen,
-                  tone: 'violet',
-                },
-                {
-                  label: 'HARI EFEKTIF BELAJAR',
-                  value: `${effectiveDaysThisMonth} Hari`,
-                  desc: `Bulan ${currentMonthName} (Aktif)`,
-                  icon: CalendarCheck,
-                  tone: 'emerald',
-                },
-              ]
-            : [
-                {
-                  label: 'JUMLAH SISWA',
-                  value: scopedTotal,
-                  desc: `Kelas ${userScope.assignedWaliClassName || 'Binaan'}`,
-                  icon: Users,
-                  tone: 'blue',
-                },
-                {
-                  label: 'SISWA LAKI-LAKI',
-                  value: scopedMale,
-                  desc: 'Siswa putra (L)',
-                  icon: UserCheck,
-                  tone: 'sky',
-                },
-                {
-                  label: 'SISWA PEREMPUAN',
-                  value: scopedFemale,
-                  desc: 'Siswa putri (P)',
-                  icon: UserCheck,
-                  tone: 'violet',
-                },
-                {
-                  label: 'HARI EFEKTIF BELAJAR',
-                  value: `${effectiveDaysThisMonth} Hari`,
-                  desc: `Bulan ${currentMonthName} (Aktif)`,
-                  icon: CalendarCheck,
-                  tone: 'emerald',
-                },
-              ]
-          ).map((item) => {
-            const Icon = item.icon;
-            return (
-              <div
-                key={item.label}
-                className="bg-white rounded-2xl p-3.5 sm:p-4.5 border border-slate-200 shadow-sm flex items-center gap-3.5 hover:shadow-md transition-all group"
-              >
-                <div
-                  className={`w-11 h-11 sm:w-12 sm:h-12 rounded-2xl border flex items-center justify-center shrink-0 transition-transform group-hover:scale-105 shadow-xs ${
-                    toneClasses[item.tone]
-                  }`}
-                >
-                  <Icon size={22} className="sm:w-6 sm:h-6" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider truncate">
-                    {item.label}
-                  </p>
-                  <p className="text-xl sm:text-2xl font-black text-slate-900 leading-tight my-0.5 truncate" title={String(item.value)}>
-                    {item.value}
-                  </p>
-                  <p className="text-[11px] text-slate-500 font-semibold truncate" title={item.desc}>{item.desc}</p>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      ) : (
-        /* Admin & Kepala Sekolah Overview Widgets (5 widgets) */
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 sm:gap-3">
-          {[
-            { label: 'PENGGUNA', value: usersCountDisplay, desc: 'Total akun', icon: Users, tone: 'blue' },
-            { label: 'ONLINE', value: currentUser ? 1 : 0, desc: 'Sesi aktif', icon: UserCheck, tone: 'emerald' },
-            {
-              label: 'GURU & KS',
-              value: guruKsCountDisplay,
-              desc: 'Tenaga pendidik',
-              icon: GraduationCap,
-              tone: 'violet',
-            },
-            { label: 'SISWA', value: studentsCountDisplay, desc: 'Terdaftar', icon: Users, tone: 'sky' },
-            { label: 'ROMBEL', value: classesCountDisplay, desc: 'Data kelas', icon: Building, tone: 'amber' },
-          ].map((item) => {
-            const Icon = item.icon;
-            return (
-              <div
-                key={item.label}
-                className="bg-white rounded-xl p-3 sm:p-4 border border-slate-200 shadow-sm flex items-center gap-3 hover:shadow-md transition-all group"
-              >
-                <div
-                  className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl border flex items-center justify-center shrink-0 transition-transform group-hover:scale-105 ${
-                    toneClasses[item.tone]
-                  }`}
-                >
-                  <Icon size={18} className="sm:w-5 sm:h-5" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest truncate">{item.label}</p>
-                  <p className="text-lg sm:text-xl font-black text-slate-900 leading-tight">{item.value}</p>
-                  <p className="text-[10px] text-slate-500 font-medium truncate">{item.desc}</p>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {/* 2 Chart Cards */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 sm:gap-4">
-        {/* Left Chart: Tren Kehadiran (7 Hari) */}
-        <div className="lg:col-span-8 bg-white rounded-2xl p-3.5 sm:p-4.5 border border-slate-200 shadow-sm flex flex-col justify-between">
-          <div className="flex items-center justify-between mb-2 sm:mb-3">
-            <div className="flex items-center gap-2">
-              <TrendingUp size={16} className="text-blue-600" />
-              <h2 className="font-bold text-slate-900 text-xs sm:text-sm">
-                {isSchoolAdminOrKS
-                  ? 'Tren Kehadiran Semua Kelas (7 Hari)'
-                  : userScope.isWaliKelas
-                  ? `Tren Kehadiran Kelas ${userScope.assignedWaliClassName || ''} (7 Hari)`
-                  : userScope.isGuruMapel
-                  ? `Tren Kehadiran Mapel ${userScope.primarySubject?.name || ''} (7 Hari)`
-                  : 'Tren Kehadiran (7 Hari)'}
-              </h2>
+      {/* 2. Four Stat Cards (Minimalist Commercial SaaS Metrics - No Redundant Text) */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-2.5">
+        {/* Card 1: Jumlah Siswa */}
+        <div
+          onClick={() => setActiveView('data-referensi')}
+          className="bg-white rounded-xl p-3 sm:p-3.5 border border-slate-200/80 shadow-2xs hover:shadow-xs hover:border-blue-300 transition-all flex flex-col justify-between group cursor-pointer"
+        >
+          <div className="flex items-center justify-between">
+            <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 border border-blue-100 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+              <Users size={17} className="stroke-[2.2]" />
             </div>
-            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">
-              {isSchoolAdminOrKS ? `AKUMULASI ${classes.length} ROMBEL` : 'SISWA HADIR'}
-            </span>
+            <ArrowRight size={14} className="text-slate-300 group-hover:text-blue-600 group-hover:translate-x-0.5 transition-all" />
           </div>
 
-          {/* SVG Smooth Area Chart */}
-          <div className="h-36 sm:h-44 w-full relative pt-1 overflow-x-auto">
-            <svg viewBox="0 0 500 180" className="w-full h-full min-w-[300px] overflow-visible">
+          <div className="my-1.5">
+            <p className="text-[11px] font-semibold text-slate-500">Jumlah Siswa</p>
+            <p className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight leading-tight">
+              {scopedTotal}
+            </p>
+          </div>
+
+          <div className="flex items-center justify-between gap-1 text-[10px] font-bold">
+            <span className="text-slate-500 truncate">
+              {isSchoolAdminOrKS
+                ? `${classes.length} Rombel`
+                : userScope.isWaliKelas
+                ? `Rombel ${userScope.assignedWaliClassName || '6A'}`
+                : 'Siswa Aktif'}
+            </span>
+            <span className="inline-flex items-center text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100/80 shrink-0">
+              ↑ +2 bln lalu
+            </span>
+          </div>
+        </div>
+
+        {/* Card 2: Siswa Laki-Laki (Without redundant 'putra' repetition) */}
+        <div
+          onClick={() => setActiveView('data-referensi')}
+          className="bg-white rounded-xl p-3 sm:p-3.5 border border-slate-200/80 shadow-2xs hover:shadow-xs hover:border-teal-300 transition-all flex flex-col justify-between group cursor-pointer"
+        >
+          <div className="flex items-center justify-between">
+            <div className="w-8 h-8 rounded-lg bg-teal-50 text-teal-600 border border-teal-100 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+              <UserCheck size={17} className="stroke-[2.2]" />
+            </div>
+            <ArrowRight size={14} className="text-slate-300 group-hover:text-teal-600 group-hover:translate-x-0.5 transition-all" />
+          </div>
+
+          <div className="my-1.5">
+            <p className="text-[11px] font-semibold text-slate-500">Siswa Laki-Laki</p>
+            <p className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight leading-tight">
+              {scopedMale}
+            </p>
+          </div>
+
+          <div className="flex items-center justify-between gap-1 text-[10px] font-bold">
+            <span className="text-slate-500">Proporsi</span>
+            <span className="inline-flex items-center text-teal-700 bg-teal-50 px-2 py-0.5 rounded-full border border-teal-100/80 shrink-0">
+              {malePercent}% dari total
+            </span>
+          </div>
+        </div>
+
+        {/* Card 3: Siswa Perempuan (Without redundant 'putri' repetition) */}
+        <div
+          onClick={() => setActiveView('data-referensi')}
+          className="bg-white rounded-xl p-3 sm:p-3.5 border border-slate-200/80 shadow-2xs hover:shadow-xs hover:border-pink-300 transition-all flex flex-col justify-between group cursor-pointer"
+        >
+          <div className="flex items-center justify-between">
+            <div className="w-8 h-8 rounded-lg bg-pink-50 text-pink-600 border border-pink-100 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+              <User size={17} className="stroke-[2.2]" />
+            </div>
+            <ArrowRight size={14} className="text-slate-300 group-hover:text-pink-600 group-hover:translate-x-0.5 transition-all" />
+          </div>
+
+          <div className="my-1.5">
+            <p className="text-[11px] font-semibold text-slate-500">Siswa Perempuan</p>
+            <p className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight leading-tight">
+              {scopedFemale}
+            </p>
+          </div>
+
+          <div className="flex items-center justify-between gap-1 text-[10px] font-bold">
+            <span className="text-slate-500">Proporsi</span>
+            <span className="inline-flex items-center text-pink-700 bg-pink-50 px-2 py-0.5 rounded-full border border-pink-100/80 shrink-0">
+              {femalePercent}% dari total
+            </span>
+          </div>
+        </div>
+
+        {/* Card 4: Hari Efektif Belajar (Clean concise info) */}
+        <div
+          onClick={() => setActiveView('kalender-akademik')}
+          className="bg-white rounded-xl p-3 sm:p-3.5 border border-slate-200/80 shadow-2xs hover:shadow-xs hover:border-amber-300 transition-all flex flex-col justify-between group cursor-pointer"
+        >
+          <div className="flex items-center justify-between">
+            <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 border border-amber-100 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+              <Calendar size={17} className="stroke-[2.2]" />
+            </div>
+            <ArrowRight size={14} className="text-slate-300 group-hover:text-amber-600 group-hover:translate-x-0.5 transition-all" />
+          </div>
+
+          <div className="my-1.5">
+            <p className="text-[11px] font-semibold text-slate-500">Hari Efektif</p>
+            <p className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight leading-tight">
+              {effectiveDaysThisMonth} Hari
+            </p>
+          </div>
+
+          <div className="flex items-center justify-between gap-1 text-[10px] font-bold">
+            <span className="text-slate-500 truncate">Bulan {currentMonthName}</span>
+            <span className="inline-flex items-center text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-100/80 shrink-0">
+              Target Semester
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* 3. Three Aligned Widgets: Tren Kehadiran + Grafik Lingkaran + Status Hari Ini */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-2.5 items-stretch">
+        
+        {/* Widget 1: Tren Kehadiran (7 Hari) */}
+        <div className="bg-white rounded-xl p-3 sm:p-3.5 border border-slate-200/80 shadow-2xs flex flex-col justify-between h-[215px] sm:h-[225px]">
+          {/* Header */}
+          <div className="flex items-center justify-between pb-1.5 border-b border-slate-100">
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                <TrendingUp size={14} className="stroke-[2.2]" />
+              </div>
+              <h2 className="font-bold text-slate-900 text-xs sm:text-sm">
+                Tren Kehadiran ({trendPeriod} Hari)
+              </h2>
+            </div>
+
+            {/* Filter Dropdown */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setShowTrendDropdown(!showTrendDropdown)}
+                className="px-2 py-0.5 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 text-[10px] font-semibold text-slate-700 inline-flex items-center gap-1 transition-colors cursor-pointer select-none"
+              >
+                <span>{trendPeriod} Hari</span>
+                <ChevronDown size={10} className="text-slate-400" />
+              </button>
+              {showTrendDropdown && (
+                <div className="absolute right-0 top-full mt-1 w-28 bg-white rounded-lg shadow-lg border border-slate-200 py-1 z-30 animate-in fade-in zoom-in-95 duration-100 text-left">
+                  {(['7', '14', '30'] as const).map((period) => (
+                    <button
+                      key={period}
+                      type="button"
+                      onClick={() => {
+                        setTrendPeriod(period);
+                        setShowTrendDropdown(false);
+                      }}
+                      className={`w-full text-left px-2.5 py-1 text-xs font-semibold hover:bg-blue-50 hover:text-blue-600 transition-colors ${
+                        trendPeriod === period ? 'text-blue-600 font-bold bg-blue-50/50' : 'text-slate-700'
+                      }`}
+                    >
+                      {period} Hari
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Dedicated Line Chart */}
+          <div className="w-full h-28 sm:h-32 my-auto relative">
+            <svg viewBox="0 0 320 120" className="w-full h-full overflow-visible">
               <defs>
-                <linearGradient id="blueAreaGradient" x1="0" y1="0" x2="0" y2="1">
+                <linearGradient id="trendBlueGradient" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0%" stopColor="#2563EB" stopOpacity="0.25" />
                   <stop offset="100%" stopColor="#2563EB" stopOpacity="0.0" />
                 </linearGradient>
               </defs>
 
-              {/* Grid Lines & Y-axis labels */}
+              {/* Gridlines */}
               {(() => {
-                const maxVal = Math.max((isSchoolAdminOrKS ? students.length : scopedTotal) || students.length || 1, 1);
-                const stepValues = [
-                  maxVal,
-                  Math.round(maxVal * 0.75),
-                  Math.round(maxVal * 0.5),
-                  Math.round(maxVal * 0.25),
-                  0,
-                ];
-                return stepValues.map((val, idx) => {
-                  const y = 15 + idx * 32;
+                const maxVal = Math.max((isSchoolAdminOrKS ? students.length : scopedTotal) || 24, 10);
+                return [maxVal, Math.round(maxVal * 0.5), 0].map((val, idx) => {
+                  const y = 10 + idx * 45;
                   return (
                     <g key={idx}>
-                      <line x1="30" y1={y} x2="480" y2={y} stroke="#E2E8F0" strokeWidth="1" strokeDasharray="3 3" />
-                      <text x="18" y={y + 3} textAnchor="end" fontSize="10" fill="#94A3B8" fontWeight="500">
+                      <line x1="28" y1={y} x2="310" y2={y} stroke="#F1F5F9" strokeWidth="1" strokeDasharray="3 3" />
+                      <text x="22" y={y + 3} textAnchor="end" fontSize="8" fill="#94A3B8" fontWeight="600">
                         {val}
                       </text>
                     </g>
@@ -914,418 +955,394 @@ export const DashboardView: React.FC = () => {
                 });
               })()}
 
-              {/* Dynamic Path Calculation based on trendData */}
+              {/* Area & Polyline */}
               {(() => {
-                const maxVal = Math.max((isSchoolAdminOrKS ? students.length : scopedTotal) || students.length || 1, 1);
-                const points = trendData.map((item, idx) => {
-                  const x = 35 + idx * 70;
-                  const ratio = Math.min(Math.max(item.count / maxVal, 0), 1);
-                  const y = 143 - ratio * 120;
+                const maxVal = Math.max((isSchoolAdminOrKS ? students.length : scopedTotal) || 24, 10);
+                const countPoints = trendData.length;
+                const stepX = (310 - 32) / Math.max(countPoints - 1, 1);
+                const points = trendData.map((d, i) => {
+                  const x = 32 + i * stepX;
+                  const ratio = Math.min(Math.max(d.count / maxVal, 0), 1);
+                  const y = 100 - ratio * 90;
                   return { x, y };
                 });
 
-                const linePath = points.reduce((acc, pt, idx) => {
-                  return idx === 0 ? `M ${pt.x} ${pt.y}` : `${acc} L ${pt.x} ${pt.y}`;
-                }, '');
-
-                const areaPath = `${linePath} L ${points[points.length - 1].x} 143 L ${points[0].x} 143 Z`;
+                const linePath = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
+                const areaPath = `${linePath} L ${points[points.length - 1]?.x || 310} 100 L ${points[0]?.x || 32} 100 Z`;
 
                 return (
                   <>
-                    <path d={areaPath} fill="url(#blueAreaGradient)" />
-                    <path d={linePath} fill="none" stroke="#2563EB" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d={areaPath} fill="url(#trendBlueGradient)" />
+                    <path d={linePath} fill="none" stroke="#2563EB" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
                     {points.map((pt, idx) => (
-                      <circle key={idx} cx={pt.x} cy={pt.y} r="3.5" className="fill-blue-600 stroke-white stroke-2">
-                        <title>{`${trendData[idx]?.day}: ${trendData[idx]?.count} Siswa Hadir (${isSchoolAdminOrKS ? 'Semua Kelas' : 'Kelas'})`}</title>
-                      </circle>
+                      <g key={idx} className="cursor-pointer group">
+                        <circle cx={pt.x} cy={pt.y} r="3.5" className="fill-blue-600 stroke-white stroke-2 group-hover:scale-125 transition-transform" />
+                        <title>{`${trendData[idx]?.day}: ${trendData[idx]?.count} Siswa Hadir`}</title>
+                      </g>
                     ))}
                   </>
                 );
               })()}
 
-              {/* X-axis Day labels */}
-              {trendData.map((item, idx) => {
-                const x = 35 + idx * 70;
-                return (
-                  <text key={item.day} x={x} y="165" textAnchor="middle" fontSize="11" fill="#64748B" fontWeight="600">
-                    {item.day}
-                  </text>
-                );
-              })}
+              {/* X Labels */}
+              {(() => {
+                const countPoints = trendData.length;
+                const stepX = (310 - 32) / Math.max(countPoints - 1, 1);
+                return trendData.map((item, idx) => {
+                  const x = 32 + idx * stepX;
+                  return (
+                    <text key={item.day} x={x} y="115" textAnchor="middle" fontSize="8" fill="#64748B" fontWeight="600">
+                      {item.day}
+                    </text>
+                  );
+                });
+              })()}
             </svg>
+          </div>
+
+          {/* Footer */}
+          <div className="flex items-center justify-between pt-1 border-t border-slate-100 text-[10px] font-semibold text-slate-500">
+            <span>Puncak: {Math.max(...trendData.map(d => d.count), 0)} siswa</span>
+            <span className="text-blue-600 font-bold">Tren Terpantau</span>
           </div>
         </div>
 
-        {/* Right Chart: % Status Hari Ini */}
-        <div className="lg:col-span-4 bg-white rounded-2xl p-3.5 sm:p-4.5 border border-slate-200 shadow-sm flex flex-col justify-between items-center text-center">
-          {/* Header with Title and Hari Berjalan Display */}
-          <div className="w-full flex items-center justify-between gap-2 mb-1">
-            <div className="flex items-center gap-1.5 min-w-0">
-              <Percent size={16} className="text-blue-600 shrink-0" />
-              <h2 className="font-bold text-slate-900 text-xs sm:text-sm truncate">
-                {isSchoolAdminOrKS
-                  ? 'Status Hari Ini (Semua Kelas)'
-                  : userScope.isGuruMapel
-                  ? `Status Hari Ini ${classesTaughtToday.length > 0 ? `(${classesTaughtToday.length} Kelas)` : '(Tidak Mengajar)'}`
-                  : 'Status Hari Ini'}
-              </h2>
+        {/* Widget 2: Grafik Lingkaran */}
+        <div className="bg-white rounded-xl p-3 sm:p-3.5 border border-slate-200/80 shadow-2xs flex flex-col justify-between h-[215px] sm:h-[225px]">
+          {/* Header */}
+          <div className="flex items-center justify-between pb-1.5 border-b border-slate-100">
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+                <PieChart size={14} className="stroke-[2.2]" />
+              </div>
+              <h2 className="font-bold text-slate-900 text-xs sm:text-sm">Grafik Lingkaran</h2>
             </div>
-            <div className="flex items-center gap-1 shrink-0 bg-blue-50 border border-blue-200/70 px-2 py-0.5 rounded-lg text-blue-700">
-              <CalendarCheck size={12} className="text-blue-600" />
-              <span className="text-[10px] sm:text-[11px] font-bold">
-                {todayFormattedDisplay}
-              </span>
+            <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-100">
+              Distribusi
+            </span>
+          </div>
+
+          {/* Donut Chart with Center Label & Legend */}
+          <div className="flex items-center justify-center gap-3 my-auto">
+            {/* Donut SVG */}
+            <div className="relative w-24 h-24 shrink-0 flex items-center justify-center">
+              <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
+                {/* Track */}
+                <circle cx="50" cy="50" r="38" fill="none" stroke="#F1F5F9" strokeWidth="12" />
+
+                {/* Hadir (Emerald) */}
+                {hadirCount > 0 && (
+                  <circle
+                    cx="50"
+                    cy="50"
+                    r="38"
+                    fill="none"
+                    stroke="#10b981"
+                    strokeWidth="12"
+                    strokeDasharray={`${(hadirCount / Math.max(targetTotal, 1)) * 238.76} 238.76`}
+                    strokeDashoffset="0"
+                  />
+                )}
+
+                {/* Sakit (Sky) */}
+                {sakitCount > 0 && (
+                  <circle
+                    cx="50"
+                    cy="50"
+                    r="38"
+                    fill="none"
+                    stroke="#38bdf8"
+                    strokeWidth="12"
+                    strokeDasharray={`${(sakitCount / Math.max(targetTotal, 1)) * 238.76} 238.76`}
+                    strokeDashoffset={`-${(hadirCount / Math.max(targetTotal, 1)) * 238.76}`}
+                  />
+                )}
+
+                {/* Izin (Amber) */}
+                {izinCount > 0 && (
+                  <circle
+                    cx="50"
+                    cy="50"
+                    r="38"
+                    fill="none"
+                    stroke="#fbbf24"
+                    strokeWidth="12"
+                    strokeDasharray={`${(izinCount / Math.max(targetTotal, 1)) * 238.76} 238.76`}
+                    strokeDashoffset={`-${((hadirCount + sakitCount) / Math.max(targetTotal, 1)) * 238.76}`}
+                  />
+                )}
+
+                {/* Alfa (Rose) */}
+                {alfaCount > 0 && (
+                  <circle
+                    cx="50"
+                    cy="50"
+                    r="38"
+                    fill="none"
+                    stroke="#f43f5e"
+                    strokeWidth="12"
+                    strokeDasharray={`${(alfaCount / Math.max(targetTotal, 1)) * 238.76} 238.76`}
+                    strokeDashoffset={`-${((hadirCount + sakitCount + izinCount) / Math.max(targetTotal, 1)) * 238.76}`}
+                  />
+                )}
+              </svg>
+
+              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                <span className="text-lg font-black text-slate-900 tracking-tight leading-none">
+                  {totalInputted > 0 ? `${hadirPercent}%` : '0%'}
+                </span>
+                <span className={`text-[8px] font-bold tracking-wider uppercase mt-0.5 ${totalInputted > 0 ? 'text-emerald-600' : 'text-slate-400'}`}>
+                  {totalInputted > 0 ? 'HADIR' : 'BELUM INPUT'}
+                </span>
+              </div>
+            </div>
+
+            {/* Legend column */}
+            <div className="space-y-1 text-[10px] font-semibold text-slate-600">
+              <div className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block shrink-0" />
+                <span className="truncate">Hadir: <strong className="text-slate-900">{hadirCount}</strong> <span className="text-slate-400 font-normal">({targetTotal > 0 ? Math.round((hadirCount / targetTotal) * 100) : 0}%)</span></span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-sky-500 inline-block shrink-0" />
+                <span className="truncate">Sakit: <strong className="text-slate-900">{sakitCount}</strong> <span className="text-slate-400 font-normal">({targetTotal > 0 ? Math.round((sakitCount / targetTotal) * 100) : 0}%)</span></span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-amber-500 inline-block shrink-0" />
+                <span className="truncate">Izin: <strong className="text-slate-900">{izinCount}</strong> <span className="text-slate-400 font-normal">({targetTotal > 0 ? Math.round((izinCount / targetTotal) * 100) : 0}%)</span></span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-rose-500 inline-block shrink-0" />
+                <span className="truncate">Alfa: <strong className="text-slate-900">{alfaCount}</strong> <span className="text-slate-400 font-normal">({targetTotal > 0 ? Math.round((alfaCount / targetTotal) * 100) : 0}%)</span></span>
+              </div>
             </div>
           </div>
 
-          {/* Status Badge: Mengikuti data yang telah di-input atau belum di-input */}
-          <div className="w-full my-1">
-            {isSchoolAdminOrKS ? (
-              isAttendanceInputtedToday ? (
-                isAttendanceFullyInputted ? (
-                  <div className="flex items-center justify-between gap-1.5 p-2 rounded-xl bg-emerald-50/80 border border-emerald-200 text-emerald-900 text-left">
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      <CheckCircle2 size={13} className="text-emerald-600 shrink-0" />
-                      <p className="text-[11px] font-bold truncate">
-                        Presensi Semua Kelas Lengkap ({totalInputted}/{targetTotal} Siswa - 100%)
-                      </p>
-                    </div>
-                    <span className="text-[10px] font-extrabold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-md shrink-0">
-                      Lengkap
-                    </span>
-                  </div>
-                ) : (
-                  <div className="flex items-center justify-between gap-1.5 p-2 rounded-xl bg-blue-50/80 border border-blue-200 text-blue-900 text-left">
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      <Clock size={13} className="text-blue-600 shrink-0" />
-                      <p className="text-[11px] font-bold truncate">
-                        Akumulasi Terdata: {totalInputted} dari {targetTotal} Siswa ({inputPercent}%)
-                      </p>
-                    </div>
-                    <span className="text-[10px] font-bold text-blue-700 bg-blue-100/80 px-2 py-0.5 rounded-md shrink-0">
-                      {classes.length} Kelas
-                    </span>
-                  </div>
-                )
-              ) : null
-            ) : userScope.isGuruMapel ? (
-              classesTaughtToday.length === 0 ? (
-                <div className="flex items-center justify-between gap-1.5 p-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-700 text-left">
-                  <div className="flex items-center gap-1.5 min-w-0">
-                    <Calendar size={13} className="text-slate-500 shrink-0" />
-                    <p className="text-[11px] font-bold truncate">
-                      Tidak Ada Jadwal Mengajar Hari Ini ({currentDayName})
-                    </p>
-                  </div>
-                  <span className="text-[10px] font-extrabold text-slate-600 bg-slate-200/80 px-2 py-0.5 rounded-md shrink-0">
-                    Libur Mengajar
-                  </span>
-                </div>
-              ) : isAttendanceInputtedToday ? (
-                isAttendanceFullyInputted ? (
-                  <div className="flex items-center justify-between gap-1.5 p-2 rounded-xl bg-emerald-50/80 border border-emerald-200 text-emerald-900 text-left">
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      <CheckCircle2 size={13} className="text-emerald-600 shrink-0" />
-                      <p className="text-[11px] font-bold truncate">
-                        Presensi Lengkap ({totalInputted}/{targetTotal} Siswa - 100%)
-                      </p>
-                    </div>
-                    <span className="text-[10px] font-extrabold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-md shrink-0">
-                      Selesai
-                    </span>
-                  </div>
-                ) : (
-                  <div className="flex items-center justify-between gap-1.5 p-2 rounded-xl bg-blue-50/80 border border-blue-200 text-blue-900 text-left">
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      <Clock size={13} className="text-blue-600 shrink-0" />
-                      <p className="text-[11px] font-bold truncate">
-                        Sebagian Di-input: {totalInputted} dari {targetTotal} Siswa ({inputPercent}%)
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setActiveView('absensi')}
-                      className="text-[10px] font-extrabold text-blue-700 hover:text-blue-900 underline shrink-0 cursor-pointer"
-                    >
-                      Lengkapi ({totalBelumInput} sisa) →
-                    </button>
-                  </div>
-                )
-              ) : null
-            ) : isAttendanceInputtedToday ? (
-              isAttendanceFullyInputted ? (
-                <div className="flex items-center justify-between gap-1.5 p-2 rounded-xl bg-emerald-50/80 border border-emerald-200 text-emerald-900 text-left">
-                  <div className="flex items-center gap-1.5 min-w-0">
-                    <CheckCircle2 size={13} className="text-emerald-600 shrink-0" />
-                    <p className="text-[11px] font-bold truncate">
-                      Presensi Lengkap ({totalInputted}/{targetTotal} Siswa - 100%)
-                    </p>
-                  </div>
-                  <span className="text-[10px] font-extrabold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-md shrink-0">
-                    Selesai
-                  </span>
-                </div>
-              ) : (
-                <div className="flex items-center justify-between gap-1.5 p-2 rounded-xl bg-blue-50/80 border border-blue-200 text-blue-900 text-left">
-                  <div className="flex items-center gap-1.5 min-w-0">
-                    <Clock size={13} className="text-blue-600 shrink-0" />
-                    <p className="text-[11px] font-bold truncate">
-                      Sebagian Di-input: {totalInputted} dari {targetTotal} Siswa ({inputPercent}%)
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setActiveView('absensi')}
-                    className="text-[10px] font-extrabold text-blue-700 hover:text-blue-900 underline shrink-0 cursor-pointer"
-                  >
-                    Lengkapi ({totalBelumInput} sisa) →
-                  </button>
-                </div>
-              )
-            ) : null}
+          {/* Footer */}
+          <div className="flex items-center justify-between pt-1 border-t border-slate-100 text-[10px] font-semibold text-slate-500">
+            <span>Total: {targetTotal} Siswa</span>
+            <span className={totalInputted > 0 ? "text-indigo-600 font-bold" : "text-slate-400 font-medium"}>
+              {totalInputted > 0 ? `${totalInputted} Terdata (${inputPercent}%)` : 'Belum Ada Input'}
+            </span>
           </div>
-
-          {/* Donut Chart */}
-          <div className="relative w-32 h-32 sm:w-36 sm:h-36 flex items-center justify-center my-1">
-            <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
-              {/* Background Track (representing total expected students / uninputted portion) */}
-              <circle cx="50" cy="50" r="38" fill="none" stroke="#F1F5F9" strokeWidth="11" />
-
-              {/* Segment 1: Hadir (Emerald Green) */}
-              {hadirCount > 0 && (
-                <circle
-                  cx="50"
-                  cy="50"
-                  r="38"
-                  fill="none"
-                  stroke="#10b981"
-                  strokeWidth="11"
-                  strokeDasharray={`${(hadirCount / Math.max(targetTotal, 1)) * 238.76} 238.76`}
-                  strokeDashoffset="0"
-                  strokeLinecap="round"
-                />
-              )}
-
-              {/* Segment 2: Sakit (Blue) */}
-              {sakitCount > 0 && (
-                <circle
-                  cx="50"
-                  cy="50"
-                  r="38"
-                  fill="none"
-                  stroke="#38bdf8"
-                  strokeWidth="11"
-                  strokeDasharray={`${(sakitCount / Math.max(targetTotal, 1)) * 238.76} 238.76`}
-                  strokeDashoffset={`-${(hadirCount / Math.max(targetTotal, 1)) * 238.76}`}
-                />
-              )}
-
-              {/* Segment 3: Izin (Amber Yellow) */}
-              {izinCount > 0 && (
-                <circle
-                  cx="50"
-                  cy="50"
-                  r="38"
-                  fill="none"
-                  stroke="#fbbf24"
-                  strokeWidth="11"
-                  strokeDasharray={`${(izinCount / Math.max(targetTotal, 1)) * 238.76} 238.76`}
-                  strokeDashoffset={`-${((hadirCount + sakitCount) / Math.max(targetTotal, 1)) * 238.76}`}
-                />
-              )}
-
-              {/* Segment 4: Alfa (Rose Red) */}
-              {alfaCount > 0 && (
-                <circle
-                  cx="50"
-                  cy="50"
-                  r="38"
-                  fill="none"
-                  stroke="#f43f5e"
-                  strokeWidth="11"
-                  strokeDasharray={`${(alfaCount / Math.max(targetTotal, 1)) * 238.76} 238.76`}
-                  strokeDashoffset={`-${((hadirCount + sakitCount + izinCount) / Math.max(targetTotal, 1)) * 238.76}`}
-                />
-              )}
-            </svg>
-
-            {/* Center Percentage Display */}
-            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-              {userScope.isGuruMapel && classesTaughtToday.length === 0 ? (
-                <>
-                  <span className="text-xl sm:text-2xl font-black text-slate-400 tracking-tight leading-none">
-                    -
-                  </span>
-                  <span className="text-[8px] sm:text-[9px] font-bold text-slate-400 tracking-wider uppercase mt-1">
-                    TIDAK MENGAJAR
-                  </span>
-                </>
-              ) : isAttendanceInputtedToday ? (
-                <>
-                  <span className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight leading-none">
-                    {hadirPercent}%
-                  </span>
-                  <span className="text-[8px] sm:text-[9px] font-bold text-emerald-600 tracking-wider uppercase mt-1">
-                    HADIR {isAttendanceFullyInputted ? '(LENGKAP)' : `(${inputPercent}% TERISI)`}
-                  </span>
-                </>
-              ) : (
-                <>
-                  <span className="text-xl sm:text-2xl font-black text-slate-400 tracking-tight leading-none">
-                    0%
-                  </span>
-                  <span className="text-[8px] sm:text-[9px] font-bold text-slate-400 tracking-wider uppercase mt-1">
-                    HADIR
-                  </span>
-                </>
-              )}
-            </div>
-          </div>
-
-          {/* Legend Pills below */}
-          {userScope.isGuruMapel && classesTaughtToday.length === 0 ? (
-            <div className="w-full mt-2 p-2 rounded-xl bg-slate-50 border border-slate-200/80 text-[11px] text-slate-500 font-medium">
-              <p className="text-slate-700 font-semibold truncate">
-                {mapelDiampuLabel}
-              </p>
-              <p className="text-[10px] text-slate-400 mt-0.5 truncate">
-                {userScope.primarySubject?.scheduleDays && userScope.primarySubject.scheduleDays.length > 0
-                  ? `Jadwal resmi: ${userScope.primarySubject.scheduleDays.join(', ')}`
-                  : `Tidak ada jadwal mengajar pada hari ${currentDayName}`}
-              </p>
-            </div>
-          ) : (
-            <div className="flex flex-wrap items-center justify-center gap-1.5 text-[10px] sm:text-[11px] font-semibold mt-1">
-              <div className="flex items-center gap-1 text-slate-700 bg-emerald-50/70 border border-emerald-200/80 px-2 py-0.5 rounded-md">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
-                <span>HADIR ({hadirCount})</span>
-              </div>
-              <div className="flex items-center gap-1 text-slate-700 bg-sky-50/70 border border-sky-200/80 px-2 py-0.5 rounded-md">
-                <span className="w-2 h-2 rounded-full bg-sky-400 shrink-0" />
-                <span>SAKIT ({sakitCount})</span>
-              </div>
-              <div className="flex items-center gap-1 text-slate-700 bg-amber-50/70 border border-amber-200/80 px-2 py-0.5 rounded-md">
-                <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />
-                <span>IZIN ({izinCount})</span>
-              </div>
-              <div className="flex items-center gap-1 text-slate-700 bg-rose-50/70 border border-rose-200/80 px-2 py-0.5 rounded-md">
-                <span className="w-2 h-2 rounded-full bg-rose-500 shrink-0" />
-                <span>ALFA ({alfaCount})</span>
-              </div>
-            </div>
-          )}
         </div>
+
+        {/* Widget 3: Status Hari Ini */}
+        <div className="bg-white rounded-xl p-3 sm:p-3.5 border border-slate-200/80 shadow-2xs flex flex-col justify-between h-[215px] sm:h-[225px]">
+          {/* Header */}
+          <div className="flex items-center justify-between pb-1.5 border-b border-slate-100">
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                <Clock size={14} className="stroke-[2.2]" />
+              </div>
+              <h2 className="font-bold text-slate-900 text-xs sm:text-sm">Status Hari Ini</h2>
+            </div>
+            <span className="text-[10px] text-slate-500 font-medium truncate max-w-[130px]">
+              {todayFormattedDisplay}
+            </span>
+          </div>
+
+          {/* 4 Status Cards in 2x2 Grid */}
+          <div className="grid grid-cols-2 gap-1.5 my-auto">
+            {/* Hadir */}
+            <div
+              onClick={() => setActiveView('absensi')}
+              className="p-2 rounded-lg bg-emerald-50/70 border border-emerald-100 hover:border-emerald-300 transition-colors cursor-pointer text-left"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold text-emerald-700">Hadir</span>
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+              </div>
+              <p className="text-base font-black text-slate-900 mt-0.5">{hadirCount}</p>
+            </div>
+
+            {/* Sakit */}
+            <div
+              onClick={() => setActiveView('absensi')}
+              className="p-2 rounded-lg bg-sky-50/70 border border-sky-100 hover:border-sky-300 transition-colors cursor-pointer text-left"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold text-sky-700">Sakit</span>
+                <span className="w-1.5 h-1.5 rounded-full bg-sky-500" />
+              </div>
+              <p className="text-base font-black text-slate-900 mt-0.5">{sakitCount}</p>
+            </div>
+
+            {/* Izin */}
+            <div
+              onClick={() => setActiveView('absensi')}
+              className="p-2 rounded-lg bg-amber-50/70 border border-amber-100 hover:border-amber-300 transition-colors cursor-pointer text-left"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold text-amber-700">Izin</span>
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+              </div>
+              <p className="text-base font-black text-slate-900 mt-0.5">{izinCount}</p>
+            </div>
+
+            {/* Alfa */}
+            <div
+              onClick={() => setActiveView('absensi')}
+              className="p-2 rounded-lg bg-rose-50/70 border border-rose-100 hover:border-rose-300 transition-colors cursor-pointer text-left"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold text-rose-700">Alfa</span>
+                <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+              </div>
+              <p className="text-base font-black text-slate-900 mt-0.5">{alfaCount}</p>
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div className="flex items-center justify-between pt-1 border-t border-slate-100 text-[10px] text-slate-500">
+            <span className="truncate">
+              {totalInputted === 0
+                ? 'Belum ada presensi diinput'
+                : isAttendanceFullyInputted
+                ? '✓ Seluruh siswa terdata'
+                : `${totalInputted} terdata • ${totalBelumInput} belum`}
+            </span>
+            <button
+              onClick={() => setActiveView('absensi')}
+              className="font-bold text-blue-600 hover:text-blue-800 hover:underline shrink-0 ml-1 cursor-pointer"
+            >
+              {totalInputted > 0 && isAttendanceFullyInputted ? 'Lihat Detail' : 'Input Presensi'}
+            </button>
+          </div>
+        </div>
+
       </div>
 
-      {/* Info / Action Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 sm:gap-4">
-        {/* Agenda Mendatang Card */}
-        <div className="lg:col-span-4 bg-white rounded-2xl p-3.5 sm:p-4.5 border border-slate-200 shadow-sm flex flex-col justify-between">
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-2 text-slate-900 font-bold text-xs sm:text-sm">
-              <Calendar size={16} className="text-blue-600" />
+      {/* 4. Bottom Section: Agenda Mendatang (4 Cols) + Action Banner (8 Cols) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-2 sm:gap-2.5">
+        
+        {/* Left: Agenda Mendatang (4 cols) */}
+        <div className="lg:col-span-4 bg-white rounded-xl p-3 sm:p-3.5 border border-slate-200/80 shadow-2xs flex flex-col justify-between">
+          <div className="flex items-center justify-between pb-1.5 mb-1.5 border-b border-slate-100">
+            <div className="flex items-center gap-1.5 text-slate-900 font-bold text-xs sm:text-sm">
+              <Calendar size={15} className="text-blue-600" />
               <span>Agenda Mendatang</span>
             </div>
             <button
               onClick={() => setActiveView('kalender-akademik')}
-              className="text-xs font-bold text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
+              className="text-[11px] font-bold text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
             >
               Lihat Semua
             </button>
           </div>
 
-          {/* Upcoming Event Item */}
-          <div className="space-y-2 mt-1">
+          <div className="space-y-1.5 my-auto">
             {upcomingEvents.length === 0 ? (
-              <div className="py-6 text-center text-slate-400 bg-slate-50/70 rounded-xl border border-dashed border-slate-200">
-                <Calendar size={22} className="mx-auto mb-1.5 text-slate-300" />
-                <p className="text-xs font-semibold text-slate-600">Tidak ada agenda mendatang di bulan ini</p>
-                <p className="text-[10px] text-slate-400">Semua agenda bulan ini telah selesai atau belum dijadwalkan</p>
+              <div className="py-4 text-center text-slate-400 bg-slate-50/70 rounded-lg border border-dashed border-slate-200">
+                <Calendar size={18} className="mx-auto mb-1 text-slate-300" />
+                <p className="text-[11px] font-semibold text-slate-600">Tidak ada agenda mendatang bulan ini</p>
+                <p className="text-[9px] text-slate-400">Kalender akademik telah up-to-date</p>
               </div>
             ) : (
-              upcomingEvents.map((ev) => (
+              upcomingEvents.slice(0, 2).map((ev) => (
                 <div
                   key={ev.id}
-                  className="bg-slate-50 hover:bg-blue-50/50 transition-colors rounded-xl p-2.5 flex items-center gap-2.5 border border-slate-100"
+                  className="bg-slate-50 hover:bg-blue-50/50 transition-colors rounded-lg p-2 flex items-center gap-2 border border-slate-100"
                 >
-                  <div className="w-10 h-10 rounded-lg bg-white border border-blue-200 flex flex-col items-center justify-center shrink-0 text-center shadow-xs">
-                    <span className="text-[8px] font-bold text-slate-400 uppercase">
-                      {ev.dateDisplay.split(' ')[1] || 'AUG'}
+                  <div className="w-8 h-8 rounded-md bg-white border border-blue-200 flex flex-col items-center justify-center shrink-0 text-center shadow-2xs">
+                    <span className="text-[7px] font-bold text-slate-400 uppercase leading-none">
+                      {ev.dateDisplay.split(' ')[1] || 'AGU'}
                     </span>
-                    <span className="text-xs sm:text-sm font-extrabold text-blue-600 leading-none">
+                    <span className="text-xs font-black text-blue-600 leading-none mt-0.5">
                       {ev.dateDisplay.split(' ')[0] || '17'}
                     </span>
                   </div>
-                  <div className="truncate">
-                    <p className="font-bold text-slate-800 text-xs truncate">{ev.title}</p>
-                    <p className="text-[10px] text-slate-500 truncate">
-                      {ev.isEffective ? 'Agenda sekolah efektif' : 'Libur / Tidak efektif'}
+                  <div className="truncate min-w-0">
+                    <p className="font-bold text-slate-800 text-[11px] truncate">{ev.title}</p>
+                    <p className="text-[9px] text-slate-500 truncate">
+                      {ev.isEffective ? 'Hari efektif' : 'Libur sekolah'}
                     </p>
                   </div>
                 </div>
               ))
             )}
           </div>
+
+          <div className="pt-1.5 border-t border-slate-100 text-[10px] text-slate-400 flex items-center justify-between">
+            <span>Kalender Akademik {currentYear}</span>
+            <span className="font-medium">{upcomingEvents.length} Acara Terjadwal</span>
+          </div>
         </div>
 
-        {/* Big Action Banner */}
-        <div className="lg:col-span-8 bg-gradient-to-r from-blue-700 via-blue-800 to-indigo-900 rounded-2xl p-4 sm:p-5 text-white shadow-md flex flex-col justify-between relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl pointer-events-none" />
-          <div>
-            <h3 className="text-base sm:text-lg font-bold tracking-tight mb-1 text-white">
+        {/* Right: Big Action Banner (8 cols) - Enterprise SaaS Styling */}
+        <div className="lg:col-span-8 bg-gradient-to-r from-[#0F1E4A] via-[#162D6E] to-[#1E3A8A] rounded-xl p-3 sm:p-4 text-white shadow-xs relative overflow-hidden flex flex-col justify-between">
+          <div className="max-w-md z-10 space-y-1">
+            <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-white/10 text-blue-200 text-[9px] font-bold uppercase tracking-wider">
+              <Building2 size={11} className="text-blue-300" />
+              <span>Manajemen Presensi</span>
+            </div>
+            <h3 className="text-sm sm:text-base font-bold tracking-tight text-white">
               Efisiensi Administrasi Terkendali
             </h3>
-            <p className="text-blue-100 text-xs max-w-2xl leading-relaxed">
-              Gunakan fitur sinkronisasi pengguna untuk memastikan setiap siswa memiliki akses login,
-              dan pantau kalender akademik untuk perhitungan hari belajar efektif yang akurat bagi
-              pelaporan semester.
+            <p className="text-blue-100/80 text-[11px] leading-snug">
+              Pantau kehadiran berkala, sinkronisasi data kelas, dan rekapitulasi semester secara otomatis dan transparan.
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2.5 mt-3.5 relative z-10">
+          {/* Action Buttons */}
+          <div className="flex flex-wrap items-center gap-2 mt-2.5 z-10">
             {currentUser?.role === 'KEPALA SEKOLAH' ? (
               <button
                 id="btn-banner-rekapitulasi"
                 onClick={() => setActiveView('rekapitulasi')}
-                className="w-full sm:w-auto px-4 py-2.5 bg-amber-400 hover:bg-amber-300 active:scale-98 text-slate-900 font-extrabold text-xs rounded-xl shadow-md transition-all flex items-center justify-center gap-2 min-h-[38px] cursor-pointer"
+                className="px-3.5 py-1.5 bg-[#0070F3] hover:bg-blue-600 active:scale-95 text-white font-extrabold text-xs rounded-lg shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer"
               >
-                <span>REKAPITULASI PRESENSI</span>
-                <ArrowRight size={15} />
+                <span>Rekapitulasi Presensi</span>
+                <ArrowRight size={13} />
               </button>
             ) : (
               <button
                 id="btn-banner-mulai-absensi"
                 onClick={() => setActiveView('absensi')}
-                className="w-full sm:w-auto px-4 py-2.5 bg-amber-400 hover:bg-amber-300 active:scale-98 text-slate-900 font-extrabold text-xs rounded-xl shadow-md transition-all flex items-center justify-center gap-2 min-h-[38px] cursor-pointer"
+                className="px-3.5 py-1.5 bg-[#0070F3] hover:bg-blue-600 active:scale-95 text-white font-extrabold text-xs rounded-lg shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer"
               >
-                <span>ABSENSI SISWA</span>
-                <ArrowRight size={15} />
+                <span>Absensi Siswa</span>
+                <ArrowRight size={13} />
               </button>
             )}
             <button
               id="btn-banner-cetak-laporan"
               onClick={() => setActiveView('laporan')}
-              className="w-full sm:w-auto px-4 py-2.5 bg-white/15 hover:bg-white/25 active:scale-95 text-white font-bold text-xs rounded-xl border border-white/20 transition-all text-center min-h-[38px] cursor-pointer"
+              className="px-3 py-1.5 bg-white/10 hover:bg-white/20 active:scale-95 text-white font-bold text-xs rounded-lg border border-white/20 transition-all flex items-center gap-1.5 cursor-pointer"
             >
-              CETAK LAPORAN
+              <Printer size={12} className="text-blue-200" />
+              <span>Cetak Laporan</span>
             </button>
           </div>
+
+          {/* 3D Laptop Illustration on Far Right - Blends seamlessly with gradient mask */}
+          <div className="hidden sm:block absolute right-0 bottom-0 top-0 w-36 md:w-48 lg:w-56 pointer-events-none overflow-hidden select-none [mask-image:linear-gradient(to_left,black_65%,transparent)]">
+            <img
+              src="/images/laptop_books_plant_3d.jpg"
+              alt="Ilustrasi Administrasi 3D"
+              className="w-full h-full object-contain object-right-bottom mix-blend-screen opacity-95"
+              onError={(e) => {
+                (e.target as HTMLImageElement).src = '/images/blog_3d_idea_laptop.jpg';
+              }}
+            />
+          </div>
         </div>
+
       </div>
 
-      {/* Menu Navigasi Section (Compact & Dense) */}
-      <div className="space-y-2.5 pt-1">
+      {/* 5. Menu Navigasi Section (Slightly larger, prominent & easily accessible) */}
+      <div className="space-y-2 pt-1.5">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span className="w-1.5 h-4 bg-blue-600 rounded-full" />
             <h2 className="text-sm sm:text-base font-bold text-slate-900">Menu Navigasi</h2>
           </div>
-          <span className="text-[11px] text-slate-400 font-medium">
-            {allowedMenuItems.length} Modul Akses ({userScope.roleBadgeLabel})
+          <span className="text-xs text-slate-400 font-semibold">
+            {allowedMenuItems.length} Menu Tersedia • {userScope.roleBadgeLabel}
           </span>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-2.5">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-6 gap-2.5 sm:gap-3">
           {allowedMenuItems.map((item) => {
             const Icon = item.icon;
             return (
@@ -1333,27 +1350,34 @@ export const DashboardView: React.FC = () => {
                 key={item.id}
                 id={`btn-menu-${item.id}`}
                 onClick={() => setActiveView(item.id as any)}
-                className="bg-white hover:bg-blue-50/60 hover:border-blue-300 border border-slate-200 rounded-xl p-3 flex items-center gap-3 shadow-xs hover:shadow-sm transition-all group cursor-pointer active:scale-98 min-h-[58px]"
+                className="bg-white hover:bg-blue-50/70 hover:border-blue-400 border border-slate-200/90 rounded-xl p-3 sm:p-3.5 flex items-center gap-3 shadow-2xs hover:shadow-xs transition-all group cursor-pointer active:scale-98 text-left"
               >
                 <div
-                  className={`w-9 h-9 rounded-xl ${item.bg} ${item.color} flex items-center justify-center shrink-0 transition-transform group-hover:scale-105 shadow-xs`}
+                  className={`w-10 h-10 sm:w-11 sm:h-11 rounded-xl ${item.bg} ${item.color} flex items-center justify-center shrink-0 transition-transform group-hover:scale-105 shadow-2xs`}
                 >
                   <Icon size={18} />
                 </div>
-                <div className="min-w-0 flex-1 text-left">
-                  <p className="font-bold text-slate-800 text-xs group-hover:text-blue-600 transition-colors truncate">
+                <div className="min-w-0 flex-1">
+                  <p className="font-bold text-slate-800 text-xs sm:text-sm group-hover:text-blue-600 transition-colors truncate">
                     {item.title}
                   </p>
-                  <p className="text-[10px] text-slate-400 truncate">
+                  <p className="text-[10px] sm:text-[11px] text-slate-400 truncate mt-0.5">
                     {item.desc}
                   </p>
                 </div>
-                <ArrowRight size={13} className="text-slate-300 group-hover:text-blue-600 group-hover:translate-x-0.5 transition-all shrink-0" />
               </button>
             );
           })}
         </div>
       </div>
+
+      {/* 6. Dashboard Footer (Copyright aligned to bottom right) */}
+      <footer className="pt-3 pb-1 border-t border-slate-200/80 flex items-center justify-end text-right text-[10px] text-slate-400 font-medium">
+        <p>
+          {systemConfig.footerCopyright || '© 2026 Kawacanaan by Maulana Yusuf. All Rights Reserved.'}
+        </p>
+      </footer>
     </div>
   );
 };
+

@@ -14,14 +14,23 @@ export const SetupSuperAdminView: React.FC = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
+  const [newPasswordInput, setNewPasswordInput] = useState('SuperAdmin2026!');
+  const [activeUsername, setActiveUsername] = useState('superadmin');
+  const [activeEmail, setActiveEmail] = useState('superadmin@login.edushift.local');
+  const [showResetForm, setShowResetForm] = useState(false);
+
   useEffect(() => {
     let isMounted = true;
     (async () => {
       try {
         const r = await fetch('/api/setup-superadmin');
         const b = await r.json();
-        if (isMounted && b.isSetup) {
-          setIsAlreadySetup(true);
+        if (isMounted) {
+          if (b.isSetup) {
+            setIsAlreadySetup(true);
+            if (b.username) setActiveUsername(b.username);
+            if (b.email) setActiveEmail(b.email);
+          }
         }
       } catch (_) {
         // Ignore check errors
@@ -33,6 +42,30 @@ export const SetupSuperAdminView: React.FC = () => {
       isMounted = false;
     };
   }, []);
+
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setSuccess('');
+    setLoading(true);
+    try {
+      const r = await fetch('/api/setup-superadmin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'reset_superadmin_password',
+          newPassword: newPasswordInput,
+        }),
+      });
+      const b = await r.json();
+      if (!r.ok) throw new Error(b.error || 'Gagal mereset kata sandi Super Admin.');
+      setSuccess(`Kata sandi Super Admin (${b.username}) berhasil diperbarui! Silakan gunakan kata sandi ini untuk login.`);
+    } catch (err: any) {
+      setError(err?.message || 'Gagal memproses pembaruan kata sandi.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const goToLogin = () => {
     try {
@@ -126,22 +159,64 @@ export const SetupSuperAdminView: React.FC = () => {
 
         {isAlreadySetup && !success ? (
           <div className="mt-6 space-y-4">
-            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-slate-200/80 flex items-center justify-center text-slate-700 shrink-0">
-                <Lock size={20} />
+            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-700 shrink-0">
+                  <ShieldCheck size={20} />
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-slate-800">Akun Super Admin Aktif</h4>
+                  <p className="text-[11px] text-slate-500">Username: <span className="font-mono font-bold text-indigo-600">{activeUsername}</span></p>
+                  <p className="text-[11px] text-slate-500">Email: <span className="font-mono text-slate-700">{activeEmail}</span></p>
+                </div>
               </div>
-              <p className="text-xs text-slate-600">
-                Silakan masuk menggunakan akun Super Admin yang telah Anda daftarkan melalui halaman login.
-              </p>
+              <div className="pt-2 border-t border-slate-200 flex items-center justify-between text-xs">
+                <span className="text-slate-500 font-medium">Kata Sandi Default:</span>
+                <span className="font-mono font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-lg border border-emerald-200">SuperAdmin2026!</span>
+              </div>
             </div>
-            <button
-              type="button"
-              onClick={goToLogin}
-              className="w-full py-3.5 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md"
-            >
-              <span>Buka Halaman Login</span>
-              <ArrowRight size={16} />
-            </button>
+
+            <div className="flex flex-col gap-2.5">
+              <button
+                type="button"
+                onClick={goToLogin}
+                className="w-full py-3.5 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md"
+              >
+                <span>Buka Halaman Login</span>
+                <ArrowRight size={16} />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowResetForm(!showResetForm)}
+                className="w-full py-2.5 rounded-2xl border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+              >
+                <Lock size={14} />
+                <span>{showResetForm ? 'Sembunyikan Form Reset' : 'Ubah / Reset Kata Sandi Super Admin'}</span>
+              </button>
+            </div>
+
+            {showResetForm && (
+              <form onSubmit={handleResetPassword} className="p-4 rounded-2xl bg-indigo-50/50 border border-indigo-100 space-y-3 mt-2">
+                <h5 className="text-xs font-bold text-indigo-900">Tetapkan Kata Sandi Baru Super Admin:</h5>
+                <input
+                  type="text"
+                  required
+                  value={newPasswordInput}
+                  onChange={(e) => setNewPasswordInput(e.target.value)}
+                  placeholder="Masukkan kata sandi baru (min 8 karakter)"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white text-xs font-mono font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs flex items-center justify-center gap-2 cursor-pointer transition-all disabled:opacity-60"
+                >
+                  {loading ? <Loader2 size={14} className="animate-spin" /> : <ShieldCheck size={14} />}
+                  <span>Perbarui Kata Sandi Sekarang</span>
+                </button>
+              </form>
+            )}
           </div>
         ) : !success ? (
           <form onSubmit={submit} className="mt-6 space-y-3.5">

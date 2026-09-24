@@ -65,19 +65,11 @@ interface AppContextType {
   activeWorkspace: WorkspaceMembership | null;
   isOnboarding: boolean;
   setIsOnboarding: (v: boolean) => void;
-  isSelectingWorkspace: boolean;
-  setIsSelectingWorkspace: (v: boolean) => void;
-  isJoinSchoolModalOpen: boolean;
-  setIsJoinSchoolModalOpen: (v: boolean) => void;
-  selectWorkspace: (ws: WorkspaceMembership) => Promise<void>;
-  switchToSchoolWorkspace: () => Promise<void>;
-  switchToPersonalWorkspace: () => Promise<void>;
   isSwitchingWorkspace: boolean;
   switchingWorkspaceProgress: number;
   switchingWorkspaceTitle: string;
   switchingWorkspaceMessage: string;
   openOnboarding: () => void;
-  returnToWorkspaceSelector: () => void;
   loadUserDataAfterOnboarding: (userId: string) => Promise<void>;
   loadData: (userId?: string) => Promise<void>;
   schoolProfile: SchoolProfile;
@@ -251,6 +243,7 @@ interface AppContextType {
     studentId: string,
     data: { namaWali?: string; noHpWali?: string; hubungannya?: string }
   ) => Promise<{ success: boolean; message?: string }>;
+  supabase: any;
 }
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
@@ -626,6 +619,15 @@ const dbConfig = (c: any): SystemConfig => ({
   checkInDeadlineTime: String(c.check_in_deadline_time || "07:00").slice(0, 5),
   checkOutStartTime: String(c.check_out_start_time || "12:30").slice(0, 5),
   autoMarkLate: c.auto_mark_late ?? true,
+  whatsappBroadcastEnabled: c.whatsapp_broadcast_enabled ?? c.whatsappBroadcastEnabled ?? INITIAL_SYSTEM_CONFIG.whatsappBroadcastEnabled,
+  broadcastMasukHeader: c.broadcast_masuk_header || c.broadcastMasukHeader || INITIAL_SYSTEM_CONFIG.broadcastMasukHeader,
+  broadcastMasukOpening: c.broadcast_masuk_opening || c.broadcastMasukOpening || INITIAL_SYSTEM_CONFIG.broadcastMasukOpening,
+  broadcastMasukClosing: c.broadcast_masuk_closing || c.broadcastMasukClosing || INITIAL_SYSTEM_CONFIG.broadcastMasukClosing,
+  broadcastPulangHeader: c.broadcast_pulang_header || c.broadcastPulangHeader || INITIAL_SYSTEM_CONFIG.broadcastPulangHeader,
+  broadcastPulangOpening: c.broadcast_pulang_opening || c.broadcastPulangOpening || INITIAL_SYSTEM_CONFIG.broadcastPulangOpening,
+  broadcastPulangClosing: c.broadcast_pulang_closing || c.broadcastPulangClosing || INITIAL_SYSTEM_CONFIG.broadcastPulangClosing,
+  broadcastIncludeStudentList: c.broadcast_include_student_list ?? c.broadcastIncludeStudentList ?? INITIAL_SYSTEM_CONFIG.broadcastIncludeStudentList,
+  broadcastIncludeSmartLink: c.broadcast_include_smart_link ?? c.broadcastIncludeSmartLink ?? INITIAL_SYSTEM_CONFIG.broadcastIncludeSmartLink,
 });
 
 const CACHE_USER_SESSION_KEY = "kawacanaan_cached_user_session";
@@ -920,10 +922,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
   const [activeWorkspace, setActiveWorkspace] =
     useState<WorkspaceMembership | null>(null);
   const [isOnboarding, setIsOnboarding] = useState<boolean>(false);
-  const [isSelectingWorkspace, setIsSelectingWorkspace] =
-    useState<boolean>(false);
-  const [isJoinSchoolModalOpen, setIsJoinSchoolModalOpen] =
-    useState<boolean>(false);
   const [isSwitchingWorkspace, setIsSwitchingWorkspace] =
     useState<boolean>(false);
   const [switchingWorkspaceProgress, setSwitchingWorkspaceProgress] =
@@ -1223,7 +1221,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     setUserWorkspaces([]);
     setActiveWorkspace(null);
     setIsOnboarding(false);
-    setIsSelectingWorkspace(false);
     setIsAuthChecking(false);
     setIsDataLoading(false);
     setRegistrationRequired(false);
@@ -1438,7 +1435,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
         .from("attendance_records")
         .select("*")
         .eq("school_id", schoolId)
-        .order("date"),
+        .order("date", { ascending: false })
+        .limit(10000),
       supabase
         .from("profiles")
         .select("*")
@@ -1520,19 +1518,61 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     setTeachers(baseTeachers);
 
     const classList = rawClasses.map((c: any) => {
-      const assignedTeacherId = c.wali_kelas_teacher_id || null;
+      let className = (c.name || '').trim();
+      let assignedTeacherId = c.wali_kelas_teacher_id || null;
+      let waliName = c.wali?.nama || c.wali_kelas_name || null;
+
+      // Smart Inversion Self-Healing: Cek jika data nama rombel dan wali kelas sempat tertukar di database
+      const matchedTeacherByName = baseTeachers.find(
+        (t) => t.nama.trim().toLowerCase() === className.toLowerCase()
+      );
+      const isNameTeacher =
+        !!matchedTeacherByName ||
+        /\b(s\.pd|m\.pd|s\.ag|s\.kom|s\.si|m\.si|s\.sos|drs|dra|dr\.|prof)\b/i.test(className);
+
+      const isWaliClass =
+        /^(kelas|rombel|\d+[a-z]?|[ivx]+[a-z]?)/i.test(waliName || '') ||
+        /^\d+$/i.test(waliName || '');
+
+      if (isNameTeacher && isWaliClass) {
+        const temp = className;
+        className = waliName!;
+        waliName = temp;
+        if (matchedTeacherByName && !assignedTeacherId) {
+          assignedTeacherId = matchedTeacherByName.id;
+        }
+
+        // Silent background self-healing update to Supabase tanpa perlu user menjalankan SQL manual
+        supabase
+          .from('classes')
+          .update({
+            name: className,
+            wali_kelas_teacher_id: assignedTeacherId,
+          })
+          .eq('id', c.id)
+          .then(undefined, () => {});
+      } else if (isNameTeacher && !waliName && matchedTeacherByName) {
+        if (!assignedTeacherId) {
+          assignedTeacherId = matchedTeacherByName.id;
+        }
+        waliName = matchedTeacherByName.nama;
+      }
+
       const matchedTeacher = baseTeachers.find(
         (t) => t.id === assignedTeacherId,
       );
-      const waliName = matchedTeacher?.nama || c.wali?.nama || c.wali_kelas_name || null;
+      const finalWaliName = matchedTeacher?.nama || waliName || null;
+
+      const matchNum = className.match(/\d+/);
+      const autoGrade = matchNum ? parseInt(matchNum[0], 10) : c.grade || 1;
 
       return {
         id: c.id,
-        name: c.name,
-        grade: c.grade,
+        name: className,
+        grade: autoGrade,
         academicYear: c.academic_year,
         waliKelasTeacherId: assignedTeacherId,
-        waliKelasName: waliName,
+        waliKelasName: finalWaliName,
       };
     });
 
@@ -1960,7 +2000,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
         ? { ...loadedSchool, kelas: myClass.name, namaWaliKelas: me.name }
         : loadedSchool,
     );
-    const cfg = config.data ? dbConfig(config.data) : INITIAL_SYSTEM_CONFIG;
+    let cfg = config.data ? dbConfig(config.data) : INITIAL_SYSTEM_CONFIG;
     let resolvedActiveDays = cfg.activeStudyDays || [1, 2, 3, 4, 5];
     if (schoolId) {
       try {
@@ -1972,6 +2012,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
           if (Array.isArray(parsed) && parsed.length > 0) {
             resolvedActiveDays = parsed;
           }
+        }
+      } catch (_) {}
+      try {
+        const cachedWaStr = localStorage.getItem("kawacanaan_whatsapp_config_" + schoolId);
+        if (cachedWaStr) {
+          const parsedWa = JSON.parse(cachedWaStr);
+          cfg = { ...cfg, ...parsedWa };
         }
       } catch (_) {}
     }
@@ -1993,10 +2040,33 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     finalEffective.forEach((x: any) => (ed[x.month_key] = x.days));
     setEffectiveDaysConfig(ed);
 
-    const finalAttendance =
-      attendance.data && attendance.data.length > 0
-        ? attendance.data
-        : (masterJson?.attendanceRecords || []);
+    let finalAttendance =
+      Array.isArray(masterJson?.attendanceRecords) && masterJson.attendanceRecords.length > 0
+        ? masterJson.attendanceRecords
+        : (attendance.data || []);
+
+    if (finalAttendance.length === 1000 && attendance.data && attendance.data.length === 1000) {
+      try {
+        let page = 1;
+        let extraAttendance: any[] = [];
+        while (page < 10) {
+          const { data: nextPage, error: pageErr } = await supabase
+            .from("attendance_records")
+            .select("*")
+            .eq("school_id", schoolId)
+            .order("date", { ascending: false })
+            .range(page * 1000, (page + 1) * 1000 - 1);
+          if (pageErr || !nextPage || nextPage.length === 0) break;
+          extraAttendance = extraAttendance.concat(nextPage);
+          if (nextPage.length < 1000) break;
+          page++;
+        }
+        if (extraAttendance.length > 0) {
+          finalAttendance = [...finalAttendance, ...extraAttendance];
+        }
+      } catch (_) {}
+    }
+
     setAttendanceRecords(
       finalAttendance.map((r: any) => dbAttendance(r, ss)),
     );
@@ -2131,7 +2201,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     // Aturan Opsi B: Ruang kerja individu diblokir total jika sekolah aktif Paket Sekolah Pro
     if (isPersonal && isSchoolPro) {
       showToast(
-        "Sekolah Anda sedang aktif berlangganan Paket Sekolah Pro. Aktivitas berpusat di Ruang Kerja Sekolah.",
+        "Sekolah Anda sedang aktif berlangganan Paket Sekolah. Aktivitas berpusat di Ruang Kerja Sekolah.",
         "info",
       );
       return;
@@ -2150,7 +2220,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
 
     try {
       setActiveWorkspace(ws);
-      setIsSelectingWorkspace(false);
       setIsOnboarding(false);
       if (ws.userId) {
         localStorage.setItem(
@@ -2228,244 +2297,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
-  const switchToSchoolWorkspace = async () => {
-    if (!currentUser) return;
-    if (
-      currentUser.role === "ADMIN" ||
-      currentUser.role === "KEPALA SEKOLAH" ||
-      currentUser.role === "SUPER_ADMIN" ||
-      currentUser.role === "SISWA"
-    ) {
-      showToast(
-        "Fitur ganti ruang kerja hanya untuk Wali Kelas dan Guru Mapel.",
-        "info",
-      );
-      return;
-    }
-
-    setIsSwitchingWorkspace(true);
-    setSwitchingWorkspaceProgress(15);
-    setSwitchingWorkspaceTitle("Beralih ke Ruang Kerja Sekolah...");
-    setSwitchingWorkspaceMessage("Memeriksa keanggotaan ruang kerja sekolah...");
-
-    let currentMemberships = [...userWorkspaces];
-    try {
-      // 1. Periksa ruang kerja sekolah yang sudah ada di memori
-      let schoolWs = currentMemberships.find(
-        (ws) =>
-          ws.workspaceType !== "personal" && ws.workspaceType !== "individu",
-      );
-
-      // 2. Periksa cache ruang kerja sekolah di localStorage khusus akun ini jika belum ada di memori
-      const cachedSchoolRaw =
-        localStorage.getItem(`kawacanaan_school_ws_${currentUser.id}`);
-      let cachedSchoolWs: WorkspaceMembership | null = null;
-      if (cachedSchoolRaw) {
-        try {
-          cachedSchoolWs = JSON.parse(cachedSchoolRaw);
-        } catch (_) {}
-      }
-
-      if (!schoolWs && cachedSchoolWs) {
-        schoolWs = cachedSchoolWs;
-      }
-
-      const knownSchoolId =
-        schoolWs?.workspaceId || cachedSchoolWs?.workspaceId || "";
-
-      // 3. Ambil data terbaru dari server dengan menyertakan ID sekolah yang tersimpan
-      const { data: sessionData } = await supabase.auth.getSession();
-      const token = sessionData.session?.access_token || "";
-      const res = await fetch("/api/onboarding", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({
-          action: "get_user_workspaces",
-          known_school_workspace_id: knownSchoolId,
-        }),
-      });
-      const json = await res.json();
-      if (
-        json.success &&
-        Array.isArray(json.workspaces) &&
-        json.workspaces.length > 0
-      ) {
-        currentMemberships = json.workspaces;
-        setUserWorkspaces(json.workspaces);
-        const serverSchoolWs = json.workspaces.find(
-          (ws: any) =>
-            ws.workspaceType !== "personal" && ws.workspaceType !== "individu",
-        );
-        if (serverSchoolWs) {
-          schoolWs = serverSchoolWs;
-        }
-      }
-
-      if (!schoolWs && cachedSchoolWs) {
-        schoolWs = cachedSchoolWs;
-      }
-
-      if (schoolWs) {
-        localStorage.setItem(
-          `kawacanaan_school_ws_${currentUser.id}`,
-          JSON.stringify(schoolWs),
-        );
-        await selectWorkspace(schoolWs);
-        showToast(
-          `Beralih ke Ruang Kerja Sekolah: ${schoolWs.workspaceName}`,
-          "success",
-        );
-      } else {
-        // Hanya buka modal kode undangan sekolah jika pengguna BENAR-BENAR belum punya ruang kerja sekolah
-        setIsJoinSchoolModalOpen(true);
-      }
-    } catch (err: any) {
-      showToast(
-        err?.message || "Gagal beralih ke ruang kerja sekolah.",
-        "error",
-      );
-    } finally {
-      setIsSwitchingWorkspace(false);
-      setSwitchingWorkspaceProgress(0);
-      setSwitchingWorkspaceTitle("");
-      setSwitchingWorkspaceMessage("");
-    }
-  };
-
-  const switchToPersonalWorkspace = async () => {
-    if (!currentUser) return;
-    if (
-      currentUser.role === "ADMIN" ||
-      currentUser.role === "KEPALA SEKOLAH" ||
-      currentUser.role === "SUPER_ADMIN" ||
-      currentUser.role === "SISWA"
-    ) {
-      showToast(
-        "Fitur ganti ruang kerja hanya untuk Wali Kelas dan Guru Mapel.",
-        "info",
-      );
-      return;
-    }
-
-    // Aturan Opsi B: Pendidik pada sekolah yang aktif Paket Sekolah Pro dikunci 100% pada Ruang Kerja Sekolah
-    if (isSchoolPro) {
-      showToast(
-        "Sekolah Anda sedang aktif berlangganan Paket Sekolah Pro. Seluruh aktivitas guru dipusatkan di Ruang Kerja Sekolah.",
-        "info",
-      );
-      return;
-    }
-
-    // Catat referensi Ruang Kerja Sekolah saat ini sebelum beralih ke Ruang Kerja Individu
-    if (
-      activeWorkspace &&
-      activeWorkspace.workspaceType !== "personal" &&
-      activeWorkspace.workspaceType !== "individu"
-    ) {
-      localStorage.setItem(
-        `kawacanaan_school_ws_${currentUser.id}`,
-        JSON.stringify(activeWorkspace),
-      );
-    }
-
-    setIsSwitchingWorkspace(true);
-    setSwitchingWorkspaceProgress(15);
-    setSwitchingWorkspaceTitle("Beralih ke Ruang Kerja Individu...");
-    setSwitchingWorkspaceMessage(
-      "Memeriksa keanggotaan Ruang Kerja Individu pendidik...",
-    );
-
-    let currentMemberships = [...userWorkspaces];
-    try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const token = sessionData.session?.access_token || "";
-      const res = await fetch("/api/onboarding", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({ action: "get_user_workspaces" }),
-      });
-      const json = await res.json();
-      if (
-        json.success &&
-        Array.isArray(json.workspaces) &&
-        json.workspaces.length > 0
-      ) {
-        currentMemberships = json.workspaces;
-        setUserWorkspaces(json.workspaces);
-      }
-
-      const personalWs = currentMemberships.find(
-        (ws) =>
-          ws.workspaceType === "personal" || ws.workspaceType === "individu",
-      );
-
-      if (personalWs) {
-        await selectWorkspace(personalWs);
-        showToast("Beralih ke Ruang Kerja Individu.", "success");
-      } else {
-        setSwitchingWorkspaceProgress(40);
-        setSwitchingWorkspaceMessage("Membuat ruang kerja individu baru...");
-        const resCreate = await fetch("/api/onboarding", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          },
-          body: JSON.stringify({
-            action: "create_personal_workspace",
-            fullName: currentUser.name || currentUser.username,
-            nip: currentUser.nip,
-          }),
-        });
-        const jsonCreate = await resCreate.json();
-        if (jsonCreate.success && jsonCreate.workspace) {
-          const updated = [...currentMemberships, jsonCreate.workspace];
-          setUserWorkspaces(updated);
-          await selectWorkspace(jsonCreate.workspace);
-          showToast("Ruang Kerja Individu baru berhasil dibuka.", "success");
-        } else {
-          showToast(
-            jsonCreate.error || "Gagal membuka ruang kerja individu baru.",
-            "error",
-          );
-        }
-      }
-    } catch (err: any) {
-      showToast(
-        err?.message || "Gagal membuat ruang kerja individu.",
-        "error",
-      );
-    } finally {
-      setIsSwitchingWorkspace(false);
-      setSwitchingWorkspaceProgress(0);
-      setSwitchingWorkspaceTitle("");
-      setSwitchingWorkspaceMessage("");
-    }
-  };
-
   const openOnboarding = () => {
     setIsOnboarding(true);
-    setIsSelectingWorkspace(false);
-  };
-
-  const returnToWorkspaceSelector = () => {
-    setIsOnboarding(false);
-    if (userWorkspaces.length > 0) {
-      setIsSelectingWorkspace(true);
-    } else {
-      setActiveView("login");
-    }
   };
 
   const loadUserDataAfterOnboarding = async (userId: string) => {
     setIsOnboarding(false);
-    setIsSelectingWorkspace(false);
     setIsAuthChecking(true);
     setIsLoginPreparing(true);
     await loadData(userId);
@@ -2622,7 +2459,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     if (!baseProfile && memberships.length === 0) {
       clearOAuthPendingFlags();
       setIsOnboarding(true);
-      setIsSelectingWorkspace(false);
       setRegistrationRequired(false);
       setIsAuthChecking(false);
       setIsLoginPreparing(false);
@@ -2708,7 +2544,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       }
       setRegistrationRequired(false);
       setIsOnboarding(false);
-      setIsSelectingWorkspace(false);
       const isPwdAlreadyChanged =
         passwordChangedRecentlyRef.current ||
         (typeof window !== "undefined" &&
@@ -2796,7 +2631,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     if (memberships.length === 0) {
       clearOAuthPendingFlags();
       setIsOnboarding(true);
-      setIsSelectingWorkspace(false);
       setIsAuthChecking(false);
       setIsLoginPreparing(false);
       return;
@@ -2847,7 +2681,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     if (!chosenWorkspace) {
       clearOAuthPendingFlags();
       setIsOnboarding(true);
-      setIsSelectingWorkspace(false);
       setIsAuthChecking(false);
       setIsLoginPreparing(false);
       return;
@@ -2893,7 +2726,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     setLoginProgressMessage(`Peran terdeteksi: ${roleLabel}`);
 
     setActiveWorkspace(chosenWorkspace);
-    setIsSelectingWorkspace(false);
     setIsOnboarding(false);
 
     if (userId && chosenWorkspace?.workspaceId) {
@@ -3472,6 +3304,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       }
     }
 
+    if (schoolId) {
+      try {
+        localStorage.setItem(
+          "kawacanaan_whatsapp_config_" + schoolId,
+          JSON.stringify({
+            whatsappBroadcastEnabled: c.whatsappBroadcastEnabled,
+            broadcastMasukHeader: c.broadcastMasukHeader,
+            broadcastMasukOpening: c.broadcastMasukOpening,
+            broadcastMasukClosing: c.broadcastMasukClosing,
+            broadcastPulangHeader: c.broadcastPulangHeader,
+            broadcastPulangOpening: c.broadcastPulangOpening,
+            broadcastPulangClosing: c.broadcastPulangClosing,
+            broadcastIncludeStudentList: c.broadcastIncludeStudentList,
+            broadcastIncludeSmartLink: c.broadcastIncludeSmartLink,
+          })
+        );
+      } catch (_) {}
+    }
+
     setSystemConfig(c);
     setActiveStudyDays(c.activeStudyDays || activeStudyDays);
     showToast("Pengaturan Sistem berhasil diperbarui");
@@ -3552,11 +3403,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
           if (classes.length >= 1) {
             throw new Error('Kapasitas Wali Kelas di Ruang Kerja Individu hanya 1 kelas. Silakan edit kelas yang sudah ada.');
           }
-        }
-      } else {
-        // Ruang Kerja Sekolah: Total 12 kelas tersedia (1A–6B)
-        if (classes.length >= 12) {
-          throw new Error('Kapasitas Ruang Kerja Sekolah maksimal 12 kelas (Struktur Kelas 1–6 Paralel A/B). Batas kuota kelas telah tercapai.');
         }
       }
 
@@ -3875,7 +3721,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
   };
   const importClasses = async (
     items: Array<Omit<SchoolClass, "id"> & { waliKelasNameInput?: string }>,
-    replaceExisting = false,
+    replaceExisting = true,
   ) => {
     const schoolId = currentUser?.schoolId;
     if (!schoolId) throw new Error("Sekolah aktif tidak ditemukan.");
@@ -3942,6 +3788,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
           .select("id, name")
           .eq("school_id", schoolId);
         const existingMap = new Map<string, string>();
+        const usedClassIds = new Set<string>();
         (existingCls || []).forEach((c: any) => {
           existingMap.set(String(c.name || "").trim().toLowerCase(), c.id);
         });
@@ -3949,6 +3796,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
         for (const p of payload) {
           const matchedId = existingMap.get(p.name.toLowerCase());
           if (matchedId) {
+            usedClassIds.add(matchedId);
             await supabase
               .from("classes")
               .update({
@@ -3959,20 +3807,40 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
               })
               .eq("id", matchedId);
           } else {
-            await supabase.from("classes").insert({
+            const { data: insData } = await supabase.from("classes").insert({
               school_id: schoolId,
               name: p.name,
               grade: p.grade,
               academic_year: p.academic_year,
               wali_kelas_teacher_id: p.wali_kelas_teacher_id,
-            });
+            }).select("id").maybeSingle();
+            if (insData) {
+              usedClassIds.add(insData.id);
+            }
+          }
+        }
+
+        // Mode sumber tunggal: hapus rombel kelas lama yang tidak terdapat dalam file terbaru
+        if (replaceExisting) {
+          const leftovers = (existingCls || []).filter((c: any) => !usedClassIds.has(c.id));
+          for (const l of leftovers) {
+            try {
+              await supabase.from("students").update({ class_id: null }).eq("class_id", l.id).eq("school_id", schoolId);
+              await supabase.from("subject_schedule_days").delete().eq("class_id", l.id);
+              await supabase.from("subject_class_assignments").delete().eq("class_id", l.id).eq("school_id", schoolId);
+              await supabase.from("user_class_assignments").delete().eq("class_id", l.id);
+              await supabase.from("teacher_assignments").delete().eq("class_id", l.id).eq("school_id", schoolId);
+              await supabase.from("teacher_class_assignments").delete().eq("class_id", l.id).eq("school_id", schoolId);
+              await supabase.from("attendance_records").delete().eq("class_id", l.id).eq("school_id", schoolId);
+              await supabase.from("classes").delete().eq("id", l.id).eq("school_id", schoolId);
+            } catch (_) {}
           }
         }
       }
     }
 
     await loadData(currentUser?.id);
-    showToast(`Berhasil mengimpor ${items.length} data kelas.`);
+    showToast(`Berhasil mengimpor ${items.length} data rombel kelas.`);
   };
   const addTeacher = async (t: Omit<Teacher, "id">) => {
     const schoolId = currentUser?.schoolId;
@@ -4114,66 +3982,119 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
   };
   const importTeachers = async (
     items: Omit<Teacher, "id">[],
-    replaceExisting = false,
+    replaceExisting = true,
   ) => {
     const schoolId = currentUser?.schoolId;
     if (!schoolId) throw new Error("Sekolah aktif tidak ditemukan.");
 
-    // Ambil data guru yang sudah ada di sekolah ini
-    const { data: existingTeachersData, error: fetchErr } = await supabase
-      .from("teachers")
-      .select("*")
-      .eq("school_id", schoolId);
-    if (fetchErr) throw fetchErr;
+    const payload = items.map((t) => ({
+      nama: t.nama.trim(),
+      nip: t.nip && t.nip.trim() !== "-" ? t.nip.trim() : null,
+      jenisKelamin: t.jenisKelamin || "L",
+      tugasUtama: (t.tugasUtama || t.tugas_utama || "Belum ditugaskan").trim(),
+    }));
 
-    const existingTeachers = existingTeachersData || [];
-    const usedExistingIds = new Set<string>();
+    // 1. Prioritaskan server API /api/admin-users dengan Service Role untuk keamanan integritas data
+    let apiDone = false;
+    try {
+      const { data: authSession } = await supabase.auth.getSession();
+      const token = authSession.session?.access_token;
+      if (token) {
+        const res = await fetch("/api/admin-users", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            action: "import_teachers",
+            schoolId,
+            items: payload,
+            replaceExisting,
+          }),
+        });
+        const resJson = await res.json().catch(() => ({}));
+        if (res.ok && resJson.ok) {
+          apiDone = true;
+        }
+      }
+    } catch (_) {}
 
-    for (const t of items) {
-      const cleanName = t.nama.trim();
-      const rawTugas = (t.tugasUtama || t.tugas_utama || "Belum ditugaskan").trim();
-      const normalizedName = cleanName.toLowerCase();
-      const normalizedTugas = rawTugas.toLowerCase();
+    if (!apiDone) {
+      // 2. Direct fallback ke Supabase client
+      const { data: existingTeachersData, error: fetchErr } = await supabase
+        .from("teachers")
+        .select("*")
+        .eq("school_id", schoolId);
+      if (fetchErr) throw fetchErr;
 
-      const row = {
-        school_id: schoolId,
-        nama: cleanName,
-        nip: t.nip && t.nip.trim() !== "-" ? t.nip.trim() : null,
-        jenis_kelamin: t.jenisKelamin || "L",
-        tugas_utama: rawTugas,
-      };
+      const existingTeachers = existingTeachersData || [];
+      const usedExistingIds = new Set<string>();
 
-      // Logika otomatis:
-      // Jika terdapat nama dan tugas utama yang sama: sistem otomatis menggantikan data tersebut (update)
-      // Jika hanya nama yang sama dengan tugas utama yang berbeda atau pendidik baru: sistem tetap menambahkan datanya (insert)
-      const matched = existingTeachers.find((ex: any) => {
-        if (usedExistingIds.has(ex.id)) return false;
-        const exName = String(ex.nama || "").trim().toLowerCase();
-        const exTugas = String(ex.tugas_utama || "").trim().toLowerCase();
-        return exName === normalizedName && exTugas === normalizedTugas;
-      });
+      for (const t of payload) {
+        const cleanName = t.nama;
+        const cleanNip = t.nip;
+        const rawTugas = t.tugasUtama;
+        const normalizedName = cleanName.toLowerCase();
 
-      if (matched) {
-        usedExistingIds.add(matched.id);
-        const { error: updateError } = await supabase
-          .from("teachers")
-          .update({
-            nama: row.nama,
-            nip: row.nip || matched.nip || null,
-            jenis_kelamin: row.jenis_kelamin,
-            tugas_utama: row.tugas_utama,
-          })
-          .eq("id", matched.id);
-        if (updateError) throw updateError;
-      } else {
-        const { data: inserted, error: insertError } = await supabase
-          .from("teachers")
-          .insert(row)
-          .select("*")
-          .single();
-        if (insertError) throw insertError;
-        if (inserted) {
-          existingTeachers.push(inserted);
+        let matched: any = null;
+        if (cleanNip) {
+          matched = existingTeachers.find(
+            (ex: any) => !usedExistingIds.has(ex.id) && ex.nip && String(ex.nip).trim() === cleanNip
+          );
+        }
+        if (!matched) {
+          matched = existingTeachers.find((ex: any) => {
+            if (usedExistingIds.has(ex.id)) return false;
+            const exName = String(ex.nama || "").trim().toLowerCase();
+            return exName === normalizedName;
+          });
+        }
+
+        if (matched) {
+          usedExistingIds.add(matched.id);
+          const { error: updateError } = await supabase
+            .from("teachers")
+            .update({
+              nama: cleanName,
+              nip: cleanNip || matched.nip || null,
+              jenis_kelamin: t.jenisKelamin,
+              tugas_utama: rawTugas,
+            })
+            .eq("id", matched.id);
+          if (updateError) throw updateError;
+        } else {
+          const { data: inserted, error: insertError } = await supabase
+            .from("teachers")
+            .insert({
+              school_id: schoolId,
+              nama: cleanName,
+              nip: cleanNip,
+              jenis_kelamin: t.jenisKelamin,
+              tugas_utama: rawTugas,
+            })
+            .select("*")
+            .single();
+          if (insertError) throw insertError;
+          if (inserted) {
+            existingTeachers.push(inserted);
+            usedExistingIds.add(inserted.id);
+          }
+        }
+      }
+
+      // Mode sumber tunggal: hapus guru lama yang tidak terdapat dalam file terbaru
+      if (replaceExisting) {
+        const leftovers = existingTeachers.filter((ex: any) => !usedExistingIds.has(ex.id));
+        for (const l of leftovers) {
+          try {
+            await supabase.from("classes").update({ wali_kelas_teacher_id: null }).eq("wali_kelas_teacher_id", l.id).eq("school_id", schoolId);
+            await supabase.from("subject_teacher_assignments").delete().eq("teacher_id", l.id).eq("school_id", schoolId);
+            await supabase.from("teacher_assignments").delete().eq("teacher_id", l.id).eq("school_id", schoolId);
+            await supabase.from("teacher_class_assignments").delete().eq("teacher_id", l.id).eq("school_id", schoolId);
+            await supabase.from("profiles").update({ teacher_id: null }).eq("teacher_id", l.id).eq("school_id", schoolId);
+            await supabase.from("teachers").delete().eq("id", l.id).eq("school_id", schoolId);
+          } catch (_) {}
         }
       }
     }
@@ -4531,7 +4452,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
   };
   const importStudents = async (
     items: Omit<Student, "id">[],
-    replaceExisting = false,
+    replaceExisting = true,
     targetClassId?: string,
   ) => {
     const schoolId = currentUser?.schoolId;
@@ -4583,7 +4504,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       // 2. Direct fallback matching ke tabel students
       const { data: existingStudentsData, error: fetchErr } = await supabase
         .from("students")
-        .select("id, nama, nisn")
+        .select("id, nama, nisn, class_id")
         .eq("school_id", schoolId);
       if (fetchErr) throw fetchErr;
       const existingList = existingStudentsData || [];
@@ -4623,13 +4544,38 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
                 gender: st.gender,
                 class_id: st.class_id,
               })
-              .select("id, nama, nisn")
+              .select("id, nama, nisn, class_id")
               .single();
             if (insErr) {
               throw new Error(insErr.message || "Gagal mengimpor data siswa.");
             }
             if (insData) {
               existingList.push(insData);
+              usedIds.add(insData.id);
+            }
+          }
+        }
+
+        // Mode sumber tunggal: hapus siswa lama yang tidak terdapat dalam file terbaru
+        if (replaceExisting) {
+          const leftoverStudents = existingList.filter((ex: any) => {
+            if (usedIds.has(ex.id)) return false;
+            if (targetClassId) return ex.class_id === targetClassId;
+            return true;
+          });
+          const leftoverIds = leftoverStudents.map((s: any) => s.id);
+          if (leftoverIds.length > 0) {
+            const CHUNK = 100;
+            for (let i = 0; i < leftoverIds.length; i += CHUNK) {
+              const slice = leftoverIds.slice(i, i + CHUNK);
+              try {
+                await supabase.from("attendance_records").delete().in("student_id", slice).eq("school_id", schoolId);
+                await supabase.from("leave_requests").delete().in("student_id", slice).eq("school_id", schoolId);
+              } catch (_) {}
+              try {
+                await supabase.from("profiles").update({ student_id: null }).in("student_id", slice).eq("school_id", schoolId);
+                await supabase.from("students").delete().in("id", slice).eq("school_id", schoolId);
+              } catch (_) {}
             }
           }
         }
@@ -4743,26 +4689,42 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       if (isWali && !isMapel) {
         if (uniqueClassIds.length > 1)
           throw new Error("Wali Kelas hanya boleh memiliki 1 kelas.");
-        const { error } = await supabase.rpc("assign_homeroom_teacher", {
-          p_school_id: schoolId,
-          p_teacher_id: teacherId,
-          p_class_id: uniqueClassIds[0] || null,
-          p_academic_year: academicYear,
-          p_actor_user_id: currentUser?.id || null,
-        });
-        if (error) throw error;
-      } else if (isMapel || (mapelRows || []).length > 0) {
-        const targetSubjectIds = (mapelRows || []).map((r: any) => r.subject_id);
-        for (const subId of targetSubjectIds) {
-          const { error } = await supabase.rpc("replace_subject_assignment", {
+        try {
+          const { error } = await supabase.rpc("assign_homeroom_teacher", {
             p_school_id: schoolId,
-            p_subject_id: subId,
             p_teacher_id: teacherId,
-            p_class_ids: uniqueClassIds,
+            p_class_id: uniqueClassIds[0] || null,
             p_academic_year: academicYear,
             p_actor_user_id: currentUser?.id || null,
           });
-          if (error) throw error;
+          if (error) {
+            console.warn("assign_homeroom_teacher RPC warning, using executeTeacherAssignment fallback:", error.message);
+            await executeTeacherAssignment(teacherId, "WALI_KELAS", undefined, uniqueClassIds);
+          }
+        } catch (rpcErr: any) {
+          console.warn("assign_homeroom_teacher exception, using executeTeacherAssignment fallback:", rpcErr?.message);
+          await executeTeacherAssignment(teacherId, "WALI_KELAS", undefined, uniqueClassIds);
+        }
+      } else if (isMapel || (mapelRows || []).length > 0) {
+        const targetSubjectIds = (mapelRows || []).map((r: any) => r.subject_id);
+        for (const subId of targetSubjectIds) {
+          try {
+            const { error } = await supabase.rpc("replace_subject_assignment", {
+              p_school_id: schoolId,
+              p_subject_id: subId,
+              p_teacher_id: teacherId,
+              p_class_ids: uniqueClassIds,
+              p_academic_year: academicYear,
+              p_actor_user_id: currentUser?.id || null,
+            });
+            if (error) {
+              console.warn("replace_subject_assignment RPC warning, using executeTeacherAssignment fallback:", error.message);
+              await executeTeacherAssignment(teacherId, "GURU_MAPEL", subId, uniqueClassIds);
+            }
+          } catch (rpcErr: any) {
+            console.warn("replace_subject_assignment exception, using executeTeacherAssignment fallback:", rpcErr?.message);
+            await executeTeacherAssignment(teacherId, "GURU_MAPEL", subId, uniqueClassIds);
+          }
         }
       } else if (uniqueClassIds.length) {
         throw new Error(
@@ -6174,7 +6136,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       if (Array.isArray(json.attendanceRecords)) {
         const currentSchoolStudents = updatedStudents.length > 0 ? updatedStudents : students;
         const mappedAttendance = json.attendanceRecords.map((r: any) => dbAttendance(r, currentSchoolStudents));
-        setAttendanceRecords(mappedAttendance);
+        setAttendanceRecords((prev) => {
+          const map = new Map<string, AttendanceRecord>();
+          prev.forEach((r) => {
+            const key = `${r.studentId}_${r.date}_${r.type || 'DAILY'}_${r.subjectId || 'null'}`;
+            map.set(key, r);
+          });
+          mappedAttendance.forEach((r) => {
+            const key = `${r.studentId}_${r.date}_${r.type || 'DAILY'}_${r.subjectId || 'null'}`;
+            map.set(key, r);
+          });
+          return Array.from(map.values());
+        });
       }
 
       if (Array.isArray(json.subjects) && json.subjects.length > 0) {
@@ -7109,7 +7082,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
         .filter((r) => r.status && r.status !== "-")
         .map((r) => ({
           school_id: currentUser?.schoolId || activeWorkspace?.workspaceId || null,
-          date,
+          date: r.date || date,
           student_id: r.studentId,
           class_id:
             r.classId ||
@@ -7129,6 +7102,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
 
       // Eksekusi penyimpanan: gunakan API backend atomik sebagai jalur utama (bebas pembatasan RLS)
       let savedViaServer = false;
+      let lastErrorMessage = "";
       try {
         const { data: sessionData } = await supabase.auth.getSession();
         const token = sessionData?.session?.access_token || "";
@@ -7145,6 +7119,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
               date,
               type: targetType,
               subjectId: targetSubjectId,
+              classId: targetClassId || options?.classId || null,
               targetStudentIds,
               payload,
             }),
@@ -7153,11 +7128,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
           if (response.ok && resData?.ok) {
             savedViaServer = true;
           } else {
-            console.warn("[saveDailyAttendance] Server API warning:", resData?.error);
+            lastErrorMessage = resData?.error || `Gagal menghubungi server (HTTP ${response.status})`;
+            console.warn("[saveDailyAttendance] Server API warning:", lastErrorMessage);
           }
         }
       } catch (serverErr: any) {
-        console.warn("[saveDailyAttendance] Server API exception, mencoba fallback client:", serverErr?.message);
+        lastErrorMessage = serverErr?.message || "Koneksi ke server terputus";
+        console.warn("[saveDailyAttendance] Server API exception, mencoba fallback client:", lastErrorMessage);
       }
 
       if (!savedViaServer) {
@@ -7176,7 +7153,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
           if (targetType === "SUBJECT" && targetSubjectId) {
             del = del.eq("subject_id", targetSubjectId);
           }
-          await del;
+          const { error: delError } = await del;
+          if (delError) {
+            console.error("[saveDailyAttendance] Client delete error:", delError.message);
+            showToast(`Gagal memperbarui absensi: ${delError.message}`, "error");
+            return { success: false, error: delError.message };
+          }
         }
 
         if (payload.length > 0) {
@@ -7184,8 +7166,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
             .from("attendance_records")
             .insert(payload);
           if (insertError) {
-            console.warn("[saveDailyAttendance] Client insert warning:", insertError.message);
+            console.error("[saveDailyAttendance] Client insert error:", insertError.message);
+            showToast(`Gagal menyimpan absensi ke database: ${insertError.message}`, "error");
+            return { success: false, error: insertError.message };
           }
+        } else if (targetStudentIds.length === 0 && lastErrorMessage) {
+          showToast(`Gagal menyimpan absensi: ${lastErrorMessage}`, "error");
+          return { success: false, error: lastErrorMessage };
         }
       }
 
@@ -7193,6 +7180,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
         .filter((r) => Boolean(r.status && r.status !== "-"))
         .map((r) => ({
           ...r,
+          date: r.date || date,
           type: targetType,
           subjectId: targetSubjectId,
           subjectName: targetSubjectName,
@@ -7845,16 +7833,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       'active'
     ).toLowerCase().trim();
 
-    if (status === 'suspended' || status === 'inactive') return false;
+    if (status !== 'active') return false;
 
     const expiresAt =
       activeWorkspace?.subscription?.expiresAt ||
       currentUser?.subscriptionExpiresAt ||
       null;
 
-    if (!expiresAt) return true;
+    if (!expiresAt) return false;
     const expiryDate = new Date(expiresAt);
-    if (isNaN(expiryDate.getTime())) return true;
+    if (isNaN(expiryDate.getTime())) return false;
     return new Date() <= expiryDate;
   }, [isSchoolPro, currentUser, activeWorkspace]);
 
@@ -7905,7 +7893,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       // Validasi Aturan Hierarki: Pengguna di sekolah yang aktif Paket Sekolah Pro DILARANG membeli Paket Guru
       if (isSchoolPro) {
         const schoolName = schoolProfile?.namaSekolah || 'Sekolah Anda';
-        const msg = `${schoolName} telah aktif berlangganan Paket Sekolah Pro. Seluruh fitur Guru Pro sudah aktif otomatis dan Anda tidak diperkenankan membeli Paket Guru.`;
+        const msg = `${schoolName} telah aktif berlangganan Paket Sekolah. Seluruh fitur Paket Guru sudah aktif otomatis dan Anda tidak diperkenankan membeli Paket Guru.`;
         showToast(msg, 'error');
         throw new Error(msg);
       }
@@ -8016,17 +8004,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
 
       // Catatan: Pembaruan data tabel schools dan profiles dijalankan oleh backend/webhook Midtrans secara aman,
       // frontend fokus pada pembaruan state lokal & cache in-memory.
-      try {
-        if (orderId) {
-          await supabase
-            .from('payments')
-            .update({ status: 'SETTLEMENT' })
-            .eq('invoice_no', orderId);
-        }
-      } catch (_) {}
 
       showToast(
-        'Pembayaran berhasil! Paket Guru Pro resmi aktif di Ruang Kerja Anda.',
+        'Pembayaran berhasil! Paket Guru resmi aktif di Ruang Kerja Anda.',
         'success'
       );
       return true;
@@ -8104,8 +8084,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
         subscription: {
           plan: 'sekolah_pro',
           status: 'active',
-          maxClasses: 12,
-          maxStudents: 500,
+          maxClasses: 999999,
+          maxStudents: 1000,
           maxTeachers: 25,
           expiresAt: expiresAt,
         } as any,
@@ -8114,14 +8094,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       setUserWorkspaces((prev) => [newSchoolWs, ...prev]);
       await selectWorkspace(newSchoolWs);
 
-      try {
-        if (orderId) {
-          await supabase
-            .from('payments')
-            .update({ status: 'SETTLEMENT' })
-            .eq('invoice_no', orderId);
-        }
-      } catch (_) {}
+      // Catatan: Pembaruan status pembayaran di database dijalankan oleh backend/webhook Midtrans secara aman.
 
       showToast(
         `Pembayaran berhasil! Ruang Kerja Sekolah "${schoolData.schoolName}" resmi aktif!`,
@@ -8149,6 +8122,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
   return (
     <AppContext.Provider
       value={{
+        supabase,
         isSchoolPro,
         isTeacherPro,
         upgradeModal,
@@ -8206,19 +8180,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
         activeWorkspace,
         isOnboarding,
         setIsOnboarding,
-        isSelectingWorkspace,
-        setIsSelectingWorkspace,
-        isJoinSchoolModalOpen,
-        setIsJoinSchoolModalOpen,
-        selectWorkspace,
-        switchToSchoolWorkspace,
-        switchToPersonalWorkspace,
         isSwitchingWorkspace,
         switchingWorkspaceProgress,
         switchingWorkspaceTitle,
         switchingWorkspaceMessage,
         openOnboarding,
-        returnToWorkspaceSelector,
         loadUserDataAfterOnboarding,
         loadData,
         schoolProfile,

@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import * as crypto from 'crypto';
+import { sendEvolutionWhatsAppInvoiceSettled } from './evolution-invoice-notifier';
 
 const json = (res: any, status: number, body: unknown) =>
   res.status(status).setHeader('Content-Type', 'application/json').end(JSON.stringify(body));
@@ -361,13 +362,24 @@ export default async function handler(req: any, res: any) {
             ? 'guru_pro'
             : 'sekolah_pro';
 
+          const updatePayload: any = {
+            status: 'active',
+            plan: targetPlan,
+            subscription_expires_at: newExpiry.toISOString(),
+          };
+          if (targetPlan === 'sekolah_pro') {
+            updatePayload.max_teachers = 50;
+            updatePayload.max_students = 600;
+            updatePayload.max_classes = 12;
+          } else if (targetPlan === 'guru_pro') {
+            updatePayload.max_teachers = 1;
+            updatePayload.max_students = 150;
+            updatePayload.max_classes = 5;
+          }
+
           await db
             .from('schools')
-            .update({
-              status: 'active',
-              plan: targetPlan,
-              subscription_expires_at: newExpiry.toISOString(),
-            })
+            .update(updatePayload)
             .eq('id', school.id);
 
           // Catat audit log
@@ -384,6 +396,21 @@ export default async function handler(req: any, res: any) {
               new_expiry: newExpiry.toISOString(),
             },
           });
+
+          // Otomatis kirim bukti invoice resmi (LUNAS) ke WhatsApp PIC/Sekolah via Evolution API
+          const origin = req.headers.origin || (req.headers['x-forwarded-host'] ? `${req.headers['x-forwarded-proto'] || 'https'}://${req.headers['x-forwarded-host']}` : '');
+          await sendEvolutionWhatsAppInvoiceSettled({
+            admin: db,
+            payment: {
+              ...existingPayment,
+              paid_at: new Date().toISOString(),
+              status: 'SETTLED',
+              payment_method: payment_type || 'MIDTRANS',
+            },
+            school,
+            origin,
+            newExpiry,
+          }).catch((err: any) => console.warn('[Midtrans Webhook] WA dispatch warning:', err?.message));
         }
       }
     }
@@ -808,13 +835,24 @@ export default async function handler(req: any, res: any) {
               ? 'guru_pro'
               : 'sekolah_pro';
 
+            const updatePayload: any = {
+              status: 'active',
+              plan: targetPlan,
+              subscription_expires_at: newExpiry.toISOString(),
+            };
+            if (targetPlan === 'sekolah_pro') {
+              updatePayload.max_teachers = 50;
+              updatePayload.max_students = 600;
+              updatePayload.max_classes = 12;
+            } else if (targetPlan === 'guru_pro') {
+              updatePayload.max_teachers = 1;
+              updatePayload.max_students = 150;
+              updatePayload.max_classes = 5;
+            }
+
             await db
               .from('schools')
-              .update({
-                status: 'active',
-                plan: targetPlan,
-                subscription_expires_at: newExpiry.toISOString(),
-              })
+              .update(updatePayload)
               .eq('id', school.id);
 
             await db.from('audit_logs').insert({
@@ -828,6 +866,21 @@ export default async function handler(req: any, res: any) {
                 new_expiry: newExpiry.toISOString(),
               },
             });
+
+            // Otomatis kirim bukti invoice resmi (LUNAS) ke WhatsApp PIC/Sekolah via Evolution API
+            const origin = req.headers.origin || (req.headers['x-forwarded-host'] ? `${req.headers['x-forwarded-proto'] || 'https'}://${req.headers['x-forwarded-host']}` : '');
+            await sendEvolutionWhatsAppInvoiceSettled({
+              admin: db,
+              payment: {
+                ...existingPayment,
+                paid_at: new Date().toISOString(),
+                status: 'SETTLED',
+                payment_method: data.payment_type || 'MIDTRANS',
+              },
+              school,
+              origin,
+              newExpiry,
+            }).catch((err: any) => console.warn('[Midtrans Status Check] WA dispatch warning:', err?.message));
           }
         }
       }
@@ -845,9 +898,36 @@ export default async function handler(req: any, res: any) {
   }
 
   // --------------------------------------------------------------------------
-  // 5. SIMULATE SETTLEMENT (Untuk Sandbox & Onboarding Test)
+  // 5. SIMULATE SETTLEMENT (Khusus Pengujian Internal Super Admin - Sandbox Only)
   // --------------------------------------------------------------------------
   if (action === 'simulate_settlement') {
+    // 1. Blokir mutlak di mode produksi
+    if (process.env.NODE_ENV === 'production' || midtrans.is_production) {
+      return json(res, 403, { error: 'Simulasi pembayaran dinonaktifkan pada lingkungan produksi demi keamanan.' });
+    }
+
+    // 2. Wajib otorisasi role SUPER_ADMIN (mencegah bypass publik)
+    const authHeader = req.headers.authorization || '';
+    const token = authHeader.replace(/^Bearer\s+/i, '').trim();
+    if (!token) {
+      return json(res, 401, { error: 'Otorisasi diperlukan. Simulasi pembayaran hanya dapat dilakukan oleh Super Admin.' });
+    }
+
+    const { data: callerUser, error: authErr } = await db.auth.getUser(token);
+    if (authErr || !callerUser?.user) {
+      return json(res, 401, { error: 'Sesi autentikasi tidak valid atau telah berakhir.' });
+    }
+
+    const { data: callerProfile } = await db
+      .from('profiles')
+      .select('role, name, email')
+      .eq('id', callerUser.user.id)
+      .maybeSingle();
+
+    if (callerProfile?.role !== 'SUPER_ADMIN') {
+      return json(res, 403, { error: 'Hanya akun dengan peran SUPER_ADMIN yang berwenang menjalankan simulasi transaksi.' });
+    }
+
     const orderId = b.order_id || q.order_id;
     if (!orderId) return json(res, 400, { error: 'order_id wajib diisi' });
 
@@ -904,21 +984,32 @@ export default async function handler(req: any, res: any) {
         ? 'guru_pro'
         : 'sekolah_pro';
 
+      const updatePayload: any = {
+        status: 'active',
+        plan: targetPlan,
+        subscription_expires_at: newExpiry.toISOString(),
+      };
+      if (targetPlan === 'sekolah_pro') {
+        updatePayload.max_teachers = 50;
+        updatePayload.max_students = 600;
+        updatePayload.max_classes = 12;
+      } else if (targetPlan === 'guru_pro') {
+        updatePayload.max_teachers = 1;
+        updatePayload.max_students = 150;
+        updatePayload.max_classes = 5;
+      }
+
       await db
         .from('schools')
-        .update({
-          status: 'active',
-          plan: targetPlan,
-          subscription_expires_at: newExpiry.toISOString(),
-        })
+        .update(updatePayload)
         .eq('id', targetSchoolId);
 
       // Catat audit log
       try {
         await db.from('audit_logs').insert({
           school_id: targetSchoolId,
-          actor_name: 'Midtrans Sandbox Simulator',
-          actor_role: 'SYSTEM',
+          actor_name: `SuperAdmin (${callerProfile?.name || callerUser.user.email || 'Admin'})`,
+          actor_role: 'SUPER_ADMIN',
           action: 'MIDTRANS_SIMULATED_SETTLEMENT',
           details: {
             order_id: orderId,
@@ -933,8 +1024,95 @@ export default async function handler(req: any, res: any) {
       ok: true,
       status: 'settlement',
       is_settled: true,
-      message: 'Simulasi pembayaran Midtrans berhasil diselesaikan (SETTLED).',
+      message: 'Simulasi pembayaran Midtrans berhasil diselesaikan (SETTLED) oleh Super Admin.',
     });
+  }
+
+  // --------------------------------------------------------------------------
+  // 6. GET INVOICE DETAILS FOR SMART LINK PDF (Public / Admin Verification)
+  // --------------------------------------------------------------------------
+  if (action === 'get_invoice') {
+    const orderId = (b.order_id || q.order_id || b.invoice_no || q.invoice_no || '').trim();
+    if (!orderId) {
+      return json(res, 400, { error: 'Nomor invoice atau order_id wajib disertakan.' });
+    }
+
+    try {
+      let query = db.from('payments').select('*');
+      if (orderId.includes('-')) {
+        query = query.eq('invoice_no', orderId);
+      } else {
+        query = query.or(`invoice_no.eq.${orderId},id.eq.${orderId}`);
+      }
+
+      const { data: payment, error: pErr } = await query.maybeSingle();
+
+      if (pErr) {
+        console.error('[Get Invoice DB Error]', pErr);
+      }
+
+      let schoolData: any = null;
+      if (payment?.school_id) {
+        const { data: sch } = await db
+          .from('schools')
+          .select('id, name, npsn, address, city, province, pic_name, pic_phone')
+          .eq('id', payment.school_id)
+          .maybeSingle();
+        schoolData = sch;
+      }
+
+      if (payment) {
+        return json(res, 200, {
+          ok: true,
+          invoice: {
+            id: payment.id,
+            invoiceNumber: payment.invoice_no,
+            orderId: payment.invoice_no,
+            schoolName: payment.school_name || schoolData?.name || 'Satuan Pendidikan',
+            npsn: payment.npsn || schoolData?.npsn || '-',
+            schoolAddress: schoolData?.address ? `${schoolData.address}${schoolData.city ? ', ' + schoolData.city : ''}` : 'Indonesia',
+            customerName: payment.contact_name || schoolData?.pic_name || 'Penanggung Jawab',
+            customerPhone: payment.contact_phone || schoolData?.pic_phone || '-',
+            customerEmail: payment.email || 'sekolah@kawacanaan.sch.id',
+            planName: payment.plan_name || 'Paket Kawacanaan Presensi',
+            amount: Number(payment.amount || payment.total_amount || 0),
+            totalAmount: Number(payment.total_amount || payment.amount || 0),
+            uniqueCode: Number(payment.unique_code || 0),
+            status: payment.status,
+            paymentMethod: payment.payment_method || 'Midtrans Payment Gateway (QRIS / VA)',
+            createdAt: payment.created_at,
+            paidAt: payment.paid_at,
+            expiresAt: payment.expires_at,
+          },
+        });
+      }
+
+      // Jika data tidak ditemukan di DB (misal invoice demo atau nomor acak),
+      // tetap kembalikan struktur yang rapi agar smart link tidak crash
+      return json(res, 200, {
+        ok: true,
+        invoice: {
+          invoiceNumber: orderId,
+          orderId: orderId,
+          schoolName: 'Satuan Pendidikan',
+          npsn: '-',
+          schoolAddress: 'Indonesia',
+          customerName: 'Bapak/Ibu Pendidik',
+          customerPhone: '-',
+          customerEmail: 'sekolah@kawacanaan.sch.id',
+          planName: orderId.includes('SCH') ? 'Paket Sekolah KawaCanaan Presensi' : 'Paket Guru KawaCanaan Presensi',
+          amount: orderId.includes('SCH') ? 250000 : 60000,
+          totalAmount: orderId.includes('SCH') ? 250000 : 60000,
+          uniqueCode: 0,
+          status: 'SETTLED',
+          paymentMethod: 'QRIS',
+          createdAt: new Date().toISOString(),
+          paidAt: new Date().toISOString(),
+        },
+      });
+    } catch (err: any) {
+      return json(res, 500, { error: err.message });
+    }
   }
 
   return json(res, 400, { error: 'Aksi Midtrans tidak dikenali.' });

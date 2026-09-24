@@ -4,7 +4,7 @@
  * Standar Penamaan Entitas & Database (Bahasa Indonesia):
  * - ruang_kerja: Ruang kerja tenant (tipe: 'individu' | 'sekolah')
  * - anggota_ruang_kerja: Keanggotaan pengguna dalam ruang kerja dengan role
- * - paket: Master konfigurasi paket (Guru Gratis, Guru Uji Coba, Guru Pro, Sekolah Gratis, Sekolah Uji Coba, Sekolah Pro)
+ * - paket: Master konfigurasi paket (Paket Gratis, Paket Guru, Paket Sekolah)
  * - langganan: Status langganan ruang kerja ('gratis' | 'uji_coba' | 'pro')
  * - pembayaran: Transaksi & invoice pembayaran upgrade paket
  * - tahun_ajaran: Tahun ajaran aktif untuk isolasi penugasan
@@ -109,7 +109,7 @@ export const STANDARD_SCHOOL_CLASSES: readonly string[] = [
   '6A', '6B',
 ] as const;
 
-export const DEFAULT_SCHOOL_CLASSES_COUNT = 12;
+export const DEFAULT_SCHOOL_CLASSES_COUNT = 999999;
 
 /**
  * Batas Kelas Ruang Kerja Individu berdasarkan Peran Pendidik:
@@ -137,7 +137,7 @@ export function getWorkspaceClassCapacity(
     return INDIVIDUAL_HOMEROOM_MAX_CLASSES; // 1 kelas (Wali Kelas / default)
   }
 
-  // Ruang Kerja Sekolah: 12 kelas (Kelas 1–6 Paralel A/B)
+  // Ruang Kerja Sekolah: Kapasitas fleksibel sesuai kebutuhan sekolah (diinput mandiri oleh admin)
   return DEFAULT_SCHOOL_CLASSES_COUNT;
 }
 
@@ -172,28 +172,21 @@ export function validateClassAddition(
   const isHomeroom = (role || '').toUpperCase().trim() === 'WALI KELAS';
   const isSubject = (role || '').toUpperCase().trim() === 'GURU MAPEL';
 
-  if (currentClassesCount >= maxAllowed) {
-    if (isPersonal) {
-      if (isHomeroom) {
-        return {
-          allowed: false,
-          maxAllowed,
-          message: 'Wali Kelas di Ruang Kerja Individu dibatasi hanya membina 1 kelas. Silakan edit kelas yang ada untuk mengubah data rombel.',
-        };
-      }
-      if (isSubject) {
-        return {
-          allowed: false,
-          maxAllowed,
-          message: 'Kapasitas Guru Mapel di Ruang Kerja Individu maksimal 6 kelas. Anda telah mencapai batas maksimal 6 rombel yang diajar.',
-        };
-      }
+  if (isPersonal && currentClassesCount >= maxAllowed) {
+    if (isHomeroom) {
+      return {
+        allowed: false,
+        maxAllowed,
+        message: 'Wali Kelas di Ruang Kerja Individu dibatasi hanya membina 1 kelas. Silakan edit kelas yang ada untuk mengubah data rombel.',
+      };
     }
-    return {
-      allowed: false,
-      maxAllowed,
-      message: `Kapasitas Ruang Kerja Sekolah telah mencapai batas maksimal ${DEFAULT_SCHOOL_CLASSES_COUNT} kelas (Struktur Kelas 1–6 Paralel A/B).`,
-    };
+    if (isSubject) {
+      return {
+        allowed: false,
+        maxAllowed,
+        message: 'Kapasitas Guru Mapel di Ruang Kerja Individu maksimal 6 kelas. Anda telah mencapai batas maksimal 6 rombel yang diajar.',
+      };
+    }
   }
 
   return { allowed: true, maxAllowed };
@@ -322,13 +315,13 @@ export const DEFAULT_MASTER_PAKET: MasterPaketSettings = {
     hargaTahunanPerdana: 250000, // Rp 250.000 (hemat 2 bulan / Rp 50.000 untuk pembelian pertama kali)
     diskonTahunanLabel: 'Hemat 2 Bulan',
     durasiHari: 30, // Perpanjangan bulanan / tahunan
-    kapasitasSiswa: 600, // 12 kelas x 50 siswa
+    kapasitasSiswa: 1000,
     kapasitasGuru: 50,
-    kapasitasKelas: 12, // 12 rombel: Kelas 1-6 paralel A/B
+    kapasitasKelas: 999999, // Fleksibel: rombel diinput mandiri oleh admin sekolah sesuai kebutuhan
     fitur: [
       'Seluruh Fitur Presensi Terbuka Penuh',
       'Multi-Role Terpadu (Admin, Kepsek, Wali Kelas, Guru Mapel)',
-      '12 Kelas Lengkap: Struktur Kelas 1–6 Paralel A/B (1A s.d. 6B)',
+      'Kelola Rombel Bebas Sesuai Kebutuhan Sekolah (Diinput Mandiri)',
       'Kapasitas Maksimal 50 Siswa per Kelas',
       'Perhitungan Hari Efektif Kalender Pendidikan Otomatis',
       'Cetak Laporan Format Kedinasan A4 Standar Diknas',
@@ -336,7 +329,7 @@ export const DEFAULT_MASTER_PAKET: MasterPaketSettings = {
       'Portal Siswa & Pengajuan Izin Mandiri',
       'Bantuan Migrasi & Unggah Data Siswa Awal'
     ],
-    deskripsi: 'Sistem presensi multi-user terpadu dan profesional untuk seluruh unit sekolah dasar (12 kelas paralel A/B, maks 50 siswa per kelas).'
+    deskripsi: 'Sistem presensi multi-user terpadu dan profesional untuk seluruh unit sekolah (rombel dikelola dan diinput mandiri oleh admin sekolah).'
   }
 };
 

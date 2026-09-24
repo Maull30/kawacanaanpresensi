@@ -89,7 +89,7 @@ export const PricingSection: React.FC<PricingSectionProps> = ({ onOpenRegister, 
     {
       id: 'teacher' as const,
       name: isId ? 'Paket Guru' : 'Teacher Plan',
-      workspaceType: isId ? 'Ruang Kerja Individu Pro' : 'Teacher Workspace Pro',
+      workspaceType: isId ? 'Ruang Kerja Individu' : 'Teacher Workspace',
       workspaceIcon: Users,
       price: billingCycle === 'monthly'
         ? formatRupiah(teacherMonthlyPrice)
@@ -172,7 +172,7 @@ export const PricingSection: React.FC<PricingSectionProps> = ({ onOpenRegister, 
   return (
     <section 
       id="harga" 
-      className="scroll-mt-16 sm:scroll-mt-20 pt-16 sm:pt-20 pb-16 sm:pb-24 bg-gradient-to-b from-[#F3F8FF] via-[#E9F3FE] to-[#DCEBFE] text-slate-900 relative antialiased overflow-hidden"
+      className="scroll-mt-16 sm:scroll-mt-20 pt-16 sm:pt-20 pb-16 sm:pb-24 lg:py-0 lg:min-h-screen lg:h-screen lg:max-h-screen lg:flex lg:flex-col lg:justify-center bg-gradient-to-b from-[#F3F8FF] via-[#E9F3FE] to-[#DCEBFE] text-slate-900 relative antialiased overflow-hidden"
     >
       {/* Background Soft Glows & Ambient Orbs */}
       <div className="absolute top-10 left-10 w-96 h-96 bg-blue-200/35 rounded-full blur-3xl pointer-events-none" />
@@ -197,9 +197,9 @@ export const PricingSection: React.FC<PricingSectionProps> = ({ onOpenRegister, 
       <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
         
         {/* ========================================================================= */}
-        {/* SECTION HEADER: Pill Badge, Main Title, Subtitle & 3D School & Doodle     */}
+        {/* SECTION HEADER: Main Title, Subtitle & 3D School & Doodle                */}
         {/* ========================================================================= */}
-        <div className="relative text-center mb-12 sm:mb-16">
+        <div className="relative text-center mb-6 sm:mb-8 lg:mb-2 xl:mb-4">
           
           {/* Top-Left Playful Handwritten Annotation with Rays */}
           <div className="hidden lg:block absolute -top-4 left-4 xl:left-8 pointer-events-none select-none text-left">
@@ -218,7 +218,7 @@ export const PricingSection: React.FC<PricingSectionProps> = ({ onOpenRegister, 
           </div>
 
           {/* Top-Right 3D Illustration of Indonesian School with 'SCHOOL' Sign */}
-          <div className="hidden lg:block absolute -top-12 right-2 xl:right-6 pointer-events-none select-none w-48 xl:w-56">
+          <div className="hidden xl:block absolute -top-8 right-2 xl:right-6 pointer-events-none select-none w-32 xl:w-40 opacity-80">
             <img 
               src="/images/pricing_school_3d.jpg" 
               alt="School 3D Illustration" 
@@ -227,32 +227,26 @@ export const PricingSection: React.FC<PricingSectionProps> = ({ onOpenRegister, 
             />
           </div>
 
-          {/* Center Pill Badge with Icon */}
-          <div className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-blue-100/90 border border-blue-200 text-blue-800 text-xs font-bold tracking-wide shadow-2xs mb-3.5">
-            <Star className="w-3.5 h-3.5 text-blue-600 fill-blue-600/30 shrink-0" />
-            <span>{isId ? 'Paket & Harga' : 'Packages & Pricing'}</span>
-          </div>
-
           {/* High-Contrast Main Title */}
-          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-slate-900 tracking-tight leading-tight uppercase max-w-2xl mx-auto">
+          <h2 className="text-2xl sm:text-3xl lg:text-3xl xl:text-4xl font-black text-slate-900 tracking-tight leading-tight uppercase max-w-2xl mx-auto">
             <span>{isId ? 'Pilih Paket Sesuai' : 'Choose Plan For'}</span>
-            <span className="block text-blue-600 mt-1">{isId ? 'Ruang Kerja Anda' : 'Your Workspace'}</span>
+            <span className="block text-blue-600 mt-0.5">{isId ? 'Ruang Kerja Anda' : 'Your Workspace'}</span>
           </h2>
 
           {/* Subtitle Description */}
-          <p className="mt-3 text-slate-600 text-xs sm:text-sm md:text-base leading-relaxed max-w-xl mx-auto font-normal">
+          <p className="mt-1.5 lg:mt-1 text-slate-600 text-xs sm:text-sm lg:text-xs xl:text-sm leading-relaxed max-w-xl mx-auto font-normal">
             {isId
               ? 'Paket ditentukan berdasarkan ruang kerja: mulai dari Ruang Kerja Individu hingga Ruang Kerja Sekolah terpadu.'
               : 'Plans are organized by workspace: from standalone personal workspaces for individual teachers to fully integrated institutional school deployment.'}
           </p>
 
           {/* Toggle Switch Periode Waktu: Bulanan vs Tahunan (Rounded Pill Style) */}
-          <div className="pt-4 flex items-center justify-center">
+          <div className="pt-3 lg:pt-2 xl:pt-3 flex items-center justify-center">
             <div className="inline-flex items-center p-1 bg-white border border-slate-200/90 rounded-full shadow-xs">
               <button
                 type="button"
                 onClick={() => setBillingCycle('monthly')}
-                className={`px-5 py-2 rounded-full text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+                className={`px-4 sm:px-5 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-bold transition-all cursor-pointer ${
                   billingCycle === 'monthly'
                     ? 'bg-blue-600 text-white shadow-xs'
                     : 'text-slate-600 hover:text-slate-900'
@@ -264,7 +258,7 @@ export const PricingSection: React.FC<PricingSectionProps> = ({ onOpenRegister, 
               <button
                 type="button"
                 onClick={() => setBillingCycle('yearly')}
-                className={`px-4 sm:px-5 py-2 rounded-full text-xs sm:text-sm font-bold transition-all flex items-center gap-2 cursor-pointer ${
+                className={`px-4 sm:px-5 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
                   billingCycle === 'yearly'
                     ? 'bg-blue-600 text-white shadow-xs'
                     : 'text-slate-600 hover:text-slate-900'

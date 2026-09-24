@@ -137,7 +137,7 @@ export function getKokaLandingResponse(
     // 2d. Jika pengguna sedang melihat section Harga
     if (dynamicContext?.sectionId === 'harga') {
       return {
-        text: 'Yang sedang Bapak/Ibu lihat di layar adalah **Pilihan Paket Lisensi KawaCanaan** 😊\n\n• **Paket Gratis (Rp0)**: Cocok untuk 1 guru kelas mandiri (s.d. 32 siswa).\n• **Paket Guru Pro (Rp5.000/bln / Rp60.000/thn)**: Untuk guru dengan hingga 5 rombel (150 siswa).\n• **Paket Sekolah Pro (Rp25.000/bln / Rp250.000/thn perdana)**: Untuk 1 sekolah penuh kelas 1–6 paralel dengan multi-guru, operator, dan portal siswa (hemat 2 bulan untuk pembelian perdana; perpanjangan Rp300.000/thn).',
+        text: 'Yang sedang Bapak/Ibu lihat di layar adalah **Pilihan Paket Lisensi KawaCanaan** 😊\n\n• **Paket Gratis (Rp0)**: Cocok untuk 1 guru kelas mandiri (s.d. 32 siswa).\n• **Paket Guru (Rp5.000/bln / Rp60.000/thn)**: Untuk guru dengan hingga 5 rombel (150 siswa).\n• **Paket Sekolah (Rp25.000/bln / Rp250.000/thn perdana)**: Untuk 1 sekolah penuh kelas 1–6 paralel dengan multi-guru, operator, dan portal siswa (hemat 2 bulan untuk pembelian perdana; perpanjangan Rp300.000/thn).',
         category: 'dynamic_pricing',
         suggestions: [],
       };
@@ -193,7 +193,7 @@ export function getKokaLandingResponse(
       }
       if (/sekolah/i.test(primaryCta.label)) {
         return {
-          text: `Jika Bapak/Ibu mengklik tombol **"${primaryCta.label}"**, Bapak/Ibu akan diarahkan ke formulir pendaftaran Paket Sekolah Pro untuk mengadopsi sistem presensi satu sekolah penuh rombel kelas 1–6 dengan multi-guru dan format kedinasan resmi.`,
+          text: `Jika Bapak/Ibu mengklik tombol **"${primaryCta.label}"**, Bapak/Ibu akan diarahkan ke formulir pendaftaran Paket Sekolah untuk mengadopsi sistem presensi satu sekolah penuh rombel kelas 1–6 dengan multi-guru dan format kedinasan resmi.`,
           category: 'dynamic_cta',
           suggestions: [],
         };

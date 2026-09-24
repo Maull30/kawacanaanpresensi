@@ -60,7 +60,6 @@ export const UpgradePromptModal: React.FC<UpgradePromptModalProps> = ({
   const [paymentSession, setPaymentSession] = useState<PaymentSession | null>(null);
   const [paymentStatusText, setPaymentStatusText] = useState<string | null>(null);
   const [isCheckingPayment, setIsCheckingPayment] = useState(false);
-  const [isSimulating, setIsSimulating] = useState(false);
 
   const pollingRef = useRef<any>(null);
 
@@ -238,31 +237,7 @@ export const UpgradePromptModal: React.FC<UpgradePromptModalProps> = ({
     }
   };
 
-  // 5. Sandbox Test Helper (Simulasi Pembayaran Berhasil)
-  const handleSimulateSandboxSuccess = async () => {
-    if (!paymentSession?.orderId) return;
-    setIsSimulating(true);
-    setPaymentStatusText('Menjalankan simulasi pembayaran berhasil (Sandbox)...');
 
-    try {
-      const res = await fetch(
-        `/api/midtrans?action=simulate_settlement&order_id=${encodeURIComponent(paymentSession.orderId)}`,
-        { method: 'POST' }
-      );
-      const data = await res.json();
-
-      if (res.ok && (data.ok || data.status === 'settlement')) {
-        await handlePaymentSuccess(paymentSession.orderId);
-      } else {
-        // Fallback aktivasi langsung di sandbox mode
-        await handlePaymentSuccess(paymentSession.orderId);
-      }
-    } catch (_) {
-      await handlePaymentSuccess(paymentSession.orderId);
-    } finally {
-      setIsSimulating(false);
-    }
-  };
 
   const whatsappMessage = encodeURIComponent(
     `Halo Tim Pendamping Kawacanaan, saya ingin bertanya seputar upgrade ke Paket Guru untuk akun presensi saya. Mohon bantuannya.`
@@ -359,7 +334,7 @@ export const UpgradePromptModal: React.FC<UpgradePromptModalProps> = ({
                 <div className="bg-blue-50/80 border border-blue-200 rounded-2xl p-4 space-y-2.5">
                   <div className="flex items-center gap-2 text-blue-900 font-bold text-sm">
                     <Building2 size={18} className="text-blue-700 shrink-0" />
-                    <span>Sekolah Anda Berlangganan Paket Sekolah Pro</span>
+                    <span>Sekolah Anda Berlangganan Paket Sekolah</span>
                   </div>
                   <p className="text-xs text-slate-600 leading-relaxed">
                     Ruang kerja satuan pendidikan <strong>{schoolProfile?.namaSekolah || 'sekolah Anda'}</strong> saat ini memiliki lisensi aktif. Seluruh Kepala Sekolah, Wali Kelas, dan Guru Mapel otomatis memiliki akses fitur profesional penuh.
@@ -556,17 +531,6 @@ export const UpgradePromptModal: React.FC<UpgradePromptModalProps> = ({
               >
                 <RefreshCw size={14} className={isCheckingPayment ? 'animate-spin' : ''} />
                 <span>{isCheckingPayment ? 'Memeriksa Status...' : 'Cek Status Pembayaran'}</span>
-              </button>
-
-              {/* Tombol Sandbox Simulation untuk Pengujian / Demo Cepat */}
-              <button
-                type="button"
-                onClick={handleSimulateSandboxSuccess}
-                disabled={isSimulating}
-                className="w-full py-2 px-3 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-800 text-[11px] font-bold transition flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
-              >
-                <Zap size={13} className="text-emerald-600" />
-                <span>{isSimulating ? 'Memproses Simulasi...' : 'Simulasi Pembayaran Berhasil (Sandbox Test)'}</span>
               </button>
             </div>
 

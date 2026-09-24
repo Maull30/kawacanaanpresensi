@@ -735,3 +735,43 @@ export function downloadStudentTemplateFile(
     URL.revokeObjectURL(url);
   }
 }
+
+/**
+ * Generate and download template in Excel (.xlsx) or CSV format for Classes
+ */
+export function downloadClassTemplateFile(format: 'xlsx' | 'csv' = 'xlsx') {
+  const headers = ['NAMA WALI KELAS', 'NAMA ROMBEL / KELAS'];
+  const data = [
+    ['Budi Santoso, S.Pd.', 'Kelas 1A'],
+    ['Siti Aminah, M.Pd.', 'Kelas 1B'],
+    ['Rahmat Hidayat, S.Pd.', 'Kelas 2A'],
+    ['Dewi Lestari, S.Pd.', 'Kelas 3A'],
+    ['', 'Kelas 4A'],
+    ['', 'Kelas 5A'],
+    ['', 'Kelas 6A'],
+  ];
+
+  if (format === 'xlsx') {
+    const wsData = [headers, ...data];
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+    ws['!cols'] = [{ wch: 32 }, { wch: 22 }];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Template Kelas');
+    XLSX.writeFile(wb, 'Template_Import_Data_Kelas.xlsx');
+  } else {
+    const csvContent =
+      '\uFEFF' +
+      headers.join(',') +
+      '\n' +
+      data.map((r) => r.map((c) => (c.includes(',') ? `"${c}"` : c)).join(',')).join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', 'Template_Import_Data_Kelas.csv');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }
+}

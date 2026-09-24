@@ -278,6 +278,16 @@ export interface SystemConfig {
   checkInDeadlineTime: string; // Batas jam masuk tepat waktu (misal "07:00")
   checkOutStartTime: string; // Jam buka presensi pulang (misal "12:30")
   autoMarkLate: boolean; // Tandai otomatis (Terlambat) jika lewat batas jam masuk
+  // Pengaturan WhatsApp Broadcast WhatsApp Group Kelas
+  whatsappBroadcastEnabled?: boolean; // Aktifkan fitur broadcast WhatsApp Group untuk guru
+  broadcastMasukHeader?: string; // Judul pesan masuk, default: *LAPORAN KEHADIRAN PAGI*
+  broadcastMasukOpening?: string; // Salam pembuka laporan masuk
+  broadcastMasukClosing?: string; // Catatan penutup laporan masuk
+  broadcastPulangHeader?: string; // Judul pesan pulang, default: *LAPORAN KEPULANGAN SISWA*
+  broadcastPulangOpening?: string; // Salam pembuka laporan pulang
+  broadcastPulangClosing?: string; // Catatan penutup laporan pulang
+  broadcastIncludeStudentList?: boolean; // Cantumkan daftar rincian siswa yang Sakit/Izin/Alfa/Terlambat
+  broadcastIncludeSmartLink?: boolean; // Cantumkan tautan Smart Link Dokumen Rekap Resmi
 }
 
 // ---------- Super Admin Pro: Role & Izin, Monitoring, Pengaturan Global, Audit ----------

@@ -1,29 +1,45 @@
 import React from 'react';
-import kawacanaanLogo from '../assets/images/kawacanaan_logo_1787055634013.jpg';
+import { usePlatformBrand, DEFAULT_PLATFORM_LOGO } from '../utils/platformBranding';
 
 interface KawacanaanEmblemProps {
   className?: string;
   size?: number;
   alt?: string;
+  src?: string;
 }
 
 export const KawacanaanEmblem: React.FC<KawacanaanEmblemProps> = ({
   className = '',
   size = 64,
-  alt = 'Emblem Kawacanaan',
+  alt = 'Emblem Resmi Kawacanaan',
+  src,
 }) => {
+  const { logoUrl } = usePlatformBrand();
+  const activeSrc = src || logoUrl || DEFAULT_PLATFORM_LOGO;
+
   return (
     <div
-      className={`relative inline-flex items-center justify-center rounded-full overflow-hidden shrink-0 select-none ${className}`}
+      className={`relative inline-flex items-center justify-center shrink-0 select-none ${className}`}
       style={{ width: size, height: size }}
       id="kawacanaan-emblem"
     >
       <img
-        src={kawacanaanLogo}
+        key={activeSrc}
+        src={activeSrc}
         alt={alt}
-        className="w-full h-full object-contain rounded-full drop-shadow-md hover:scale-105 transition-transform duration-300"
+        className="w-full h-full object-contain hover:scale-105 transition-transform duration-300 drop-shadow-sm"
+        onError={(e) => {
+          // Fallback jika logo custom gagal dimuat
+          const target = e.currentTarget;
+          if (target.src !== `${window.location.origin}/lk.png` && !target.src.endsWith('/lk.png')) {
+            target.src = '/lk.png';
+          } else if (target.src !== `${window.location.origin}/kawacanaan-logo.png` && !target.src.endsWith('/kawacanaan-logo.png')) {
+            target.src = '/kawacanaan-logo.png';
+          }
+        }}
         referrerPolicy="no-referrer"
       />
     </div>
   );
 };
+

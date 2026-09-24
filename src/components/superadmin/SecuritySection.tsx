@@ -16,7 +16,8 @@ import {
   Database,
   ExternalLink,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Download
 } from 'lucide-react';
 
 export type AuditFilterType = 'all' | 'auth' | 'critical' | 'data_change';
@@ -144,6 +145,35 @@ export const SecuritySection: React.FC<{
     return 'bg-slate-100 text-slate-700 border-slate-200';
   };
 
+  const handleExportAuditLogs = () => {
+    if (filteredLogs.length === 0) {
+      showToast('Tidak ada data audit untuk diekspor.', 'info');
+      return;
+    }
+    const headers = ['ID', 'Waktu', 'Aktor', 'Role', 'Sekolah', 'Aksi', 'IP', 'Detail'];
+    const csvRows = filteredLogs.map((l) => [
+      `"${l.id || ''}"`,
+      `"${l.created_at || ''}"`,
+      `"${(l.actor_name || l.actor_username || '').replace(/"/g, '""')}"`,
+      `"${l.actor_role || ''}"`,
+      `"${(l.school_name || '').replace(/"/g, '""')}"`,
+      `"${l.action || ''}"`,
+      `"${l.ip_address || ''}"`,
+      `"${JSON.stringify(l.details || {}).replace(/"/g, '""')}"`,
+    ]);
+    const csvContent = [headers.join(','), ...csvRows.map((r) => r.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `audit_logs_${filter}_${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast(`Berhasil mengekspor ${filteredLogs.length} baris log audit!`, 'success');
+  };
+
   return (
     <div className="space-y-4">
       {/* Bar Filter Terpadu & Pencarian */}
@@ -185,9 +215,9 @@ export const SecuritySection: React.FC<{
           })}
         </div>
 
-        {/* Pencarian & Tombol Refresh */}
+        {/* Pencarian & Tombol Refresh & Export */}
         <div className="flex items-center gap-2">
-          <div className="relative w-full md:w-72">
+          <div className="relative w-full md:w-64">
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
@@ -197,6 +227,15 @@ export const SecuritySection: React.FC<{
               className="w-full pl-9 pr-3 py-1.5 rounded-xl border border-slate-200 text-xs font-medium focus:outline-indigo-600"
             />
           </div>
+
+          <button
+            type="button"
+            onClick={handleExportAuditLogs}
+            title="Ekspor CSV log ini"
+            className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition cursor-pointer shrink-0"
+          >
+            <Download size={15} />
+          </button>
 
           <button
             type="button"

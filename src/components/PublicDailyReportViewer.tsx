@@ -41,6 +41,7 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
     attendanceRecords: ctxAttendanceRecords,
     teachers: ctxTeachers,
     subjects: ctxSubjects,
+    users: ctxUsers,
   } = useApp();
 
   const isInternalUser = Boolean(currentUser && ctxClasses && ctxClasses.length > 0);
@@ -175,6 +176,10 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
     if (!isInternalUser || !resolvedClass) return null;
     if (resolvedClass.waliKelasTeacherId) {
       const t = ctxTeachers.find((tch) => tch.id === resolvedClass.waliKelasTeacherId);
+      if (t) return t;
+    }
+    if (resolvedClass.waliKelasName) {
+      const t = ctxTeachers.find((tch) => tch.nama.trim().toLowerCase() === resolvedClass.waliKelasName?.trim().toLowerCase());
       if (t) return t;
     }
     return null;
@@ -693,14 +698,200 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
   const letterheadImageUrl = ctxSystemConfig?.letterheadImageUrl || externalReportData?.letterheadImageUrl || '';
   const schoolLogoUrl = ctxSystemConfig?.schoolLogoUrl || externalReportData?.logoUrl || '';
 
+  // Helper to extract clean raw NIP string (without "NIP.")
+  const cleanRawNip = (rawNip?: string | null): string => {
+    if (!rawNip) return '';
+    const trimmed = String(rawNip).trim();
+    if (
+      !trimmed ||
+      trimmed === '-' ||
+      trimmed === '—' ||
+      trimmed === 'null' ||
+      trimmed === 'undefined'
+    ) {
+      return '';
+    }
+    return trimmed.replace(/^NIP[:.\s]*/i, '').trim();
+  };
+
+  // Helper to normalize & format NIP
+  const formatNipDisplay = (rawNip?: string | null): string => {
+    const clean = cleanRawNip(rawNip);
+    if (!clean || clean === '-' || clean === '—') {
+      return 'NIP. -';
+    }
+    return `NIP. ${clean}`;
+  };
+
+  const isSubjectReport = attendanceType === 'SUBJECT' || Boolean(resolvedSubject);
+
+  // Resolusi guru mata pelajaran & NIP
+  const resolvedGuruMapel = useMemo(() => {
+    if (!isInternalUser || !isSubjectReport) return null;
+
+    let matched: { nama: string; nip: string } | null = null;
+
+    // A. By subject's teacherId
+    if (resolvedSubject?.teacherId) {
+      const t = ctxTeachers.find((tch) => tch.id === resolvedSubject.teacherId);
+      if (t) {
+        matched = { nama: t.nama, nip: cleanRawNip(t.nip) };
+      }
+    }
+
+    // B. By subject's teacherName
+    if (!matched && resolvedSubject?.teacherName) {
+      const targetName = resolvedSubject.teacherName.trim().toLowerCase();
+      const t = ctxTeachers.find((tch) => tch.nama.trim().toLowerCase() === targetName);
+      if (t) {
+        matched = { nama: t.nama, nip: cleanRawNip(t.nip) };
+      } else {
+        const u = (ctxUsers || []).find((usr) => usr.name.trim().toLowerCase() === targetName);
+        matched = {
+          nama: resolvedSubject.teacherName,
+          nip: cleanRawNip(u?.nip),
+        };
+      }
+    }
+
+    // C. If current user is GURU MAPEL
+    if (!matched && currentUser && currentUser.role === 'GURU MAPEL') {
+      if (currentUser.teacherId) {
+        const t = ctxTeachers.find((tch) => tch.id === currentUser.teacherId);
+        if (t) matched = { nama: t.nama, nip: cleanRawNip(t.nip) || cleanRawNip(currentUser.nip) };
+      }
+      if (!matched) {
+        matched = { nama: currentUser.name, nip: cleanRawNip(currentUser.nip) };
+      }
+    }
+
+    // D. By attendance records teacherId
+    if (!matched && targetRecords.length > 0) {
+      const rec = targetRecords.find((r) => r.teacherId);
+      if (rec?.teacherId) {
+        const t = ctxTeachers.find((tch) => tch.id === rec.teacherId);
+        if (t) matched = { nama: t.nama, nip: cleanRawNip(t.nip) };
+      }
+    }
+
+    // Fallback if matched teacher has empty nip, check ctxUsers
+    if (matched && !matched.nip) {
+      const u = (ctxUsers || []).find(
+        (usr) =>
+          usr.name.trim().toLowerCase() === matched?.nama.trim().toLowerCase() ||
+          (resolvedSubject?.teacherId && usr.teacherId === resolvedSubject.teacherId)
+      );
+      if (u?.nip) {
+        matched.nip = cleanRawNip(u.nip);
+      }
+    }
+
+    return matched;
+  }, [isInternalUser, isSubjectReport, resolvedSubject, ctxTeachers, ctxUsers, currentUser, targetRecords]);
+
+  // Resolusi wali kelas & NIP
+  const resolvedWaliKelasData = useMemo(() => {
+    if (!isInternalUser || !resolvedClass) return null;
+
+    let matched: { nama: string; nip: string } | null = null;
+
+    // A. By resolvedClass.waliKelasTeacherId
+    if (resolvedClass.waliKelasTeacherId) {
+      const t = ctxTeachers.find((tch) => tch.id === resolvedClass.waliKelasTeacherId);
+      if (t) {
+        matched = { nama: t.nama, nip: cleanRawNip(t.nip) };
+      }
+    }
+
+    // B. By resolvedClass.waliKelasName
+    if (!matched && resolvedClass.waliKelasName) {
+      const targetName = resolvedClass.waliKelasName.trim().toLowerCase();
+      const t = ctxTeachers.find((tch) => tch.nama.trim().toLowerCase() === targetName);
+      if (t) {
+        matched = { nama: t.nama, nip: cleanRawNip(t.nip) };
+      } else {
+        const u = (ctxUsers || []).find((usr) => usr.name.trim().toLowerCase() === targetName);
+        matched = {
+          nama: resolvedClass.waliKelasName,
+          nip: cleanRawNip(u?.nip),
+        };
+      }
+    }
+
+    // C. If current user is WALI KELAS
+    if (!matched && currentUser && currentUser.role === 'WALI KELAS') {
+      const isMyClass =
+        currentUser.classIds?.includes(resolvedClass.id) ||
+        currentUser.assignedClassIds?.includes(resolvedClass.id) ||
+        (currentUser.teacherId && resolvedClass.waliKelasTeacherId === currentUser.teacherId);
+      if (isMyClass || (!resolvedClass.waliKelasTeacherId && !resolvedClass.waliKelasName)) {
+        if (currentUser.teacherId) {
+          const t = ctxTeachers.find((tch) => tch.id === currentUser.teacherId);
+          if (t) matched = { nama: t.nama, nip: cleanRawNip(t.nip) || cleanRawNip(currentUser.nip) };
+        }
+        if (!matched) {
+          matched = { nama: currentUser.name, nip: cleanRawNip(currentUser.nip) };
+        }
+      }
+    }
+
+    // D. By attendance records teacherId
+    if (!matched && targetRecords.length > 0) {
+      const rec = targetRecords.find((r) => r.teacherId);
+      if (rec?.teacherId) {
+        const t = ctxTeachers.find((tch) => tch.id === rec.teacherId);
+        if (t) matched = { nama: t.nama, nip: cleanRawNip(t.nip) };
+      }
+    }
+
+    // Fallback if matched teacher has empty nip, check ctxUsers
+    if (matched && !matched.nip) {
+      const u = (ctxUsers || []).find(
+        (usr) =>
+          usr.name.trim().toLowerCase() === matched?.nama.trim().toLowerCase() ||
+          (resolvedClass.waliKelasTeacherId && usr.teacherId === resolvedClass.waliKelasTeacherId)
+      );
+      if (u?.nip) {
+        matched.nip = cleanRawNip(u.nip);
+      }
+    }
+
+    return matched;
+  }, [isInternalUser, resolvedClass, ctxTeachers, ctxUsers, currentUser, targetRecords]);
+
   const activeClassName = resolvedClass?.name || externalReportData?.className || 'Kelas';
   const activeClassClean = activeClassName.replace(/^kelas\s*/i, '');
   const activeFase = resolvedClass ? getFaseByClassName(resolvedClass.name, resolvedClass.grade) : (externalReportData?.fase || 'Fase A');
-  const principalName = ctxSchoolProfile?.namaKepalaSekolah || externalReportData?.principalName || 'Nama Kepala Sekolah';
-  const principalNip = ctxSchoolProfile?.nipKepalaSekolah || externalReportData?.principalNip || '-';
 
-  const teacherName = resolvedSubject?.teacherName || resolvedWaliKelas?.nama || ctxSchoolProfile?.namaWaliKelas || externalReportData?.teacherName || 'Wali Kelas';
-  const teacherNip = resolvedSubject ? '' : (resolvedWaliKelas?.nip || ctxSchoolProfile?.nipWaliKelas || externalReportData?.teacherNip || '-');
+  const principalName =
+    ctxSchoolProfile?.namaKepalaSekolah || externalReportData?.principalName || 'Nama Kepala Sekolah';
+
+  const principalNip = useMemo(() => {
+    let pNip = cleanRawNip(ctxSchoolProfile?.nipKepalaSekolah) || cleanRawNip(externalReportData?.principalNip);
+    if (!pNip) {
+      const kepsekTeacher = (ctxTeachers || []).find((t) =>
+        (t.tugasUtama || t.tugas_utama || '').toLowerCase().includes('kepala sekolah')
+      );
+      if (kepsekTeacher?.nip) {
+        pNip = cleanRawNip(kepsekTeacher.nip);
+      } else {
+        const kepsekUser = (ctxUsers || []).find((u) => u.role === 'KEPALA SEKOLAH');
+        if (kepsekUser?.nip) {
+          pNip = cleanRawNip(kepsekUser.nip);
+        }
+      }
+    }
+    return pNip;
+  }, [ctxSchoolProfile?.nipKepalaSekolah, externalReportData?.principalNip, ctxTeachers, ctxUsers]);
+
+  const teacherName = isSubjectReport
+    ? (resolvedGuruMapel?.nama || resolvedSubject?.teacherName || externalReportData?.teacherName || 'Guru Mata Pelajaran')
+    : (resolvedWaliKelasData?.nama || resolvedClass?.waliKelasName || ctxSchoolProfile?.namaWaliKelas || externalReportData?.teacherName || 'Wali Kelas');
+
+  const teacherNip = isSubjectReport
+    ? (resolvedGuruMapel?.nip || cleanRawNip(externalReportData?.teacherNip))
+    : (resolvedWaliKelasData?.nip || cleanRawNip(ctxSchoolProfile?.nipWaliKelas) || cleanRawNip(externalReportData?.teacherNip));
+
   const reportPlace = ctxSystemConfig?.reportPlace || externalReportData?.reportPlace || 'Jakarta';
   const reportDateOfficial = ctxSystemConfig?.reportDate || externalReportData?.reportDateOfficial || selectedDate;
 
@@ -858,18 +1049,30 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
               {isKepsekReport ? (
                 <>
                   <p><span className="font-semibold text-slate-600">NPSN:</span> {npsn}</p>
-                  <p><span className="font-semibold text-slate-600">Kepala Sekolah:</span> {principalName}</p>
+                  <p>
+                    <span className="font-semibold text-slate-600">Kepala Sekolah:</span>{' '}
+                    {principalName} {cleanRawNip(principalNip) ? `(${formatNipDisplay(principalNip)})` : ''}
+                  </p>
                 </>
               ) : (
                 <>
                   <p><span className="font-semibold text-slate-600">Kelas / Fase:</span> {activeClassName} / {activeFase}</p>
-                  {attendanceType === 'SUBJECT' ? (
-                    <p>
-                      <span className="font-semibold text-slate-600">Mata Pelajaran:</span>{' '}
-                      <strong className="text-blue-900">{resolvedSubject?.name || 'Mata Pelajaran Khusus'}</strong>
-                    </p>
+                  {isSubjectReport ? (
+                    <>
+                      <p>
+                        <span className="font-semibold text-slate-600">Mata Pelajaran:</span>{' '}
+                        <strong className="text-blue-900">{resolvedSubject?.name || externalReportData?.subjectName || 'Mata Pelajaran Khusus'}</strong>
+                      </p>
+                      <p>
+                        <span className="font-semibold text-slate-600">Guru Pengampu:</span>{' '}
+                        {teacherName} {cleanRawNip(teacherNip) ? `(${formatNipDisplay(teacherNip)})` : ''}
+                      </p>
+                    </>
                   ) : (
-                    <p><span className="font-semibold text-slate-600">Wali Kelas:</span> {teacherName}</p>
+                    <p>
+                      <span className="font-semibold text-slate-600">Wali Kelas:</span>{' '}
+                      {teacherName} {cleanRawNip(teacherNip) ? `(${formatNipDisplay(teacherNip)})` : ''}
+                    </p>
                   )}
                 </>
               )}
@@ -1009,6 +1212,18 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
                     </tr>
                   ))}
                 </tbody>
+                <tfoot>
+                  <tr className="bg-slate-100 font-bold border-t-2 border-slate-400">
+                    <td colSpan={4 + weekWorkingDays.length} className="border border-slate-400 p-1.5 text-center uppercase font-bold">
+                      TOTAL / RATA-RATA
+                    </td>
+                    <td className="border border-slate-400 p-1 text-center text-emerald-900 font-extrabold">{weeklyTotalHadir}</td>
+                    <td className="border border-slate-400 p-1 text-center text-sky-900 font-extrabold">{weeklyTotalSakit}</td>
+                    <td className="border border-slate-400 p-1 text-center text-amber-900 font-extrabold">{weeklyTotalIzin}</td>
+                    <td className="border border-slate-400 p-1 text-center text-rose-900 font-extrabold">{weeklyTotalAlfa}</td>
+                    <td className="border border-slate-400 p-1.5 text-center text-blue-950 font-black">{formatPct(weeklyPctHadir)}%</td>
+                  </tr>
+                </tfoot>
               </table>
             </div>
           )}
@@ -1047,8 +1262,8 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
                 </tbody>
                 <tfoot>
                   <tr className="bg-slate-100 font-bold border-t-2 border-slate-400">
-                    <td colSpan={4} className="border border-slate-400 p-1.5 text-right uppercase">
-                      TOTAL / RATA-RATA:
+                    <td colSpan={4} className="border border-slate-400 p-1.5 text-center uppercase font-bold">
+                      TOTAL / RATA-RATA
                     </td>
                     <td className="border border-slate-400 p-1.5 text-center text-emerald-900 font-extrabold">{monthlyTotalHadir}</td>
                     <td className="border border-slate-400 p-1.5 text-center text-sky-900 font-extrabold">{monthlyTotalSakit}</td>
@@ -1109,8 +1324,8 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
                 </tbody>
                 <tfoot>
                   <tr className="bg-slate-100 font-bold border-t-2 border-slate-400">
-                    <td colSpan={4} className="border border-slate-400 p-2 text-right uppercase font-extrabold">
-                      TOTAL / RATA-RATA:
+                    <td colSpan={4} className="border border-slate-400 p-2 text-center uppercase font-extrabold">
+                      TOTAL / RATA-RATA
                     </td>
                     <td className="border border-slate-400 p-1.5 text-center text-emerald-900 font-extrabold">{semesterTotalHadir}</td>
                     <td className="border border-slate-400 p-1.5 text-center text-sky-900 font-extrabold">{semesterTotalSakit}</td>
@@ -1170,8 +1385,8 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
                 </tbody>
                 <tfoot>
                   <tr className="bg-slate-100 font-bold border-t-2 border-slate-400">
-                    <td colSpan={4} className="border border-slate-400 p-1.5 text-right uppercase">
-                      TOTAL SEKOLAH:
+                    <td colSpan={4} className="border border-slate-400 p-1.5 text-center uppercase font-bold">
+                      TOTAL SEKOLAH
                     </td>
                     <td className="border border-slate-400 p-1.5 text-center font-mono">{kepsekSchoolTotalMale}</td>
                     <td className="border border-slate-400 p-1.5 text-center font-mono">{kepsekSchoolTotalFemale}</td>
@@ -1260,7 +1475,7 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
               <div className="h-14 sm:h-20" />
               <p className="font-bold underline text-sm">{principalName}</p>
               <p className="text-slate-600 font-mono">
-                {principalNip && principalNip !== '-' ? `NIP. ${principalNip}` : 'NIP. -'}
+                {formatNipDisplay(principalNip)}
               </p>
             </div>
 
@@ -1271,8 +1486,8 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
               <p className="font-bold">
                 {isKepsekReport
                   ? 'Koordinator Kurikulum / Tim Presensi'
-                  : attendanceType === 'SUBJECT'
-                  ? `Guru Mata Pelajaran ${resolvedSubject?.name || ''}`
+                  : isSubjectReport
+                  ? `Guru Mata Pelajaran ${resolvedSubject?.name || externalReportData?.subjectName || ''}`
                   : `Wali ${activeClassName}`}
               </p>
               <div className="h-14 sm:h-20" />
@@ -1280,7 +1495,7 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
                 {isKepsekReport ? (ctxSchoolProfile?.namaWaliKelas || teacherName) : teacherName}
               </p>
               <p className="text-slate-600 font-mono">
-                {teacherNip && teacherNip !== '-' ? `NIP. ${teacherNip}` : 'NIP. -'}
+                {formatNipDisplay(isKepsekReport ? (ctxSchoolProfile?.nipWaliKelas || teacherNip) : teacherNip)}
               </p>
             </div>
           </div>

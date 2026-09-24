@@ -108,7 +108,8 @@ export const calculateAttendanceStats = (
 };
 
 /**
- * Membuat Smart Short Link untuk laporan harian on-the-fly (dynamic render)
+ * Membuat Smart Link langsung untuk laporan harian on-the-fly (dynamic render)
+ * Format standar: https://[domain-aplikasi]/?r=[id_kelas]&d=[tanggal]
  */
 export const generateSmartReportLink = (
   classId: string,
@@ -126,27 +127,6 @@ export const generateSmartReportLink = (
     params.set('m', 'subject');
   }
   return `${origin}/?${params.toString()}`;
-};
-
-/**
- * Mempersingkat Smart Link menggunakan layanan shortener agar pesan WhatsApp ringkas & elegan
- */
-export const shortenReportLink = async (longUrl: string): Promise<string> => {
-  if (!longUrl) return '';
-  try {
-    const res = await fetch('/api/onboarding', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'shorten_url', url: longUrl }),
-    });
-    if (res.ok) {
-      const data = await res.json();
-      if (data?.ok && data?.shortUrl) {
-        return data.shortUrl;
-      }
-    }
-  } catch (_) {}
-  return longUrl;
 };
 
 /**
@@ -272,10 +252,9 @@ export const generateWhatsAppBroadcastMessage = (
     lines.push('');
   }
 
-  // 7. Smart Link Dokumen Rekap Resmi (Instruksi eksplisit user: hilangkan kata/teks kop sekolahnya)
+  // 7. Smart Link Dokumen Rekap Resmi sesuai kesepakatan: 📄 Dokumen Rekap Resmi: https://[domain-aplikasi]/?r=[id_kelas]&d=[tanggal]
   if (includeSmartLink && smartLinkUrl) {
-    lines.push('📄 Dokumen Rekap Resmi:');
-    lines.push(smartLinkUrl);
+    lines.push(`📄 Dokumen Rekap Resmi: ${smartLinkUrl}`);
     lines.push('');
   }
 

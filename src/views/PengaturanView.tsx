@@ -1042,8 +1042,7 @@ export const PengaturanView: React.FC = () => {
                     )}
                     {formData.broadcastIncludeSmartLink !== false && (
                       <>
-                        📄 Dokumen Rekap Resmi:{'\n'}
-                        https://kawacanaan.app/?r=6A&d=2026-08-24{'\n\n'}
+                        📄 Dokumen Rekap Resmi: https://kawacanaan.app/?r=6A&d=2026-08-24{'\n\n'}
                       </>
                     )}
                     {formData.broadcastMasukClosing || 'Terima kasih atas perhatian dan kerja sama Bapak/Ibu sekalian. Semoga anak-anak selalu sehat dan semangat belajar! 🙏✨'}
@@ -1064,8 +1063,7 @@ export const PengaturanView: React.FC = () => {
                     📈 Total Kehadiran     : 93%{'\n\n'}
                     {formData.broadcastIncludeSmartLink !== false && (
                       <>
-                        📄 Dokumen Rekap Resmi:{'\n'}
-                        https://kawacanaan.app/?r=6A&d=2026-08-24{'\n\n'}
+                        📄 Dokumen Rekap Resmi: https://kawacanaan.app/?r=6A&d=2026-08-24{'\n\n'}
                       </>
                     )}
                     {formData.broadcastPulangClosing || 'Mohon dipantau kepulangan ananda agar dapat tiba di rumah dengan selamat dan tertib. Terima kasih. 🏠🎒✨'}

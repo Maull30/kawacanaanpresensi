@@ -4,7 +4,6 @@ import { AttendanceRecord, Student, AttendanceType } from '../types';
 import {
   generateWhatsAppBroadcastMessage,
   generateSmartReportLink,
-  shortenReportLink,
   calculateAttendanceStats,
   formatDateToIndoLong,
   openWhatsAppBroadcast,
@@ -114,35 +113,9 @@ export const WhatsAppBroadcastModal: React.FC<WhatsAppBroadcastModalProps> = ({
     );
   }, [currentUser, attendanceType, teachers, schoolProfile.namaWaliKelas]);
 
-  // Dynamic Smart Short Link (Base long URL)
-  const baseSmartLinkUrl = useMemo(() => {
+  // Dynamic Smart Link directly from application domain: https://[domain-aplikasi]/?r=[id_kelas]&d=[tanggal]
+  const smartLinkUrl = useMemo(() => {
     return generateSmartReportLink(classId, date, attendanceType, subjectId);
-  }, [classId, date, attendanceType, subjectId]);
-
-  // Actual shortened URL state (e.g. tinyurl / is.gd short link)
-  const [shortLinkUrl, setShortLinkUrl] = useState<string>(baseSmartLinkUrl);
-  const [isShortening, setIsShortening] = useState<boolean>(false);
-
-  useEffect(() => {
-    let active = true;
-    const base = generateSmartReportLink(classId, date, attendanceType, subjectId);
-    setShortLinkUrl(base);
-    setIsShortening(true);
-
-    shortenReportLink(base)
-      .then((res) => {
-        if (active && res) {
-          setShortLinkUrl(res);
-        }
-      })
-      .catch(() => {})
-      .finally(() => {
-        if (active) setIsShortening(false);
-      });
-
-    return () => {
-      active = false;
-    };
   }, [classId, date, attendanceType, subjectId]);
 
   // Computed summary statistics
@@ -150,7 +123,7 @@ export const WhatsAppBroadcastModal: React.FC<WhatsAppBroadcastModalProps> = ({
     return calculateAttendanceStats(targetRecords, targetStudents);
   }, [targetRecords, targetStudents]);
 
-  // Generated WhatsApp message text with real short link
+  // Generated WhatsApp message text with official domain smart link
   const messageText = useMemo(() => {
     return generateWhatsAppBroadcastMessage({
       type: broadcastType,
@@ -167,7 +140,7 @@ export const WhatsAppBroadcastModal: React.FC<WhatsAppBroadcastModalProps> = ({
       customNote,
       includeStudentList,
       includeSmartLink,
-      smartLinkUrl: shortLinkUrl || baseSmartLinkUrl,
+      smartLinkUrl,
     });
   }, [
     broadcastType,
@@ -185,8 +158,7 @@ export const WhatsAppBroadcastModal: React.FC<WhatsAppBroadcastModalProps> = ({
     customNote,
     includeStudentList,
     includeSmartLink,
-    shortLinkUrl,
-    baseSmartLinkUrl,
+    smartLinkUrl,
   ]);
 
   if (!isOpen) return null;

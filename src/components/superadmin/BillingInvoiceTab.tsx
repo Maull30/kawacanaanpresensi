@@ -18,8 +18,10 @@ import {
   Check,
   Building2,
   Calendar,
-  DollarSign
+  DollarSign,
+  Sparkles,
 } from 'lucide-react';
+import { getSmartInvoiceUrl, copySmartInvoiceLink } from '../../utils/smartInvoice';
 
 interface InvoiceItem {
   id: string;
@@ -454,10 +456,25 @@ export const BillingInvoiceTab: React.FC<BillingInvoiceTabProps> = ({
                             created_at: inv.issueDate,
                           });
                         }}
-                        title="Pratinjau / Cetak Faktur Resmi"
+                        title="Buka Smart Link PDF Invoice Resmi"
+                        className="px-2.5 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-xs flex items-center gap-1.5 transition cursor-pointer border border-indigo-200/80 shadow-2xs"
+                      >
+                        <FileText size={13} className="text-indigo-600" />
+                        <span>Smart Link PDF</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          const ok = await copySmartInvoiceLink(inv.invoiceNumber);
+                          if (ok) {
+                            showToast(`Smart Link PDF ${inv.invoiceNumber} berhasil disalin ke clipboard!`, 'success');
+                          }
+                        }}
+                        title="Salin tautan publik Smart Link PDF"
                         className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition cursor-pointer"
                       >
-                        <Eye size={13} />
+                        <Copy size={13} />
                       </button>
 
                       {inv.status !== 'paid' && (
@@ -480,15 +497,6 @@ export const BillingInvoiceTab: React.FC<BillingInvoiceTabProps> = ({
                           </button>
                         </>
                       )}
-
-                      <button
-                        type="button"
-                        onClick={() => handleCopyPaymentLink(inv)}
-                        title="Salin Tautan Bayar"
-                        className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition cursor-pointer"
-                      >
-                        <Copy size={13} />
-                      </button>
                     </div>
                   </td>
                 </tr>

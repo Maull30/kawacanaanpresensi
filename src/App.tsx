@@ -25,6 +25,7 @@ import { UpgradePromptModal } from './components/UpgradePromptModal';
 import { TeacherUpgradeModal } from './components/TeacherUpgradeModal';
 import { SchoolUpgradeModal } from './components/SchoolUpgradeModal';
 import { PublicDailyReportViewer } from './components/PublicDailyReportViewer';
+import { PublicSmartInvoiceViewer } from './components/PublicSmartInvoiceViewer';
 import { CheckCircle2, AlertCircle, Info, X } from 'lucide-react';
 import type { ActiveView, UserRole } from './types';
 
@@ -211,6 +212,13 @@ const MainAppContent: React.FC = () => {
     return null;
   });
 
+  // Check if public Smart Link PDF Invoice is accessed
+  const [smartInvoiceNumber, setSmartInvoiceNumber] = React.useState<string | null>(() => {
+    if (typeof window === 'undefined') return null;
+    const p = new URLSearchParams(window.location.search);
+    return p.get('smart_invoice') || p.get('invoice') || null;
+  });
+
   // Pastikan landing page tertutup jika user sudah login, sedang onboarding, recovery password, atau OAuth pending
   React.useEffect(() => {
     if (
@@ -372,6 +380,24 @@ const MainAppContent: React.FC = () => {
             url.searchParams.delete('ay');
             url.searchParams.delete('class');
             url.searchParams.delete('date');
+            window.history.pushState(null, '', url.pathname + (url.search ? url.search : ''));
+          } catch (_) {}
+        }}
+      />
+    );
+  }
+
+  // Smart Link PDF Invoice Viewer (Bisa diakses langsung oleh sekolah, guru, atau auditor via link)
+  if (smartInvoiceNumber) {
+    return (
+      <PublicSmartInvoiceViewer
+        invoiceNumber={smartInvoiceNumber}
+        onBackToApp={() => {
+          setSmartInvoiceNumber(null);
+          try {
+            const url = new URL(window.location.href);
+            url.searchParams.delete('smart_invoice');
+            url.searchParams.delete('invoice');
             window.history.pushState(null, '', url.pathname + (url.search ? url.search : ''));
           } catch (_) {}
         }}

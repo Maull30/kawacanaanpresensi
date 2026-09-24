@@ -1206,6 +1206,7 @@ export const BillingSection: React.FC<{
         <InvoiceModal
           isOpen={Boolean(selectedInvoice)}
           onClose={() => setSelectedInvoice(null)}
+          onShowToast={showToast}
           data={{
             id: selectedInvoice.id,
             invoiceNumber:

@@ -18,7 +18,8 @@ import {
   CreditCard,
   QrCode,
   Wallet,
-  Trash2
+  Trash2,
+  FileText,
 } from 'lucide-react';
 
 interface TransactionRecord {
@@ -464,9 +465,33 @@ export const BillingHistoryTab: React.FC<BillingHistoryTabProps> = ({
                     <div className="inline-flex items-center justify-end gap-1.5">
                       <button
                         type="button"
+                        onClick={() => {
+                          onSelectInvoice({
+                            invoiceNumber: tx.orderId,
+                            orderId: tx.orderId,
+                            schoolName: tx.schoolName,
+                            npsn: '-',
+                            customerName: tx.payerName,
+                            planName: tx.orderId.includes('SCH') ? 'Paket Sekolah KawaCanaan Presensi' : 'Paket Guru KawaCanaan Presensi',
+                            amount: tx.amount,
+                            totalAmount: tx.amount,
+                            issueDate: tx.createdAt,
+                            paidAt: tx.settledAt,
+                            paymentMethod: tx.channel,
+                            status: tx.status,
+                          });
+                        }}
+                        className="px-2.5 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold transition cursor-pointer inline-flex items-center gap-1 border border-indigo-200/80 shadow-2xs"
+                        title="Buka Smart Link PDF Invoice Resmi"
+                      >
+                        <FileText size={12} className="text-indigo-600" />
+                        <span>Smart Link PDF</span>
+                      </button>
+                      <button
+                        type="button"
                         onClick={() => setSelectedReceipt(tx)}
-                        className="px-2.5 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold transition cursor-pointer inline-flex items-center gap-1"
-                        title="Lihat Kuitansi"
+                        className="px-2 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition cursor-pointer inline-flex items-center gap-1"
+                        title="Lihat Kuitansi Ringkas"
                       >
                         <Eye size={12} />
                         <span>Kuitansi</span>

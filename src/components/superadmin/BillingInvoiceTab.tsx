@@ -21,7 +21,7 @@ import {
   DollarSign,
   Sparkles,
 } from 'lucide-react';
-import { getSmartInvoiceUrl, copySmartInvoiceLink } from '../../utils/smartInvoice';
+import { getSmartInvoiceUrl, copySmartInvoiceLink, openSmartInvoiceTab } from '../../utils/smartInvoice';
 
 interface InvoiceItem {
   id: string;
@@ -431,7 +431,7 @@ export const BillingInvoiceTab: React.FC<BillingInvoiceTabProps> = ({
                       <button
                         type="button"
                         onClick={() => {
-                          onSelectInvoice({
+                          openSmartInvoiceTab({
                             id: inv.id,
                             invoiceNumber: inv.invoiceNumber,
                             invoiceNo: inv.invoiceNumber,
@@ -456,11 +456,12 @@ export const BillingInvoiceTab: React.FC<BillingInvoiceTabProps> = ({
                             created_at: inv.issueDate,
                           });
                         }}
-                        title="Buka Smart Link PDF Invoice Resmi"
+                        title="Buka Smart Link PDF Invoice Resmi di Tab Baru"
                         className="px-2.5 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-xs flex items-center gap-1.5 transition cursor-pointer border border-indigo-200/80 shadow-2xs"
                       >
                         <FileText size={13} className="text-indigo-600" />
                         <span>Smart Link PDF</span>
+                        <ExternalLink size={11} className="text-indigo-500 opacity-75" />
                       </button>
 
                       <button

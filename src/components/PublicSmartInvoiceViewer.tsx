@@ -21,9 +21,28 @@ export const PublicSmartInvoiceViewer: React.FC<PublicSmartInvoiceViewerProps> =
   useEffect(() => {
     let isMounted = true;
     async function fetchInvoice() {
-      setLoading(true);
+      const cleanNo = invoiceNumber.trim();
+
+      // 1. Cek cache lokal terlebih dahulu agar tampilan tab baru langsung muncul tanpa jeda
+      let hasCachedData = false;
       try {
-        const cleanNo = invoiceNumber.trim();
+        const cached = localStorage.getItem(`kawacanaan_invoice_${cleanNo}`);
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (parsed && (parsed.invoiceNumber || parsed.orderId)) {
+            setInvoiceData(parsed);
+            setLoading(false);
+            hasCachedData = true;
+          }
+        }
+      } catch (_) {}
+
+      if (!hasCachedData) {
+        setLoading(true);
+      }
+
+      // 2. Ambil data faktur dari server untuk memastikan akurasi dan status pelunasan
+      try {
         const res = await fetch(`/api/midtrans?action=get_invoice&order_id=${encodeURIComponent(cleanNo)}`);
         const json = await res.json();
         if (isMounted && json?.ok && json.invoice) {
@@ -35,24 +54,24 @@ export const PublicSmartInvoiceViewer: React.FC<PublicSmartInvoiceViewerProps> =
         console.warn('[Fetch Smart Invoice Error]', err);
       }
 
-      // Fallback data jika backend gagal atau offline
-      if (isMounted) {
+      // 3. Fallback data jika backend offline atau belum ada di database
+      if (isMounted && !hasCachedData) {
         const isSch = invoiceNumber.toUpperCase().includes('SCH');
         setInvoiceData({
           invoiceNumber,
           orderId: invoiceNumber,
           schoolName: 'Satuan Pendidikan',
           npsn: '12345678',
-          schoolAddress: 'Jl. Pendidikan No. 10, Jakarta',
+          schoolAddress: 'Indonesia',
           customerName: 'Bapak/Ibu Pendidik',
           customerPhone: '0812-xxxx-xxxx',
-          customerEmail: 'sekolah@example.sch.id',
+          customerEmail: 'sekolah@kawacanaan.sch.id',
           planName: isSch ? 'Paket Sekolah KawaCanaan Presensi' : 'Paket Guru KawaCanaan Presensi',
           amount: isSch ? 250000 : 60000,
           totalAmount: isSch ? 250000 : 60000,
           uniqueCode: 0,
           status: 'SETTLED',
-          paymentMethod: 'QRIS',
+          paymentMethod: 'QRIS / Transfer Bank',
           issueDate: new Date().toLocaleDateString('id-ID', {
             day: 'numeric',
             month: 'long',
@@ -111,16 +130,23 @@ export const PublicSmartInvoiceViewer: React.FC<PublicSmartInvoiceViewerProps> =
       <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-slate-200 px-4 sm:px-8 py-3.5 print:hidden shadow-xs">
         <div className="max-w-5xl mx-auto flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            {onBackToApp && (
-              <button
-                type="button"
-                onClick={onBackToApp}
-                className="px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
-              >
-                <ArrowLeft size={14} />
-                <span>Ke Aplikasi</span>
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={() => {
+                if (onBackToApp) {
+                  onBackToApp();
+                } else if (typeof window !== 'undefined' && window.opener) {
+                  window.close();
+                } else {
+                  window.location.href = '/';
+                }
+              }}
+              className="px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
+              title={typeof window !== 'undefined' && window.opener ? 'Tutup Tab Invoice Ini' : 'Kembali ke Aplikasi'}
+            >
+              <ArrowLeft size={14} />
+              <span>{typeof window !== 'undefined' && window.opener ? 'Tutup Tab' : 'Ke Aplikasi'}</span>
+            </button>
             <div className="flex items-center gap-2">
               <span className="font-mono text-xs font-black text-indigo-700 bg-indigo-50 px-2 py-1 rounded-lg border border-indigo-100">
                 {invoiceNumber}

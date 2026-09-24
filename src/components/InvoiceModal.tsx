@@ -11,7 +11,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { InvoiceDocument, InvoiceItemData } from './InvoiceDocument';
-import { getSmartInvoiceUrl, copySmartInvoiceLink, exportInvoiceToPdf } from '../utils/smartInvoice';
+import { getSmartInvoiceUrl, copySmartInvoiceLink, exportInvoiceToPdf, openSmartInvoiceTab } from '../utils/smartInvoice';
 
 export type InvoiceData = InvoiceItemData;
 
@@ -48,7 +48,7 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
   };
 
   const handleOpenSmartLink = () => {
-    window.open(smartUrl, '_blank', 'noopener,noreferrer');
+    openSmartInvoiceTab(data);
   };
 
   const handlePrint = () => {

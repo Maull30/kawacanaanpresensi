@@ -20,7 +20,9 @@ import {
   Wallet,
   Trash2,
   FileText,
+  ExternalLink,
 } from 'lucide-react';
+import { openSmartInvoiceTab } from '../../utils/smartInvoice';
 
 interface TransactionRecord {
   id: string;
@@ -466,7 +468,7 @@ export const BillingHistoryTab: React.FC<BillingHistoryTabProps> = ({
                       <button
                         type="button"
                         onClick={() => {
-                          onSelectInvoice({
+                          openSmartInvoiceTab({
                             invoiceNumber: tx.orderId,
                             orderId: tx.orderId,
                             schoolName: tx.schoolName,
@@ -482,10 +484,11 @@ export const BillingHistoryTab: React.FC<BillingHistoryTabProps> = ({
                           });
                         }}
                         className="px-2.5 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold transition cursor-pointer inline-flex items-center gap-1 border border-indigo-200/80 shadow-2xs"
-                        title="Buka Smart Link PDF Invoice Resmi"
+                        title="Buka Smart Link PDF Invoice Resmi di Tab Baru"
                       >
                         <FileText size={12} className="text-indigo-600" />
                         <span>Smart Link PDF</span>
+                        <ExternalLink size={11} className="text-indigo-500 opacity-75" />
                       </button>
                       <button
                         type="button"

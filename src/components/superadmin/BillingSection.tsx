@@ -43,6 +43,7 @@ import {
 } from 'lucide-react';
 import { getTenantLifecycleInfo } from '../../utils/tenantLifecycle';
 import { PackageFeatureMatrixTab } from './PackageFeatureMatrixTab';
+import { openSmartInvoiceTab } from '../../utils/smartInvoice';
 import { PaymentCardIllustration } from './SuperAdminIllustrations';
 import { InvoiceModal, InvoiceData } from '../InvoiceModal';
 import {
@@ -997,12 +998,31 @@ export const BillingSection: React.FC<{
                               <div className="relative inline-flex items-center justify-end gap-1">
                                 <button
                                   type="button"
-                                  onClick={() => setSelectedInvoice(p)}
-                                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold text-blue-600 hover:text-blue-700 hover:bg-blue-50 transition cursor-pointer"
-                                  title="Lihat Detail Invoice"
+                                  onClick={() => {
+                                    const invNo = p.invoiceNo || p.invoice_no || p.orderId || p.order_id || `INV-${String(p.id).slice(0, 8).toUpperCase()}`;
+                                    openSmartInvoiceTab({
+                                      id: p.id,
+                                      invoiceNumber: invNo,
+                                      orderId: invNo,
+                                      schoolName: p.schoolName || p.school_name || 'Satuan Pendidikan',
+                                      npsn: p.npsn || '-',
+                                      customerName: p.contactName || p.contact_name || p.pic_name || 'Bendahara / PIC',
+                                      customerPhone: p.contactPhone || p.contact_phone || '-',
+                                      planName: p.planName || (p.planId === 'sekolah_pro' ? 'Paket Sekolah' : 'Paket Guru'),
+                                      amount: Number(p.totalAmount || p.total_amount || p.amount || 0),
+                                      totalAmount: Number(p.totalAmount || p.total_amount || p.amount || 0),
+                                      issueDate: p.createdAt || p.created_at,
+                                      paidAt: p.paidAt || p.paid_at,
+                                      paymentMethod: p.paymentMethod || p.payment_method || 'Midtrans QRIS / VA',
+                                      status: p.status === 'paid' ? 'settled' : p.status,
+                                    });
+                                  }}
+                                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200/80 transition cursor-pointer"
+                                  title="Buka Smart Link PDF Invoice Resmi di Tab Baru"
                                 >
-                                  <Eye size={13} />
-                                  <span>Detail</span>
+                                  <FileText size={13} className="text-indigo-600" />
+                                  <span>Smart Link PDF</span>
+                                  <ExternalLink size={11} className="text-indigo-500 opacity-75" />
                                 </button>
 
                                 <div className="relative">
@@ -1015,7 +1035,7 @@ export const BillingSection: React.FC<{
                                   </button>
 
                                   {actionMenuOpenId === p.id && (
-                                    <div className="absolute right-0 top-full mt-1 w-44 bg-white rounded-xl shadow-xl border border-slate-100 py-1 z-30 text-left text-xs animate-in fade-in zoom-in duration-100">
+                                    <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-xl shadow-xl border border-slate-100 py-1 z-30 text-left text-xs animate-in fade-in zoom-in duration-100">
                                       <button
                                         type="button"
                                         onClick={() => {
@@ -1032,13 +1052,29 @@ export const BillingSection: React.FC<{
                                       <button
                                         type="button"
                                         onClick={() => {
-                                          setSelectedInvoice(p);
+                                          const invNo = p.invoiceNo || p.invoice_no || p.orderId || p.order_id || `INV-${String(p.id).slice(0, 8).toUpperCase()}`;
+                                          openSmartInvoiceTab({
+                                            id: p.id,
+                                            invoiceNumber: invNo,
+                                            orderId: invNo,
+                                            schoolName: p.schoolName || p.school_name || 'Satuan Pendidikan',
+                                            npsn: p.npsn || '-',
+                                            customerName: p.contactName || p.contact_name || p.pic_name || 'Bendahara / PIC',
+                                            customerPhone: p.contactPhone || p.contact_phone || '-',
+                                            planName: p.planName || (p.planId === 'sekolah_pro' ? 'Paket Sekolah' : 'Paket Guru'),
+                                            amount: Number(p.totalAmount || p.total_amount || p.amount || 0),
+                                            totalAmount: Number(p.totalAmount || p.total_amount || p.amount || 0),
+                                            issueDate: p.createdAt || p.created_at,
+                                            paidAt: p.paidAt || p.paid_at,
+                                            paymentMethod: p.paymentMethod || p.payment_method || 'Midtrans QRIS / VA',
+                                            status: p.status === 'paid' ? 'settled' : p.status,
+                                          });
                                           setActionMenuOpenId(null);
                                         }}
-                                        className="w-full px-3 py-1.5 hover:bg-slate-50 text-slate-700 flex items-center gap-2 cursor-pointer"
+                                        className="w-full px-3 py-1.5 hover:bg-indigo-50 text-indigo-700 flex items-center gap-2 cursor-pointer font-medium"
                                       >
-                                        <Printer size={13} />
-                                        <span>Cetak Invoice</span>
+                                        <FileText size={13} />
+                                        <span>Buka Smart Link PDF</span>
                                       </button>
 
                                       {isPending && (

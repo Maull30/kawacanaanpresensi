@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import * as crypto from 'crypto';
+import { sendEvolutionWhatsAppInvoiceSettled } from './evolution-invoice-notifier';
 
 const json = (res: any, status: number, body: unknown) =>
   res.status(status).setHeader('Content-Type', 'application/json').end(JSON.stringify(body));
@@ -395,6 +396,21 @@ export default async function handler(req: any, res: any) {
               new_expiry: newExpiry.toISOString(),
             },
           });
+
+          // Otomatis kirim bukti invoice resmi (LUNAS) ke WhatsApp PIC/Sekolah via Evolution API
+          const origin = req.headers.origin || (req.headers['x-forwarded-host'] ? `${req.headers['x-forwarded-proto'] || 'https'}://${req.headers['x-forwarded-host']}` : '');
+          await sendEvolutionWhatsAppInvoiceSettled({
+            admin: db,
+            payment: {
+              ...existingPayment,
+              paid_at: new Date().toISOString(),
+              status: 'SETTLED',
+              payment_method: payment_type || 'MIDTRANS',
+            },
+            school,
+            origin,
+            newExpiry,
+          }).catch((err: any) => console.warn('[Midtrans Webhook] WA dispatch warning:', err?.message));
         }
       }
     }
@@ -850,6 +866,21 @@ export default async function handler(req: any, res: any) {
                 new_expiry: newExpiry.toISOString(),
               },
             });
+
+            // Otomatis kirim bukti invoice resmi (LUNAS) ke WhatsApp PIC/Sekolah via Evolution API
+            const origin = req.headers.origin || (req.headers['x-forwarded-host'] ? `${req.headers['x-forwarded-proto'] || 'https'}://${req.headers['x-forwarded-host']}` : '');
+            await sendEvolutionWhatsAppInvoiceSettled({
+              admin: db,
+              payment: {
+                ...existingPayment,
+                paid_at: new Date().toISOString(),
+                status: 'SETTLED',
+                payment_method: data.payment_type || 'MIDTRANS',
+              },
+              school,
+              origin,
+              newExpiry,
+            }).catch((err: any) => console.warn('[Midtrans Status Check] WA dispatch warning:', err?.message));
           }
         }
       }

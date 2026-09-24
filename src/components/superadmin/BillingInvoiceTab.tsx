@@ -179,6 +179,24 @@ export const BillingInvoiceTab: React.FC<BillingInvoiceTabProps> = ({
     }
   };
 
+  const handleResendWhatsAppReceipt = async (inv: InvoiceItem) => {
+    if (!call) return;
+    try {
+      showToast(`Mengirim bukti invoice lunas ${inv.invoiceNumber} via WhatsApp Gateway...`, 'info');
+      const res = await call('resend_invoice_whatsapp', {
+        payment_id: inv.id,
+        invoice_no: inv.invoiceNumber,
+      });
+      if (res.ok) {
+        showToast(res.message || 'Bukti invoice resmi berhasil dikirim ke WhatsApp!', 'success');
+      } else {
+        throw new Error(res.error || 'Gagal mengirim ke WhatsApp');
+      }
+    } catch (err: any) {
+      showToast(err.message || 'Gagal mengirim bukti ke WhatsApp.', 'error');
+    }
+  };
+
   const handleSendReminder = (inv: InvoiceItem) => {
     const rawPhone = inv.picPhone ? inv.picPhone.replace(/\D/g, '') : '';
     const phone = rawPhone.startsWith('0') ? `62${rawPhone.slice(1)}` : rawPhone;
@@ -477,6 +495,17 @@ export const BillingInvoiceTab: React.FC<BillingInvoiceTabProps> = ({
                       >
                         <Copy size={13} />
                       </button>
+
+                      {inv.status === 'paid' && (
+                        <button
+                          type="button"
+                          onClick={() => handleResendWhatsAppReceipt(inv)}
+                          title="Kirim Bukti Invoice Lunas ke WhatsApp via Evolution API"
+                          className="p-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 transition cursor-pointer"
+                        >
+                          <Send size={13} />
+                        </button>
+                      )}
 
                       {inv.status !== 'paid' && (
                         <>

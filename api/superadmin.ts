@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { GoogleGenAI } from '@google/genai';
+import { sendEvolutionWhatsAppInvoiceSettled } from './evolution-invoice-notifier';
 
 const json = (res:any,status:number,body:unknown)=>res.status(status).setHeader('Content-Type','application/json').end(JSON.stringify(body));
 
@@ -1567,9 +1568,24 @@ export default async function handler(req:any,res:any){
         },
       });
 
+      // Otomatis kirim bukti invoice resmi Lunas ke WhatsApp PIC/Sekolah via Evolution API
+      const origin = req.headers.origin || (req.headers['x-forwarded-host'] ? `${req.headers['x-forwarded-proto'] || 'https'}://${req.headers['x-forwarded-host']}` : '');
+      const waSendResult = await sendEvolutionWhatsAppInvoiceSettled({
+        admin,
+        payment: {
+          ...payment,
+          paid_at: paidAt,
+          status: 'SETTLED',
+        },
+        school,
+        origin,
+        newExpiry,
+      }).catch((e: any) => ({ ok: false, error: e.message }));
+
       return json(res, 200, {
         ok: true,
-        message: `Pembayaran ${payment.invoice_no} untuk ${school.name} berhasil diverifikasi LUNAS (+${durationDays} hari).`
+        message: `Pembayaran ${payment.invoice_no} untuk ${school.name} berhasil diverifikasi LUNAS (+${durationDays} hari).`,
+        whatsapp_notif: waSendResult,
       });
     }
 
@@ -2059,7 +2075,12 @@ export default async function handler(req:any,res:any){
         return json(res, 400, { error: `Section "${section}" tidak dikenal.` });
       }
 
-      const { error } = await admin.from('platform_settings').update({ integrations: updatedIntegrations }).eq('id', 1);
+      // Gunakan upsert dengan id: 1 agar baris otomatis dibuat jika belum ada di database
+      const { error } = await admin.from('platform_settings').upsert({
+        id: 1,
+        integrations: updatedIntegrations,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'id' });
       if(error) throw error;
 
       await admin.from('audit_logs').insert({
@@ -2071,6 +2092,49 @@ export default async function handler(req:any,res:any){
       });
 
       return json(res, 200, { ok: true, message: `Pengaturan ${section} berhasil diperbarui di server.` });
+    }
+
+    if (action === 'resend_invoice_whatsapp') {
+      const paymentId = req.body.payment_id || req.body.id;
+      const invoiceNo = req.body.invoice_no || req.body.invoiceNo;
+      if (!paymentId && !invoiceNo) return json(res, 400, { error: 'ID Pembayaran atau No Invoice wajib diisi.' });
+
+      let query = admin.from('payments').select('*');
+      if (paymentId) query = query.eq('id', paymentId);
+      else query = query.eq('invoice_no', invoiceNo);
+      const { data: payment, error: pErr } = await query.maybeSingle();
+
+      if (pErr || !payment) return json(res, 404, { error: 'Data tagihan/invoice tidak ditemukan.' });
+
+      let school: any = null;
+      if (payment.school_id) {
+        const { data: sch } = await admin.from('schools').select('*').eq('id', payment.school_id).maybeSingle();
+        school = sch;
+      }
+
+      const origin = req.headers.origin || (req.headers['x-forwarded-host'] ? `${req.headers['x-forwarded-proto'] || 'https'}://${req.headers['x-forwarded-host']}` : '');
+      const waResult = await sendEvolutionWhatsAppInvoiceSettled({
+        admin,
+        payment,
+        school,
+        origin,
+        newExpiry: school?.subscription_expires_at,
+      });
+
+      if (!waResult.ok && !waResult.skipped) {
+        return json(res, 400, {
+          ok: false,
+          error: `Gagal mengirim ke WhatsApp: ${waResult.error || 'Periksa koneksi Evolution API'}`
+        });
+      }
+
+      return json(res, 200, {
+        ok: true,
+        message: waResult.skipped
+          ? 'Gateway Evolution API belum aktif. Silakan aktifkan di Pengaturan Sistem > Evolution API.'
+          : `Bukti invoice resmi ${payment.invoice_no} berhasil dikirim ke WhatsApp!`,
+        details: waResult,
+      });
     }
 
     if(action==='test_evolution_api'){

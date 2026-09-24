@@ -61,6 +61,15 @@ export const AbsensiView: React.FC = () => {
     [currentUser, classes, subjects, teachers]
   );
 
+  const isTeacherOrWali = useMemo(() => {
+    return (
+      currentUser?.role === 'WALI KELAS' ||
+      currentUser?.role === 'GURU MAPEL' ||
+      userScope.isWaliKelas ||
+      userScope.isGuruMapel
+    );
+  }, [currentUser?.role, userScope.isWaliKelas, userScope.isGuruMapel]);
+
   const initialMode: AttendanceType = userScope.isGuruMapel ? 'SUBJECT' : 'DAILY';
 
   const [date, setDate] = useState<string>(currentAttendanceDate);
@@ -479,7 +488,7 @@ export const AbsensiView: React.FC = () => {
           sessionStorage.removeItem(draftStorageKey);
         } catch (_) {}
 
-        if (systemConfig.whatsappBroadcastEnabled !== false) {
+        if (systemConfig.whatsappBroadcastEnabled !== false && !isTeacherOrWali) {
           const nowHour = new Date().getHours();
           setBroadcastInitialType(nowHour >= 11 ? 'PULANG' : 'MASUK');
           setJustSavedPrompt(true);
@@ -1470,8 +1479,8 @@ export const AbsensiView: React.FC = () => {
         </div>
       </div>
 
-      {/* Just-Saved 1-Langkah Otomatis Prompt Banner */}
-      {justSavedPrompt && systemConfig.whatsappBroadcastEnabled !== false && (
+      {/* Just-Saved 1-Langkah Otomatis Prompt Banner (Khusus Admin, disembunyikan untuk Wali Kelas & Guru Mapel) */}
+      {justSavedPrompt && systemConfig.whatsappBroadcastEnabled !== false && !isTeacherOrWali && (
         <div className="sticky bottom-20 z-30 animate-in slide-in-from-bottom-3 duration-300">
           <div className="bg-gradient-to-r from-emerald-600 via-teal-600 to-green-700 text-white rounded-2xl p-3 sm:p-4 shadow-xl border border-emerald-400/40 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <div className="flex items-center gap-3">
@@ -1538,8 +1547,8 @@ export const AbsensiView: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end">
-          {/* WhatsApp Broadcast Button Matching Uploaded Icon */}
-          {systemConfig.whatsappBroadcastEnabled !== false && (
+          {/* WhatsApp Broadcast Button (Khusus Admin, disembunyikan untuk Wali Kelas & Guru Mapel) */}
+          {systemConfig.whatsappBroadcastEnabled !== false && !isTeacherOrWali && (
             <button
               type="button"
               onClick={() => {

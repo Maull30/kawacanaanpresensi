@@ -41,7 +41,7 @@ export const INITIAL_SYSTEM_CONFIG: SystemConfig = {
   defaultCheckInTime: '06:30 AM',
   defaultCheckOutTime: '12:20 PM',
   reportPlace: '',
-  reportDate: new Date().toISOString().split('T')[0],
+  reportDate: '',
   studentSelfAttendanceEnabled: false,
   checkInStartTime: '06:00',
   checkInDeadlineTime: '07:00',

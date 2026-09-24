@@ -182,7 +182,8 @@ const MainAppContent: React.FC = () => {
     const r = p.get('r') || p.get('class') || p.get('classId');
     const d = p.get('d') || p.get('date');
     const periodParam = (p.get('p') || p.get('period') || '').toLowerCase();
-    if (r || periodParam === 'kepsek') {
+    const isReportLink = Boolean(r || periodParam || p.get('report') === 'true' || (d && (p.get('m') || p.get('s'))));
+    if (isReportLink) {
       let resolvedReportType: 'Laporan Harian' | 'Laporan Mingguan' | 'Laporan Bulanan' | 'Laporan Semester' | 'Laporan Kepala Sekolah (Bulanan)' | 'Laporan Kepala Sekolah (Semester)' = 'Laporan Harian';
       if (periodParam === 'kepsek' || periodParam === 'kepsek_monthly') {
         resolvedReportType = 'Laporan Kepala Sekolah (Bulanan)';
@@ -241,6 +242,39 @@ const MainAppContent: React.FC = () => {
   React.useEffect(() => {
     const handlePopState = () => {
       const params = new URLSearchParams(window.location.search);
+      const r = params.get('r') || params.get('class') || params.get('classId');
+      const d = params.get('d') || params.get('date');
+      const periodParam = (params.get('p') || params.get('period') || '').toLowerCase();
+      const isReportLink = Boolean(r || periodParam || params.get('report') === 'true' || (d && (params.get('m') || params.get('s'))));
+      if (isReportLink) {
+        let resolvedReportType: 'Laporan Harian' | 'Laporan Mingguan' | 'Laporan Bulanan' | 'Laporan Semester' | 'Laporan Kepala Sekolah (Bulanan)' | 'Laporan Kepala Sekolah (Semester)' = 'Laporan Harian';
+        if (periodParam === 'kepsek' || periodParam === 'kepsek_monthly') {
+          resolvedReportType = 'Laporan Kepala Sekolah (Bulanan)';
+        } else if (periodParam === 'kepsek_semester') {
+          resolvedReportType = 'Laporan Kepala Sekolah (Semester)';
+        } else if (periodParam === 'weekly') {
+          resolvedReportType = 'Laporan Mingguan';
+        } else if (periodParam === 'monthly') {
+          resolvedReportType = 'Laporan Bulanan';
+        } else if (periodParam === 'semester') {
+          resolvedReportType = 'Laporan Semester';
+        }
+
+        setPublicReportParams({
+          classId: r || '',
+          date: d || new Date().toISOString().split('T')[0],
+          attendanceType: (params.get('m') === 'subject' || params.get('type') === 'subject') ? ('SUBJECT' as const) : ('DAILY' as const),
+          subjectId: params.get('s') || params.get('subjectId') || null,
+          reportType: resolvedReportType,
+          selectedWeek: params.get('w') || params.get('week') || 'Minggu Ke-1',
+          month: params.get('mo') || params.get('month') || 'Juli',
+          year: params.get('y') || params.get('year') || '2026',
+          semester: (params.get('sem') === 'Genap' || params.get('semester') === 'Genap') ? ('Genap' as const) : ('Ganjil' as const),
+          academicYear: params.get('ay') || params.get('academicYear') || '2025/2026',
+        });
+      } else {
+        setPublicReportParams(null);
+      }
 
       if (
         !currentUser &&

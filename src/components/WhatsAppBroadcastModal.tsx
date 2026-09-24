@@ -38,7 +38,14 @@ interface WhatsAppBroadcastModalProps {
   records?: AttendanceRecord[];
   students?: Student[];
   initialType?: 'MASUK' | 'PULANG';
+  reportType?: string;
+  selectedWeek?: string;
+  month?: string;
+  year?: string;
+  semester?: 'Ganjil' | 'Genap';
+  academicYear?: string;
   onOpenPdfPreview?: () => void;
+  onOpenSmartReport?: () => void;
 }
 
 export const WhatsAppBroadcastModal: React.FC<WhatsAppBroadcastModalProps> = ({
@@ -53,7 +60,14 @@ export const WhatsAppBroadcastModal: React.FC<WhatsAppBroadcastModalProps> = ({
   records: propRecords,
   students: propStudents,
   initialType = 'MASUK',
+  reportType,
+  selectedWeek,
+  month,
+  year,
+  semester,
+  academicYear,
   onOpenPdfPreview,
+  onOpenSmartReport,
 }) => {
   const attendanceType: AttendanceType = (rawAttendanceType as AttendanceType) || 'DAILY';
   const {
@@ -62,6 +76,7 @@ export const WhatsAppBroadcastModal: React.FC<WhatsAppBroadcastModalProps> = ({
     currentUser,
     attendanceRecords,
     students: contextStudents,
+    classes: contextClasses,
     teachers,
     showToast,
   } = useApp();
@@ -76,12 +91,27 @@ export const WhatsAppBroadcastModal: React.FC<WhatsAppBroadcastModalProps> = ({
   );
   const [customNote, setCustomNote] = useState('');
 
+  // Robust class ID resolution
+  const effectiveClassId = useMemo(() => {
+    if (classId) return classId;
+    if (currentUser?.classIds && currentUser.classIds.length > 0) return currentUser.classIds[0];
+    if (className) {
+      const found = contextClasses.find((c) => c.name.toLowerCase() === className.toLowerCase() || c.name.toLowerCase().includes(className.toLowerCase()));
+      if (found) return found.id;
+    }
+    if (schoolProfile.kelas) {
+      const found = contextClasses.find((c) => c.name.toLowerCase() === schoolProfile.kelas.toLowerCase());
+      if (found) return found.id;
+    }
+    return contextClasses[0]?.id || '';
+  }, [classId, currentUser, className, schoolProfile.kelas, contextClasses]);
+
   // Target students in class
   const targetStudents = useMemo(() => {
     if (propStudents && propStudents.length > 0) return propStudents;
-    if (classId) return contextStudents.filter((s) => s.classId === classId);
+    if (effectiveClassId) return contextStudents.filter((s) => s.classId === effectiveClassId);
     return contextStudents;
-  }, [propStudents, classId, contextStudents]);
+  }, [propStudents, effectiveClassId, contextStudents]);
 
   // Target records for selected date, class, and attendance mode
   const targetRecords = useMemo(() => {
@@ -94,10 +124,10 @@ export const WhatsAppBroadcastModal: React.FC<WhatsAppBroadcastModalProps> = ({
       } else {
         if (r.type === 'SUBJECT') return false;
       }
-      if (classId && r.classId && r.classId !== classId) return false;
+      if (effectiveClassId && r.classId && r.classId !== effectiveClassId) return false;
       return true;
     });
-  }, [propRecords, attendanceRecords, date, attendanceType, subjectId, classId]);
+  }, [propRecords, attendanceRecords, date, attendanceType, subjectId, effectiveClassId]);
 
   // Teacher name resolution
   const resolvedTeacherName = useMemo(() => {
@@ -115,8 +145,78 @@ export const WhatsAppBroadcastModal: React.FC<WhatsAppBroadcastModalProps> = ({
 
   // Dynamic Smart Link directly from application domain: https://[domain-aplikasi]/?r=[id_kelas]&d=[tanggal]
   const smartLinkUrl = useMemo(() => {
-    return generateSmartReportLink(classId, date, attendanceType, subjectId);
-  }, [classId, date, attendanceType, subjectId]);
+    let period: 'daily' | 'weekly' | 'monthly' | 'semester' | 'kepsek' = 'daily';
+    if (reportType === 'Laporan Mingguan') period = 'weekly';
+    else if (reportType === 'Laporan Bulanan') period = 'monthly';
+    else if (reportType === 'Laporan Semester') period = 'semester';
+    else if (reportType?.startsWith('Laporan Kepala Sekolah')) period = 'kepsek';
+
+    return generateSmartReportLink(
+      effectiveClassId,
+      date,
+      attendanceType,
+      subjectId,
+      period,
+      {
+        week: selectedWeek,
+        month,
+        year,
+        semester,
+        academicYear,
+      }
+    );
+  }, [
+    effectiveClassId,
+    date,
+    attendanceType,
+    subjectId,
+    reportType,
+    selectedWeek,
+    month,
+    year,
+    semester,
+    academicYear,
+  ]);
+
+  const handleOpenSmartReportDocument = (e?: React.MouseEvent, targetUrl?: string) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    const finalUrl = targetUrl || smartLinkUrl;
+
+    // 1. If parent component provided onOpenSmartReport or onOpenPdfPreview, open directly in-app!
+    if (onOpenSmartReport) {
+      onOpenSmartReport();
+      return;
+    }
+    if (onOpenPdfPreview) {
+      onOpenPdfPreview();
+      return;
+    }
+
+    // 2. Try window.open for external browser tab
+    let opened = false;
+    try {
+      const win = window.open(finalUrl, '_blank', 'noopener,noreferrer');
+      if (win && !win.closed) {
+        opened = true;
+      }
+    } catch (_) {
+      opened = false;
+    }
+
+    // 3. If window.open is blocked by iframe sandbox, smoothly navigate in-app via pushState + popstate
+    if (!opened) {
+      try {
+        window.history.pushState(null, '', finalUrl);
+        window.dispatchEvent(new PopStateEvent('popstate'));
+        onClose();
+      } catch (_) {
+        window.location.href = finalUrl;
+      }
+    }
+  };
 
   // Computed summary statistics
   const stats = useMemo(() => {
@@ -310,8 +410,30 @@ export const WhatsAppBroadcastModal: React.FC<WhatsAppBroadcastModalProps> = ({
 
             <div className="relative bg-[#EFEAE2] p-3.5 sm:p-4 rounded-2xl border border-slate-300 shadow-inner">
               {/* WhatsApp Speech Bubble */}
-              <div className="relative bg-white text-slate-800 rounded-2xl p-4 shadow-sm max-w-full text-xs font-mono sm:text-[13px] leading-relaxed whitespace-pre-wrap select-all border border-slate-200/80">
-                {messageText}
+              <div className="relative bg-white text-slate-800 rounded-2xl p-4 shadow-sm max-w-full text-xs font-mono sm:text-[13px] leading-relaxed whitespace-pre-wrap border border-slate-200/80">
+                {messageText.split('\n').map((line, lIdx) => {
+                  const urlMatch = line.match(/(https?:\/\/[^\s]+)/);
+                  if (urlMatch) {
+                    const url = urlMatch[1];
+                    const [before, after] = line.split(url);
+                    return (
+                      <div key={lIdx} className="break-all">
+                        <span>{before}</span>
+                        <button
+                          type="button"
+                          onClick={(e) => handleOpenSmartReportDocument(e, url)}
+                          className="inline-flex items-center gap-1 font-bold text-emerald-700 hover:text-emerald-900 underline bg-emerald-50 px-1 py-0.5 rounded cursor-pointer transition-colors text-left break-all"
+                          title="Klik untuk membuka tautan dokumen rekap resmi"
+                        >
+                          <span>{url}</span>
+                          <ExternalLink size={12} className="shrink-0" />
+                        </button>
+                        <span>{after}</span>
+                      </div>
+                    );
+                  }
+                  return <div key={lIdx}>{line || '\u00A0'}</div>;
+                })}
 
                 <div className="mt-2 pt-2 border-t border-slate-100 flex items-center justify-end gap-1.5 text-[10px] text-slate-400 font-sans">
                   <span>Hari ini</span>
@@ -352,6 +474,42 @@ export const WhatsAppBroadcastModal: React.FC<WhatsAppBroadcastModalProps> = ({
               </label>
             </div>
 
+            {/* Smart Link Live Access Card */}
+            {includeSmartLink && smartLinkUrl && (
+              <div className="p-3 bg-emerald-50/90 border border-emerald-300/80 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 mt-2">
+                <div className="flex items-start sm:items-center gap-2.5 min-w-0">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center shrink-0 mt-0.5 sm:mt-0 shadow-2xs">
+                    <FileText size={16} />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs font-black text-emerald-950">
+                        Tautan Dokumen Rekap Resmi
+                      </span>
+                      <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-emerald-200 text-emerald-900">
+                        Siap Dibuka
+                      </span>
+                    </div>
+                    <span className="text-[11px] text-emerald-700 font-mono block truncate max-w-sm sm:max-w-md">
+                      {smartLinkUrl}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={(e) => handleOpenSmartReportDocument(e, smartLinkUrl)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 active:scale-95 text-white font-bold text-xs rounded-xl shadow-xs transition-all cursor-pointer"
+                    title="Buka dokumen rekap resmi"
+                  >
+                    <ExternalLink size={13} />
+                    <span>Buka Tautan Resmi</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Custom Announcement / Teacher's Note */}
             <div className="pt-1">
               <input
@@ -367,7 +525,19 @@ export const WhatsAppBroadcastModal: React.FC<WhatsAppBroadcastModalProps> = ({
 
         {/* Modal Commercial Action Footer */}
         <div className="p-3.5 sm:p-5 bg-white border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0">
-          <div className="flex items-center gap-2 w-full sm:w-auto">
+          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+            {includeSmartLink && smartLinkUrl && (
+              <button
+                type="button"
+                onClick={(e) => handleOpenSmartReportDocument(e, smartLinkUrl)}
+                className="px-3.5 py-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 min-h-[40px] cursor-pointer shadow-2xs"
+                title="Buka langsung tautan dokumen rekap resmi"
+              >
+                <ExternalLink size={14} />
+                <span>Buka Tautan Rekap</span>
+              </button>
+            )}
+
             {onOpenPdfPreview && (
               <button
                 type="button"

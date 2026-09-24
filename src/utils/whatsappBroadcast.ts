@@ -128,7 +128,9 @@ export const generateSmartReportLink = (
   if (typeof window === 'undefined') return '';
   const origin = window.location.origin;
   const params = new URLSearchParams();
-  if (classId) params.set('r', classId);
+  const effectiveR = (classId && classId.trim()) || 'default';
+  params.set('r', effectiveR);
+  params.set('report', 'true');
   if (date) params.set('d', date);
   if (period) params.set('p', period);
   if (extraParams?.week) params.set('w', extraParams.week);

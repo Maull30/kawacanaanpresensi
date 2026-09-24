@@ -214,13 +214,6 @@ export const FeaturesSection: React.FC<FeaturesSectionProps> = ({ lang, onOpenRe
               ? 'Sistem presensi terpadu, rekapitulasi rombel kelas 1–6, dan pelaporan kedinasan dalam satu antarmuka bersih.'
               : 'Integrated attendance logging, grade 1–6 cohort recap, and official educational reporting in one clean interface.'}
           </p>
-
-          {/* Decorative Capsule Divider & Dots */}
-          <div className="flex items-center justify-center gap-1.5 mt-2.5 lg:mt-2">
-            <span className="w-8 h-1.5 bg-blue-600 rounded-full" />
-            <span className="w-1.5 h-1.5 bg-blue-400 rounded-full" />
-            <span className="w-1.5 h-1.5 bg-blue-300 rounded-full" />
-          </div>
         </div>
 
         {/* ========================================================================= */}
@@ -384,16 +377,6 @@ export const FeaturesSection: React.FC<FeaturesSectionProps> = ({ lang, onOpenRe
               </div>
             );
           })}
-        </div>
-
-        {/* ========================================================================= */}
-        {/* BOTTOM PAGINATION INDICATOR DOTS SINKRON DENGAN DESAIN REFERENSI          */}
-        {/* ========================================================================= */}
-        <div className="flex items-center justify-center gap-2 pt-4 sm:pt-6 lg:pt-2 xl:pt-3">
-          <span className="w-2.5 h-2.5 rounded-full bg-blue-600 shadow-xs ring-2 ring-blue-400/30" />
-          <span className="w-2 h-2 rounded-full bg-blue-300" />
-          <span className="w-2 h-2 rounded-full bg-blue-300" />
-          <span className="w-2 h-2 rounded-full bg-blue-300" />
         </div>
 
       </div>

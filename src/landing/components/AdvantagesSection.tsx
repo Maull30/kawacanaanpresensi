@@ -307,9 +307,6 @@ export const AdvantagesSection: React.FC<AdvantagesSectionProps> = ({ lang, onOp
               ? 'Arsitektur sistem presensi modern yang dirancang khusus memenuhi regulasi administrasi sekolah dasar.'
               : 'Modern attendance system architecture specifically engineered to comply with primary school administrative regulations.'}
           </p>
-
-          {/* Small Blue Divider Capsule */}
-          <div className="w-10 h-1.5 bg-blue-600 rounded-full mx-auto mt-2.5 lg:mt-2" />
         </div>
 
         {/* ========================================================================= */}

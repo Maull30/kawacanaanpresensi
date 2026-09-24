@@ -1,12 +1,11 @@
-import React, { useState } from 'react';
-import { School, CheckCircle2, Star, Quote } from 'lucide-react';
+import React from 'react';
+import { School, CheckCircle2, Star } from 'lucide-react';
 
 interface TestimonialSectionProps {
   lang: 'ID' | 'EN';
 }
 
 export const TestimonialSection: React.FC<TestimonialSectionProps> = ({ lang }) => {
-  const [activePage, setActivePage] = useState(0);
   const isId = lang === 'ID';
 
   const testimonials = isId ? [
@@ -201,13 +200,6 @@ export const TestimonialSection: React.FC<TestimonialSectionProps> = ({ lang }) 
               ? 'Kisah nyata dari kepala sekolah, wali kelas, guru, dan tata usaha yang telah merasakan manfaat sistem presensi ini.'
               : 'True stories from principals, homeroom teachers, subject instructors, and administrative staff who rely on our platform.'}
           </p>
-
-          {/* Small Center Capsule Indicator (as in screenshot under subtitle) */}
-          <div className="flex items-center justify-center gap-1.5 mt-2.5 lg:mt-2">
-            <div className="w-8 h-1.5 bg-blue-600 rounded-full" />
-            <div className="w-1.5 h-1.5 bg-blue-300 rounded-full" />
-            <div className="w-1.5 h-1.5 bg-blue-200 rounded-full" />
-          </div>
         </div>
 
         {/* ========================================================================= */}
@@ -314,42 +306,6 @@ export const TestimonialSection: React.FC<TestimonialSectionProps> = ({ lang }) 
 
             </div>
           ))}
-        </div>
-
-        {/* Bottom Pagination Dots Indicator (Matching Bottom of Screenshot) */}
-        <div className="flex items-center justify-center gap-2 mt-3 sm:mt-5 lg:mt-2 xl:mt-3">
-          <button
-            type="button"
-            onClick={() => setActivePage(0)}
-            className={`w-2.5 h-2.5 rounded-full transition-all cursor-pointer ${
-              activePage === 0 ? 'bg-blue-600 w-6' : 'bg-blue-300'
-            }`}
-            aria-label="Testimonial page 1"
-          />
-          <button
-            type="button"
-            onClick={() => setActivePage(1)}
-            className={`w-2.5 h-2.5 rounded-full transition-all cursor-pointer ${
-              activePage === 1 ? 'bg-blue-600 w-6' : 'bg-blue-300'
-            }`}
-            aria-label="Testimonial page 2"
-          />
-          <button
-            type="button"
-            onClick={() => setActivePage(2)}
-            className={`w-2.5 h-2.5 rounded-full transition-all cursor-pointer ${
-              activePage === 2 ? 'bg-blue-600 w-6' : 'bg-blue-300'
-            }`}
-            aria-label="Testimonial page 3"
-          />
-          <button
-            type="button"
-            onClick={() => setActivePage(3)}
-            className={`w-2.5 h-2.5 rounded-full transition-all cursor-pointer ${
-              activePage === 3 ? 'bg-blue-600 w-6' : 'bg-blue-300'
-            }`}
-            aria-label="Testimonial page 4"
-          />
         </div>
 
       </div>

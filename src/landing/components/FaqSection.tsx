@@ -153,13 +153,6 @@ export const FaqSection: React.FC<FaqSectionProps> = ({ lang }) => {
                   ? 'Jawaban lengkap seputar fitur, akses pengguna, dan implementasi sistem Kawacanaan.'
                   : 'Complete answers regarding features, user access levels, and system implementation of Kawacanaan.'}
               </p>
-
-              {/* Small Center Capsule Indicator */}
-              <div className="flex items-center justify-center gap-1.5 mt-2.5 lg:mt-2">
-                <div className="w-8 h-1.5 bg-blue-600 rounded-full" />
-                <div className="w-1.5 h-1.5 bg-blue-300 rounded-full" />
-                <div className="w-1.5 h-1.5 bg-blue-200 rounded-full" />
-              </div>
             </div>
 
             {/* Right 3D Stylized School with Flag, Clock Tower & Textbooks */}

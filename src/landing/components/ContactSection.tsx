@@ -266,13 +266,6 @@ export const ContactSection: React.FC<ContactSectionProps> = ({ lang }) => {
                   ? 'Kami siap membantu Anda. Silakan hubungi kami melalui komunitas resmi, konsultasi langsung, atau pindai barcode WhatsApp di bawah ini.'
                   : 'We are ready to assist you. Reach out through our official educator community, direct consultation, or scan the WhatsApp barcode below.'}
               </p>
-
-              {/* Small Center Capsule Indicator */}
-              <div className="flex items-center justify-center gap-1.5 mt-2.5 lg:mt-2">
-                <div className="w-8 h-1.5 bg-blue-600 rounded-full" />
-                <div className="w-1.5 h-1.5 bg-blue-300 rounded-full" />
-                <div className="w-1.5 h-1.5 bg-blue-200 rounded-full" />
-              </div>
             </div>
 
             {/* Right 3D Stylized Envelope, Phone & Message Illustration */}

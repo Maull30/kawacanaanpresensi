@@ -150,13 +150,6 @@ export const BlogSection: React.FC<BlogSectionProps> = ({ lang }) => {
               ? 'Edukasi dan panduan praktis pengelolaan presensi serta administrasi sekolah dasar.'
               : 'Actionable guidance and practical insights for primary school attendance administration.'}
           </p>
-
-          {/* Small Center Capsule Indicator (as in screenshot under subtitle) */}
-          <div className="flex items-center justify-center gap-1.5 mt-2.5 lg:mt-2">
-            <div className="w-8 h-1.5 bg-blue-600 rounded-full" />
-            <div className="w-1.5 h-1.5 bg-blue-300 rounded-full" />
-            <div className="w-1.5 h-1.5 bg-blue-200 rounded-full" />
-          </div>
         </div>
 
         {/* ========================================================================= */}

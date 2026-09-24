@@ -534,35 +534,6 @@ export default async function handler(req: any, res: any) {
       let teacherNip = '';
       if (attType === 'SUBJECT') {
         teacherName = 'Guru Mata Pelajaran';
-        if (subjectId) {
-          const { data: subj } = await db.from('subjects').select('name, teacher_id, teacher_name').eq('id', subjectId).maybeSingle();
-          if (subj) {
-            subjectName = subj.name;
-            if (subj.teacher_name) teacherName = subj.teacher_name;
-            if (subj.teacher_id) {
-              const tch = (teachersList || []).find((t: any) => t.id === subj.teacher_id);
-              if (tch) {
-                teacherName = tch.nama;
-                teacherNip = tch.nip || '';
-              }
-            } else if (subj.teacher_name) {
-              const tch = (teachersList || []).find((t: any) => t.nama.trim().toLowerCase() === subj.teacher_name.trim().toLowerCase());
-              if (tch?.nip) {
-                teacherNip = tch.nip;
-              }
-            }
-          }
-        }
-        if (!teacherNip && attRecords.length > 0) {
-          const attTeacherId = attRecords.find((r: any) => r.teacher_id)?.teacher_id;
-          if (attTeacherId) {
-            const tObj = (teachersList || []).find((t: any) => t.id === attTeacherId);
-            if (tObj) {
-              if (teacherName === 'Guru Mata Pelajaran') teacherName = tObj.nama;
-              teacherNip = tObj.nip || '';
-            }
-          }
-        }
       } else if (targetClass.wali_kelas_teacher_id) {
         const wk = (teachersList || []).find((t: any) => t.id === targetClass.wali_kelas_teacher_id);
         if (wk) {
@@ -582,13 +553,6 @@ export default async function handler(req: any, res: any) {
             teacherName = tObj.nama;
             teacherNip = tObj.nip || teacherNip;
           }
-        }
-      }
-
-      if (!teacherNip && teacherName && teacherName !== 'Wali Kelas' && teacherName !== 'Guru Mata Pelajaran') {
-        const tObj = (teachersList || []).find((t: any) => t.nama.trim().toLowerCase() === teacherName.trim().toLowerCase());
-        if (tObj?.nip) {
-          teacherNip = tObj.nip;
         }
       }
 

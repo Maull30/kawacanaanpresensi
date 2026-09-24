@@ -21,7 +21,6 @@ import {
 } from 'lucide-react';
 import { WhatsAppBroadcastModal } from '../components/WhatsAppBroadcastModal';
 import { WhatsAppIcon } from '../components/WhatsAppIcon';
-import { generateSmartReportLink } from '../utils/whatsappBroadcast';
 
 export const LaporanView: React.FC = () => {
   const {
@@ -199,81 +198,266 @@ export const LaporanView: React.FC = () => {
     return students.filter((s) => s.classId === selectedClassId);
   }, [students, selectedClassId]);
 
-  // Calculate week dates helper
-  const weekNum = parseInt(selectedWeek.replace(/\D/g, ''), 10) || 1;
-  const weekDates = useMemo(() => {
-    const yearNum = Number(year) || 2026;
-    const daysInMonth = new Date(yearNum, mNum, 0).getDate();
-    const startDay = (weekNum - 1) * 7 + 1;
-    const endDay = Math.min(daysInMonth, weekNum * 7);
+  // Semester calculation for Class View
+  const isSemesterGenap = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni'].includes(month);
+  const classSemester: 'Ganjil' | 'Genap' = isSemesterGenap ? 'Genap' : 'Ganjil';
+  const semYear = isSemesterGenap ? endYear : startYear;
 
-    const dates: string[] = [];
-    for (let d = startDay; d <= endDay; d++) {
-      const jsDate = new Date(yearNum, mNum - 1, d);
-      const dayOfWeek = jsDate.getDay();
-      if (dayOfWeek >= 1 && dayOfWeek <= 5) {
-        dates.push(`${yearNum}-${String(mNum).padStart(2, '0')}-${String(d).padStart(2, '0')}`);
-      }
+  const semesterMonths = useMemo(() => {
+    if (isSemesterGenap) {
+      return [
+        { code: '01', name: 'Januari', mNum: 1, key: `${endYear}-01` },
+        { code: '02', name: 'Februari', mNum: 2, key: `${endYear}-02` },
+        { code: '03', name: 'Maret', mNum: 3, key: `${endYear}-03` },
+        { code: '04', name: 'April', mNum: 4, key: `${endYear}-04` },
+        { code: '05', name: 'Mei', mNum: 5, key: `${endYear}-05` },
+        { code: '06', name: 'Juni', mNum: 6, key: `${endYear}-06` },
+      ];
+    } else {
+      return [
+        { code: '07', name: 'Juli', mNum: 7, key: `${startYear}-07` },
+        { code: '08', name: 'Agustus', mNum: 8, key: `${startYear}-08` },
+        { code: '09', name: 'September', mNum: 9, key: `${startYear}-09` },
+        { code: '10', name: 'Oktober', mNum: 10, key: `${startYear}-10` },
+        { code: '11', name: 'November', mNum: 11, key: `${startYear}-11` },
+        { code: '12', name: 'Desember', mNum: 12, key: `${startYear}-12` },
+      ];
     }
-    return dates;
-  }, [year, mNum, weekNum]);
+  }, [isSemesterGenap, startYear, endYear]);
 
-  // Live Summary Stats for single-class preview
-  const liveSummary = useMemo(() => {
-    let relevantRecords = attendanceRecords.filter((r) => {
+  const semesterEffectiveDays = useMemo(() => {
+    return semesterMonths.reduce(
+      (acc, m) => acc + (getEffectiveDaysForMonth(semYear, m.mNum) || 20),
+      0
+    );
+  }, [semesterMonths, semYear, getEffectiveDaysForMonth]);
+
+  // Filter attendance records based on selected class, subject, and students
+  const relevantRecords = useMemo(() => {
+    const studentIds = new Set(filteredStudents.map((s) => s.id));
+    return attendanceRecords.filter((r) => {
       if (attendanceType === 'SUBJECT') {
         if (r.type !== 'SUBJECT') return false;
         if (selectedSubjectId && r.subjectId !== selectedSubjectId) return false;
       } else {
         if (r.type === 'SUBJECT') return false;
       }
-      if (selectedClassId && r.classId && r.classId !== selectedClassId) return false;
+      if (selectedClassId) {
+        if (r.classId && r.classId === selectedClassId) return true;
+        if (studentIds.has(r.studentId)) return true;
+        return false;
+      }
       return true;
     });
+  }, [attendanceRecords, attendanceType, selectedSubjectId, selectedClassId, filteredStudents]);
 
-    if (reportType === 'Laporan Harian') {
-      relevantRecords = relevantRecords.filter((r) => r.date === selectedDate);
-    } else if (reportType === 'Laporan Mingguan') {
-      relevantRecords = relevantRecords.filter((r) => weekDates.includes(r.date));
-    } else if (reportType === 'Laporan Bulanan') {
-      relevantRecords = relevantRecords.filter((r) => r.date.startsWith(monthKey));
+  // 1. DATA COMPUTATION: LAPORAN HARIAN
+  const dailyRows = useMemo(() => {
+    return filteredStudents.map((s) => {
+      const rec = relevantRecords.find((r) => r.studentId === s.id && r.date === selectedDate);
+      return {
+        ...s,
+        status: rec?.status || 'Belum Diabsen',
+        timeIn: rec?.checkInTime || '-',
+        timeOut: rec?.checkOutTime || '-',
+        notes: rec?.notes || '-',
+      };
+    });
+  }, [filteredStudents, relevantRecords, selectedDate]);
+
+  // 2. DATA COMPUTATION: LAPORAN MINGGUAN
+  const weekNum = parseInt(selectedWeek.replace(/\D/g, ''), 10) || 1;
+  const weeklyDays = useMemo(() => {
+    const yearNum = Number(year) || 2026;
+    const daysInMonth = new Date(yearNum, mNum, 0).getDate();
+    const startDay = (weekNum - 1) * 7 + 1;
+    const endDay = Math.min(daysInMonth, weekNum * 7);
+
+    const days: { dateStr: string; dayNum: number; dayShort: string; dayName: string }[] = [];
+    const dayNamesShort = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
+    const dayNamesFull = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+
+    for (let d = startDay; d <= endDay; d++) {
+      const jsDate = new Date(yearNum, mNum - 1, d);
+      const dow = jsDate.getDay();
+      if (dow >= 1 && dow <= 5) {
+        const dateStr = `${yearNum}-${String(mNum).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+        days.push({
+          dateStr,
+          dayNum: d,
+          dayShort: dayNamesShort[dow],
+          dayName: dayNamesFull[dow],
+        });
+      }
     }
+    return days;
+  }, [year, mNum, weekNum]);
 
-    const hadir = relevantRecords.filter((r) => r.status === 'Hadir').length;
-    const sakit = relevantRecords.filter((r) => r.status === 'Sakit').length;
-    const izin = relevantRecords.filter((r) => r.status === 'Izin').length;
-    const alfa = relevantRecords.filter((r) => r.status === 'Alfa').length;
-    const total = hadir + sakit + izin + alfa;
+  const weekDates = useMemo(() => weeklyDays.map((d) => d.dateStr), [weeklyDays]);
 
-    const baseCount = filteredStudents.length || 1;
-    let denominator = total;
-    if (reportType === 'Laporan Harian') {
-      denominator = baseCount;
-    } else if (reportType === 'Laporan Mingguan') {
-      denominator = (baseCount * (weekDates.length || 1)) || 1;
-    } else {
-      denominator = total > 0 ? total : (baseCount * (effectiveDays || 1)) || 1;
-    }
+  const weeklyRows = useMemo(() => {
+    return filteredStudents.map((s) => {
+      const recs = relevantRecords.filter((r) => r.studentId === s.id && weekDates.includes(r.date));
+      const dayMap: { [dateStr: string]: string } = {};
+      weeklyDays.forEach((d) => {
+        const found = recs.find((r) => r.date === d.dateStr);
+        dayMap[d.dateStr] = found
+          ? found.status === 'Hadir'
+            ? 'H'
+            : found.status === 'Sakit'
+            ? 'S'
+            : found.status === 'Izin'
+            ? 'I'
+            : 'A'
+          : '-';
+      });
+      const hadir = recs.filter((r) => r.status === 'Hadir').length;
+      const sakit = recs.filter((r) => r.status === 'Sakit').length;
+      const izin = recs.filter((r) => r.status === 'Izin').length;
+      const alfa = recs.filter((r) => r.status === 'Alfa').length;
+      const totalDays = weeklyDays.length || 1;
+      const pct = Math.round((hadir / totalDays) * 100);
+      return { ...s, dayMap, hadir, sakit, izin, alfa, pct };
+    });
+  }, [filteredStudents, relevantRecords, weeklyDays, weekDates]);
 
-    const pctHadir = denominator > 0 ? (hadir / denominator) * 100 : 0;
-    const pctSakit = denominator > 0 ? (sakit / denominator) * 100 : 0;
-    const pctIzin = denominator > 0 ? (izin / denominator) * 100 : 0;
-    const pctAlfa = denominator > 0 ? (alfa / denominator) * 100 : 0;
+  // 3. DATA COMPUTATION: LAPORAN BULANAN
+  const monthlyRows = useMemo(() => {
+    return filteredStudents.map((s) => {
+      const recs = relevantRecords.filter((r) => r.studentId === s.id && r.date.startsWith(monthKey));
+      const hadir = recs.filter((r) => r.status === 'Hadir').length;
+      const sakit = recs.filter((r) => r.status === 'Sakit').length;
+      const izin = recs.filter((r) => r.status === 'Izin').length;
+      const alfa = recs.filter((r) => r.status === 'Alfa').length;
+      const totalRecorded = hadir + sakit + izin + alfa;
+      const baseDenom = effectiveDays || totalRecorded || 1;
+      const pct = Math.min(100, Math.round((hadir / baseDenom) * 100));
+      return { ...s, hadir, sakit, izin, alfa, totalRecorded, pct };
+    });
+  }, [filteredStudents, relevantRecords, monthKey, effectiveDays]);
 
+  // 4. DATA COMPUTATION: LAPORAN SEMESTER
+  const semesterRows = useMemo(() => {
+    const denom = semesterEffectiveDays || 1;
+    return filteredStudents.map((s) => {
+      const recs = relevantRecords.filter(
+        (r) => r.studentId === s.id && semesterMonths.some((m) => r.date.startsWith(m.key))
+      );
+      const hadir = recs.filter((r) => r.status === 'Hadir').length;
+      const sakit = recs.filter((r) => r.status === 'Sakit').length;
+      const izin = recs.filter((r) => r.status === 'Izin').length;
+      const alfa = recs.filter((r) => r.status === 'Alfa').length;
+      const totalRecorded = hadir + sakit + izin + alfa;
+
+      const pctHadir = Math.min(100, Math.round((hadir / denom) * 100));
+      const pctSakit = Math.round((sakit / denom) * 100 * 10) / 10;
+      const pctIzin = Math.round((izin / denom) * 100 * 10) / 10;
+      const pctAlfa = Math.round((alfa / denom) * 100 * 10) / 10;
+
+      let predicate = 'Sangat Baik';
+      if (pctHadir < 75) predicate = 'Perlu Pembinaan';
+      else if (pctHadir < 85) predicate = 'Cukup';
+      else if (pctHadir < 95) predicate = 'Baik';
+
+      return {
+        ...s,
+        hadir,
+        sakit,
+        izin,
+        alfa,
+        totalRecorded,
+        pctHadir,
+        pctSakit,
+        pctIzin,
+        pctAlfa,
+        predicate,
+      };
+    });
+  }, [filteredStudents, relevantRecords, semesterMonths, semesterEffectiveDays]);
+
+  // Live Summary Stats for single-class preview according to selected period
+  const liveSummary = useMemo(() => {
     const formatPct = (val: number) => (val % 1 === 0 ? val.toFixed(0) : val.toFixed(1));
 
+    if (reportType === 'Laporan Harian') {
+      const hadir = dailyRows.filter((r) => r.status === 'Hadir').length;
+      const sakit = dailyRows.filter((r) => r.status === 'Sakit').length;
+      const izin = dailyRows.filter((r) => r.status === 'Izin').length;
+      const alfa = dailyRows.filter((r) => r.status === 'Alfa').length;
+      const total = hadir + sakit + izin + alfa;
+      const denom = filteredStudents.length || total || 1;
+      return {
+        hadir,
+        sakit,
+        izin,
+        alfa,
+        total,
+        pctHadir: formatPct((hadir / denom) * 100),
+        pctSakit: formatPct((sakit / denom) * 100),
+        pctIzin: formatPct((izin / denom) * 100),
+        pctAlfa: formatPct((alfa / denom) * 100),
+      };
+    }
+
+    if (reportType === 'Laporan Mingguan') {
+      const hadir = weeklyRows.reduce((acc, r) => acc + r.hadir, 0);
+      const sakit = weeklyRows.reduce((acc, r) => acc + r.sakit, 0);
+      const izin = weeklyRows.reduce((acc, r) => acc + r.izin, 0);
+      const alfa = weeklyRows.reduce((acc, r) => acc + r.alfa, 0);
+      const total = hadir + sakit + izin + alfa;
+      const denom = (filteredStudents.length * (weeklyDays.length || 1)) || total || 1;
+      return {
+        hadir,
+        sakit,
+        izin,
+        alfa,
+        total,
+        pctHadir: formatPct((hadir / denom) * 100),
+        pctSakit: formatPct((sakit / denom) * 100),
+        pctIzin: formatPct((izin / denom) * 100),
+        pctAlfa: formatPct((alfa / denom) * 100),
+      };
+    }
+
+    if (reportType === 'Laporan Bulanan') {
+      const hadir = monthlyRows.reduce((acc, r) => acc + r.hadir, 0);
+      const sakit = monthlyRows.reduce((acc, r) => acc + r.sakit, 0);
+      const izin = monthlyRows.reduce((acc, r) => acc + r.izin, 0);
+      const alfa = monthlyRows.reduce((acc, r) => acc + r.alfa, 0);
+      const total = hadir + sakit + izin + alfa;
+      const denom = (filteredStudents.length * (effectiveDays || 20)) || total || 1;
+      return {
+        hadir,
+        sakit,
+        izin,
+        alfa,
+        total,
+        pctHadir: formatPct((hadir / denom) * 100),
+        pctSakit: formatPct((sakit / denom) * 100),
+        pctIzin: formatPct((izin / denom) * 100),
+        pctAlfa: formatPct((alfa / denom) * 100),
+      };
+    }
+
+    // Laporan Semester
+    const hadir = semesterRows.reduce((acc, r) => acc + r.hadir, 0);
+    const sakit = semesterRows.reduce((acc, r) => acc + r.sakit, 0);
+    const izin = semesterRows.reduce((acc, r) => acc + r.izin, 0);
+    const alfa = semesterRows.reduce((acc, r) => acc + r.alfa, 0);
+    const total = hadir + sakit + izin + alfa;
+    const denom = (filteredStudents.length * (semesterEffectiveDays || 1)) || total || 1;
     return {
       hadir,
       sakit,
       izin,
       alfa,
       total,
-      pctHadir: formatPct(pctHadir),
-      pctSakit: formatPct(pctSakit),
-      pctIzin: formatPct(pctIzin),
-      pctAlfa: formatPct(pctAlfa),
+      pctHadir: formatPct((hadir / denom) * 100),
+      pctSakit: formatPct((sakit / denom) * 100),
+      pctIzin: formatPct((izin / denom) * 100),
+      pctAlfa: formatPct((alfa / denom) * 100),
     };
-  }, [attendanceRecords, attendanceType, selectedSubjectId, selectedClassId, reportType, selectedDate, weekDates, monthKey, filteredStudents.length, effectiveDays]);
+  }, [reportType, dailyRows, weeklyRows, monthlyRows, semesterRows, filteredStudents.length, weeklyDays.length, effectiveDays, semesterEffectiveDays]);
 
   // =========================================================================
   // KEPALA SEKOLAH COMPUTED DATA (AUTO AGGREGATION FROM WALI KELAS INPUTS)
@@ -444,50 +628,7 @@ export const LaporanView: React.FC = () => {
 
   const handlePrintSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-
-    // Tentukan ID kelas target
-    const targetClassId =
-      selectedClassId ||
-      userScope.assignedWaliClassId ||
-      (selectableClasses.length > 0 ? selectableClasses[0].id : '') ||
-      (classes.length > 0 ? classes[0].id : '') ||
-      schoolProfile.kelas ||
-      '';
-
-    // Tentukan tanggal target sesuai jenis/periode laporan yang dipilih
-    let targetDate = selectedDate;
-    if (reportType === 'Laporan Mingguan' && weekDates.length > 0) {
-      targetDate = weekDates[0];
-    } else if (reportType === 'Laporan Bulanan') {
-      const monthPrefix = `${year}-${String(mNum).padStart(2, '0')}`;
-      const today = new Date().toISOString().split('T')[0];
-      if (today.startsWith(monthPrefix)) {
-        targetDate = today;
-      } else {
-        const rec = attendanceRecords.find(
-          (r) =>
-            r.date.startsWith(monthPrefix) &&
-            (!targetClassId || r.classId === targetClassId)
-        );
-        targetDate = rec ? rec.date : `${monthPrefix}-01`;
-      }
-    }
-    if (!targetDate) {
-      targetDate = new Date().toISOString().split('T')[0];
-    }
-
-    const smartUrl = generateSmartReportLink(
-      targetClassId,
-      targetDate,
-      attendanceType,
-      attendanceType === 'SUBJECT' ? (selectedSubjectId || null) : null
-    );
-
-    if (smartUrl) {
-      window.open(smartUrl, '_blank', 'noopener,noreferrer');
-    } else {
-      setIsPrintModalOpen(true);
-    }
+    setIsPrintModalOpen(true);
   };
 
   const handleKepsekPrint = () => {
@@ -500,21 +641,7 @@ export const LaporanView: React.FC = () => {
     ) {
       return;
     }
-
-    const targetClassId =
-      selectedClassId ||
-      (selectableClasses.length > 0 ? selectableClasses[0].id : '') ||
-      (classes.length > 0 ? classes[0].id : '') ||
-      schoolProfile.kelas ||
-      '';
-    const targetDate = selectedDate || new Date().toISOString().split('T')[0];
-    const smartUrl = generateSmartReportLink(targetClassId, targetDate, 'DAILY');
-
-    if (smartUrl) {
-      window.open(smartUrl, '_blank', 'noopener,noreferrer');
-    } else {
-      setIsPrintModalOpen(true);
-    }
+    setIsPrintModalOpen(true);
   };
 
   return (
@@ -1171,8 +1298,17 @@ export const LaporanView: React.FC = () => {
                       SEMESTER
                     </label>
                     <select
-                      value={month === 'Januari' ? 'Genap' : 'Ganjil'}
-                      onChange={(e) => setMonth(e.target.value === 'Ganjil' ? 'Juli' : 'Januari')}
+                      value={classSemester}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val === 'Ganjil') {
+                          setMonth('Juli');
+                          setYear(String(startYear));
+                        } else {
+                          setMonth('Januari');
+                          setYear(String(endYear));
+                        }
+                      }}
                       className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-xs sm:text-sm font-semibold text-slate-900 focus:border-blue-600 focus:ring-2 focus:ring-blue-500/10 outline-none cursor-pointer min-h-[44px]"
                     >
                       <option value="Ganjil">Semester 1 (Ganjil)</option>
@@ -1186,7 +1322,7 @@ export const LaporanView: React.FC = () => {
                     </label>
                     <input
                       type="text"
-                      value={`${year}/${Number(year) + 1}`}
+                      value={schoolProfile.tahunPelajaran || `${startYear}/${endYear}`}
                       readOnly
                       className="w-full px-4 py-3 bg-slate-100 border border-slate-200 rounded-xl text-xs sm:text-sm font-semibold text-slate-700 outline-none min-h-[44px] cursor-not-allowed"
                     />
@@ -1197,12 +1333,12 @@ export const LaporanView: React.FC = () => {
               {/* Ringkasan & Kesimpulan Cepat */}
               <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl space-y-2">
                 <div className="flex items-center justify-between text-[11px] font-bold text-slate-700">
-                  <span className="uppercase tracking-wider">Ringkasan Persentase:</span>
+                  <span className="uppercase tracking-wider">Ringkasan Persentase ({reportType}):</span>
                   <span className="text-blue-700 font-extrabold">
                     {reportType === 'Laporan Harian' && formatReportDateIndo(selectedDate)}
                     {reportType === 'Laporan Mingguan' && `${selectedWeek} (${month} ${year})`}
                     {reportType === 'Laporan Bulanan' && `${month} ${year}`}
-                    {reportType === 'Laporan Semester' && `Semester ${month === 'Januari' ? 'Genap' : 'Ganjil'} ${year}`}
+                    {reportType === 'Laporan Semester' && `Semester ${classSemester === 'Genap' ? '2 (Genap)' : '1 (Ganjil)'} (${schoolProfile.tahunPelajaran || `${startYear}/${endYear}`})`}
                   </span>
                 </div>
                 <div className="grid grid-cols-4 gap-2 text-center">
@@ -1247,7 +1383,7 @@ export const LaporanView: React.FC = () => {
                 <button
                   type="submit"
                   id="btn-cetak-laporan-pdf"
-                  title="Buka dokumen laporan di tab baru untuk dicetak atau disimpan sebagai PDF"
+                  title="Buka dokumen resmi laporan untuk dicetak atau disimpan sebagai PDF"
                   className="flex-1 py-3.5 px-6 rounded-xl bg-[#1D82F5] hover:bg-blue-600 active:scale-98 text-white font-black text-xs sm:text-sm tracking-wider uppercase transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2 min-h-[48px] sm:min-h-[50px] cursor-pointer"
                 >
                   <Printer size={18} />
@@ -1269,6 +1405,304 @@ export const LaporanView: React.FC = () => {
                 sesuai pengaturan sistem.
               </div>
             </div>
+
+            {/* TABEL PRATINJAU DATA LAPORAN SESUAI PERIODE YANG DIPILIH */}
+            <div className="bg-white border border-slate-200 rounded-3xl p-4 sm:p-6 shadow-sm space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm sm:text-base font-black text-slate-900">
+                      Tabel Data {reportType}
+                    </h3>
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-blue-50 text-blue-700 border border-blue-200">
+                      {selectedClassObj?.name || 'Rombel Kelas'}
+                    </span>
+                    {attendanceType === 'SUBJECT' && selectedSubjectObj && (
+                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                        {selectedSubjectObj.name}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    {reportType === 'Laporan Harian' && `Presensi per tanggal ${formatReportDateIndo(selectedDate)}`}
+                    {reportType === 'Laporan Mingguan' && `Presensi ${selectedWeek} • Bulan ${month} ${year} (${weeklyDays.length} hari efektif)`}
+                    {reportType === 'Laporan Bulanan' && `Rekapitulasi Bulan ${month} ${year} (${effectiveDays} hari efektif)`}
+                    {reportType === 'Laporan Semester' && `Rekapitulasi Semester ${classSemester === 'Genap' ? '2 (Genap)' : '1 (Ganjil)'} TA ${schoolProfile.tahunPelajaran || `${startYear}/${endYear}`} (${semesterEffectiveDays} hari efektif)`}
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setIsPrintModalOpen(true)}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition-all shadow-xs cursor-pointer self-start sm:self-auto"
+                >
+                  <Printer size={15} />
+                  <span>Cetak Dokumen Resmi (PDF)</span>
+                </button>
+              </div>
+
+              {filteredStudents.length === 0 ? (
+                <div className="py-12 text-center text-slate-400 text-xs">
+                  Tidak ada data siswa untuk rombel kelas yang dipilih.
+                </div>
+              ) : (
+                <div className="overflow-x-auto rounded-2xl border border-slate-200">
+                  {/* PREVIEW: LAPORAN HARIAN */}
+                  {reportType === 'Laporan Harian' && (
+                    <table className="w-full text-xs text-left border-collapse">
+                      <thead>
+                        <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-700 uppercase tracking-wider">
+                          <th className="py-3 px-3 w-12 text-center">No</th>
+                          <th className="py-3 px-3 w-28">NISN</th>
+                          <th className="py-3 px-3">Nama Siswa</th>
+                          <th className="py-3 px-3 w-14 text-center">L/P</th>
+                          <th className="py-3 px-3 w-28 text-center">Status</th>
+                          <th className="py-3 px-3 w-24 text-center">Waktu Masuk</th>
+                          <th className="py-3 px-3 w-24 text-center">Waktu Pulang</th>
+                          <th className="py-3 px-3">Catatan</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 font-medium">
+                        {dailyRows.map((r, idx) => (
+                          <tr key={r.id} className="hover:bg-slate-50/70 transition-colors">
+                            <td className="py-2.5 px-3 text-center text-slate-500">{idx + 1}</td>
+                            <td className="py-2.5 px-3 font-mono text-slate-600">{r.nisn || '-'}</td>
+                            <td className="py-2.5 px-3 font-bold text-slate-900">{r.nama}</td>
+                            <td className="py-2.5 px-3 text-center font-bold text-slate-600">
+                              {r.gender === 'Laki-laki' || r.gender === 'L' ? 'L' : 'P'}
+                            </td>
+                            <td className="py-2.5 px-3 text-center">
+                              <span
+                                className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${
+                                  r.status === 'Hadir'
+                                    ? 'bg-emerald-100 text-emerald-800'
+                                    : r.status === 'Sakit'
+                                    ? 'bg-sky-100 text-sky-800'
+                                    : r.status === 'Izin'
+                                    ? 'bg-amber-100 text-amber-800'
+                                    : r.status === 'Alfa'
+                                    ? 'bg-rose-100 text-rose-800'
+                                    : 'bg-slate-100 text-slate-500'
+                                }`}
+                              >
+                                {r.status}
+                              </span>
+                            </td>
+                            <td className="py-2.5 px-3 text-center font-mono text-slate-600">{r.timeIn}</td>
+                            <td className="py-2.5 px-3 text-center font-mono text-slate-600">{r.timeOut}</td>
+                            <td className="py-2.5 px-3 text-slate-500 italic text-[11px]">{r.notes}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+
+                  {/* PREVIEW: LAPORAN MINGGUAN */}
+                  {reportType === 'Laporan Mingguan' && (
+                    <table className="w-full text-xs text-left border-collapse">
+                      <thead>
+                        <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-700 uppercase tracking-wider">
+                          <th className="py-3 px-3 w-12 text-center">No</th>
+                          <th className="py-3 px-3 w-28">NISN</th>
+                          <th className="py-3 px-3">Nama Siswa</th>
+                          <th className="py-3 px-3 w-12 text-center">L/P</th>
+                          {weeklyDays.map((d) => (
+                            <th key={d.dateStr} className="py-3 px-2 text-center w-16">
+                              <span className="block text-[10px]">{d.dayShort}</span>
+                              <span className="text-[9px] font-normal text-slate-500">{d.dayNum}</span>
+                            </th>
+                          ))}
+                          <th className="py-3 px-2 w-10 text-center text-emerald-700">H</th>
+                          <th className="py-3 px-2 w-10 text-center text-sky-700">S</th>
+                          <th className="py-3 px-2 w-10 text-center text-amber-700">I</th>
+                          <th className="py-3 px-2 w-10 text-center text-rose-700">A</th>
+                          <th className="py-3 px-3 w-20 text-center">% Hadir</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 font-medium">
+                        {weeklyRows.map((r, idx) => (
+                          <tr key={r.id} className="hover:bg-slate-50/70 transition-colors">
+                            <td className="py-2.5 px-3 text-center text-slate-500">{idx + 1}</td>
+                            <td className="py-2.5 px-3 font-mono text-slate-600">{r.nisn || '-'}</td>
+                            <td className="py-2.5 px-3 font-bold text-slate-900">{r.nama}</td>
+                            <td className="py-2.5 px-3 text-center font-bold text-slate-600">
+                              {r.gender === 'Laki-laki' || r.gender === 'L' ? 'L' : 'P'}
+                            </td>
+                            {weeklyDays.map((d) => {
+                              const st = r.dayMap[d.dateStr] || '-';
+                              return (
+                                <td key={d.dateStr} className="py-2.5 px-2 text-center">
+                                  <span
+                                    className={`inline-block w-6 h-6 leading-6 rounded-md text-[10px] font-black ${
+                                      st === 'H'
+                                        ? 'bg-emerald-100 text-emerald-800'
+                                        : st === 'S'
+                                        ? 'bg-sky-100 text-sky-800'
+                                        : st === 'I'
+                                        ? 'bg-amber-100 text-amber-800'
+                                        : st === 'A'
+                                        ? 'bg-rose-100 text-rose-800'
+                                        : 'text-slate-300'
+                                    }`}
+                                  >
+                                    {st}
+                                  </span>
+                                </td>
+                              );
+                            })}
+                            <td className="py-2.5 px-2 text-center font-bold text-emerald-700">{r.hadir}</td>
+                            <td className="py-2.5 px-2 text-center font-bold text-sky-700">{r.sakit}</td>
+                            <td className="py-2.5 px-2 text-center font-bold text-amber-700">{r.izin}</td>
+                            <td className="py-2.5 px-2 text-center font-bold text-rose-700">{r.alfa}</td>
+                            <td className="py-2.5 px-3 text-center font-black text-blue-700">{r.pct}%</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+
+                  {/* PREVIEW: LAPORAN BULANAN */}
+                  {reportType === 'Laporan Bulanan' && (
+                    <table className="w-full text-xs text-left border-collapse">
+                      <thead>
+                        <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-700 uppercase tracking-wider">
+                          <th className="py-3 px-3 w-12 text-center">No</th>
+                          <th className="py-3 px-3 w-32">NISN</th>
+                          <th className="py-3 px-4">Nama Siswa</th>
+                          <th className="py-3 px-3 w-16 text-center">L/P</th>
+                          <th className="py-3 px-3 w-20 text-center text-emerald-700">Hadir</th>
+                          <th className="py-3 px-3 w-20 text-center text-sky-700">Sakit</th>
+                          <th className="py-3 px-3 w-20 text-center text-amber-700">Izin</th>
+                          <th className="py-3 px-3 w-20 text-center text-rose-700">Alfa</th>
+                          <th className="py-3 px-4 w-28 text-center text-blue-700">% Hadir</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 font-medium">
+                        {monthlyRows.map((r, idx) => (
+                          <tr key={r.id} className="hover:bg-slate-50/70 transition-colors">
+                            <td className="py-2.5 px-3 text-center text-slate-500">{idx + 1}</td>
+                            <td className="py-2.5 px-3 font-mono text-slate-600">{r.nisn || '-'}</td>
+                            <td className="py-2.5 px-4 font-bold text-slate-900">{r.nama}</td>
+                            <td className="py-2.5 px-3 text-center font-bold text-slate-600">
+                              {r.gender === 'Laki-laki' || r.gender === 'L' ? 'L' : 'P'}
+                            </td>
+                            <td className="py-2.5 px-3 text-center font-bold text-emerald-700">{r.hadir}</td>
+                            <td className="py-2.5 px-3 text-center font-bold text-sky-700">{r.sakit}</td>
+                            <td className="py-2.5 px-3 text-center font-bold text-amber-700">{r.izin}</td>
+                            <td className="py-2.5 px-3 text-center font-bold text-rose-700">{r.alfa}</td>
+                            <td className="py-2.5 px-4 text-center font-black text-blue-700">{r.pct}%</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot>
+                        <tr className="bg-slate-100/80 font-black border-t-2 border-slate-200 text-slate-900">
+                          <td colSpan={4} className="py-3 px-4 text-right uppercase text-[11px] tracking-wider">
+                            Total / Rata-rata:
+                          </td>
+                          <td className="py-3 px-3 text-center text-emerald-800">
+                            {monthlyRows.reduce((a, b) => a + b.hadir, 0)}
+                          </td>
+                          <td className="py-3 px-3 text-center text-sky-800">
+                            {monthlyRows.reduce((a, b) => a + b.sakit, 0)}
+                          </td>
+                          <td className="py-3 px-3 text-center text-amber-800">
+                            {monthlyRows.reduce((a, b) => a + b.izin, 0)}
+                          </td>
+                          <td className="py-3 px-3 text-center text-rose-800">
+                            {monthlyRows.reduce((a, b) => a + b.alfa, 0)}
+                          </td>
+                          <td className="py-3 px-4 text-center text-blue-800">
+                            {liveSummary.pctHadir}%
+                          </td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  )}
+
+                  {/* PREVIEW: LAPORAN SEMESTER */}
+                  {reportType === 'Laporan Semester' && (
+                    <table className="w-full text-xs text-left border-collapse">
+                      <thead>
+                        <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-700 uppercase tracking-wider">
+                          <th className="py-3 px-3 w-12 text-center">No</th>
+                          <th className="py-3 px-3 w-28">NISN</th>
+                          <th className="py-3 px-4">Nama Siswa</th>
+                          <th className="py-3 px-2 w-12 text-center">L/P</th>
+                          <th className="py-3 px-2 w-14 text-center text-emerald-700">H (Hari)</th>
+                          <th className="py-3 px-2 w-14 text-center text-sky-700">S (Hari)</th>
+                          <th className="py-3 px-2 w-14 text-center text-amber-700">I (Hari)</th>
+                          <th className="py-3 px-2 w-14 text-center text-rose-700">A (Hari)</th>
+                          <th className="py-3 px-2 w-14 text-center text-emerald-800">%H</th>
+                          <th className="py-3 px-2 w-14 text-center text-sky-800">%S</th>
+                          <th className="py-3 px-2 w-14 text-center text-amber-800">%I</th>
+                          <th className="py-3 px-2 w-14 text-center text-rose-800">%A</th>
+                          <th className="py-3 px-3 w-32 text-center">Predikat</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 font-medium">
+                        {semesterRows.map((r, idx) => (
+                          <tr key={r.id} className="hover:bg-slate-50/70 transition-colors">
+                            <td className="py-2.5 px-3 text-center text-slate-500">{idx + 1}</td>
+                            <td className="py-2.5 px-3 font-mono text-slate-600">{r.nisn || '-'}</td>
+                            <td className="py-2.5 px-4 font-bold text-slate-900">{r.nama}</td>
+                            <td className="py-2.5 px-2 text-center font-bold text-slate-600">
+                              {r.gender === 'Laki-laki' || r.gender === 'L' ? 'L' : 'P'}
+                            </td>
+                            <td className="py-2.5 px-2 text-center font-bold text-emerald-700">{r.hadir}</td>
+                            <td className="py-2.5 px-2 text-center font-bold text-sky-700">{r.sakit}</td>
+                            <td className="py-2.5 px-2 text-center font-bold text-amber-700">{r.izin}</td>
+                            <td className="py-2.5 px-2 text-center font-bold text-rose-700">{r.alfa}</td>
+                            <td className="py-2.5 px-2 text-center font-black text-emerald-700">{r.pctHadir}%</td>
+                            <td className="py-2.5 px-2 text-center text-sky-700">{r.pctSakit}%</td>
+                            <td className="py-2.5 px-2 text-center text-amber-700">{r.pctIzin}%</td>
+                            <td className="py-2.5 px-2 text-center text-rose-700">{r.pctAlfa}%</td>
+                            <td className="py-2.5 px-3 text-center">
+                              <span
+                                className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-black ${
+                                  r.predicate === 'Sangat Baik'
+                                    ? 'bg-emerald-100 text-emerald-800'
+                                    : r.predicate === 'Baik'
+                                    ? 'bg-blue-100 text-blue-800'
+                                    : r.predicate === 'Cukup'
+                                    ? 'bg-amber-100 text-amber-800'
+                                    : 'bg-rose-100 text-rose-800'
+                                }`}
+                              >
+                                {r.predicate}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot>
+                        <tr className="bg-slate-100/80 font-black border-t-2 border-slate-200 text-slate-900">
+                          <td colSpan={4} className="py-3 px-4 text-right uppercase text-[11px] tracking-wider">
+                            Total / Rata-rata:
+                          </td>
+                          <td className="py-3 px-2 text-center text-emerald-800">
+                            {semesterRows.reduce((a, b) => a + b.hadir, 0)}
+                          </td>
+                          <td className="py-3 px-2 text-center text-sky-800">
+                            {semesterRows.reduce((a, b) => a + b.sakit, 0)}
+                          </td>
+                          <td className="py-3 px-2 text-center text-amber-800">
+                            {semesterRows.reduce((a, b) => a + b.izin, 0)}
+                          </td>
+                          <td className="py-3 px-2 text-center text-rose-800">
+                            {semesterRows.reduce((a, b) => a + b.alfa, 0)}
+                          </td>
+                          <td className="py-3 px-2 text-center text-emerald-800">{liveSummary.pctHadir}%</td>
+                          <td className="py-3 px-2 text-center text-sky-800">{liveSummary.pctSakit}%</td>
+                          <td className="py-3 px-2 text-center text-amber-800">{liveSummary.pctIzin}%</td>
+                          <td className="py-3 px-2 text-center text-rose-800">{liveSummary.pctAlfa}%</td>
+                          <td className="py-3 px-3 text-center text-slate-600">-</td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
@@ -1282,8 +1716,8 @@ export const LaporanView: React.FC = () => {
         selectedWeek={selectedWeek}
         month={month}
         year={year}
-        semester={kepsekSemester}
-        academicYear={kepsekAcademicYear}
+        semester={viewScopeMode === 'KEPSEK' ? kepsekSemester : classSemester}
+        academicYear={viewScopeMode === 'KEPSEK' ? kepsekAcademicYear : (schoolProfile.tahunPelajaran || `${startYear}/${endYear}`)}
         attendanceType={viewScopeMode === 'KEPSEK' ? 'DAILY' : attendanceType}
         subjectId={viewScopeMode === 'KEPSEK' ? null : (selectedSubjectId || null)}
         subjectName={viewScopeMode === 'KEPSEK' ? null : (selectedSubjectObj?.name || null)}

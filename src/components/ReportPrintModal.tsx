@@ -97,6 +97,7 @@ export const ReportPrintModal: React.FC<ReportPrintModalProps> = ({
 
   // Filter attendance records based on mode, subject, and class
   const targetRecords = useMemo(() => {
+    const studentIds = new Set(targetStudents.map((s) => s.id));
     return attendanceRecords.filter((r) => {
       if (attendanceType === 'SUBJECT') {
         if (r.type !== 'SUBJECT') return false;
@@ -104,10 +105,14 @@ export const ReportPrintModal: React.FC<ReportPrintModalProps> = ({
       } else {
         if (r.type === 'SUBJECT') return false;
       }
-      if (classId && r.classId && r.classId !== classId) return false;
+      if (classId) {
+        if (r.classId && r.classId === classId) return true;
+        if (studentIds.has(r.studentId)) return true;
+        return false;
+      }
       return true;
     });
-  }, [attendanceRecords, attendanceType, subjectId, classId]);
+  }, [attendanceRecords, attendanceType, subjectId, classId, targetStudents]);
 
   // Resolved teacher info (Name & NIP) from Master Data Guru / Class / Subject
   const resolvedTeacherInfo = useMemo(() => {
@@ -366,33 +371,33 @@ export const ReportPrintModal: React.FC<ReportPrintModalProps> = ({
 
   // 3. DATA COMPUTATION FOR LAPORAN BULANAN & SEMESTER
   const semesterMonthList = useMemo(() => {
-    const isSem1 = ['Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'].includes(month);
-    const semYear = Number(year) || 2026;
+    const isSem1 = semester === 'Ganjil' || ['Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'].includes(month);
     if (isSem1) {
       return [
-        { code: '07', name: 'Juli', mNum: 7, key: `${semYear}-07` },
-        { code: '08', name: 'Agustus', mNum: 8, key: `${semYear}-08` },
-        { code: '09', name: 'September', mNum: 9, key: `${semYear}-09` },
-        { code: '10', name: 'Oktober', mNum: 10, key: `${semYear}-10` },
-        { code: '11', name: 'November', mNum: 11, key: `${semYear}-11` },
-        { code: '12', name: 'Desember', mNum: 12, key: `${semYear}-12` },
+        { code: '07', name: 'Juli', mNum: 7, key: `${startYear}-07` },
+        { code: '08', name: 'Agustus', mNum: 8, key: `${startYear}-08` },
+        { code: '09', name: 'September', mNum: 9, key: `${startYear}-09` },
+        { code: '10', name: 'Oktober', mNum: 10, key: `${startYear}-10` },
+        { code: '11', name: 'November', mNum: 11, key: `${startYear}-11` },
+        { code: '12', name: 'Desember', mNum: 12, key: `${startYear}-12` },
       ];
     } else {
       return [
-        { code: '01', name: 'Januari', mNum: 1, key: `${semYear}-01` },
-        { code: '02', name: 'Februari', mNum: 2, key: `${semYear}-02` },
-        { code: '03', name: 'Maret', mNum: 3, key: `${semYear}-03` },
-        { code: '04', name: 'April', mNum: 4, key: `${semYear}-04` },
-        { code: '05', name: 'Mei', mNum: 5, key: `${semYear}-05` },
-        { code: '06', name: 'Juni', mNum: 6, key: `${semYear}-06` },
+        { code: '01', name: 'Januari', mNum: 1, key: `${endYear}-01` },
+        { code: '02', name: 'Februari', mNum: 2, key: `${endYear}-02` },
+        { code: '03', name: 'Maret', mNum: 3, key: `${endYear}-03` },
+        { code: '04', name: 'April', mNum: 4, key: `${endYear}-04` },
+        { code: '05', name: 'Mei', mNum: 5, key: `${endYear}-05` },
+        { code: '06', name: 'Juni', mNum: 6, key: `${endYear}-06` },
       ];
     }
-  }, [month, year]);
+  }, [semester, month, startYear, endYear]);
 
   const semesterTotalEffectiveDays = useMemo(() => {
-    const semYear = Number(year) || 2026;
+    const isSem1 = semester === 'Ganjil' || ['Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'].includes(month);
+    const semYear = isSem1 ? startYear : endYear;
     return semesterMonthList.reduce((acc, m) => acc + (getEffectiveDaysForMonth(semYear, m.mNum) || 20), 0);
-  }, [semesterMonthList, getEffectiveDaysForMonth, year]);
+  }, [semesterMonthList, getEffectiveDaysForMonth, semester, month, startYear, endYear]);
 
   const semesterStudentRows = useMemo(() => {
     const denom = semesterTotalEffectiveDays > 0 ? semesterTotalEffectiveDays : 1;

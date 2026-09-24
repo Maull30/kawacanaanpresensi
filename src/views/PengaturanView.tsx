@@ -24,6 +24,9 @@ import {
   Layers,
   Globe,
   Info,
+  MessageSquare,
+  Sun,
+  Home,
 } from 'lucide-react';
 
 // Sample Banner Generator for official Kop Surat
@@ -139,6 +142,7 @@ export const PengaturanView: React.FC = () => {
   });
   const fileInputRef = useRef<HTMLInputElement>(null);
   const kopInputRef = useRef<HTMLInputElement>(null);
+  const [broadcastTab, setBroadcastTab] = useState<'MASUK' | 'PULANG'>('MASUK');
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target as HTMLInputElement;
@@ -756,7 +760,322 @@ export const PengaturanView: React.FC = () => {
           </div>
         </div>
 
-        {/* Section 4: Parameter Laporan & Operasional */}
+        {/* Section 4: Pengaturan WhatsApp Broadcast (Grup Paguyuban Orang Tua) */}
+        <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200 shadow-sm p-4 sm:p-6 lg:p-8 space-y-4 sm:space-y-6">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-600 flex items-center justify-center shrink-0">
+                <MessageSquare size={20} />
+              </div>
+              <div>
+                <h2 className="text-sm font-bold text-slate-900">
+                  Pengaturan WhatsApp Broadcast (Grup Paguyuban Kelas)
+                </h2>
+                <p className="text-xs text-slate-500">
+                  Kelola format narasi resmi dan template pesan WhatsApp harian (Masuk & Pulang) beserta Smart Link dokumen rekap.
+                </p>
+              </div>
+            </div>
+            <span className="hidden sm:inline-block px-2.5 py-1 text-[10px] font-extrabold rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+              PAGUYUBAN ORANG TUA
+            </span>
+          </div>
+
+          {/* Master Toggle Broadcast */}
+          <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <p className="text-xs font-bold text-slate-900">
+                  Aktifkan Fitur WhatsApp Broadcast untuk Guru
+                </p>
+                {formData.whatsappBroadcastEnabled !== false ? (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300">
+                    AKTIF
+                  </span>
+                ) : (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-slate-200 text-slate-600">
+                    NONAKTIF
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-slate-500 leading-relaxed">
+                Menampilkan tombol aksi komersial 1-klik untuk broadcast laporan harian ke grup WhatsApp kelas di menu Laporan dan setelah simpan presensi.
+              </p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={formData.whatsappBroadcastEnabled !== false}
+              onClick={() => {
+                setFormData((prev) => ({
+                  ...prev,
+                  whatsappBroadcastEnabled: prev.whatsappBroadcastEnabled === false ? true : false,
+                }));
+              }}
+              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 ${
+                formData.whatsappBroadcastEnabled !== false ? 'bg-emerald-600' : 'bg-slate-300'
+              }`}
+            >
+              <span
+                aria-hidden="true"
+                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                  formData.whatsappBroadcastEnabled !== false ? 'translate-x-5' : 'translate-x-0'
+                }`}
+              />
+            </button>
+          </div>
+
+          {/* Sub-Tabs: Konfigurasi Template Pagi vs Siang */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-slate-700">Pilih Periode Laporan Broadcast:</span>
+              <div className="inline-flex p-1 bg-slate-100 rounded-xl border border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => setBroadcastTab('MASUK')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                    broadcastTab === 'MASUK'
+                      ? 'bg-white text-emerald-800 shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <Sun size={14} className={broadcastTab === 'MASUK' ? 'text-amber-500' : 'text-slate-400'} />
+                  <span>Laporan Masuk (Pagi)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBroadcastTab('PULANG')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                    broadcastTab === 'PULANG'
+                      ? 'bg-white text-teal-800 shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <Home size={14} className={broadcastTab === 'PULANG' ? 'text-teal-600' : 'text-slate-400'} />
+                  <span>Laporan Pulang (Siang)</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Form Fields for Active Period Tab */}
+            {broadcastTab === 'MASUK' ? (
+              <div className="p-4 sm:p-5 bg-emerald-50/40 border border-emerald-200/80 rounded-2xl space-y-4">
+                <div className="flex items-center gap-2 text-xs font-bold text-emerald-900 pb-1 border-b border-emerald-200/60">
+                  <Sun size={16} className="text-amber-500" />
+                  <span>Template Pesan: Laporan Masuk (Pagi Hari)</span>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-600 uppercase tracking-widest mb-1.5">
+                    JUDUL PESAN (HEADER)
+                  </label>
+                  <input
+                    type="text"
+                    name="broadcastMasukHeader"
+                    value={formData.broadcastMasukHeader || '*LAPORAN KEHADIRAN PAGI*'}
+                    onChange={handleChange}
+                    placeholder="Contoh: *LAPORAN KEHADIRAN PAGI*"
+                    className="w-full px-3.5 py-2.5 bg-white border border-slate-200 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-500/10 rounded-xl text-xs sm:text-sm font-semibold text-slate-900 outline-none"
+                  />
+                  <p className="text-[10px] text-slate-500 mt-1">Gunakan tanda asteris (*) untuk menebalkan teks di WhatsApp</p>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-600 uppercase tracking-widest mb-1.5">
+                    SALAM & NARASI PEMBUKA
+                  </label>
+                  <textarea
+                    rows={3}
+                    name="broadcastMasukOpening"
+                    value={
+                      formData.broadcastMasukOpening ||
+                      'Assalamu’alaikum Wr. Wb. & Selamat Pagi Bapak/Ibu Wali Murid,\nBerikut kami sampaikan rekapitulasi kehadiran ananda pada hari ini:'
+                    }
+                    onChange={handleChange}
+                    className="w-full px-3.5 py-2.5 bg-white border border-slate-200 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-500/10 rounded-xl text-xs sm:text-sm font-medium text-slate-900 outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-600 uppercase tracking-widest mb-1.5">
+                    CATATAN & DOA PENUTUP
+                  </label>
+                  <textarea
+                    rows={2}
+                    name="broadcastMasukClosing"
+                    value={
+                      formData.broadcastMasukClosing ||
+                      'Terima kasih atas perhatian dan kerja sama Bapak/Ibu sekalian. Semoga anak-anak selalu sehat dan semangat belajar! 🙏✨'
+                    }
+                    onChange={handleChange}
+                    className="w-full px-3.5 py-2.5 bg-white border border-slate-200 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-500/10 rounded-xl text-xs sm:text-sm font-medium text-slate-900 outline-none"
+                  />
+                </div>
+              </div>
+            ) : (
+              <div className="p-4 sm:p-5 bg-teal-50/40 border border-teal-200/80 rounded-2xl space-y-4">
+                <div className="flex items-center gap-2 text-xs font-bold text-teal-900 pb-1 border-b border-teal-200/60">
+                  <Home size={16} className="text-teal-600" />
+                  <span>Template Pesan: Laporan Pulang (Siang Hari)</span>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-600 uppercase tracking-widest mb-1.5">
+                    JUDUL PESAN (HEADER)
+                  </label>
+                  <input
+                    type="text"
+                    name="broadcastPulangHeader"
+                    value={formData.broadcastPulangHeader || '*LAPORAN KEPULANGAN SISWA*'}
+                    onChange={handleChange}
+                    placeholder="Contoh: *LAPORAN KEPULANGAN SISWA*"
+                    className="w-full px-3.5 py-2.5 bg-white border border-slate-200 focus:border-teal-600 focus:ring-2 focus:ring-teal-500/10 rounded-xl text-xs sm:text-sm font-semibold text-slate-900 outline-none"
+                  />
+                  <p className="text-[10px] text-slate-500 mt-1">Gunakan tanda asteris (*) untuk menebalkan teks di WhatsApp</p>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-600 uppercase tracking-widest mb-1.5">
+                    SALAM & NARASI PEMBUKA
+                  </label>
+                  <textarea
+                    rows={3}
+                    name="broadcastPulangOpening"
+                    value={
+                      formData.broadcastPulangOpening ||
+                      'Assalamu’alaikum Wr. Wb. & Selamat Siang Bapak/Ibu Wali Murid,\nAlhamdulillah seluruh rangkaian kegiatan pembelajaran hari ini telah selesai:'
+                    }
+                    onChange={handleChange}
+                    className="w-full px-3.5 py-2.5 bg-white border border-slate-200 focus:border-teal-600 focus:ring-2 focus:ring-teal-500/10 rounded-xl text-xs sm:text-sm font-medium text-slate-900 outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-600 uppercase tracking-widest mb-1.5">
+                    CATATAN & DOA PENUTUP
+                  </label>
+                  <textarea
+                    rows={2}
+                    name="broadcastPulangClosing"
+                    value={
+                      formData.broadcastPulangClosing ||
+                      'Mohon dipantau kepulangan ananda agar dapat tiba di rumah dengan selamat dan tertib. Terima kasih. 🏠🎒✨'
+                    }
+                    onChange={handleChange}
+                    className="w-full px-3.5 py-2.5 bg-white border border-slate-200 focus:border-teal-600 focus:ring-2 focus:ring-teal-500/10 rounded-xl text-xs sm:text-sm font-medium text-slate-900 outline-none"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Pengaturan Smart Link & Rincian Data */}
+          <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
+            <h3 className="text-xs font-bold text-slate-900">Format Kelengkapan Data Dokumen:</h3>
+
+            <div className="space-y-2">
+              <label className="flex items-center gap-2.5 text-xs font-medium text-slate-800 cursor-pointer">
+                <input
+                  type="checkbox"
+                  name="broadcastIncludeStudentList"
+                  checked={formData.broadcastIncludeStudentList !== false}
+                  onChange={handleChange}
+                  className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 border-slate-300 cursor-pointer"
+                />
+                <span>Sertakan daftar rincian siswa yang Sakit, Izin, Alfa, dan Terlambat</span>
+              </label>
+
+              <label className="flex items-center gap-2.5 text-xs font-medium text-slate-800 cursor-pointer">
+                <input
+                  type="checkbox"
+                  name="broadcastIncludeSmartLink"
+                  checked={formData.broadcastIncludeSmartLink !== false}
+                  onChange={handleChange}
+                  className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 border-slate-300 cursor-pointer"
+                />
+                <span>Sertakan Smart Link PDF Cloud (Render Langsung Tanpa Beban Simpan File)</span>
+              </label>
+            </div>
+
+            {/* Standard Link Narrative Note */}
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-[11px] text-amber-900 leading-relaxed flex items-start gap-2.5">
+              <Info size={15} className="text-amber-700 shrink-0 mt-0.5" />
+              <div>
+                <span className="font-bold">Standar Teks Tautan Resmi:</span> Sesuai arahan, narasi link dicetak menggunakan format{' '}
+                <code className="px-1.5 py-0.5 bg-amber-100/80 rounded font-mono font-bold text-amber-950">
+                  📄 Dokumen Rekap Resmi: [tautan]
+                </code>{' '}
+                (Keterangan &quot;Kop Sekolah&quot; ditiadakan agar lebih ringkas dan elegan saat dibaca oleh orang tua di WhatsApp).
+              </div>
+            </div>
+          </div>
+
+          {/* Live Smartphone WhatsApp Chat Mockup */}
+          <div className="space-y-2">
+            <span className="text-xs font-bold text-slate-700 block">
+              Simulasi Pratinjau Tampilan Pesan di WhatsApp:
+            </span>
+            <div className="bg-[#EFEAE2] p-4 rounded-2xl border border-slate-300 shadow-inner">
+              <div className="bg-white rounded-2xl p-4 shadow-xs text-xs font-mono text-slate-800 whitespace-pre-wrap leading-relaxed max-w-lg border border-slate-200/80">
+                {broadcastTab === 'MASUK' ? (
+                  <>
+                    <span className="font-bold text-emerald-900">{formData.broadcastMasukHeader || '*LAPORAN KEHADIRAN PAGI*'}</span>{'\n'}
+                    🏫 {(schoolProfile.namaSekolah || 'SD NEGERI 01 CONTOH').toUpperCase()}{'\n'}
+                    📅 Hari/Tgl : Senin, 24 Agustus 2026{'\n'}
+                    👥 Rombel   : Kelas 6A{'\n'}
+                    👨‍🏫 Wali Kelas : {schoolProfile.namaWaliKelas || 'Bapak Budi Santoso, S.Pd.'}{'\n\n'}
+                    {formData.broadcastMasukOpening || 'Assalamu’alaikum Wr. Wb. & Selamat Pagi Bapak/Ibu Wali Murid,\nBerikut kami sampaikan rekapitulasi kehadiran ananda pada hari ini:'}{'\n\n'}
+                    📊 *RINGKASAN KEHADIRAN:*{'\n'}
+                    ✅ Hadir        : 28 Siswa{'\n'}
+                    🤒 Sakit        : 1 Siswa{'\n'}
+                    📝 Izin         : 1 Siswa{'\n'}
+                    ❌ Alfa         : 0 Siswa{'\n'}
+                    ⏱️ Terlambat    : 2 Siswa{'\n'}
+                    📈 Kehadiran    : 93%{'\n\n'}
+                    {formData.broadcastIncludeStudentList !== false && (
+                      <>
+                        📋 *KETERANGAN SISWA:*{'\n'}
+                        🤒 *Sakit (1):*{'\n'}  • Ahmad Fauzi (Demam){'\n'}
+                        📝 *Izin (1):*{'\n'}  • Siti Nurhaliza (Acara Keluarga){'\n\n'}
+                      </>
+                    )}
+                    {formData.broadcastIncludeSmartLink !== false && (
+                      <>
+                        📄 Dokumen Rekap Resmi:{'\n'}
+                        https://kawacanaan.app/?r=6A&d=2026-08-24{'\n\n'}
+                      </>
+                    )}
+                    {formData.broadcastMasukClosing || 'Terima kasih atas perhatian dan kerja sama Bapak/Ibu sekalian. Semoga anak-anak selalu sehat dan semangat belajar! 🙏✨'}
+                  </>
+                ) : (
+                  <>
+                    <span className="font-bold text-teal-900">{formData.broadcastPulangHeader || '*LAPORAN KEPULANGAN SISWA*'}</span>{'\n'}
+                    🏫 {(schoolProfile.namaSekolah || 'SD NEGERI 01 CONTOH').toUpperCase()}{'\n'}
+                    📅 Hari/Tgl : Senin, 24 Agustus 2026{'\n'}
+                    👥 Rombel   : Kelas 6A{'\n'}
+                    👨‍🏫 Wali Kelas : {schoolProfile.namaWaliKelas || 'Bapak Budi Santoso, S.Pd.'}{'\n\n'}
+                    {formData.broadcastPulangOpening || 'Assalamu’alaikum Wr. Wb. & Selamat Siang Bapak/Ibu Wali Murid,\nAlhamdulillah seluruh rangkaian kegiatan pembelajaran hari ini telah selesai:'}{'\n\n'}
+                    📊 *REKAP KEHADIRAN & KEPULANGAN:*{'\n'}
+                    ✅ Hadir Hingga Pulang : 28 Siswa{'\n'}
+                    🤒 Sakit : 1 Siswa{'\n'}
+                    📝 Izin  : 1 Siswa{'\n'}
+                    ❌ Alfa  : 0 Siswa{'\n'}
+                    📈 Total Kehadiran     : 93%{'\n\n'}
+                    {formData.broadcastIncludeSmartLink !== false && (
+                      <>
+                        📄 Dokumen Rekap Resmi:{'\n'}
+                        https://kawacanaan.app/?r=6A&d=2026-08-24{'\n\n'}
+                      </>
+                    )}
+                    {formData.broadcastPulangClosing || 'Mohon dipantau kepulangan ananda agar dapat tiba di rumah dengan selamat dan tertib. Terima kasih. 🏠🎒✨'}
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Section 5: Parameter Laporan & Operasional */}
         <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200 shadow-sm p-4 sm:p-6 lg:p-8 space-y-4 sm:space-y-6">
           <div className="border-b border-slate-100 pb-3">
             <h2 className="text-sm font-bold text-slate-900">

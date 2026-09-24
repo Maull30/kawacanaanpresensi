@@ -17,7 +17,9 @@ import {
   Sparkles,
   Users,
   Check,
+  MessageSquare,
 } from 'lucide-react';
+import { WhatsAppBroadcastModal } from '../components/WhatsAppBroadcastModal';
 
 export const LaporanView: React.FC = () => {
   const {
@@ -65,6 +67,8 @@ export const LaporanView: React.FC = () => {
 
   // Class/Standard report state
   const [reportType, setReportType] = useState('Laporan Bulanan');
+  const [isBroadcastModalOpen, setIsBroadcastModalOpen] = useState(false);
+  const [broadcastInitialType, setBroadcastInitialType] = useState<'MASUK' | 'PULANG'>('MASUK');
   const [attendanceType, setAttendanceType] = useState<'DAILY' | 'SUBJECT'>(
     userScope.isGuruMapel ? 'SUBJECT' : 'DAILY'
   );
@@ -1163,8 +1167,27 @@ export const LaporanView: React.FC = () => {
                 </div>
               </div>
 
-              {/* Cetak Button */}
-              <div className="pt-2">
+              {/* Action Buttons: WhatsApp Broadcast Paguyuban & Cetak PDF */}
+              <div className="pt-2 space-y-2.5">
+                {reportType === 'Laporan Harian' && systemConfig.whatsappBroadcastEnabled !== false && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const nowHour = new Date().getHours();
+                      setBroadcastInitialType(nowHour >= 11 ? 'PULANG' : 'MASUK');
+                      setIsBroadcastModalOpen(true);
+                    }}
+                    className="w-full py-3.5 px-6 rounded-xl bg-gradient-to-r from-emerald-600 via-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 active:scale-98 text-white font-black text-xs sm:text-sm tracking-wide transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2.5 min-h-[46px] cursor-pointer border border-emerald-400/30"
+                    title="Kirim narasi rekapitulasi kehadiran harian resmi ke grup WhatsApp paguyuban orang tua"
+                  >
+                    <MessageSquare size={18} className="text-white" />
+                    <span>KIRIM KE WHATSAPP PAGUYUBAN</span>
+                    <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-white/20 text-white border border-white/30">
+                      <Sparkles size={11} /> 1-Klik Otomatis
+                    </span>
+                  </button>
+                )}
+
                 <button
                   type="submit"
                   id="btn-cetak-laporan-pdf"
@@ -1172,7 +1195,7 @@ export const LaporanView: React.FC = () => {
                   className="w-full py-3.5 px-6 rounded-xl bg-[#1D82F5] hover:bg-blue-600 active:scale-98 text-white font-black text-xs sm:text-sm tracking-wider uppercase transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2 min-h-[46px] cursor-pointer"
                 >
                   <Printer size={18} />
-                  <span>CETAK LAPORAN</span>
+                  <span>CETAK DOKUMEN PDF</span>
                 </button>
               </div>
             </form>
@@ -1211,6 +1234,25 @@ export const LaporanView: React.FC = () => {
         classId={viewScopeMode === 'KEPSEK' ? null : (selectedClassId || null)}
         className={viewScopeMode === 'KEPSEK' ? null : (selectedClassObj?.name || null)}
       />
+
+      {/* WhatsApp Broadcast Paguyuban Modal */}
+      {isBroadcastModalOpen && (
+        <WhatsAppBroadcastModal
+          isOpen={isBroadcastModalOpen}
+          onClose={() => setIsBroadcastModalOpen(false)}
+          date={selectedDate}
+          classId={selectedClassId}
+          className={selectedClassObj?.name || 'Kelas'}
+          attendanceType={attendanceType}
+          subjectId={attendanceType === 'SUBJECT' ? selectedSubjectId : null}
+          subjectName={selectedSubjectObj?.name || null}
+          initialType={broadcastInitialType}
+          onOpenPdfPreview={() => {
+            setIsBroadcastModalOpen(false);
+            setIsPrintModalOpen(true);
+          }}
+        />
+      )}
     </div>
   );
 };

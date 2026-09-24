@@ -29,8 +29,10 @@ import {
   CheckCircle,
   AlertCircle,
   X,
+  MessageSquare,
 } from 'lucide-react';
 import { ClassQrModal } from '../components/ClassQrModal';
+import { WhatsAppBroadcastModal } from '../components/WhatsAppBroadcastModal';
 
 export const AbsensiView: React.FC = () => {
   const {
@@ -86,6 +88,9 @@ export const AbsensiView: React.FC = () => {
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [isClassQrOpen, setIsClassQrOpen] = useState<boolean>(false);
+  const [isBroadcastModalOpen, setIsBroadcastModalOpen] = useState<boolean>(false);
+  const [broadcastInitialType, setBroadcastInitialType] = useState<'MASUK' | 'PULANG'>('MASUK');
+  const [justSavedPrompt, setJustSavedPrompt] = useState<boolean>(false);
   const [isDirty, setIsDirty] = useState<boolean>(false);
   const isDirtyRef = React.useRef<boolean>(false);
   const prevContextKeyRef = React.useRef<string>('');
@@ -472,6 +477,12 @@ export const AbsensiView: React.FC = () => {
         try {
           sessionStorage.removeItem(draftStorageKey);
         } catch (_) {}
+
+        if (systemConfig.whatsappBroadcastEnabled !== false) {
+          const nowHour = new Date().getHours();
+          setBroadcastInitialType(nowHour >= 11 ? 'PULANG' : 'MASUK');
+          setJustSavedPrompt(true);
+        }
       }
     } finally {
       setIsSaving(false);
@@ -1458,6 +1469,53 @@ export const AbsensiView: React.FC = () => {
         </div>
       </div>
 
+      {/* Just-Saved 1-Langkah Otomatis Prompt Banner */}
+      {justSavedPrompt && systemConfig.whatsappBroadcastEnabled !== false && (
+        <div className="sticky bottom-20 z-30 animate-in slide-in-from-bottom-3 duration-300">
+          <div className="bg-gradient-to-r from-emerald-600 via-teal-600 to-green-700 text-white rounded-2xl p-3 sm:p-4 shadow-xl border border-emerald-400/40 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-white/20 border border-white/30 flex items-center justify-center shrink-0">
+                <MessageSquare size={20} className="text-white" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h4 className="text-xs sm:text-sm font-black tracking-tight">
+                    Presensi Berhasil Disimpan!
+                  </h4>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-white/25 text-white">
+                    1-Langkah Otomatis
+                  </span>
+                </div>
+                <p className="text-[11px] sm:text-xs text-emerald-100 font-medium mt-0.5">
+                  Lanjutkan broadcast rekapitulasi ke Grup WhatsApp Paguyuban {activeTargetClass?.name || 'Kelas'}?
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 self-end sm:self-auto w-full sm:w-auto">
+              <button
+                type="button"
+                onClick={() => setJustSavedPrompt(false)}
+                className="flex-1 sm:flex-none px-3 py-2 rounded-xl text-xs font-bold text-emerald-100 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+              >
+                Nanti Saja
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setJustSavedPrompt(false);
+                  setIsBroadcastModalOpen(true);
+                }}
+                className="flex-1 sm:flex-none px-4 py-2 bg-white text-emerald-800 hover:bg-emerald-50 active:scale-95 text-xs font-black rounded-xl shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                <MessageSquare size={14} className="text-emerald-600" />
+                <span>Kirim ke Paguyuban</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Floating Sticky Bottom Save Bar */}
       <div className="sticky bottom-3 z-30 bg-white/95 backdrop-blur-md rounded-2xl border border-slate-200/90 shadow-xl p-3 sm:p-3.5 flex flex-col sm:flex-row items-center justify-between gap-2.5">
         <div className="flex items-center gap-2 text-xs font-bold text-slate-700 self-start sm:self-auto">
@@ -1478,35 +1536,74 @@ export const AbsensiView: React.FC = () => {
           </span>
         </div>
 
-        <button
-          type="button"
-          onClick={handleSave}
-          disabled={isDateLocked || isSaving}
-          id="btn-simpan-absensi"
-          className={`w-full sm:w-auto px-5 py-2.5 font-extrabold text-xs sm:text-sm rounded-xl shadow-xs transition-all flex items-center justify-center gap-2 min-h-[42px] cursor-pointer ${
-            isDateLocked || isSaving
-              ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
-              : 'bg-blue-600 hover:bg-blue-700 active:scale-95 text-white hover:shadow-md'
-          }`}
-        >
-          {isSaving ? (
-            <Loader2 size={16} className="animate-spin" />
-          ) : isDateLocked ? (
-            <Lock size={16} />
-          ) : (
-            <Save size={16} />
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          {/* Commercial WhatsApp Broadcast Button */}
+          {systemConfig.whatsappBroadcastEnabled !== false && (
+            <button
+              type="button"
+              onClick={() => {
+                const nowHour = new Date().getHours();
+                setBroadcastInitialType(nowHour >= 11 ? 'PULANG' : 'MASUK');
+                setIsBroadcastModalOpen(true);
+              }}
+              id="btn-broadcast-paguyuban"
+              className="flex-1 sm:flex-none px-4 py-2.5 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 active:scale-95 text-white font-extrabold text-xs sm:text-sm rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 min-h-[42px] cursor-pointer"
+              title="Kirim narasi laporan resmi ke grup WhatsApp paguyuban orang tua"
+            >
+              <MessageSquare size={16} />
+              <span>Broadcast Paguyuban</span>
+              <span className="hidden md:inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-extrabold bg-white/20 text-white border border-white/30">
+                WhatsApp
+              </span>
+            </button>
           )}
-          <span>
-            {isSaving
-              ? 'Menyimpan...'
-              : isNonEffectiveDay
-              ? 'Presensi Terkunci (Hari Libur)'
-              : isLockedForGuruMapel
-              ? 'Terkunci (Bukan Jadwal Mengajar)'
-              : 'Simpan Presensi'}
-          </span>
-        </button>
+
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={isDateLocked || isSaving}
+            id="btn-simpan-absensi"
+            className={`flex-1 sm:flex-none px-5 py-2.5 font-extrabold text-xs sm:text-sm rounded-xl shadow-xs transition-all flex items-center justify-center gap-2 min-h-[42px] cursor-pointer ${
+              isDateLocked || isSaving
+                ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
+                : 'bg-blue-600 hover:bg-blue-700 active:scale-95 text-white hover:shadow-md'
+            }`}
+          >
+            {isSaving ? (
+              <Loader2 size={16} className="animate-spin" />
+            ) : isDateLocked ? (
+              <Lock size={16} />
+            ) : (
+              <Save size={16} />
+            )}
+            <span>
+              {isSaving
+                ? 'Menyimpan...'
+                : isNonEffectiveDay
+                ? 'Presensi Terkunci (Hari Libur)'
+                : isLockedForGuruMapel
+                ? 'Terkunci (Bukan Jadwal Mengajar)'
+                : 'Simpan Presensi'}
+            </span>
+          </button>
+        </div>
       </div>
+
+      {/* WhatsApp Broadcast Modal */}
+      {isBroadcastModalOpen && (
+        <WhatsAppBroadcastModal
+          isOpen={isBroadcastModalOpen}
+          onClose={() => setIsBroadcastModalOpen(false)}
+          date={date}
+          classId={selectedClassId}
+          className={activeTargetClass?.name || schoolProfile.kelas || 'Kelas'}
+          attendanceType={attendanceMode}
+          subjectId={attendanceMode === 'SUBJECT' ? selectedSubjectId : null}
+          subjectName={activeSubject?.name || null}
+          records={records}
+          initialType={broadcastInitialType}
+        />
+      )}
       {/* Class QR Attendance Code Modal */}
       {isClassQrOpen && activeTargetClass && (
         <ClassQrModal

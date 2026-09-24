@@ -24,6 +24,7 @@ import { AIChatWidget } from './components/AIChatWidget';
 import { UpgradePromptModal } from './components/UpgradePromptModal';
 import { TeacherUpgradeModal } from './components/TeacherUpgradeModal';
 import { SchoolUpgradeModal } from './components/SchoolUpgradeModal';
+import { PublicDailyReportViewer } from './components/PublicDailyReportViewer';
 import { CheckCircle2, AlertCircle, Info, X } from 'lucide-react';
 import type { ActiveView, UserRole } from './types';
 
@@ -173,6 +174,23 @@ const MainAppContent: React.FC = () => {
     return params.get('page') !== 'login' && params.get('page') !== 'setup';
   });
 
+  // Check if public smart report link is accessed (e.g. by parents clicking link from WhatsApp)
+  const [publicReportParams, setPublicReportParams] = React.useState(() => {
+    if (typeof window === 'undefined') return null;
+    const p = new URLSearchParams(window.location.search);
+    const r = p.get('r') || p.get('class') || p.get('classId');
+    const d = p.get('d') || p.get('date');
+    if (r && d) {
+      return {
+        classId: r,
+        date: d,
+        attendanceType: (p.get('m') === 'subject' || p.get('type') === 'subject') ? ('SUBJECT' as const) : ('DAILY' as const),
+        subjectId: p.get('s') || p.get('subjectId') || null,
+      };
+    }
+    return null;
+  });
+
   // Pastikan landing page tertutup jika user sudah login, sedang onboarding, recovery password, atau OAuth pending
   React.useEffect(() => {
     if (
@@ -302,6 +320,31 @@ const MainAppContent: React.FC = () => {
   // 4. Jika sedang memeriksa sesi auth saat reload halaman tanpa data cache sesi
   if (isAuthChecking && !currentUser && hasPersistedAuthToken()) {
     return <AppAuthLoadingSkeleton />;
+  }
+
+  // Public Daily Report Viewer (Smart Link accessed by parents/community from WhatsApp)
+  if (publicReportParams) {
+    return (
+      <PublicDailyReportViewer
+        classId={publicReportParams.classId}
+        date={publicReportParams.date}
+        attendanceType={publicReportParams.attendanceType}
+        subjectId={publicReportParams.subjectId}
+        onBackToApp={() => {
+          setPublicReportParams(null);
+          try {
+            const url = new URL(window.location.href);
+            url.searchParams.delete('r');
+            url.searchParams.delete('d');
+            url.searchParams.delete('s');
+            url.searchParams.delete('m');
+            url.searchParams.delete('class');
+            url.searchParams.delete('date');
+            window.history.pushState(null, '', url.pathname + (url.search ? url.search : ''));
+          } catch (_) {}
+        }}
+      />
+    );
   }
 
   // Tampilan landing page sebagai layar awal SAAT pengguna memang belum login sama sekali

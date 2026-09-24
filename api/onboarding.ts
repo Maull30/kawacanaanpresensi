@@ -439,6 +439,173 @@ export default async function handler(req: any, res: any) {
     }
 
     // -------------------------------------------------------------
+    // 2.1. GET PUBLIC DAILY REPORT ON-THE-FLY (DYNAMIC SMART LINK)
+    // -------------------------------------------------------------
+    if (action === 'get_public_daily_report') {
+      const classIdOrName = String(body.classId || '').trim();
+      const reportDate = String(body.date || '').trim();
+      const attType = String(body.attendanceType || 'DAILY').toUpperCase() === 'SUBJECT' ? 'SUBJECT' : 'DAILY';
+      const subjectId = body.subjectId || null;
+
+      if (!classIdOrName || !reportDate) {
+        return json(res, 400, { error: 'ID Kelas dan Tanggal Laporan wajib disertakan.' });
+      }
+
+      // 1. Cari kelas berdasarkan ID atau Nama
+      let clsQuery = db.from('classes').select('id, name, grade, academic_year, school_id, wali_kelas_teacher_id');
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(classIdOrName);
+      if (isUuid) {
+        clsQuery = clsQuery.eq('id', classIdOrName);
+      } else {
+        clsQuery = clsQuery.or(`id.eq.${classIdOrName},name.ilike.${classIdOrName}`);
+      }
+
+      const { data: clsRows } = await clsQuery.limit(1);
+      const targetClass = clsRows?.[0];
+
+      if (!targetClass) {
+        return json(res, 404, { error: 'Rombel kelas tidak ditemukan di sistem.' });
+      }
+
+      const schoolId = targetClass.school_id;
+
+      // 2. Ambil profil sekolah dan konfigurasi sistem
+      const [{ data: sp }, { data: sc }, { data: teachersList }] = await Promise.all([
+        db.from('school_profile').select('*').eq('school_id', schoolId).maybeSingle(),
+        db.from('system_config').select('*').eq('school_id', schoolId).maybeSingle(),
+        db.from('teachers').select('id, nama, nip, tugas_utama').eq('school_id', schoolId),
+      ]);
+
+      // 3. Ambil daftar siswa kelas tersebut
+      const { data: studentRows } = await db
+        .from('students')
+        .select('id, nisn, nama, gender')
+        .eq('class_id', targetClass.id)
+        .order('nama', { ascending: true });
+
+      const students = studentRows || [];
+      const studentIds = students.map((s: any) => s.id);
+
+      // 4. Ambil catatan absensi untuk tanggal & siswa tersebut
+      let attRecords: any[] = [];
+      if (studentIds.length > 0) {
+        let attQuery = db
+          .from('attendance_records')
+          .select('id, student_id, student_name, status, check_in_time, check_out_time, notes, type, subject_id')
+          .eq('date', reportDate)
+          .in('student_id', studentIds);
+
+        if (attType === 'SUBJECT') {
+          attQuery = attQuery.eq('type', 'SUBJECT');
+          if (subjectId) {
+            attQuery = attQuery.eq('subject_id', subjectId);
+          }
+        } else {
+          attQuery = attQuery.or('type.eq.DAILY,type.is.null');
+        }
+
+        const { data: recordsData } = await attQuery;
+        attRecords = recordsData || [];
+      }
+
+      // Map subject name jika ada
+      let subjectName = null;
+      if (attType === 'SUBJECT' && subjectId) {
+        const { data: subj } = await db.from('subjects').select('name').eq('id', subjectId).maybeSingle();
+        subjectName = subj?.name || null;
+      }
+
+      // Resolve nama wali kelas / guru mapel
+      let teacherName = 'Wali Kelas';
+      let teacherNip = '';
+      if (attType === 'SUBJECT') {
+        teacherName = 'Guru Mata Pelajaran';
+      } else if (targetClass.wali_kelas_teacher_id) {
+        const wk = (teachersList || []).find((t: any) => t.id === targetClass.wali_kelas_teacher_id);
+        if (wk) {
+          teacherName = wk.nama;
+          teacherNip = wk.nip || '';
+        }
+      } else if (sp?.nama_wali_kelas) {
+        teacherName = sp.nama_wali_kelas;
+        teacherNip = sp.nip_wali_kelas || '';
+      }
+
+      // Ringkasan kehadiran
+      const recordMap = new Map<string, any>();
+      attRecords.forEach((r: any) => {
+        recordMap.set(r.student_id, r);
+      });
+
+      let hadir = 0;
+      let sakit = 0;
+      let izin = 0;
+      let alfa = 0;
+      let terlambat = 0;
+
+      const studentList = students.map((s: any, idx: number) => {
+        const rec = recordMap.get(s.id);
+        const status = rec?.status || '-';
+        if (status === 'Hadir') hadir++;
+        else if (status === 'Sakit') sakit++;
+        else if (status === 'Izin') izin++;
+        else if (status === 'Alfa') alfa++;
+
+        const checkIn = rec?.check_in_time || '';
+        if (status === 'Hadir' && checkIn && checkIn > '07:00' && checkIn < '11:00') {
+          terlambat++;
+        }
+
+        return {
+          no: idx + 1,
+          nisn: s.nisn || '',
+          nama: s.nama,
+          gender: s.gender || 'L',
+          status,
+          checkInTime: rec?.check_in_time || '',
+          checkOutTime: rec?.check_out_time || '',
+          notes: rec?.notes || '',
+        };
+      });
+
+      const totalStudents = students.length || 1;
+      const persentase = Math.round((hadir / totalStudents) * 100);
+
+      return json(res, 200, {
+        ok: true,
+        report: {
+          schoolName: sp?.nama_sekolah || 'SATUAN PENDIDIKAN',
+          npsn: sp?.npsn || '',
+          alamat: sp?.alamat || '',
+          logoUrl: sc?.school_logo_url || null,
+          letterheadType: sc?.letterhead_type || 'standard_text',
+          letterheadImageUrl: sc?.letterhead_image_url || null,
+          showLetterhead: sc?.show_letterhead ?? true,
+          className: targetClass.name.toLowerCase().startsWith('kelas') ? targetClass.name : `Kelas ${targetClass.name}`,
+          grade: targetClass.grade,
+          date: reportDate,
+          attendanceType: attType,
+          subjectName,
+          teacherName,
+          teacherNip,
+          principalName: sp?.nama_kepala_sekolah || 'Kepala Sekolah',
+          principalNip: sp?.nip_kepala_sekolah || '',
+          reportPlace: sc?.report_place || 'Jakarta',
+          stats: {
+            totalStudents: students.length,
+            hadir,
+            sakit,
+            izin,
+            alfa,
+            terlambat,
+            persentase,
+          },
+          students: studentList,
+        },
+      });
+    }
+
+    // -------------------------------------------------------------
     // CHANGE OWN PASSWORD & MARK PASSWORD CHANGED
     // -------------------------------------------------------------
     if (action === 'change_own_password' || action === 'mark_password_changed') {

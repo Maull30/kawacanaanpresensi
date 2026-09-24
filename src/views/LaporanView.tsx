@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
-import { ReportPrintModal } from '../components/ReportPrintModal';
+import { PublicDailyReportViewer } from '../components/PublicDailyReportViewer';
 import { getUserRoleScope } from '../utils/userScope';
 import { getFaseByClassName, formatClassDisplay } from '../utils/faseKurikulum';
 import {
@@ -643,6 +643,25 @@ export const LaporanView: React.FC = () => {
     }
     setIsPrintModalOpen(true);
   };
+
+  // Render Smart Link Document Viewer langsung menggantikan modal popup lama
+  if (isPrintModalOpen) {
+    return (
+      <PublicDailyReportViewer
+        classId={viewScopeMode === 'KEPSEK' ? (classes[0]?.id || '') : (selectedClassId || '')}
+        date={selectedDate}
+        attendanceType={viewScopeMode === 'KEPSEK' ? 'DAILY' : attendanceType}
+        subjectId={viewScopeMode === 'KEPSEK' ? null : (selectedSubjectId || null)}
+        reportType={viewScopeMode === 'KEPSEK' ? kepsekPeriodData.reportTypeModal : reportType}
+        selectedWeek={selectedWeek}
+        month={month}
+        year={year}
+        semester={viewScopeMode === 'KEPSEK' ? kepsekSemester : classSemester}
+        academicYear={viewScopeMode === 'KEPSEK' ? kepsekAcademicYear : (schoolProfile.tahunPelajaran || `${startYear}/${endYear}`)}
+        onBackToApp={() => setIsPrintModalOpen(false)}
+      />
+    );
+  }
 
   return (
     <div className="w-full max-w-6xl 2xl:max-w-7xl mx-auto px-3.5 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-5 sm:space-y-6 animate-in fade-in duration-200 pb-20">
@@ -1437,7 +1456,7 @@ export const LaporanView: React.FC = () => {
                   className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition-all shadow-xs cursor-pointer self-start sm:self-auto"
                 >
                   <Printer size={15} />
-                  <span>Cetak Dokumen Resmi (PDF)</span>
+                  <span>CETAK LAPORAN</span>
                 </button>
               </div>
 
@@ -1706,24 +1725,6 @@ export const LaporanView: React.FC = () => {
           </div>
         </div>
       )}
-
-      {/* PDF / Print Document Preview Modal */}
-      <ReportPrintModal
-        isOpen={isPrintModalOpen}
-        onClose={() => setIsPrintModalOpen(false)}
-        reportType={viewScopeMode === 'KEPSEK' ? kepsekPeriodData.reportTypeModal : reportType}
-        selectedDate={selectedDate}
-        selectedWeek={selectedWeek}
-        month={month}
-        year={year}
-        semester={viewScopeMode === 'KEPSEK' ? kepsekSemester : classSemester}
-        academicYear={viewScopeMode === 'KEPSEK' ? kepsekAcademicYear : (schoolProfile.tahunPelajaran || `${startYear}/${endYear}`)}
-        attendanceType={viewScopeMode === 'KEPSEK' ? 'DAILY' : attendanceType}
-        subjectId={viewScopeMode === 'KEPSEK' ? null : (selectedSubjectId || null)}
-        subjectName={viewScopeMode === 'KEPSEK' ? null : (selectedSubjectObj?.name || null)}
-        classId={viewScopeMode === 'KEPSEK' ? null : (selectedClassId || null)}
-        className={viewScopeMode === 'KEPSEK' ? null : (selectedClassObj?.name || null)}
-      />
 
       {/* WhatsApp Broadcast Group Modal */}
       {isBroadcastModalOpen && (

@@ -174,18 +174,38 @@ const MainAppContent: React.FC = () => {
     return params.get('page') !== 'login' && params.get('page') !== 'setup';
   });
 
-  // Check if public smart report link is accessed (e.g. by parents clicking link from WhatsApp)
+  // Check if public smart report link is accessed (e.g. by parents/supervisors clicking link from WhatsApp)
   const [publicReportParams, setPublicReportParams] = React.useState(() => {
     if (typeof window === 'undefined') return null;
     const p = new URLSearchParams(window.location.search);
     const r = p.get('r') || p.get('class') || p.get('classId');
     const d = p.get('d') || p.get('date');
-    if (r && d) {
+    const periodParam = (p.get('p') || p.get('period') || '').toLowerCase();
+    if (r || periodParam === 'kepsek') {
+      let resolvedReportType: 'Laporan Harian' | 'Laporan Mingguan' | 'Laporan Bulanan' | 'Laporan Semester' | 'Laporan Kepala Sekolah (Bulanan)' | 'Laporan Kepala Sekolah (Semester)' = 'Laporan Harian';
+      if (periodParam === 'kepsek' || periodParam === 'kepsek_monthly') {
+        resolvedReportType = 'Laporan Kepala Sekolah (Bulanan)';
+      } else if (periodParam === 'kepsek_semester') {
+        resolvedReportType = 'Laporan Kepala Sekolah (Semester)';
+      } else if (periodParam === 'weekly') {
+        resolvedReportType = 'Laporan Mingguan';
+      } else if (periodParam === 'monthly') {
+        resolvedReportType = 'Laporan Bulanan';
+      } else if (periodParam === 'semester') {
+        resolvedReportType = 'Laporan Semester';
+      }
+
       return {
-        classId: r,
-        date: d,
+        classId: r || '',
+        date: d || new Date().toISOString().split('T')[0],
         attendanceType: (p.get('m') === 'subject' || p.get('type') === 'subject') ? ('SUBJECT' as const) : ('DAILY' as const),
         subjectId: p.get('s') || p.get('subjectId') || null,
+        reportType: resolvedReportType,
+        selectedWeek: p.get('w') || p.get('week') || 'Minggu Ke-1',
+        month: p.get('mo') || p.get('month') || 'Juli',
+        year: p.get('y') || p.get('year') || '2026',
+        semester: (p.get('sem') === 'Genap' || p.get('semester') === 'Genap') ? ('Genap' as const) : ('Ganjil' as const),
+        academicYear: p.get('ay') || p.get('academicYear') || '2025/2026',
       };
     }
     return null;
@@ -322,7 +342,7 @@ const MainAppContent: React.FC = () => {
     return <AppAuthLoadingSkeleton />;
   }
 
-  // Public Daily Report Viewer (Smart Link accessed by parents/community from WhatsApp)
+  // Public Report Viewer (Smart Link accessed by parents/teachers/supervisors)
   if (publicReportParams) {
     return (
       <PublicDailyReportViewer
@@ -330,6 +350,12 @@ const MainAppContent: React.FC = () => {
         date={publicReportParams.date}
         attendanceType={publicReportParams.attendanceType}
         subjectId={publicReportParams.subjectId}
+        reportType={publicReportParams.reportType}
+        selectedWeek={publicReportParams.selectedWeek}
+        month={publicReportParams.month}
+        year={publicReportParams.year}
+        semester={publicReportParams.semester}
+        academicYear={publicReportParams.academicYear}
         onBackToApp={() => {
           setPublicReportParams(null);
           try {
@@ -338,6 +364,12 @@ const MainAppContent: React.FC = () => {
             url.searchParams.delete('d');
             url.searchParams.delete('s');
             url.searchParams.delete('m');
+            url.searchParams.delete('p');
+            url.searchParams.delete('w');
+            url.searchParams.delete('mo');
+            url.searchParams.delete('y');
+            url.searchParams.delete('sem');
+            url.searchParams.delete('ay');
             url.searchParams.delete('class');
             url.searchParams.delete('date');
             window.history.pushState(null, '', url.pathname + (url.search ? url.search : ''));

@@ -20,7 +20,7 @@ import {
   Lock,
   ShieldCheck,
 } from 'lucide-react';
-import { ReportPrintModal } from '../components/ReportPrintModal';
+import { PublicDailyReportViewer } from '../components/PublicDailyReportViewer';
 import { getFaseByClassName, formatClassDisplay } from '../utils/faseKurikulum';
 
 export const RekapitulasiView: React.FC = () => {
@@ -396,10 +396,33 @@ export const RekapitulasiView: React.FC = () => {
     return targetStudents.find((s) => s.id === detailStudentId) || null;
   }, [detailStudentId, targetStudents]);
 
-  // Print function
+  // Print function -> Menggunakan Smart Link Document Viewer
   const handlePrint = () => {
     setIsPrintModalOpen(true);
   };
+
+  if (isPrintModalOpen) {
+    return (
+      <PublicDailyReportViewer
+        classId={selectedClassId || ''}
+        date={`${selectedYear}-${selectedMonth}-01`}
+        attendanceType={attendanceType}
+        subjectId={selectedSubjectId || null}
+        reportType={rekapMode === 'bulanan' ? 'Laporan Bulanan' : 'Laporan Semester'}
+        month={
+          rekapMode === 'bulanan'
+            ? monthNames[selectedMonth] || 'Januari'
+            : selectedSemester === '1'
+            ? 'Juli'
+            : 'Januari'
+        }
+        year={rekapMode === 'bulanan' ? selectedYear : semesterYear}
+        semester={selectedSemester === '2' ? 'Genap' : 'Ganjil'}
+        academicYear={schoolProfile.tahunPelajaran}
+        onBackToApp={() => setIsPrintModalOpen(false)}
+      />
+    );
+  }
 
   return (
     <div className="w-full max-w-6xl 2xl:max-w-7xl mx-auto px-3.5 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-4 sm:space-y-6 animate-in fade-in duration-200 pb-20">
@@ -1025,27 +1048,6 @@ export const RekapitulasiView: React.FC = () => {
           </div>
         </div>
       )}
-
-      {/* Direct Report Print Modal for Rekapitulasi */}
-      <ReportPrintModal
-        isOpen={isPrintModalOpen}
-        onClose={() => setIsPrintModalOpen(false)}
-        reportType={rekapMode === 'bulanan' ? 'Laporan Bulanan' : 'Laporan Semester'}
-        selectedDate={`${selectedYear}-${selectedMonth}-01`}
-        month={
-          rekapMode === 'bulanan'
-            ? monthNames[selectedMonth] || 'Januari'
-            : selectedSemester === '1'
-            ? 'Juli'
-            : 'Januari'
-        }
-        year={rekapMode === 'bulanan' ? selectedYear : semesterYear}
-        attendanceType={attendanceType}
-        subjectId={selectedSubjectId || null}
-        subjectName={selectedSubjectObj?.name || null}
-        classId={selectedClassId || null}
-        className={selectedClassObj?.name || null}
-      />
     </div>
   );
 };

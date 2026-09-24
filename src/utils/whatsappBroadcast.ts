@@ -108,20 +108,34 @@ export const calculateAttendanceStats = (
 };
 
 /**
- * Membuat Smart Link langsung untuk laporan harian on-the-fly (dynamic render)
- * Format standar: https://[domain-aplikasi]/?r=[id_kelas]&d=[tanggal]
+ * Membuat Smart Link langsung untuk dokumen laporan on-the-fly (dynamic render)
+ * Format standar: https://[domain-aplikasi]/?r=[id_kelas]&d=[tanggal]&p=[periode]
  */
 export const generateSmartReportLink = (
   classId: string,
   date: string,
   attendanceType: AttendanceType = 'DAILY',
-  subjectId?: string | null
+  subjectId?: string | null,
+  period?: 'daily' | 'weekly' | 'monthly' | 'semester' | 'kepsek',
+  extraParams?: {
+    week?: string;
+    month?: string;
+    year?: string;
+    semester?: string;
+    academicYear?: string;
+  }
 ): string => {
   if (typeof window === 'undefined') return '';
   const origin = window.location.origin;
   const params = new URLSearchParams();
-  params.set('r', classId);
-  params.set('d', date);
+  if (classId) params.set('r', classId);
+  if (date) params.set('d', date);
+  if (period) params.set('p', period);
+  if (extraParams?.week) params.set('w', extraParams.week);
+  if (extraParams?.month) params.set('mo', extraParams.month);
+  if (extraParams?.year) params.set('y', extraParams.year);
+  if (extraParams?.semester) params.set('sem', extraParams.semester);
+  if (extraParams?.academicYear) params.set('ay', extraParams.academicYear);
   if (attendanceType === 'SUBJECT' && subjectId) {
     params.set('s', subjectId);
     params.set('m', 'subject');

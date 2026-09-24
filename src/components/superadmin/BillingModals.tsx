@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
+import * as XLSX from 'xlsx';
 import {
   X,
   Download,
@@ -17,44 +18,154 @@ import {
 } from 'lucide-react';
 
 /**
- * Modal Unduh Laporan Keuangan
+ * Modal Unduh Laporan Keuangan berbasis Data Riil Sistem Kawacanaan
  */
 export const FinancialReportModal: React.FC<{
   isOpen: boolean;
   onClose: () => void;
+  payments?: any[];
+  schools?: any[];
   showToast: (msg: string, type: 'success' | 'error' | 'info') => void;
-}> = ({ isOpen, onClose, showToast }) => {
-  const [period, setPeriod] = useState('september-2026');
+}> = ({ isOpen, onClose, payments = [], schools = [], showToast }) => {
+  const [period, setPeriod] = useState('all-time');
   const [format, setFormat] = useState<'csv' | 'xlsx'>('csv');
   const [isExporting, setIsExporting] = useState(false);
+
+  // Filter data riil pembayaran berdasarkan periode yang dipilih
+  const filteredData = useMemo(() => {
+    if (!payments || payments.length === 0) return [];
+    const now = new Date();
+
+    return payments.filter((p: any) => {
+      const dStr = p.createdAt || p.created_at || p.paidAt || p.paid_at;
+      if (!dStr) return true;
+      const d = new Date(dStr);
+      if (isNaN(d.getTime())) return true;
+
+      if (period === 'current-month') {
+        return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+      }
+      if (period === 'last-month') {
+        const lastMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        return d.getFullYear() === lastMonthDate.getFullYear() && d.getMonth() === lastMonthDate.getMonth();
+      }
+      if (period === 'q3-2026') {
+        return d.getFullYear() === 2026 && d.getMonth() >= 6 && d.getMonth() <= 8;
+      }
+      if (period === 'ta-2026-2027') {
+        const startTA = new Date(2026, 6, 1);
+        const endTA = new Date(2027, 5, 30);
+        return d >= startTA && d <= endTA;
+      }
+      return true; // 'all-time'
+    });
+  }, [payments, period]);
+
+  const totalCalculatedAmount = useMemo(() => {
+    return filteredData.reduce((acc: number, p: any) => {
+      return acc + Number(p.totalAmount || p.total_amount || p.amount || 0);
+    }, 0);
+  }, [filteredData]);
 
   if (!isOpen) return null;
 
   const handleExport = () => {
     setIsExporting(true);
     setTimeout(() => {
-      // Mock CSV generation and download
-      const csvContent = "data:text/csv;charset=utf-8," + 
-        "No,ID Transaksi,Sekolah,Siswa/PIC,Paket,Metode,Jumlah,Tanggal,Status\n" +
-        "1,TRX-2026-000248,SDN KAWUNG LUWUK,Rina Putri,Paket Sekolah (1 Bulan),Transfer Bank,25000,19/09/2026 10:24,Lunas\n" +
-        "2,TRX-2026-000247,SMKN 1 Luwuk,Andi Saputra,Paket Premium (1 Bulan),Virtual Account,150000,19/09/2026 09:17,Lunas\n" +
-        "3,TRX-2026-000246,SMPN 1 Luwuk,Siti Nurhaliza,Paket Basic (1 Bulan),QRIS,75000,18/09/2026 16:43,Lunas\n" +
-        "4,TRX-2026-000245,SMK Negeri 1 Luwuk,Budi Santoso,Paket Premium (1 Bulan),E-Wallet,120000,18/09/2026 14:20,Lunas\n" +
-        "5,TRX-2026-000244,SDN 1 Luwuk,Nabila Zahra,Paket Sekolah (1 Bulan),Transfer Bank,25000,17/09/2026 11:05,Menunggu\n";
-      
-      const encodedUri = encodeURI(csvContent);
-      const link = document.createElement("a");
-      link.setAttribute("href", encodedUri);
-      link.setAttribute("download", `laporan_keuangan_kawacanaan_${period}.${format}`);
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      try {
+        const rows = filteredData.map((p: any, idx: number) => {
+          const invNo = p.invoiceNo || p.invoice_no || p.id || `INV-${idx + 1}`;
+          const school = p.schoolName || p.school_name || '-';
+          const npsn = p.npsn || '-';
+          const contact = p.contactName || p.contact_name || p.studentName || '-';
+          const plan = p.planName || p.plan_name || 'Paket Layanan';
+          const method = p.paymentMethod || p.payment_method || 'Midtrans';
+          const amt = Number(p.totalAmount || p.total_amount || p.amount || 0);
+          const rawDate = p.createdAt || p.created_at;
+          const formattedDate = rawDate ? new Date(rawDate).toLocaleString('id-ID') : '-';
+          const rawPaidDate = p.paidAt || p.paid_at;
+          const formattedPaidDate = rawPaidDate ? new Date(rawPaidDate).toLocaleString('id-ID') : '-';
+          const status = p.status === 'SETTLED' || p.status === 'paid'
+            ? 'Lunas'
+            : p.status === 'PENDING' || p.status === 'pending'
+            ? 'Menunggu Pembayaran'
+            : 'Batal / Kedaluwarsa';
 
-      setIsExporting(false);
-      showToast(`Laporan keuangan ${period} berhasil diunduh!`, 'success');
-      onClose();
-    }, 600);
+          return {
+            'No': idx + 1,
+            'No Invoice': invNo,
+            'Satuan Pendidikan / Tenant': school,
+            'NPSN': npsn,
+            'PIC / Pendidik': contact,
+            'Paket Layanan': plan,
+            'Metode Pembayaran': method,
+            'Nominal (Rp)': amt,
+            'Tanggal Dibuat': formattedDate,
+            'Tanggal Lunas': formattedPaidDate,
+            'Status': status,
+          };
+        });
+
+        if (format === 'xlsx') {
+          const worksheet = XLSX.utils.json_to_sheet(rows);
+          const workbook = XLSX.utils.book_new();
+          XLSX.utils.book_append_sheet(workbook, worksheet, 'Laporan Keuangan');
+          XLSX.writeFile(workbook, `laporan_keuangan_kawacanaan_${period}.xlsx`);
+        } else {
+          const headers = [
+            'No',
+            'No Invoice',
+            'Satuan Pendidikan / Tenant',
+            'NPSN',
+            'PIC / Pendidik',
+            'Paket Layanan',
+            'Metode Pembayaran',
+            'Nominal (Rp)',
+            'Tanggal Dibuat',
+            'Tanggal Lunas',
+            'Status',
+          ];
+
+          const csvLines = [headers.join(',')];
+          rows.forEach((r) => {
+            const escaped = [
+              r['No'],
+              `"${String(r['No Invoice']).replace(/"/g, '""')}"`,
+              `"${String(r['Satuan Pendidikan / Tenant']).replace(/"/g, '""')}"`,
+              `"${String(r['NPSN']).replace(/"/g, '""')}"`,
+              `"${String(r['PIC / Pendidik']).replace(/"/g, '""')}"`,
+              `"${String(r['Paket Layanan']).replace(/"/g, '""')}"`,
+              `"${String(r['Metode Pembayaran']).replace(/"/g, '""')}"`,
+              r['Nominal (Rp)'],
+              `"${String(r['Tanggal Dibuat']).replace(/"/g, '""')}"`,
+              `"${String(r['Tanggal Lunas']).replace(/"/g, '""')}"`,
+              `"${String(r['Status']).replace(/"/g, '""')}"`,
+            ];
+            csvLines.push(escaped.join(','));
+          });
+
+          const blob = new Blob(['\uFEFF' + csvLines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = url;
+          link.setAttribute('download', `laporan_keuangan_kawacanaan_${period}.csv`);
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          URL.revokeObjectURL(url);
+        }
+
+        showToast(`Laporan keuangan ${period} (${filteredData.length} transaksi) berhasil diunduh!`, 'success');
+        onClose();
+      } catch (err: any) {
+        showToast(err?.message || 'Gagal mengekspor laporan keuangan.', 'error');
+      } finally {
+        setIsExporting(false);
+      }
+    }, 400);
   };
+
+  const currentMonthLabel = new Date().toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 overflow-y-auto">
@@ -66,7 +177,7 @@ export const FinancialReportModal: React.FC<{
             </div>
             <div>
               <h3 className="text-sm font-black text-slate-900">Ekspor Laporan Keuangan</h3>
-              <p className="text-[11px] text-slate-400">Unduh data transaksi & rekapitulasi</p>
+              <p className="text-[11px] text-slate-400">Data riil transaksi sistem Kawacanaan</p>
             </div>
           </div>
           <button
@@ -85,11 +196,11 @@ export const FinancialReportModal: React.FC<{
               onChange={(e) => setPeriod(e.target.value)}
               className="w-full px-3 py-2 rounded-xl border border-slate-200 font-medium text-slate-800 focus:outline-blue-600"
             >
-              <option value="september-2026">September 2026 (Bulan Berjalan)</option>
-              <option value="agustus-2026">Agustus 2026</option>
-              <option value="q3-2026">Kuartal 3 2026 (Juli - Sep)</option>
-              <option value="ta-2026-2027">Tahun Ajaran 2026/2027 Penuh</option>
-              <option value="all-time">Seluruh Riwayat Transaksi (All Time)</option>
+              <option value="all-time">Seluruh Riwayat Transaksi (Semua)</option>
+              <option value="current-month">{currentMonthLabel} (Bulan Berjalan)</option>
+              <option value="last-month">Bulan Lalu</option>
+              <option value="q3-2026">Kuartal 3 2026 (Juli - September 2026)</option>
+              <option value="ta-2026-2027">Tahun Ajaran 2026/2027</option>
             </select>
           </div>
 
@@ -123,12 +234,14 @@ export const FinancialReportModal: React.FC<{
 
           <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 text-[11px] text-slate-500 space-y-1">
             <div className="flex justify-between">
-              <span>Estimasi Transaksi:</span>
-              <strong className="text-slate-800">248 baris</strong>
+              <span>Total Transaksi Terfilter:</span>
+              <strong className="text-slate-800">{filteredData.length} baris</strong>
             </div>
             <div className="flex justify-between">
-              <span>Total Nominal:</span>
-              <strong className="text-emerald-700 font-bold">Rp 257.800.000</strong>
+              <span>Akumulasi Nominal:</span>
+              <strong className="text-emerald-700 font-bold">
+                Rp {totalCalculatedAmount.toLocaleString('id-ID')}
+              </strong>
             </div>
           </div>
         </div>
@@ -144,7 +257,7 @@ export const FinancialReportModal: React.FC<{
           <button
             type="button"
             onClick={handleExport}
-            disabled={isExporting}
+            disabled={isExporting || filteredData.length === 0}
             className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-xs transition cursor-pointer disabled:opacity-50"
           >
             <Download size={14} />

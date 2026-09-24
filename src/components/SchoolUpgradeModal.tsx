@@ -23,6 +23,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import { InvoiceModal } from './InvoiceModal';
 
 interface SchoolUpgradeModalProps {
   isOpen: boolean;
@@ -82,6 +83,7 @@ export const SchoolUpgradeModal: React.FC<SchoolUpgradeModalProps> = ({
   const [isCheckingPayment, setIsCheckingPayment] = useState(false);
   const [paymentCheckMessage, setPaymentCheckMessage] = useState<string | null>(null);
   const [copiedInvoice, setCopiedInvoice] = useState(false);
+  const [showInvoiceModal, setShowInvoiceModal] = useState(false);
 
   // Hasil Sukses
   const [generatedSchoolCode, setGeneratedSchoolCode] = useState('');
@@ -685,6 +687,17 @@ export const SchoolUpgradeModal: React.FC<SchoolUpgradeModalProps> = ({
                     <span className="text-blue-700">Rp {paymentSession.amount.toLocaleString('id-ID')}</span>
                   </div>
                 </div>
+
+                <div className="pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setShowInvoiceModal(true)}
+                    className="w-full py-2.5 px-3 rounded-xl border border-blue-300 bg-blue-50/70 hover:bg-blue-100 text-blue-800 text-xs font-bold flex items-center justify-center gap-1.5 transition cursor-pointer"
+                  >
+                    <FileText size={14} />
+                    <span>Lihat & Cetak Faktur / Tagihan Resmi Sekolah</span>
+                  </button>
+                </div>
               </div>
 
               {/* Status Message */}
@@ -790,6 +803,19 @@ export const SchoolUpgradeModal: React.FC<SchoolUpgradeModalProps> = ({
                   <span>Sekolah otomatis terdaftar dan terpantau di Super Admin platform.</span>
                 </div>
               </div>
+
+              {paymentSession && (
+                <div className="pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowInvoiceModal(true)}
+                    className="py-2.5 px-4 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-slate-800 text-xs font-bold inline-flex items-center gap-2 shadow-xs transition cursor-pointer"
+                  >
+                    <Printer size={15} className="text-blue-600" />
+                    <span>Cetak Bukti Pembayaran / Invoice Lunas</span>
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -861,6 +887,45 @@ export const SchoolUpgradeModal: React.FC<SchoolUpgradeModalProps> = ({
           </div>
         </div>
       </div>
+
+      {showInvoiceModal && paymentSession && (
+        <InvoiceModal
+          isOpen={showInvoiceModal}
+          onClose={() => setShowInvoiceModal(false)}
+          data={{
+            invoiceNumber: paymentSession.orderId,
+            orderId: paymentSession.orderId,
+            schoolName: schoolName,
+            npsn: npsn,
+            customerName: adminName,
+            customerEmail: adminEmail,
+            customerPhone: currentUser?.phone,
+            planName: `Paket Sekolah (${billingCycle === 'yearly' ? '1 Tahun' : '1 Bulan'})`,
+            amount: paymentSession.amount,
+            issueDate: new Date().toLocaleDateString('id-ID', {
+              day: '2-digit',
+              month: 'long',
+              year: 'numeric',
+            }),
+            dueDate: new Date(Date.now() + 24 * 3600 * 1000).toLocaleDateString('id-ID', {
+              day: '2-digit',
+              month: 'long',
+              year: 'numeric',
+            }),
+            paidAt:
+              step === 4
+                ? new Date().toLocaleDateString('id-ID', {
+                    day: '2-digit',
+                    month: 'long',
+                    year: 'numeric',
+                  })
+                : undefined,
+            paymentMethod: 'Midtrans Payment Gateway (QRIS / Virtual Account / Transfer)',
+            status: step === 4 ? 'settled' : 'pending',
+            notes: `Lisensi Satuan Pendidikan Kawacanaan (${billingCycle === 'yearly' ? 'Tahunan' : 'Bulanan'}) untuk NPSN ${npsn}.`,
+          }}
+        />
+      )}
     </div>
   );
 };

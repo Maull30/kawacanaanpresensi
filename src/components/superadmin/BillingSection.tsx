@@ -44,6 +44,7 @@ import {
 import { getTenantLifecycleInfo } from '../../utils/tenantLifecycle';
 import { PackageFeatureMatrixTab } from './PackageFeatureMatrixTab';
 import { PaymentCardIllustration } from './SuperAdminIllustrations';
+import { InvoiceModal, InvoiceData } from '../InvoiceModal';
 import {
   MiniSparkline,
   RevenueTrendChart,
@@ -346,6 +347,7 @@ export const BillingSection: React.FC<{
   // Ringkasan Metrics Finansial
   const summaryMetrics = useMemo(() => {
     let totalRevenue = 0;
+    let pendingRevenue = 0;
     let paidCount = 0;
     let pendingCount = 0;
     let cancelledCount = 0;
@@ -355,11 +357,13 @@ export const BillingSection: React.FC<{
       const isPending = p.status === 'PENDING' || p.status === 'pending' || p.status === 'menunggu_pembayaran';
       const isCancelled = p.status === 'CANCELLED' || p.status === 'EXPIRED' || p.status === 'batal';
 
+      const amt = Number(p.totalAmount || p.total_amount || p.amount || 0);
       if (isSettled) {
         paidCount++;
-        totalRevenue += Number(p.totalAmount || p.total_amount || p.amount || 0);
+        totalRevenue += amt;
       } else if (isPending) {
         pendingCount++;
+        pendingRevenue += amt;
       } else if (isCancelled) {
         cancelledCount++;
       }
@@ -381,14 +385,18 @@ export const BillingSection: React.FC<{
       }
     });
 
+    const totalActiveStudents = schools.reduce((acc, s) => acc + (s.total_students || s.studentCount || 0), 0);
+
     return {
       totalRevenue,
+      pendingRevenue,
       paidCount,
       pendingCount,
       cancelledCount,
       activeSchools,
       expiringSchools,
       inactiveSchools,
+      totalActiveStudents,
     };
   }, [payments, schools]);
 
@@ -473,11 +481,10 @@ export const BillingSection: React.FC<{
     },
   ], []);
 
-  // Menggabungkan pembayaran API dan preset
+  // Menggabungkan pembayaran API dan preset jika belum ada transaksi di DB
   const combinedPayments = useMemo(() => {
-    const existingIds = new Set(payments.map(p => (p.invoiceNo || p.invoice_no || p.id)));
-    const presetsToAdd = DEFAULT_PRESET_TRANSACTIONS.filter(p => !existingIds.has(p.id));
-    return [...payments, ...presetsToAdd];
+    if (payments && payments.length > 0) return payments;
+    return DEFAULT_PRESET_TRANSACTIONS;
   }, [payments, DEFAULT_PRESET_TRANSACTIONS]);
 
   // Tab 1: Pembayaran Terfilter
@@ -627,7 +634,7 @@ export const BillingSection: React.FC<{
       {/* ========================================================================= */}
       {currentSubTab === 'dashboard' && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {/* Kartu 1: Total Pembayaran (Bulan Ini) */}
+          {/* Kartu 1: Total Pembayaran (Terverifikasi) */}
           <div className="bg-white p-5 rounded-2xl border border-slate-100/90 shadow-xs flex flex-col justify-between">
             <div className="flex items-center justify-between">
               <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
@@ -635,14 +642,16 @@ export const BillingSection: React.FC<{
               </div>
             </div>
             <div className="mt-3">
-              <span className="text-xs font-semibold text-slate-500 block">Total Pembayaran (Bulan Ini)</span>
+              <span className="text-xs font-semibold text-slate-500 block">Total Pendapatan Terverifikasi</span>
               <div className="mt-1 text-2xl font-black text-slate-900 tracking-tight">
-                Rp 257.800.000
+                {summaryMetrics.totalRevenue > 0
+                  ? `Rp ${summaryMetrics.totalRevenue.toLocaleString('id-ID')}`
+                  : 'Rp 0'}
               </div>
             </div>
             <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between">
               <span className="text-emerald-600 font-bold text-xs flex items-center gap-1">
-                <ArrowUpRight size={14} /> 12% dari bulan lalu
+                <ArrowUpRight size={14} /> {summaryMetrics.paidCount} transaksi lunas
               </span>
               <MiniSparkline type="blue" />
             </div>
@@ -656,14 +665,14 @@ export const BillingSection: React.FC<{
               </div>
             </div>
             <div className="mt-3">
-              <span className="text-xs font-semibold text-slate-500 block">Jumlah Transaksi</span>
+              <span className="text-xs font-semibold text-slate-500 block">Jumlah Transaksi Masuk</span>
               <div className="mt-1 text-2xl font-black text-slate-900 tracking-tight">
-                248
+                {payments.length > 0 ? payments.length : combinedPayments.length}
               </div>
             </div>
             <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between">
               <span className="text-emerald-600 font-bold text-xs flex items-center gap-1">
-                <ArrowUpRight size={14} /> 8% dari bulan lalu
+                <ArrowUpRight size={14} /> Terdata di sistem
               </span>
               <MiniSparkline type="green" />
             </div>
@@ -677,20 +686,22 @@ export const BillingSection: React.FC<{
               </div>
             </div>
             <div className="mt-3">
-              <span className="text-xs font-semibold text-slate-500 block">Tagihan Tertunggak</span>
+              <span className="text-xs font-semibold text-slate-500 block">Tagihan Tertunggak / Pending</span>
               <div className="mt-1 text-2xl font-black text-slate-900 tracking-tight">
-                Rp 48.750.000
+                {summaryMetrics.pendingRevenue > 0
+                  ? `Rp ${summaryMetrics.pendingRevenue.toLocaleString('id-ID')}`
+                  : 'Rp 0'}
               </div>
             </div>
             <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between">
-              <span className="text-rose-500 font-bold text-xs flex items-center gap-1">
-                <ArrowUpRight size={14} /> 5% dari bulan lalu
+              <span className="text-amber-600 font-bold text-xs flex items-center gap-1">
+                <Clock size={14} /> {summaryMetrics.pendingCount} invoice menunggu
               </span>
               <MiniSparkline type="red" />
             </div>
           </div>
 
-          {/* Kartu 4: Total Siswa Aktif (Berbayar) */}
+          {/* Kartu 4: Total Sekolah Aktif Berlangganan */}
           <div className="bg-white p-5 rounded-2xl border border-slate-100/90 shadow-xs flex flex-col justify-between">
             <div className="flex items-center justify-between">
               <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-500 flex items-center justify-center font-bold">
@@ -698,14 +709,14 @@ export const BillingSection: React.FC<{
               </div>
             </div>
             <div className="mt-3">
-              <span className="text-xs font-semibold text-slate-500 block">Total Siswa Aktif (Berbayar)</span>
+              <span className="text-xs font-semibold text-slate-500 block">Sekolah Aktif Berlangganan</span>
               <div className="mt-1 text-2xl font-black text-slate-900 tracking-tight">
-                1.842
+                {summaryMetrics.activeSchools} Sekolah
               </div>
             </div>
             <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between">
               <span className="text-emerald-600 font-bold text-xs flex items-center gap-1">
-                <ArrowUpRight size={14} /> 6% dari bulan lalu
+                <ShieldCheck size={14} /> Status operasional aktif
               </span>
               <MiniSparkline type="teal" />
             </div>
@@ -1189,92 +1200,94 @@ export const BillingSection: React.FC<{
       )}
 
       {/* ========================================================================= */}
-      {/* MODAL INVOICE PEMBAYARAN (PRATINJAU & CETAK)                              */}
+      {/* MODAL INVOICE PEMBAYARAN (PRATINJAU & CETAK RESMI)                       */}
       {/* ========================================================================= */}
       {selectedInvoice && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-7 shadow-2xl border border-slate-100 space-y-5">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold">
-                  <FileText size={18} />
-                </div>
-                <div>
-                  <h3 className="text-sm font-black text-slate-900">Bukti Invoice Pembayaran</h3>
-                  <p className="text-[11px] text-slate-500 font-mono">{selectedInvoice.invoiceNo || selectedInvoice.invoice_no}</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setSelectedInvoice(null)}
-                className="text-slate-400 hover:text-slate-700 p-1 cursor-pointer"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2.5 text-xs">
-              <div className="flex justify-between">
-                <span className="text-slate-500">Sekolah / Pelanggan:</span>
-                <span className="font-bold text-slate-900">{selectedInvoice.schoolName || selectedInvoice.school_name}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">NPSN:</span>
-                <span className="font-mono text-slate-700">{selectedInvoice.npsn || '-'}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Paket Layanan:</span>
-                <span className="font-bold text-indigo-700 uppercase">{selectedInvoice.planName || selectedInvoice.plan_name}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Metode:</span>
-                <span className="font-semibold text-slate-800">{selectedInvoice.paymentMethod || selectedInvoice.payment_method || 'Midtrans / QRIS'}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Tanggal:</span>
-                <span className="text-slate-700 font-mono">
-                  {selectedInvoice.createdAt ? new Date(selectedInvoice.createdAt).toLocaleString('id-ID') : '-'}
-                </span>
-              </div>
-              <div className="pt-2 border-t border-slate-200 flex justify-between items-baseline">
-                <span className="text-slate-700 font-bold">Total Pembayaran:</span>
-                <span className="font-black text-emerald-800 text-base">
-                  Rp {Number(selectedInvoice.totalAmount || selectedInvoice.total_amount || selectedInvoice.amount || 0).toLocaleString('id-ID')}
-                </span>
-              </div>
-              <div className="flex justify-between items-center pt-1">
-                <span className="text-slate-500">Status Transaksi:</span>
-                <span
-                  className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase ${
-                    selectedInvoice.status === 'SETTLED' || selectedInvoice.status === 'paid'
-                      ? 'bg-emerald-100 text-emerald-800'
-                      : 'bg-amber-100 text-amber-800'
-                  }`}
-                >
-                  {selectedInvoice.status}
-                </span>
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-2 pt-2">
-              <button
-                type="button"
-                onClick={() => setSelectedInvoice(null)}
-                className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition cursor-pointer"
-              >
-                Tutup
-              </button>
-              <button
-                type="button"
-                onClick={() => window.print()}
-                className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-xs cursor-pointer transition"
-              >
-                <Printer size={14} />
-                <span>Cetak Invoice</span>
-              </button>
-            </div>
-          </div>
-        </div>
+        <InvoiceModal
+          isOpen={Boolean(selectedInvoice)}
+          onClose={() => setSelectedInvoice(null)}
+          data={{
+            id: selectedInvoice.id,
+            invoiceNumber:
+              selectedInvoice.invoiceNumber ||
+              selectedInvoice.invoiceNo ||
+              selectedInvoice.invoice_no ||
+              selectedInvoice.orderId ||
+              selectedInvoice.order_id ||
+              'INV-KAWACANAAN',
+            orderId:
+              selectedInvoice.orderId ||
+              selectedInvoice.order_id ||
+              selectedInvoice.invoiceNumber ||
+              selectedInvoice.invoiceNo ||
+              selectedInvoice.invoice_no,
+            schoolName:
+              selectedInvoice.schoolName ||
+              selectedInvoice.school_name ||
+              'Satuan Pendidikan',
+            npsn: selectedInvoice.npsn || '-',
+            customerName:
+              selectedInvoice.customerName ||
+              selectedInvoice.contactName ||
+              selectedInvoice.contact_name ||
+              selectedInvoice.picName ||
+              selectedInvoice.studentName ||
+              'Bapak/Ibu Pendidik',
+            customerEmail:
+              selectedInvoice.email ||
+              selectedInvoice.customerEmail,
+            customerPhone:
+              selectedInvoice.customerPhone ||
+              selectedInvoice.contactPhone ||
+              selectedInvoice.contact_phone ||
+              selectedInvoice.picPhone,
+            planName:
+              selectedInvoice.planName ||
+              selectedInvoice.plan_name ||
+              'Paket Layanan Kawacanaan',
+            amount: Number(
+              selectedInvoice.totalAmount ||
+              selectedInvoice.total_amount ||
+              selectedInvoice.amount ||
+              0
+            ),
+            issueDate:
+              selectedInvoice.issueDate ||
+              (selectedInvoice.createdAt
+                ? new Date(selectedInvoice.createdAt).toLocaleDateString('id-ID', {
+                    day: '2-digit',
+                    month: 'long',
+                    year: 'numeric',
+                  })
+                : undefined),
+            dueDate: selectedInvoice.dueDate,
+            paidAt:
+              selectedInvoice.paidAt ||
+              selectedInvoice.settlement_time ||
+              (selectedInvoice.paid_at
+                ? new Date(selectedInvoice.paid_at).toLocaleDateString('id-ID', {
+                    day: '2-digit',
+                    month: 'long',
+                    year: 'numeric',
+                  })
+                : undefined),
+            paymentMethod:
+              selectedInvoice.paymentMethod ||
+              selectedInvoice.payment_method ||
+              selectedInvoice.payment_type ||
+              'Midtrans Payment Gateway',
+            status:
+              selectedInvoice.status === 'SETTLED' ||
+              selectedInvoice.status === 'paid' ||
+              selectedInvoice.status === 'settled'
+                ? 'settled'
+                : selectedInvoice.status === 'PENDING' ||
+                  selectedInvoice.status === 'pending'
+                ? 'pending'
+                : 'expired',
+            notes: selectedInvoice.notes,
+          }}
+        />
       )}
 
       {/* ========================================================================= */}
@@ -1577,6 +1590,8 @@ export const BillingSection: React.FC<{
       <FinancialReportModal
         isOpen={showFinancialReportModal}
         onClose={() => setShowFinancialReportModal(false)}
+        payments={payments}
+        schools={schools}
         showToast={showToast}
       />
 

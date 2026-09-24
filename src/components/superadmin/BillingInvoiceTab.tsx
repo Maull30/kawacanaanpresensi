@@ -431,16 +431,30 @@ export const BillingInvoiceTab: React.FC<BillingInvoiceTabProps> = ({
                         onClick={() => {
                           onSelectInvoice({
                             id: inv.id,
+                            invoiceNumber: inv.invoiceNumber,
+                            invoiceNo: inv.invoiceNumber,
+                            orderId: inv.invoiceNumber,
                             order_id: inv.invoiceNumber,
+                            schoolName: inv.schoolName,
                             school_name: inv.schoolName,
+                            npsn: inv.npsn,
+                            customerName: inv.picName,
+                            customerPhone: inv.picPhone,
+                            planName: inv.planName,
                             amount: inv.amount,
-                            status: inv.status === 'paid' ? 'settled' : 'pending',
-                            payment_type: inv.paymentMethod || 'virtual_account',
-                            created_at: inv.issueDate,
+                            totalAmount: inv.amount,
+                            issueDate: inv.issueDate,
+                            dueDate: inv.dueDate,
+                            paidAt: inv.paidAt,
                             settlement_time: inv.paidAt || '-',
+                            paymentMethod: inv.paymentMethod,
+                            payment_method: inv.paymentMethod,
+                            payment_type: inv.paymentMethod,
+                            status: inv.status === 'paid' ? 'settled' : inv.status,
+                            created_at: inv.issueDate,
                           });
                         }}
-                        title="Pratinjau / Cetak Faktur"
+                        title="Pratinjau / Cetak Faktur Resmi"
                         className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition cursor-pointer"
                       >
                         <Eye size={13} />

@@ -461,7 +461,18 @@ export default async function handler(req: any, res: any) {
       }
 
       const { data: clsRows } = await clsQuery.limit(1);
-      const targetClass = clsRows?.[0];
+      let targetClass = clsRows?.[0];
+
+      if (!targetClass && !isUuid) {
+        // Fallback: pencarian fleksibel dengan wildcard
+        const cleanName = classIdOrName.replace(/^kelas\s*/i, '').trim();
+        const { data: fallbackRows } = await db
+          .from('classes')
+          .select('id, name, grade, academic_year, school_id, wali_kelas_teacher_id')
+          .or(`name.ilike.%${classIdOrName}%,name.ilike.%${cleanName}%`)
+          .limit(1);
+        targetClass = fallbackRows?.[0];
+      }
 
       if (!targetClass) {
         return json(res, 404, { error: 'Rombel kelas tidak ditemukan di sistem.' });
@@ -491,7 +502,7 @@ export default async function handler(req: any, res: any) {
       if (studentIds.length > 0) {
         let attQuery = db
           .from('attendance_records')
-          .select('id, student_id, student_name, status, check_in_time, check_out_time, notes, type, subject_id')
+          .select('id, student_id, teacher_id, status, check_in_time, check_out_time, notes, type, subject_id')
           .eq('date', reportDate)
           .in('student_id', studentIds);
 
@@ -504,7 +515,10 @@ export default async function handler(req: any, res: any) {
           attQuery = attQuery.or('type.eq.DAILY,type.is.null');
         }
 
-        const { data: recordsData } = await attQuery;
+        const { data: recordsData, error: recordsErr } = await attQuery;
+        if (recordsErr) {
+          console.warn('[get_public_daily_report] attQuery error:', recordsErr.message);
+        }
         attRecords = recordsData || [];
       }
 
@@ -531,6 +545,17 @@ export default async function handler(req: any, res: any) {
         teacherNip = sp.nip_wali_kelas || '';
       }
 
+      if (teacherName === 'Wali Kelas' && attRecords.length > 0) {
+        const attTeacherId = attRecords.find((r: any) => r.teacher_id)?.teacher_id;
+        if (attTeacherId) {
+          const tObj = (teachersList || []).find((t: any) => t.id === attTeacherId);
+          if (tObj) {
+            teacherName = tObj.nama;
+            teacherNip = tObj.nip || teacherNip;
+          }
+        }
+      }
+
       // Ringkasan kehadiran
       const recordMap = new Map<string, any>();
       attRecords.forEach((r: any) => {
@@ -546,13 +571,14 @@ export default async function handler(req: any, res: any) {
       const studentList = students.map((s: any, idx: number) => {
         const rec = recordMap.get(s.id);
         const status = rec?.status || '-';
-        if (status === 'Hadir') hadir++;
+        if (status === 'Hadir' || status === 'Terlambat') hadir++;
         else if (status === 'Sakit') sakit++;
         else if (status === 'Izin') izin++;
         else if (status === 'Alfa') alfa++;
 
         const checkIn = rec?.check_in_time || '';
-        if (status === 'Hadir' && checkIn && checkIn > '07:00' && checkIn < '11:00') {
+        const isLate = status === 'Terlambat' || (checkIn && checkIn > '07:00' && checkIn < '11:00');
+        if (isLate) {
           terlambat++;
         }
 

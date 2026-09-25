@@ -195,26 +195,15 @@ export const WhatsAppBroadcastModal: React.FC<WhatsAppBroadcastModalProps> = ({
       return;
     }
 
-    // 2. Try window.open for external browser tab
-    let opened = false;
+    // 2. Open smoothly in-app via popstate routing (avoids iframe about:blank white screen)
     try {
-      const win = window.open(finalUrl, '_blank', 'noopener,noreferrer');
-      if (win && !win.closed) {
-        opened = true;
-      }
+      window.history.pushState(null, '', finalUrl);
+      window.dispatchEvent(new PopStateEvent('popstate'));
+      onClose();
     } catch (_) {
-      opened = false;
-    }
-
-    // 3. If window.open is blocked by iframe sandbox, smoothly navigate in-app via pushState + popstate
-    if (!opened) {
       try {
-        window.history.pushState(null, '', finalUrl);
-        window.dispatchEvent(new PopStateEvent('popstate'));
-        onClose();
-      } catch (_) {
         window.location.href = finalUrl;
-      }
+      } catch (_) {}
     }
   };
 

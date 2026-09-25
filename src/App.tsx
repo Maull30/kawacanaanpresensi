@@ -414,6 +414,14 @@ const MainAppContent: React.FC = () => {
             url.searchParams.delete('ay');
             url.searchParams.delete('class');
             url.searchParams.delete('date');
+            url.searchParams.delete('report');
+            url.searchParams.delete('type');
+            url.searchParams.delete('week');
+            url.searchParams.delete('month');
+            url.searchParams.delete('year');
+            url.searchParams.delete('semester');
+            url.searchParams.delete('academicYear');
+            url.searchParams.delete('subjectId');
             window.history.pushState(null, '', url.pathname + (url.search ? url.search : ''));
           } catch (_) {}
         }}

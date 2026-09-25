@@ -73,6 +73,13 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
   const [externalReportData, setExternalReportData] = useState<any | null>(null);
   const [copiedLink, setCopiedLink] = useState(false);
 
+  // Sync loading state immediately when internal data is ready
+  useEffect(() => {
+    if (isInternalUser) {
+      setLoading(false);
+    }
+  }, [isInternalUser]);
+
   const selectedDate = propDate || new Date().toISOString().split('T')[0];
   const isKepsekReport = reportType.startsWith('Laporan Kepala Sekolah');
 
@@ -312,17 +319,48 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
 
   // Target students
   const targetStudents = useMemo(() => {
-    if (!isInternalUser) return [];
+    if (!isInternalUser) {
+      if (externalReportData?.students && Array.isArray(externalReportData.students) && externalReportData.students.length > 0) {
+        return externalReportData.students.map((s: any, idx: number) => ({
+          id: s.id || `ext-std-${idx}`,
+          nama: s.nama || 'Siswa',
+          nisn: s.nisn || '-',
+          gender: s.gender === 'Perempuan' || s.gender === 'P' ? 'P' : 'L',
+          classId: propClassId || '',
+          className: externalReportData?.className || '',
+        }));
+      }
+      return [];
+    }
     if (isKepsekReport) return ctxStudents;
     if (!resolvedClass) return ctxStudents;
     return ctxStudents
       .filter((s) => s.classId === resolvedClass.id || s.className === resolvedClass.name)
       .sort((a, b) => a.nama.localeCompare(b.nama));
-  }, [isInternalUser, isKepsekReport, resolvedClass, ctxStudents]);
+  }, [isInternalUser, externalReportData, isKepsekReport, resolvedClass, ctxStudents, propClassId]);
 
   // Target records
   const targetRecords = useMemo(() => {
-    if (!isInternalUser) return [];
+    if (!isInternalUser) {
+      if (externalReportData?.records && Array.isArray(externalReportData.records)) {
+        return externalReportData.records;
+      }
+      if (externalReportData?.students && Array.isArray(externalReportData.students)) {
+        return externalReportData.students.map((s: any, idx: number) => ({
+          id: `ext-rec-${idx}`,
+          studentId: s.id || `ext-std-${idx}`,
+          studentName: s.nama,
+          date: selectedDate,
+          status: s.status || 'Hadir',
+          checkInTime: s.checkInTime || '',
+          checkOutTime: s.checkOutTime || '',
+          notes: s.notes || '',
+          type: attendanceType,
+          subjectId: subjectId || null,
+        }));
+      }
+      return [];
+    }
     const studentIds = new Set(targetStudents.map((s) => s.id));
     return ctxAttendanceRecords.filter((r) => {
       const matchesStudent = studentIds.has(r.studentId);
@@ -332,7 +370,7 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
       }
       return r.type === 'DAILY' || !r.type;
     });
-  }, [isInternalUser, targetStudents, ctxAttendanceRecords, attendanceType, subjectId]);
+  }, [isInternalUser, externalReportData, selectedDate, attendanceType, subjectId, targetStudents, ctxAttendanceRecords]);
 
   const formatPct = (val: number) => (val % 1 === 0 ? val.toFixed(0) : val.toFixed(1));
 
@@ -599,8 +637,17 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
 
   // Fallback fetching for external visitor via URL
   useEffect(() => {
-    if (isInternalUser) return;
+    if (isInternalUser) {
+      setLoading(false);
+      return;
+    }
     let isMounted = true;
+    const safetyTimer = setTimeout(() => {
+      if (isMounted) {
+        setLoading(false);
+      }
+    }, 3500);
+
     const fetchReport = async () => {
       setLoading(true);
       setError(null);
@@ -710,6 +757,7 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
           });
         }
       } finally {
+        clearTimeout(safetyTimer);
         if (isMounted) {
           setLoading(false);
         }
@@ -719,6 +767,7 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
     fetchReport();
     return () => {
       isMounted = false;
+      clearTimeout(safetyTimer);
     };
   }, [isInternalUser, propClassId, selectedDate, attendanceType, subjectId]);
 
@@ -780,12 +829,17 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
   // Determine current active metrics for the summary cards
   const activeMetrics = useMemo(() => {
     if (!isInternalUser && externalReportData) {
-      const total = externalReportData.stats?.totalStudents || externalReportData.students?.length || 1;
+      const stats = externalReportData.stats || {};
+      const total = stats.totalStudents || (Array.isArray(externalReportData.students) ? externalReportData.students.length : 1) || 1;
+      const h = Number(stats.hadir) || 0;
+      const s = Number(stats.sakit) || 0;
+      const i = Number(stats.izin) || 0;
+      const a = Number(stats.alfa) || 0;
       return {
-        pctHadir: formatPct((externalReportData.stats.hadir / total) * 100),
-        pctSakit: formatPct((externalReportData.stats.sakit / total) * 100),
-        pctIzin: formatPct((externalReportData.stats.izin / total) * 100),
-        pctAlfa: formatPct((externalReportData.stats.alfa / total) * 100),
+        pctHadir: formatPct((h / total) * 100),
+        pctSakit: formatPct((s / total) * 100),
+        pctIzin: formatPct((i / total) * 100),
+        pctAlfa: formatPct((a / total) * 100),
       };
     }
     if (isKepsekReport) {
@@ -1032,6 +1086,51 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
     ? ctxSystemConfig.reportDate.trim()
     : (externalReportData?.reportDateOfficial || new Date().toISOString().slice(0, 10));
 
+  // Metadata Display Helpers for Hasil Cetak Presensi
+  const semesterDisplay = useMemo(() => {
+    const semVal = semester || ctxSchoolProfile?.semester || externalReportData?.semester || 'Ganjil';
+    const clean = String(semVal).trim();
+    if (clean.toLowerCase().startsWith('semester')) return clean;
+    return `Semester ${clean}`;
+  }, [semester, ctxSchoolProfile?.semester, externalReportData?.semester]);
+
+  const classNameDisplay = useMemo(() => {
+    if (isKepsekReport) {
+      const rombelCount = ctxClasses?.length || externalReportData?.classesCount || 0;
+      return `Semua Rombel (${rombelCount > 0 ? `${rombelCount} Kelas` : 'Paralel 1-6'})`;
+    }
+    return `${activeClassName}${activeFase ? ` (${activeFase})` : ''}`;
+  }, [isKepsekReport, ctxClasses?.length, externalReportData?.classesCount, activeClassName, activeFase]);
+
+  const displayEffectiveDays = useMemo(() => {
+    if (reportType === 'Laporan Semester' || isKepsekSemester) {
+      return `${semesterTotalEffectiveDays} Hari`;
+    }
+    if (reportType === 'Laporan Mingguan') {
+      return `${weekWorkingDays.length} Hari`;
+    }
+    return `${effectiveDays} Hari`;
+  }, [reportType, isKepsekSemester, semesterTotalEffectiveDays, weekWorkingDays.length, effectiveDays]);
+
+  const displayPeriodText = useMemo(() => {
+    if (reportType === 'Laporan Harian') {
+      return formatReportDateIndo(selectedDate);
+    }
+    if (reportType === 'Laporan Mingguan') {
+      return `${selectedWeek} (${month} ${year})`;
+    }
+    if (reportType === 'Laporan Bulanan') {
+      return `${month} ${year}`;
+    }
+    if (reportType === 'Laporan Semester') {
+      return `Semester ${semester} (${academicYear})`;
+    }
+    if (isKepsekReport) {
+      return isKepsekSemester ? `Semester ${semester} (${academicYear})` : `${month} ${year}`;
+    }
+    return `${month} ${year}`;
+  }, [reportType, isKepsekReport, isKepsekSemester, selectedDate, selectedWeek, month, year, semester, academicYear]);
+
   return (
     <div className="min-h-screen bg-slate-200/70 text-slate-900 antialiased print:bg-white print:p-0 font-sans">
       {/* Floating Top Action Bar (Non-Printable) */}
@@ -1185,54 +1284,38 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-4 text-xs font-sans mb-4 border border-slate-200 p-3 rounded-lg bg-slate-50/50">
             <div>
               <p>
-                <span className="font-semibold text-slate-600">Satuan Pendidikan:</span> {schoolName}
+                <span className="font-semibold text-slate-600">Nama Sekolah:</span> {schoolName}
               </p>
-              {isKepsekReport ? (
-                <>
-                  <p><span className="font-semibold text-slate-600">NPSN:</span> {npsn}</p>
-                  <p><span className="font-semibold text-slate-600">Kepala Sekolah:</span> {principalName}</p>
-                </>
-              ) : (
-                <>
-                  <p><span className="font-semibold text-slate-600">Kelas / Fase:</span> {activeClassName} / {activeFase}</p>
-                  {attendanceType === 'SUBJECT' || userScope.isGuruMapel ? (
-                    <>
-                      <p>
-                        <span className="font-semibold text-slate-600">Mata Pelajaran:</span>{' '}
-                        <strong className="text-blue-900">{resolvedSubject?.name || currentUser?.subjectName || 'Mata Pelajaran'}</strong>
-                      </p>
-                      <p>
-                        <span className="font-semibold text-slate-600">Guru Mapel:</span>{' '}
-                        <strong>{teacherName}</strong>
-                      </p>
-                    </>
-                  ) : (
-                    <p><span className="font-semibold text-slate-600">Wali Kelas:</span> <strong>{teacherName}</strong></p>
-                  )}
-                </>
-              )}
+              <p>
+                <span className="font-semibold text-slate-600">Tahun Ajaran:</span> {academicYear}
+              </p>
+              <p>
+                <span className="font-semibold text-slate-600">Semester:</span> {semesterDisplay}
+              </p>
             </div>
             <div>
               <p>
-                <span className="font-semibold text-slate-600">
-                  {reportType === 'Laporan Harian' ? 'Tanggal Presensi:' : 'Periode Presensi:'}
-                </span>{' '}
-                {reportType === 'Laporan Harian' && formatReportDateIndo(selectedDate)}
-                {reportType === 'Laporan Mingguan' && `${selectedWeek} (${month} ${year})`}
-                {reportType === 'Laporan Bulanan' && `${month} ${year}`}
-                {reportType === 'Laporan Semester' && `Semester ${semester} (${academicYear})`}
-                {isKepsekReport && (isKepsekSemester ? `Semester ${semester} (${academicYear})` : `${month} ${year}`)}
+                <span className="font-semibold text-slate-600">Kelas:</span> {classNameDisplay}
               </p>
               <p>
-                <span className="font-semibold text-slate-600">
-                  {isKepsekReport ? 'Total Rombel:' : 'Total Siswa:'}
-                </span>{' '}
-                {isKepsekReport ? `${ctxClasses.length} Rombel` : `${targetStudents.length || externalReportData?.students?.length || 0} Siswa`}
+                <span className="font-semibold text-slate-600">Hari Efektif:</span> {displayEffectiveDays}
               </p>
               <p>
-                <span className="font-semibold text-slate-600">Tahun Pelajaran:</span> {academicYear}
+                <span className="font-semibold text-slate-600">Periode Presensi:</span> {displayPeriodText}
               </p>
             </div>
+            {(attendanceType === 'SUBJECT' || userScope.isGuruMapel || subjectId) && (
+              <div className="col-span-1 sm:col-span-2 pt-2 border-t border-slate-200 flex flex-wrap items-center gap-4 text-xs font-sans">
+                <p>
+                  <span className="font-semibold text-slate-600">Mata Pelajaran:</span>{' '}
+                  <strong className="text-blue-900">{resolvedSubject?.name || currentUser?.subjectName || externalReportData?.subjectName || 'Mata Pelajaran'}</strong>
+                </p>
+                <p>
+                  <span className="font-semibold text-slate-600">Guru Pengajar:</span>{' '}
+                  <strong>{teacherName}</strong>
+                </p>
+              </div>
+            )}
           </div>
 
           {/* 4. TABEL PRESENSI (KOLOM TIDAK DIUBAH SAMA SEKALI - TETAP & DIPERTAHANKAN) */}

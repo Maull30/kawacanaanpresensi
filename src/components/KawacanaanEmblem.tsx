@@ -1,12 +1,22 @@
 import React from 'react';
 import { usePlatformBrand, DEFAULT_PLATFORM_LOGO } from '../utils/platformBranding';
 
+export type EmblemSizePreset = 'xs' | 'sm' | 'md' | 'lg' | 'xl';
+
 interface KawacanaanEmblemProps {
   className?: string;
-  size?: number;
+  size?: number | EmblemSizePreset;
   alt?: string;
   src?: string;
 }
+
+const SIZE_MAP: Record<EmblemSizePreset, number> = {
+  xs: 24,
+  sm: 32,
+  md: 48,
+  lg: 64,
+  xl: 80,
+};
 
 export const KawacanaanEmblem: React.FC<KawacanaanEmblemProps> = ({
   className = '',
@@ -16,11 +26,12 @@ export const KawacanaanEmblem: React.FC<KawacanaanEmblemProps> = ({
 }) => {
   const { logoUrl } = usePlatformBrand();
   const activeSrc = src || logoUrl || DEFAULT_PLATFORM_LOGO;
+  const numericSize = typeof size === 'number' ? size : SIZE_MAP[size] || 64;
 
   return (
     <div
       className={`relative inline-flex items-center justify-center shrink-0 select-none ${className}`}
-      style={{ width: size, height: size }}
+      style={{ width: numericSize, height: numericSize }}
       id="kawacanaan-emblem"
     >
       <img

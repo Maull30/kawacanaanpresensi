@@ -162,8 +162,8 @@ export const SystemPlatformTab: React.FC<Props> = ({
         const rawDataUrl = e.target?.result as string;
         const img = new Image();
         img.onload = () => {
-          // Kompresi dan skala proporsional maksimal 400x400 agar tetap tajam namun ringan di database
-          const maxDim = 400;
+          // Kompresi dan skala proporsional maksimal 320x320 agar sangat tajam namun super ringan (< 40 KB)
+          const maxDim = 320;
           let w = img.width;
           let h = img.height;
           if (w > maxDim || h > maxDim) {
@@ -183,9 +183,11 @@ export const SystemPlatformTab: React.FC<Props> = ({
             ctx.imageSmoothingEnabled = true;
             ctx.imageSmoothingQuality = 'high';
             ctx.drawImage(img, 0, 0, w, h);
-            const optimized = canvas.toDataURL('image/png', 0.95);
+            // Gunakan format webp jika didukung untuk efisiensi ukuran, fallback ke png
+            const webpUrl = canvas.toDataURL('image/webp', 0.85);
+            const optimized = webpUrl.startsWith('data:image/webp') ? webpUrl : canvas.toDataURL('image/png', 0.85);
             setForm((prev) => ({ ...prev, app_logo_url: optimized }));
-            showToast('Logo berhasil diproses. Klik "Simpan Konfigurasi" untuk menyinkronkan ke seluruh sistem.', 'info');
+            showToast('Logo berhasil dioptimasi & dikompresi. Klik "Simpan Konfigurasi" untuk menyinkronkan ke seluruh sistem.', 'info');
           } else {
             setForm((prev) => ({ ...prev, app_logo_url: rawDataUrl }));
           }

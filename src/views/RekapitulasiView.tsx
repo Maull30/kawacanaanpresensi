@@ -417,7 +417,7 @@ export const RekapitulasiView: React.FC = () => {
         classId={selectedClassId || ''}
         date={`${selectedYear}-${selectedMonth}-01`}
         attendanceType={attendanceType}
-        subjectId={selectedSubjectId || null}
+        subjectId={attendanceType === 'SUBJECT' ? (selectedSubjectId || null) : null}
         reportType={rekapMode === 'bulanan' ? 'Laporan Bulanan' : 'Laporan Semester'}
         month={
           rekapMode === 'bulanan'

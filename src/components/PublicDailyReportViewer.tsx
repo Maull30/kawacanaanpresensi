@@ -212,6 +212,7 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
 
   const resolvedSubject = useMemo(() => {
     if (!isInternalUser) return null;
+    if (attendanceType === 'DAILY') return null;
     if (subjectId) {
       const byId = ctxSubjects.find((s) => s.id === subjectId);
       if (byId) return byId;
@@ -223,7 +224,7 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
       if (userScope.assignedSubjects.length > 0) return userScope.assignedSubjects[0];
     }
     return null;
-  }, [isInternalUser, subjectId, ctxSubjects, userScope]);
+  }, [isInternalUser, attendanceType, subjectId, ctxSubjects, userScope]);
 
   const resolvedWaliKelas = useMemo(() => {
     if (!isInternalUser || !resolvedClass) return null;
@@ -922,7 +923,56 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
 
   // Penentuan Nama, NIP, dan Jabatan Penandatangan sesuai Role Pengguna & Konteks Dokumen
   const resolvedTeacherInfo = useMemo(() => {
-    // KASUS 1: USER YANG LOGIN ADALAH GURU MATA PELAJARAN (Role Guru Mapel)
+    const isCurrentUserWaliKelas = Boolean(
+      userScope.isWaliKelas ||
+      currentUser?.role === 'WALI KELAS' ||
+      userScope.assignedWaliClassId ||
+      userScope.assignedWaliClassName
+    );
+
+    // KASUS 1: USER YANG MENCETAK ADALAH WALI KELAS
+    // Secara otomatis jabatan penanda tangan menjadi 'Wali Kelas' alih-alih 'Guru Mata Pelajaran'
+    if (isCurrentUserWaliKelas) {
+      let name = '';
+      let nip = '-';
+
+      // 1. Ambil dari profil guru/user yang sedang login
+      const rawUserName = userScope.currentTeacher?.nama || currentUser?.name || '';
+      if (!isPlaceholderText(rawUserName)) {
+        name = rawUserName;
+        nip = userScope.currentTeacher?.nip || currentUser?.nip || (currentUser?.username && /^\d{10,}$/.test(currentUser.username) ? currentUser.username : '') || '-';
+      }
+
+      // 2. Fallback dari resolvedWaliKelas atau master kelas jika nama belum terisi
+      if (!name && resolvedWaliKelas?.nama && !isPlaceholderText(resolvedWaliKelas.nama)) {
+        name = resolvedWaliKelas.nama;
+        if (resolvedWaliKelas.nip && nip === '-') nip = resolvedWaliKelas.nip;
+      }
+      if (!name && resolvedClass?.waliKelasTeacherId) {
+        const matched = ctxTeachers.find((t) => t.id === resolvedClass.waliKelasTeacherId);
+        if (matched?.nama) {
+          name = matched.nama;
+          if (matched.nip && nip === '-') nip = matched.nip;
+        }
+      }
+      if (!name && resolvedClass?.waliKelasName && !isPlaceholderText(resolvedClass.waliKelasName)) {
+        name = resolvedClass.waliKelasName;
+        const matched = ctxTeachers.find((t) => t.nama.trim().toLowerCase() === resolvedClass.waliKelasName!.trim().toLowerCase());
+        if (matched?.nip && nip === '-') nip = matched.nip;
+      }
+      if (!name && ctxSchoolProfile?.namaWaliKelas && !isPlaceholderText(ctxSchoolProfile.namaWaliKelas)) {
+        name = ctxSchoolProfile.namaWaliKelas;
+        if (ctxSchoolProfile?.nipWaliKelas && nip === '-') nip = ctxSchoolProfile.nipWaliKelas;
+      }
+
+      return {
+        name: isPlaceholderText(name) ? '' : name,
+        nip,
+        title: 'Wali Kelas',
+      };
+    }
+
+    // KASUS 2: USER YANG LOGIN ADALAH GURU MATA PELAJARAN (Role Guru Mapel)
     if (userScope.isGuruMapel || currentUser?.role === 'GURU MAPEL') {
       const rawName = userScope.currentTeacher?.nama || currentUser?.name || '';
       const name = isPlaceholderText(rawName) ? '' : rawName;
@@ -935,7 +985,7 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
       };
     }
 
-    // KASUS 2: DOKUMEN ADALAH PRESENSI MATA PELAJARAN (dilihat oleh Admin/Kepsek/Tamu/Wali Kelas)
+    // KASUS 3: DOKUMEN ADALAH PRESENSI MATA PELAJARAN (dilihat oleh Admin/Kepsek/Tamu)
     if (attendanceType === 'SUBJECT' || resolvedSubject) {
       let name = '';
       let nip = '-';
@@ -966,7 +1016,7 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
       };
     }
 
-    // KASUS 3: DOKUMEN ADALAH PRESENSI HARIAN / WALI KELAS (Harus sesuai rombel/kelas aktif yang dipilih!)
+    // KASUS 4: DOKUMEN ADALAH PRESENSI HARIAN / WALI KELAS (dilihat oleh Admin/Kepsek/Tamu)
     let name = '';
     let nip = '-';
 
@@ -984,44 +1034,34 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
       if (matched?.nip) nip = matched.nip;
     }
 
-    // 2. Jika currentUser adalah Wali Kelas dari kelas yang aktif ini
-    if (!name && (userScope.isWaliKelas || currentUser?.role === 'WALI KELAS')) {
-      const userClassIds = [
-        ...(currentUser?.classIds || []),
-        ...((currentUser as any)?.assignedClassIds || []),
-      ];
-      const isAssigned =
-        resolvedClass &&
-        (userClassIds.includes(resolvedClass.id) ||
-         userScope.assignedWaliClassId === resolvedClass.id ||
-         normalizeClassToken(userScope.assignedWaliClassName || '') === normalizeClassToken(resolvedClass.name));
-      if (isAssigned) {
-        const rawName = userScope.currentTeacher?.nama || currentUser?.name || '';
-        name = isPlaceholderText(rawName) ? '' : rawName;
-        nip = userScope.currentTeacher?.nip || currentUser?.nip || (currentUser?.username && /^\d{10,}$/.test(currentUser.username) ? currentUser.username : '') || '-';
-      }
-    }
-
-    // 3. Jika dari data external (smart link publik)
+    // 2. Jika dari data external (smart link publik)
     if (!name && externalReportData?.teacherName && !isPlaceholderText(externalReportData.teacherName)) {
       name = externalReportData.teacherName;
       nip = externalReportData.teacherNip || '-';
     }
 
+    // 3. Fallback profil sekolah
+    if (!name && ctxSchoolProfile?.namaWaliKelas && !isPlaceholderText(ctxSchoolProfile.namaWaliKelas)) {
+      name = ctxSchoolProfile.namaWaliKelas;
+      if (ctxSchoolProfile.nipWaliKelas) nip = ctxSchoolProfile.nipWaliKelas;
+    }
+
     return {
       name: isPlaceholderText(name) ? '' : name,
       nip,
-      title: `Wali ${activeClassName}`,
+      title: 'Wali Kelas',
     };
   }, [
     userScope,
     currentUser,
     resolvedClass,
+    resolvedWaliKelas,
     resolvedSubject,
     resolvedSubjectTeacher,
     activeClassName,
     attendanceType,
     ctxTeachers,
+    ctxSchoolProfile,
     externalReportData,
   ]);
 
@@ -1262,7 +1302,7 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
                 <span className="font-semibold text-slate-600">Periode Presensi:</span> {displayPeriodText}
               </p>
             </div>
-            {(attendanceType === 'SUBJECT' || userScope.isGuruMapel || subjectId) && (
+            {(attendanceType === 'SUBJECT' || (Boolean(resolvedSubject) && !userScope.isWaliKelas)) && (
               <div className="col-span-1 sm:col-span-2 pt-2 border-t border-slate-200 flex flex-wrap items-center gap-4 text-xs font-sans">
                 <p>
                   <span className="font-semibold text-slate-600">Mata Pelajaran:</span>{' '}

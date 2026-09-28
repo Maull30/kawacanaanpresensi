@@ -710,7 +710,7 @@ export const LaporanView: React.FC = () => {
         classId={viewScopeMode === 'KEPSEK' ? (classes[0]?.id || '') : (effectiveClassId || selectedClassId || '')}
         date={selectedDate}
         attendanceType={viewScopeMode === 'KEPSEK' ? 'DAILY' : attendanceType}
-        subjectId={viewScopeMode === 'KEPSEK' ? null : (effectiveSubjectId || selectedSubjectId || null)}
+        subjectId={viewScopeMode === 'KEPSEK' ? null : (attendanceType === 'SUBJECT' ? (effectiveSubjectId || selectedSubjectId || null) : null)}
         reportType={viewScopeMode === 'KEPSEK' ? kepsekPeriodData.reportTypeModal : reportType}
         selectedWeek={selectedWeek}
         month={month}

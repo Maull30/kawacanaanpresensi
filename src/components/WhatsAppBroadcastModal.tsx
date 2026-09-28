@@ -8,6 +8,7 @@ import {
   formatDateToIndoLong,
   openWhatsAppBroadcast,
 } from '../utils/whatsappBroadcast';
+import { normalizeClassToken } from '../utils/documentParser';
 import { WhatsAppIcon } from './WhatsAppIcon';
 import {
   X,
@@ -93,57 +94,117 @@ export const WhatsAppBroadcastModal: React.FC<WhatsAppBroadcastModalProps> = ({
   );
   const [customNote, setCustomNote] = useState('');
 
-  // Robust class ID resolution
-  const effectiveClassId = useMemo(() => {
-    if (classId) return classId;
-    if (currentUser?.classIds && currentUser.classIds.length > 0) return currentUser.classIds[0];
+  // Robust resolution of target class
+  const effectiveClass = useMemo(() => {
+    if (classId) {
+      const byId = contextClasses.find((c) => c.id === classId);
+      if (byId) return byId;
+      const byNormId = contextClasses.find((c) => normalizeClassToken(c.name) === normalizeClassToken(classId));
+      if (byNormId) return byNormId;
+      const byName = contextClasses.find((c) => c.name.toLowerCase() === classId.toLowerCase());
+      if (byName) return byName;
+    }
     if (className) {
-      const found = contextClasses.find((c) => c.name.toLowerCase() === className.toLowerCase() || c.name.toLowerCase().includes(className.toLowerCase()));
-      if (found) return found.id;
+      const byNorm = contextClasses.find((c) => normalizeClassToken(c.name) === normalizeClassToken(className));
+      if (byNorm) return byNorm;
+      const byName = contextClasses.find((c) => c.name.toLowerCase() === className.toLowerCase() || c.name.toLowerCase().includes(className.toLowerCase()));
+      if (byName) return byName;
     }
-    if (schoolProfile.kelas) {
-      const found = contextClasses.find((c) => c.name.toLowerCase() === schoolProfile.kelas.toLowerCase());
-      if (found) return found.id;
+    if (currentUser?.classIds && currentUser.classIds.length > 0) {
+      const byUserClass = contextClasses.find((c) => c.id === currentUser.classIds![0]);
+      if (byUserClass) return byUserClass;
     }
-    return contextClasses[0]?.id || '';
-  }, [classId, currentUser, className, schoolProfile.kelas, contextClasses]);
+    return contextClasses[0] || null;
+  }, [classId, className, currentUser, contextClasses]);
 
-  // Target students in class
+  const effectiveClassId = effectiveClass?.id || classId || '';
+  const effectiveClassName = effectiveClass?.name || className || 'Kelas';
+
+  // Target students strictly belonging to the active/selected class
   const targetStudents = useMemo(() => {
-    if (propStudents && propStudents.length > 0) return propStudents;
-    if (effectiveClassId) return contextStudents.filter((s) => s.classId === effectiveClassId);
-    return contextStudents;
-  }, [propStudents, effectiveClassId, contextStudents]);
+    if (propStudents && propStudents.length > 0) {
+      if (effectiveClass) {
+        const strictMatch = propStudents.filter((s) => {
+          if (s.classId && s.classId === effectiveClass.id) return true;
+          if (s.className && normalizeClassToken(s.className) === normalizeClassToken(effectiveClass.name)) return true;
+          return false;
+        });
+        if (strictMatch.length > 0) {
+          return strictMatch.sort((a, b) => a.nama.localeCompare(b.nama, 'id'));
+        }
+      }
+      return propStudents.sort((a, b) => a.nama.localeCompare(b.nama, 'id'));
+    }
 
-  // Target records for selected date, class, and attendance mode
+    if (effectiveClass) {
+      return contextStudents
+        .filter((s) => {
+          if (s.classId && s.classId === effectiveClass.id) return true;
+          if (s.className && normalizeClassToken(s.className) === normalizeClassToken(effectiveClass.name)) return true;
+          return false;
+        })
+        .sort((a, b) => a.nama.localeCompare(b.nama, 'id'));
+    }
+
+    return [];
+  }, [propStudents, effectiveClass, contextStudents]);
+
+  // Target records strictly for the active class's students on selected date
   const targetRecords = useMemo(() => {
-    if (propRecords && propRecords.length > 0) return propRecords;
+    const studentIds = new Set(targetStudents.map((s) => s.id));
+    if (studentIds.size === 0) return [];
+
+    if (propRecords && propRecords.length > 0) {
+      return propRecords.filter((r) => studentIds.has(r.studentId) && r.date === date);
+    }
+
     return attendanceRecords.filter((r) => {
       if (r.date !== date) return false;
+      if (!studentIds.has(r.studentId)) return false;
       if (attendanceType === 'SUBJECT') {
         if (r.type !== 'SUBJECT') return false;
         if (subjectId && r.subjectId !== subjectId) return false;
       } else {
         if (r.type === 'SUBJECT') return false;
       }
-      if (effectiveClassId && r.classId && r.classId !== effectiveClassId) return false;
       return true;
     });
-  }, [propRecords, attendanceRecords, date, attendanceType, subjectId, effectiveClassId]);
+  }, [propRecords, attendanceRecords, date, attendanceType, subjectId, targetStudents]);
 
-  // Teacher name resolution
+  // Teacher name resolution: strictly uses the actual teacher / wali kelas of this class
   const resolvedTeacherName = useMemo(() => {
     if (currentUser?.role === 'GURU MAPEL' || attendanceType === 'SUBJECT') {
+      if (subjectId) {
+        const matchedSubj = (contextClasses as any)?._subjects?.find((s: any) => s.id === subjectId);
+        if (matchedSubj?.teacherName) return matchedSubj.teacherName;
+      }
       return currentUser?.name || 'Guru Mata Pelajaran';
     }
-    const matchedTeacher = teachers.find((t) => t.id === currentUser?.teacherId);
-    return (
-      matchedTeacher?.nama ||
-      currentUser?.name ||
-      schoolProfile.namaWaliKelas ||
-      'Wali Kelas'
-    );
-  }, [currentUser, attendanceType, teachers, schoolProfile.namaWaliKelas]);
+
+    // Prioritaskan wali kelas definitif dari data kelas yang aktif
+    if (effectiveClass?.waliKelasTeacherId) {
+      const matched = teachers.find((t) => t.id === effectiveClass.waliKelasTeacherId);
+      if (matched?.nama) return matched.nama;
+    }
+    if (effectiveClass?.waliKelasName && effectiveClass.waliKelasName.trim() && effectiveClass.waliKelasName !== '-') {
+      return effectiveClass.waliKelasName;
+    }
+    // Jika currentUser adalah wali kelas yang mengampu rombel ini
+    if (currentUser?.role === 'WALI KELAS') {
+      const userClassIds = [
+        ...(currentUser.classIds || []),
+        ...((currentUser as any).assignedClassIds || []),
+      ];
+      if (effectiveClass && (userClassIds.length === 0 || userClassIds.includes(effectiveClass.id))) {
+        return currentUser.name;
+      }
+    }
+    // Fallback profil sekolah
+    if (schoolProfile.namaWaliKelas && schoolProfile.namaWaliKelas.trim() && schoolProfile.namaWaliKelas !== '-') {
+      return schoolProfile.namaWaliKelas;
+    }
+    return 'Wali Kelas';
+  }, [currentUser, attendanceType, teachers, effectiveClass, schoolProfile.namaWaliKelas, subjectId, contextClasses]);
 
   // Check whether attendance records / document data actually exists for this class and period
   const isDocumentAvailable = useMemo(() => {
@@ -273,7 +334,7 @@ export const WhatsAppBroadcastModal: React.FC<WhatsAppBroadcastModalProps> = ({
       type: broadcastType,
       date,
       schoolName: schoolProfile.namaSekolah || 'SATUAN PENDIDIKAN',
-      className: className || schoolProfile.kelas || 'Kelas',
+      className: effectiveClassName,
       teacherName: resolvedTeacherName,
       teacherRole: currentUser?.role || 'WALI_KELAS',
       subjectName,
@@ -291,8 +352,7 @@ export const WhatsAppBroadcastModal: React.FC<WhatsAppBroadcastModalProps> = ({
     broadcastType,
     date,
     schoolProfile.namaSekolah,
-    className,
-    schoolProfile.kelas,
+    effectiveClassName,
     resolvedTeacherName,
     currentUser?.role,
     subjectName,
@@ -357,7 +417,7 @@ export const WhatsAppBroadcastModal: React.FC<WhatsAppBroadcastModalProps> = ({
                 </span>
               </div>
               <p className="text-xs text-emerald-100 font-medium">
-                {className || 'Kelas'} • {formatDateToIndoLong(date)}
+                {effectiveClassName} • {resolvedTeacherName} • {targetStudents.length} Siswa Terdaftar • {formatDateToIndoLong(date)}
               </p>
             </div>
           </div>

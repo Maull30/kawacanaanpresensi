@@ -32,6 +32,7 @@ import { isFeatureAccessibleInPackage } from "../utils/featureRegistry";
 import { getServerNow, formatServerTimeString } from "../utils/serverTime";
 import { isUserInActiveSchoolPlan } from "../utils/tenantLifecycle";
 import { normalizePlan, normalizeWorkspaceType } from "../utils/packageSystem";
+import { normalizeClassToken } from "../utils/documentParser";
 
 interface Toast {
   id: string;
@@ -6850,8 +6851,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     const targetType: AttendanceType = options?.type || "DAILY";
     const targetSubjectId = options?.subjectId || null;
     const targetClassId = options?.classId || null;
+    const targetClassObj = targetClassId
+      ? classes.find((c) => c.id === targetClassId || normalizeClassToken(c.name) === normalizeClassToken(targetClassId))
+      : null;
     const targetStudents = targetClassId
-      ? students.filter((s) => s.classId === targetClassId)
+      ? students.filter((s) => {
+          if (s.classId === targetClassId) return true;
+          if (targetClassObj && (s.classId === targetClassObj.id || (s.className && normalizeClassToken(s.className) === normalizeClassToken(targetClassObj.name)))) return true;
+          return false;
+        })
       : students;
     const sortedStudents = [...targetStudents].sort((a, b) =>
       a.nama.localeCompare(b.nama, "id"),

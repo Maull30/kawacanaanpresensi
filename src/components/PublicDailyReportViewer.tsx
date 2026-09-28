@@ -5,6 +5,7 @@ import { useApp } from '../context/AppContext';
 import { getFaseByClassName } from '../utils/faseKurikulum';
 import { generateSmartReportLink } from '../utils/whatsappBroadcast';
 import { getUserRoleScope } from '../utils/userScope';
+import { normalizeClassToken } from '../utils/documentParser';
 
 const isPlaceholderText = (text: string | null | undefined): boolean => {
   if (!text) return true;
@@ -184,17 +185,21 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
     return semesterMonthList.reduce((acc, m) => acc + getEffectiveDaysForMonth(m.year, m.num), 0);
   }, [semesterMonthList]);
 
-  // Target class resolution
+  // Target class resolution - strictly resolves the requested or active class
   const resolvedClass = useMemo(() => {
     if (!isInternalUser) return null;
     if (propClassId) {
       const byId = ctxClasses.find((c) => c.id === propClassId);
       if (byId) return byId;
+      const byNormId = ctxClasses.find((c) => normalizeClassToken(c.name) === normalizeClassToken(propClassId));
+      if (byNormId) return byNormId;
       const byName = ctxClasses.find((c) => c.name.toLowerCase() === propClassId.toLowerCase());
       if (byName) return byName;
       const cleanTarget = propClassId.replace(/^kelas\s*/i, '').trim().toLowerCase();
       const byClean = ctxClasses.find((c) => c.name.replace(/^kelas\s*/i, '').trim().toLowerCase() === cleanTarget);
       if (byClean) return byClean;
+      // Do not substitute an unrelated class if specific class was requested!
+      return null;
     }
     if (userScope.isWaliKelas && userScope.assignedWaliClass) {
       return userScope.assignedWaliClass;
@@ -222,7 +227,7 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
 
   const resolvedWaliKelas = useMemo(() => {
     if (!isInternalUser || !resolvedClass) return null;
-    // 1. Match by waliKelasTeacherId
+    // 1. Match by waliKelasTeacherId in teachers master
     if (resolvedClass.waliKelasTeacherId) {
       const t = ctxTeachers.find((tch) => tch.id === resolvedClass.waliKelasTeacherId);
       if (t) return t;
@@ -233,16 +238,16 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
       const t = ctxTeachers.find((tch) => tch.nama.trim().toLowerCase() === cleanName);
       if (t) return t;
     }
-    // 3. Fallback: if currentUser is WALI KELAS
+    // 3. Fallback: if currentUser is WALI KELAS assigned to THIS specific class
     if (userScope.isWaliKelas || currentUser?.role === 'WALI KELAS') {
       const userClassIds = [
         ...(currentUser?.classIds || []),
         ...((currentUser as any)?.assignedClassIds || []),
       ];
       const isAssigned =
-        userClassIds.length === 0 ||
         userClassIds.includes(resolvedClass.id) ||
-        userScope.assignedWaliClassId === resolvedClass.id;
+        userScope.assignedWaliClassId === resolvedClass.id ||
+        normalizeClassToken(userScope.assignedWaliClassName || '') === normalizeClassToken(resolvedClass.name);
       if (isAssigned) {
         if (userScope.currentTeacher) return userScope.currentTeacher;
         if (currentUser?.teacherId) {
@@ -257,14 +262,8 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
         };
       }
     }
-    // 4. Fallback: match by ctxSchoolProfile.namaWaliKelas
-    if (ctxSchoolProfile?.namaWaliKelas && !isPlaceholderText(ctxSchoolProfile.namaWaliKelas)) {
-      const cleanWali = ctxSchoolProfile.namaWaliKelas.trim().toLowerCase();
-      const t = ctxTeachers.find((tch) => tch.nama.trim().toLowerCase() === cleanWali);
-      if (t) return t;
-    }
     return null;
-  }, [isInternalUser, resolvedClass, ctxTeachers, currentUser, userScope, ctxSchoolProfile]);
+  }, [isInternalUser, resolvedClass, ctxTeachers, currentUser, userScope]);
 
   const resolvedSubjectTeacher = useMemo(() => {
     // 1. By subject.teacherId
@@ -333,10 +332,14 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
       return [];
     }
     if (isKepsekReport) return ctxStudents;
-    if (!resolvedClass) return ctxStudents;
+    if (!resolvedClass) return [];
     return ctxStudents
-      .filter((s) => s.classId === resolvedClass.id || s.className === resolvedClass.name)
-      .sort((a, b) => a.nama.localeCompare(b.nama));
+      .filter((s) => {
+        if (s.classId && s.classId === resolvedClass.id) return true;
+        if (s.className && normalizeClassToken(s.className) === normalizeClassToken(resolvedClass.name)) return true;
+        return false;
+      })
+      .sort((a, b) => a.nama.localeCompare(b.nama, 'id'));
   }, [isInternalUser, externalReportData, isKepsekReport, resolvedClass, ctxStudents, propClassId]);
 
   // Target records
@@ -669,92 +672,14 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
           if (res.ok && json.ok && json.report) {
             setExternalReportData(json.report);
           } else {
-            const fallbackClassName = (propClassId || 'Kelas 1A').replace(/^kelas\s*/i, 'Kelas ');
-            setExternalReportData({
-              schoolName: 'SD NEGERI CONTOH',
-              pemerintahDaerah: 'PEMERINTAH PROVINSI DAERAH KHUSUS IBUKOTA JAKARTA',
-              dinasPendidikan: 'DINAS PENDIDIKAN',
-              npsn: '20104501',
-              alamat: 'Jl. Pendidikan No. 123, Kel. Merdeka, Kec. Nusantara, Kota Jakarta',
-              className: fallbackClassName,
-              grade: 1,
-              fase: 'Fase A',
-              academicYear: '2026/2027',
-              semester: '1',
-              date: selectedDate,
-              attendanceType,
-              subjectName: attendanceType === 'SUBJECT' ? 'Pendidikan Jasmani' : null,
-              teacherName: attendanceType === 'SUBJECT' ? 'Guru Mata Pelajaran' : 'Wali Kelas',
-              teacherNip: '-',
-              principalName: 'Nama Kepala Sekolah',
-              principalNip: '-',
-              reportPlace: 'Jakarta',
-              reportDateOfficial: selectedDate,
-              showLetterhead: true,
-              letterheadType: 'standard_text',
-              letterheadImageUrl: '',
-              logoUrl: '',
-              stats: {
-                totalStudents: 28,
-                hadir: 26,
-                sakit: 1,
-                izin: 1,
-                alfa: 0,
-                terlambat: 1,
-                persentase: 93,
-              },
-              students: [
-                { no: 1, nisn: '0123456781', nama: 'Ahmad Fauzi', gender: 'L', status: 'Hadir', checkInTime: '06:45', checkOutTime: '12:30', notes: '' },
-                { no: 2, nisn: '0123456782', nama: 'Annisa Putri', gender: 'P', status: 'Hadir', checkInTime: '06:40', checkOutTime: '12:30', notes: '' },
-                { no: 3, nisn: '0123456783', nama: 'Budi Santoso', gender: 'L', status: 'Sakit', checkInTime: '', checkOutTime: '', notes: 'Surat dokter' },
-                { no: 4, nisn: '0123456784', nama: 'Dewi Lestari', gender: 'P', status: 'Izin', checkInTime: '', checkOutTime: '', notes: 'Acara keluarga' },
-              ],
-            });
+            setError(json.error || 'Data rekap kehadiran untuk rombel dan periode ini belum tersedia di sistem.');
+            setExternalReportData(null);
           }
         }
       } catch (err: any) {
         if (isMounted) {
-          const fallbackClassName = (propClassId || 'Kelas 1A').replace(/^kelas\s*/i, 'Kelas ');
-          setExternalReportData({
-            schoolName: 'SD NEGERI CONTOH',
-            pemerintahDaerah: 'PEMERINTAH PROVINSI DAERAH KHUSUS IBUKOTA JAKARTA',
-            dinasPendidikan: 'DINAS PENDIDIKAN',
-            npsn: '20104501',
-            alamat: 'Jl. Pendidikan No. 123, Kel. Merdeka, Kec. Nusantara, Kota Jakarta',
-            className: fallbackClassName,
-            grade: 1,
-            fase: 'Fase A',
-            academicYear: '2026/2027',
-            semester: '1',
-            date: selectedDate,
-            attendanceType,
-            subjectName: attendanceType === 'SUBJECT' ? 'Pendidikan Jasmani' : null,
-            teacherName: attendanceType === 'SUBJECT' ? 'Guru Mata Pelajaran' : 'Wali Kelas',
-            teacherNip: '-',
-            principalName: 'Nama Kepala Sekolah',
-            principalNip: '-',
-            reportPlace: 'Jakarta',
-            reportDateOfficial: selectedDate,
-            showLetterhead: true,
-            letterheadType: 'standard_text',
-            letterheadImageUrl: '',
-            logoUrl: '',
-            stats: {
-              totalStudents: 28,
-              hadir: 26,
-              sakit: 1,
-              izin: 1,
-              alfa: 0,
-              terlambat: 1,
-              persentase: 93,
-            },
-            students: [
-              { no: 1, nisn: '0123456781', nama: 'Ahmad Fauzi', gender: 'L', status: 'Hadir', checkInTime: '06:45', checkOutTime: '12:30', notes: '' },
-              { no: 2, nisn: '0123456782', nama: 'Annisa Putri', gender: 'P', status: 'Hadir', checkInTime: '06:40', checkOutTime: '12:30', notes: '' },
-              { no: 3, nisn: '0123456783', nama: 'Budi Santoso', gender: 'L', status: 'Sakit', checkInTime: '', checkOutTime: '', notes: 'Surat dokter' },
-              { no: 4, nisn: '0123456784', nama: 'Dewi Lestari', gender: 'P', status: 'Izin', checkInTime: '', checkOutTime: '', notes: 'Acara keluarga' },
-            ],
-          });
+          setError('Gagal memuat dokumen rekap kehadiran. Silakan muat ulang halaman atau hubungi pihak sekolah.');
+          setExternalReportData(null);
         }
       } finally {
         clearTimeout(safetyTimer);
@@ -977,11 +902,11 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
   }
 
   // Active School and Teacher Profile Data
-  const schoolName = ctxSchoolProfile?.namaSekolah || externalReportData?.schoolName || 'SD NEGERI CONTOH';
-  const pemerintahDaerah = ctxSystemConfig?.pemerintahDaerah || externalReportData?.pemerintahDaerah || 'PEMERINTAH PROVINSI DAERAH KHUSUS IBUKOTA JAKARTA';
-  const dinasPendidikan = ctxSystemConfig?.dinasPendidikan || externalReportData?.dinasPendidikan || 'DINAS PENDIDIKAN';
-  const npsn = ctxSchoolProfile?.npsn || externalReportData?.npsn || '20104501';
-  const alamatSekolah = ctxSchoolProfile?.alamat || externalReportData?.alamat || 'Jl. Pendidikan No. 123, Kel. Merdeka, Kec. Nusantara, Kota Jakarta';
+  const schoolName = ctxSchoolProfile?.namaSekolah || externalReportData?.schoolName || 'SATUAN PENDIDIKAN';
+  const pemerintahDaerah = ctxSystemConfig?.pemerintahDaerah || externalReportData?.pemerintahDaerah || '';
+  const dinasPendidikan = ctxSystemConfig?.dinasPendidikan || externalReportData?.dinasPendidikan || '';
+  const npsn = ctxSchoolProfile?.npsn || externalReportData?.npsn || '-';
+  const alamatSekolah = ctxSchoolProfile?.alamat || externalReportData?.alamat || '';
   const showLetterhead = ctxSystemConfig?.showLetterhead ?? externalReportData?.showLetterhead ?? true;
   const letterheadType = ctxSystemConfig?.letterheadType || externalReportData?.letterheadType || 'standard_text';
   const letterheadImageUrl = ctxSystemConfig?.letterheadImageUrl || externalReportData?.letterheadImageUrl || '';
@@ -990,7 +915,7 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
   const activeClassName = resolvedClass?.name || externalReportData?.className || 'Kelas';
   const activeClassClean = activeClassName.replace(/^kelas\s*/i, '');
   const activeFase = resolvedClass ? getFaseByClassName(resolvedClass.name, resolvedClass.grade) : (externalReportData?.fase || 'Fase A');
-  const principalName = ctxSchoolProfile?.namaKepalaSekolah || resolvedPrincipalTeacher?.nama || externalReportData?.principalName || 'Nama Kepala Sekolah';
+  const principalName = ctxSchoolProfile?.namaKepalaSekolah || resolvedPrincipalTeacher?.nama || externalReportData?.principalName || 'Kepala Sekolah';
   const principalNip = (ctxSchoolProfile?.nipKepalaSekolah && ctxSchoolProfile.nipKepalaSekolah !== '-')
     ? ctxSchoolProfile.nipKepalaSekolah
     : (resolvedPrincipalTeacher?.nip || (currentUser?.role === 'KEPALA SEKOLAH' ? (currentUser.nip || (currentUser.username && /^\d{10,}$/.test(currentUser.username) ? currentUser.username : '')) : '') || externalReportData?.principalNip || '-');
@@ -1010,30 +935,7 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
       };
     }
 
-    // KASUS 2: USER YANG LOGIN ADALAH WALI KELAS (Role Wali Kelas)
-    if (userScope.isWaliKelas || currentUser?.role === 'WALI KELAS') {
-      const userClassIds = [
-        ...(currentUser?.classIds || []),
-        ...((currentUser as any)?.assignedClassIds || []),
-      ];
-      const isAssigned =
-        !resolvedClass ||
-        userClassIds.length === 0 ||
-        userClassIds.includes(resolvedClass.id) ||
-        userScope.assignedWaliClassId === resolvedClass.id;
-      if (isAssigned) {
-        const rawName = userScope.currentTeacher?.nama || currentUser?.name || '';
-        const name = isPlaceholderText(rawName) ? '' : rawName;
-        const nip = userScope.currentTeacher?.nip || currentUser?.nip || (currentUser?.username && /^\d{10,}$/.test(currentUser.username) ? currentUser.username : '') || '-';
-        return {
-          name,
-          nip,
-          title: `Wali ${activeClassName}`,
-        };
-      }
-    }
-
-    // KASUS 3: DOKUMEN ADALAH PRESENSI MATA PELAJARAN (dilihat oleh Admin/Kepsek/Tamu/Wali Kelas)
+    // KASUS 2: DOKUMEN ADALAH PRESENSI MATA PELAJARAN (dilihat oleh Admin/Kepsek/Tamu/Wali Kelas)
     if (attendanceType === 'SUBJECT' || resolvedSubject) {
       let name = '';
       let nip = '-';
@@ -1064,21 +966,44 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
       };
     }
 
-    // KASUS 4: DOKUMEN ADALAH PRESENSI HARIAN / WALI KELAS (dilihat oleh Admin/Kepsek/Tamu)
+    // KASUS 3: DOKUMEN ADALAH PRESENSI HARIAN / WALI KELAS (Harus sesuai rombel/kelas aktif yang dipilih!)
     let name = '';
     let nip = '-';
 
-    if (resolvedWaliKelas?.nama && !isPlaceholderText(resolvedWaliKelas.nama)) {
-      name = resolvedWaliKelas.nama;
-      nip = resolvedWaliKelas.nip || '-';
-    } else if (resolvedClass?.waliKelasName && !isPlaceholderText(resolvedClass.waliKelasName)) {
+    // 1. Wali kelas definitif dari kelas yang aktif
+    if (resolvedClass?.waliKelasTeacherId) {
+      const matched = ctxTeachers.find((t) => t.id === resolvedClass.waliKelasTeacherId);
+      if (matched?.nama) {
+        name = matched.nama;
+        nip = matched.nip || '-';
+      }
+    }
+    if (!name && resolvedClass?.waliKelasName && !isPlaceholderText(resolvedClass.waliKelasName)) {
       name = resolvedClass.waliKelasName;
       const matched = ctxTeachers.find((t) => t.nama.trim().toLowerCase() === resolvedClass.waliKelasName!.trim().toLowerCase());
       if (matched?.nip) nip = matched.nip;
-    } else if (ctxSchoolProfile?.namaWaliKelas && !isPlaceholderText(ctxSchoolProfile.namaWaliKelas)) {
-      name = ctxSchoolProfile.namaWaliKelas;
-      nip = ctxSchoolProfile.nipWaliKelas || '-';
-    } else if (externalReportData?.teacherName && !isPlaceholderText(externalReportData.teacherName)) {
+    }
+
+    // 2. Jika currentUser adalah Wali Kelas dari kelas yang aktif ini
+    if (!name && (userScope.isWaliKelas || currentUser?.role === 'WALI KELAS')) {
+      const userClassIds = [
+        ...(currentUser?.classIds || []),
+        ...((currentUser as any)?.assignedClassIds || []),
+      ];
+      const isAssigned =
+        resolvedClass &&
+        (userClassIds.includes(resolvedClass.id) ||
+         userScope.assignedWaliClassId === resolvedClass.id ||
+         normalizeClassToken(userScope.assignedWaliClassName || '') === normalizeClassToken(resolvedClass.name));
+      if (isAssigned) {
+        const rawName = userScope.currentTeacher?.nama || currentUser?.name || '';
+        name = isPlaceholderText(rawName) ? '' : rawName;
+        nip = userScope.currentTeacher?.nip || currentUser?.nip || (currentUser?.username && /^\d{10,}$/.test(currentUser.username) ? currentUser.username : '') || '-';
+      }
+    }
+
+    // 3. Jika dari data external (smart link publik)
+    if (!name && externalReportData?.teacherName && !isPlaceholderText(externalReportData.teacherName)) {
       name = externalReportData.teacherName;
       nip = externalReportData.teacherNip || '-';
     }
@@ -1094,10 +1019,8 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
     resolvedClass,
     resolvedSubject,
     resolvedSubjectTeacher,
-    resolvedWaliKelas,
     activeClassName,
     attendanceType,
-    ctxSchoolProfile,
     ctxTeachers,
     externalReportData,
   ]);
@@ -1148,14 +1071,23 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
     if (reportType === 'Laporan Bulanan') {
       return `${month} ${year}`;
     }
-    if (reportType === 'Laporan Semester') {
-      return `Semester ${semester} (${academicYear})`;
-    }
     if (isKepsekReport) {
       return isKepsekSemester ? `Semester ${semester} (${academicYear})` : `${month} ${year}`;
     }
     return `${month} ${year}`;
   }, [reportType, isKepsekReport, isKepsekSemester, selectedDate, selectedWeek, month, year, semester, academicYear]);
+
+  // Update document.title so when user prints or saves as PDF, the PDF filename matches the active class
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    const originalTitle = document.title;
+    const cleanCls = isKepsekReport ? 'Supervisi_Kepala_Sekolah' : (activeClassClean || 'Kelas');
+    const cleanPeriod = (displayPeriodText || 'Laporan').replace(/[^a-zA-Z0-9_-]/g, '_');
+    document.title = `Laporan_Presensi_${cleanCls}_${cleanPeriod}`;
+    return () => {
+      document.title = originalTitle;
+    };
+  }, [activeClassClean, isKepsekReport, displayPeriodText]);
 
   return (
     <div className="min-h-screen bg-slate-200/70 text-slate-900 antialiased print:bg-white print:p-0 font-sans">

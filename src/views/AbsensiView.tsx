@@ -3,6 +3,7 @@ import { useApp } from '../context/AppContext';
 import { AttendanceRecord, AttendanceStatus, AttendanceType } from '../types';
 import { getUserRoleScope } from '../utils/userScope';
 import { getFaseByClassName, formatClassDisplay } from '../utils/faseKurikulum';
+import { normalizeClassToken } from '../utils/documentParser';
 import {
   ArrowLeft,
   ClipboardList,
@@ -574,9 +575,10 @@ export const AbsensiView: React.FC = () => {
     const monthName = monthNames[mIdx] || 'Juli';
     const sem = (mIdx >= 0 && mIdx <= 5) ? 'Genap' : 'Ganjil';
 
+    const activeClsId = selectedClassId || activeTargetClass?.id || '';
     return (
       <PublicDailyReportViewer
-        classId={selectedClassId}
+        classId={activeClsId}
         date={date}
         attendanceType={attendanceMode}
         subjectId={attendanceMode === 'SUBJECT' ? selectedSubjectId : null}
@@ -1631,13 +1633,18 @@ export const AbsensiView: React.FC = () => {
           isOpen={isBroadcastModalOpen}
           onClose={() => setIsBroadcastModalOpen(false)}
           date={date}
-          classId={selectedClassId}
-          className={activeTargetClass?.name || schoolProfile.kelas || 'Kelas'}
+          classId={selectedClassId || activeTargetClass?.id || ''}
+          className={activeTargetClass?.name || 'Kelas'}
           attendanceType={attendanceMode}
           subjectId={attendanceMode === 'SUBJECT' ? selectedSubjectId : null}
           subjectName={activeSubject?.name || null}
           records={records}
-          students={students.filter((s) => s.classId === selectedClassId)}
+          students={students.filter((s) => {
+            const targetId = selectedClassId || activeTargetClass?.id;
+            if (targetId && s.classId === targetId) return true;
+            if (activeTargetClass && s.className && normalizeClassToken(s.className) === normalizeClassToken(activeTargetClass.name)) return true;
+            return false;
+          })}
           initialType={broadcastInitialType}
           reportType="Laporan Harian"
           onOpenPdfPreview={() => {

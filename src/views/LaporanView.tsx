@@ -3,6 +3,7 @@ import { useApp } from '../context/AppContext';
 import { PublicDailyReportViewer } from '../components/PublicDailyReportViewer';
 import { getUserRoleScope } from '../utils/userScope';
 import { getFaseByClassName, formatClassDisplay } from '../utils/faseKurikulum';
+import { normalizeClassToken } from '../utils/documentParser';
 import {
   ArrowLeft,
   FileText,
@@ -227,11 +228,18 @@ export const LaporanView: React.FC = () => {
   const monthKey = `${year}-${String(mNum).padStart(2, '0')}`;
   const effectiveDays = getEffectiveDaysForMonth(Number(year) || 2026, mNum);
 
-  // Filter students by selected class
+  // Filter students strictly by selected class (never leak all students or other classes)
   const filteredStudents = useMemo(() => {
-    if (!selectedClassId) return students;
-    return students.filter((s) => s.classId === selectedClassId);
-  }, [students, selectedClassId]);
+    const targetClass = selectedClassObj || classes.find((c) => c.id === effectiveClassId || c.id === selectedClassId);
+    if (!targetClass) return [];
+    return students
+      .filter((s) => {
+        if (s.classId && s.classId === targetClass.id) return true;
+        if (s.className && normalizeClassToken(s.className) === normalizeClassToken(targetClass.name)) return true;
+        return false;
+      })
+      .sort((a, b) => a.nama.localeCompare(b.nama, 'id'));
+  }, [students, selectedClassObj, classes, effectiveClassId, selectedClassId]);
 
   // Semester calculation for Class View
   const isSemesterGenap = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni'].includes(month);
@@ -267,24 +275,21 @@ export const LaporanView: React.FC = () => {
     );
   }, [semesterMonths, semYear, getEffectiveDaysForMonth]);
 
-  // Filter attendance records based on selected class, subject, and students
+  // Filter attendance records based strictly on selected class students
   const relevantRecords = useMemo(() => {
     const studentIds = new Set(filteredStudents.map((s) => s.id));
+    if (studentIds.size === 0) return [];
     return attendanceRecords.filter((r) => {
+      if (!studentIds.has(r.studentId)) return false;
       if (attendanceType === 'SUBJECT') {
         if (r.type !== 'SUBJECT') return false;
         if (selectedSubjectId && r.subjectId !== selectedSubjectId) return false;
       } else {
         if (r.type === 'SUBJECT') return false;
       }
-      if (selectedClassId) {
-        if (r.classId && r.classId === selectedClassId) return true;
-        if (studentIds.has(r.studentId)) return true;
-        return false;
-      }
       return true;
     });
-  }, [attendanceRecords, attendanceType, selectedSubjectId, selectedClassId, filteredStudents]);
+  }, [attendanceRecords, attendanceType, selectedSubjectId, filteredStudents]);
 
   // 1. DATA COMPUTATION: LAPORAN HARIAN
   const dailyRows = useMemo(() => {
@@ -702,10 +707,10 @@ export const LaporanView: React.FC = () => {
   if (isPrintModalOpen) {
     return (
       <PublicDailyReportViewer
-        classId={viewScopeMode === 'KEPSEK' ? (classes[0]?.id || '') : (selectedClassId || '')}
+        classId={viewScopeMode === 'KEPSEK' ? (classes[0]?.id || '') : (effectiveClassId || selectedClassId || '')}
         date={selectedDate}
         attendanceType={viewScopeMode === 'KEPSEK' ? 'DAILY' : attendanceType}
-        subjectId={viewScopeMode === 'KEPSEK' ? null : (selectedSubjectId || null)}
+        subjectId={viewScopeMode === 'KEPSEK' ? null : (effectiveSubjectId || selectedSubjectId || null)}
         reportType={viewScopeMode === 'KEPSEK' ? kepsekPeriodData.reportTypeModal : reportType}
         selectedWeek={selectedWeek}
         month={month}

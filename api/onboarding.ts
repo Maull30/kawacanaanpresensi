@@ -101,23 +101,12 @@ export default async function handler(req: any, res: any) {
   }
 
   const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '';
-  const serverServiceKey =
-    process.env.SUPABASE_SERVICE_ROLE_KEY ||
-    process.env.SUPABASE_SECRET_KEY ||
-    process.env.VITE_SUPABASE_SERVICE_ROLE_KEY ||
-    process.env.SUPABASE_SERVICE_ROLE_KEY ||
-    process.env.SUPABASE_SECRET_KEY ||
-    process.env.VITE_SUPABASE_SERVICE_ROLE_KEY ||
-    process.env.SERVICE_ROLE_KEY ||
-    process.env.SUPABASE_KEY ||
-    process.env.SERVICE_ROLE_KEY ||
-    process.env.SUPABASE_KEY ||
-    '';
   const serviceKey =
-    serverServiceKey ||
-    process.env.VITE_SUPABASE_ANON_KEY ||
-    process.env.SUPABASE_ANON_KEY ||
-    '';
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    process.env.SUPABASE_SECRET_KEY ||
+    process.env.VITE_SUPABASE_SERVICE_ROLE_KEY ||
+    process.env.SERVICE_ROLE_KEY ||
+    process.env.SUPABASE_KEY ||
     process.env.VITE_SUPABASE_ANON_KEY ||
     process.env.SUPABASE_ANON_KEY ||
     '';
@@ -132,19 +121,6 @@ export default async function handler(req: any, res: any) {
   }
   const action = body.action;
 
-  // Dokumen Rekap Resmi harus selalu membaca database melalui credential
-  // server. Jangan pernah menurunkan endpoint laporan ke anon key karena
-  // hasilnya harus identik dengan data yang dipakai aplikasi saat mencetak.
-  if (action === 'get_public_daily_report' && !serverServiceKey) {
-    return json(res, 500, {
-      ok: false,
-      error: 'Konfigurasi database server untuk Dokumen Rekap Resmi belum tersedia. Pastikan SUPABASE_SERVICE_ROLE_KEY terpasang.',
-    });
-  }
-
-  // Fallback jika kredensial server belum tersedia sama sekali
-  if (!url || !serviceKey) {
-    if (action === 'lookup_school') {
   // Fallback jika kredensial server belum tersedia sama sekali
   if (!url || !serviceKey) {
     if (action === 'lookup_school') {
@@ -509,46 +485,39 @@ export default async function handler(req: any, res: any) {
       const attType = String(body.attendanceType || 'DAILY').toUpperCase() === 'SUBJECT' ? 'SUBJECT' : 'DAILY';
       const subjectId = body.subjectId || null;
 
-      // 1. Resolve kelas secara deterministik. Smart Link membawa UUID kelas
-      // yang sama dengan kelas yang dipilih saat guru mencetak laporan.
-      // Untuk dokumen resmi, jangan pernah mengganti UUID yang tidak ditemukan
-      // dengan kelas lain atau kelas pertama.
+      // 1. Cari kelas secara cerdas & bertingkat (Aman dari ketidakcocokan ID/UUID)
       let targetClass: any = null;
       const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(classIdOrName);
 
+      // 1.a. Jika parameter classId adalah UUID yang valid
       if (isUuid) {
-        const { data: cls, error: clsErr } = await db
+        const { data: clsRows } = await db
           .from('classes')
           .select('id, name, grade, academic_year, school_id, wali_kelas_teacher_id')
           .eq('id', classIdOrName)
-          .maybeSingle();
-        if (clsErr) {
-          console.error('[get_public_daily_report] class lookup error:', clsErr.message);
-          return json(res, 500, { ok: false, error: 'Gagal membaca data rombel untuk Dokumen Rekap Resmi.' });
-        }
-        targetClass = cls || null;
-      } else {
+          .limit(1);
+        targetClass = clsRows?.[0] || null;
+      }
+
+      // 1.b. Pencarian berdasarkan nama kelas atau explicitClassName
+      if (!targetClass) {
         const candidateNames = [explicitClassName, classIdOrName].filter(
           (n) => n && n !== 'default' && n !== 'all'
         );
+
         for (const rawName of candidateNames) {
+          // Bersihkan prefix seperti "cls-", "class-", "kelas "
           const cleanName = rawName.replace(/^cls[-_]?/i, '').replace(/^kelas\s*/i, '').trim();
-          if (!cleanName) continue;
-          const { data: found, error: nameErr } = await db
+
+          const { data: found } = await db
             .from('classes')
             .select('id, name, grade, academic_year, school_id, wali_kelas_teacher_id')
             .or(`name.ilike.%${cleanName}%,name.ilike.%${rawName}%`)
-            .limit(2);
-          if (nameErr) {
-            console.error('[get_public_daily_report] class name lookup error:', nameErr.message);
-            return json(res, 500, { ok: false, error: 'Gagal membaca data rombel untuk Dokumen Rekap Resmi.' });
-          }
-          if (found && found.length === 1) {
+            .limit(1);
+
+          if (found && found.length > 0) {
             targetClass = found[0];
             break;
-          }
-          if (found && found.length > 1) {
-            return json(res, 409, { ok: false, error: 'Rombel tidak dapat ditentukan secara unik. Gunakan tautan Dokumen Rekap Resmi yang terbaru.' });
           }
         }
       }
@@ -583,9 +552,6 @@ export default async function handler(req: any, res: any) {
           }
         }
       }
-          }
-        }
-      }
 
       // 1.d. Fallback terakhir jika tetap tidak ditemukan
       if (!targetClass) {
@@ -603,32 +569,18 @@ export default async function handler(req: any, res: any) {
       const schoolId = targetClass.school_id;
 
       // 2. Ambil profil sekolah dan konfigurasi sistem
-      const [schoolResult, configResult, teachersResult] = await Promise.all([
+      const [{ data: sp }, { data: sc }, { data: teachersList }] = await Promise.all([
         db.from('school_profile').select('*').eq('school_id', schoolId).maybeSingle(),
         db.from('system_config').select('*').eq('school_id', schoolId).maybeSingle(),
         db.from('teachers').select('id, nama, nip, tugas_utama').eq('school_id', schoolId),
       ]);
-      if (schoolResult.error || configResult.error || teachersResult.error) {
-        console.error('[get_public_daily_report] profile/config/teacher read error:',
-          schoolResult.error?.message || configResult.error?.message || teachersResult.error?.message);
-        return json(res, 500, { ok: false, error: 'Gagal membaca data pendukung Dokumen Rekap Resmi.' });
-      }
-      const sp = schoolResult.data;
-      const sc = configResult.data;
-      const teachersList = teachersResult.data || [];
 
-      // 3. Ambil daftar siswa kelas tersebut. Urutan dan identitas siswa
-      // disamakan dengan sumber data laporan internal aplikasi.
-      const { data: studentRows, error: studentErr } = await db
+      // 3. Ambil daftar siswa kelas tersebut
+      const { data: studentRows } = await db
         .from('students')
         .select('id, nisn, nama, gender')
-        .eq('school_id', schoolId)
         .eq('class_id', targetClass.id)
         .order('nama', { ascending: true });
-      if (studentErr) {
-        console.error('[get_public_daily_report] student read error:', studentErr.message);
-        return json(res, 500, { ok: false, error: 'Gagal membaca daftar siswa untuk Dokumen Rekap Resmi.' });
-      }
 
       const students = studentRows || [];
       const studentIds = students.map((s: any) => s.id);
@@ -655,8 +607,7 @@ export default async function handler(req: any, res: any) {
 
         const { data: recordsData, error: recordsErr } = await attQuery;
         if (recordsErr) {
-          console.error('[get_public_daily_report] attendance read error:', recordsErr.message);
-          return json(res, 500, { ok: false, error: 'Gagal membaca data presensi untuk Dokumen Rekap Resmi.' });
+          console.warn('[get_public_daily_report] attQuery error:', recordsErr.message);
         }
         attRecords = recordsData || [];
       }
@@ -761,10 +712,10 @@ export default async function handler(req: any, res: any) {
           nisn: s.nisn || '',
           nama: s.nama,
           gender: s.gender || 'L',
-          status: status === '-' ? 'Belum Diabsen' : status,
-          checkInTime: rec?.check_in_time ? String(rec.check_in_time).slice(0, 5) : '-',
-          checkOutTime: rec?.check_out_time ? String(rec.check_out_time).slice(0, 5) : '-',
-          notes: rec?.notes || '-',
+          status,
+          checkInTime: rec?.check_in_time || '',
+          checkOutTime: rec?.check_out_time || '',
+          notes: rec?.notes || '',
         };
       });
 
@@ -819,18 +770,13 @@ export default async function handler(req: any, res: any) {
           records: attRecords.map((r: any) => ({
             id: r.id,
             studentId: r.student_id,
-            studentName: students.find((s: any) => s.id === r.student_id)?.nama || '',
             date: r.date || reportDate,
             status: r.status,
-            // Sama dengan dbAttendance() di AppContext: hasil cetak internal
-            // menggunakan format jam HH:MM, bukan timestamp mentah.
-            checkInTime: r.check_in_time ? String(r.check_in_time).slice(0, 5) : '-',
-            checkOutTime: r.check_out_time ? String(r.check_out_time).slice(0, 5) : '-',
+            checkInTime: r.check_in_time || '',
+            checkOutTime: r.check_out_time || '',
             notes: r.notes || '',
             type: r.type || 'DAILY',
             subjectId: r.subject_id || null,
-            classId: r.class_id || targetClass?.id || null,
-            teacherId: r.teacher_id || null,
           })),
         },
       });

@@ -240,6 +240,63 @@ async function callCloudflareWorkersAI(
   throw lastError || new Error('Tidak ada respon yang diterima dari Cloudflare Workers AI.');
 }
 
+/**
+ * Pemanggil Google Gemini Gen AI SDK
+ */
+async function callGeminiAI(
+  messages: Array<{ role: string; content: string }>,
+  systemInstruction?: string
+): Promise<string> {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error('GEMINI_API_KEY belum disetel di server.');
+  }
+  const { GoogleGenAI } = await import('@google/genai');
+  const ai = new GoogleGenAI({ apiKey });
+
+  const systemMessage = messages.find((m) => m.role === 'system')?.content || systemInstruction;
+  const userMessages = messages.filter((m) => m.role !== 'system');
+
+  const contents = userMessages.map((m) => ({
+    role: m.role === 'model' || m.role === 'assistant' ? 'model' : 'user',
+    parts: [{ text: m.content }],
+  }));
+
+  const response = await ai.models.generateContent({
+    model: 'gemini-2.5-flash',
+    contents: contents.length > 0 ? contents : [{ role: 'user', parts: [{ text: 'Halo' }] }],
+    config: systemMessage ? { systemInstruction: systemMessage } : undefined,
+  });
+
+  return response.text?.trim() || '';
+}
+
+/**
+ * Pemanggil provider AI (memprioritaskan Gemini jika GEMINI_API_KEY ada, dengan fallback Cloudflare Workers AI)
+ */
+async function callAIProvider(
+  messages: Array<{ role: string; content: string }>,
+  systemInstruction?: string
+): Promise<string> {
+  if (process.env.GEMINI_API_KEY) {
+    try {
+      return await callGeminiAI(messages, systemInstruction);
+    } catch (geminiErr: any) {
+      console.warn('[AI] Gemini generation error, attempting Cloudflare fallback:', geminiErr?.message);
+      if (process.env.CLOUDFLARE_ACCOUNT_ID && process.env.CLOUDFLARE_API_TOKEN) {
+        return await callCloudflareWorkersAI(messages);
+      }
+      throw geminiErr;
+    }
+  }
+
+  if (process.env.CLOUDFLARE_ACCOUNT_ID && process.env.CLOUDFLARE_API_TOKEN) {
+    return await callCloudflareWorkersAI(messages);
+  }
+
+  throw new Error('Konfigurasi AI (GEMINI_API_KEY atau CLOUDFLARE_ACCOUNT_ID) belum disetel di server.');
+}
+
 export default async function handler(req: any, res: any) {
   // 1. Only allow POST
   if (req.method !== 'POST') {
@@ -337,7 +394,7 @@ ${dynamicContextBlock}
    - Jawaban harus lebih relevan, singkat, padat, ramah, dan membantu pengunjung menemukan langkah berikutnya dengan cepat.
    - Jangan menyebut section secara kaku jika tidak relevan.`;
 
-    // Eksekusi tunggal melalui Cloudflare Workers AI
+    // Eksekusi melalui AI Provider (Gemini / Cloudflare)
     try {
       const messages = [
         { role: 'system', content: landingInstructionText },
@@ -345,7 +402,7 @@ ${dynamicContextBlock}
         { role: 'user', content: sanitizedQuestion },
       ];
 
-      const rawText = await callCloudflareWorkersAI(messages, '@cf/zai-org/glm-4.7-flash');
+      const rawText = await callAIProvider(messages, landingInstructionText);
       if (rawText && rawText.trim()) {
         const cleanedText = rawText.replace(/^```(?:json)?\s*|\s*```$/gi, '').trim();
         return json(res, 200, {
@@ -353,8 +410,8 @@ ${dynamicContextBlock}
           answer: cleanedText,
         });
       }
-    } catch (cfErr: any) {
-      console.warn('[Landing AI] Cloudflare Workers AI error:', cfErr?.message);
+    } catch (aiErr: any) {
+      console.warn('[Landing AI] AI provider error:', aiErr?.message);
       return json(res, 200, {
         ok: true,
         fallback: true,
@@ -410,14 +467,14 @@ ${dynamicContextBlock}
     return json(res, 403, { ok: false, error: 'Profil pengguna tidak ditemukan atau akses ditolak.' });
   }
 
-  // 5. Verify Cloudflare Workers AI credentials (eksklusif)
-  const cfAccountId = process.env.CLOUDFLARE_ACCOUNT_ID;
-  const cfApiToken = process.env.CLOUDFLARE_API_TOKEN;
+  // 5. Verify AI credentials (Gemini or Cloudflare)
+  const hasGemini = Boolean(process.env.GEMINI_API_KEY);
+  const hasCloudflare = Boolean(process.env.CLOUDFLARE_ACCOUNT_ID && process.env.CLOUDFLARE_API_TOKEN);
 
-  if (!cfAccountId || !cfApiToken) {
+  if (!hasGemini && !hasCloudflare) {
     return json(res, 500, {
       ok: false,
-      error: 'Konfigurasi Cloudflare Workers AI (CLOUDFLARE_ACCOUNT_ID dan CLOUDFLARE_API_TOKEN) belum tersedia pada server environment.',
+      error: 'Konfigurasi AI (GEMINI_API_KEY atau CLOUDFLARE_ACCOUNT_ID dan CLOUDFLARE_API_TOKEN) belum tersedia pada server environment.',
     });
   }
 
@@ -452,7 +509,7 @@ ${dynamicContextBlock}
     sanitizedContext || 'Data absensi belum tersedia atau kosong untuk konteks saat ini.'
   }`;
 
-  // 7. Execute AI generation via Cloudflare Workers AI semata
+  // 7. Execute AI generation via AI Provider (Gemini / Cloudflare)
   try {
     const messages = [
       { role: 'system', content: systemInstructionText },
@@ -460,7 +517,7 @@ ${dynamicContextBlock}
       { role: 'user', content: sanitizedQuestion },
     ];
 
-    const rawAnswer = await callCloudflareWorkersAI(messages, '@cf/zai-org/glm-4.7-flash');
+    const rawAnswer = await callAIProvider(messages, systemInstructionText);
 
     if (!rawAnswer) {
       return json(res, 200, {

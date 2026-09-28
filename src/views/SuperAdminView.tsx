@@ -106,7 +106,7 @@ const clusters: ClusterConfig[] = [
     icon: ShieldCheck,
     submenus: [
       { id: 'platform', label: 'Konfigurasi Platform', icon: SlidersHorizontal },
-      { id: 'koka-ai', label: 'Mesin AI Koka', icon: Sparkles },
+      { id: 'koka-ai', label: 'Mesin AI Presiden Konoha', icon: Sparkles },
       { id: 'evolution-api', label: 'Gateway WhatsApp', icon: Radio },
       { id: 'siaran', label: 'Siaran Pengumuman', icon: Megaphone },
       { id: 'keamanan', label: 'Pusat Keamanan & Audit', icon: Shield },

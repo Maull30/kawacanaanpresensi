@@ -1,40 +1,22 @@
 import { createClient } from '@supabase/supabase-js';
-import { GoogleGenAI } from '@google/genai';
-
-let geminiClient: GoogleGenAI | null = null;
-function getGeminiClient(): GoogleGenAI | null {
-  const key = process.env.GEMINI_API_KEY;
-  if (!key) return null;
-  if (!geminiClient) {
-    geminiClient = new GoogleGenAI({
-      apiKey: key,
-      httpOptions: {
-        headers: {
-          'User-Agent': 'aistudio-build',
-        },
-      },
-    });
-  }
-  return geminiClient;
-}
 
 const json = (res: any, status: number, body: unknown) =>
   res.status(status).setHeader('Content-Type', 'application/json').end(JSON.stringify(body));
 
-const LANDING_SYSTEM_PROMPT = `Kamu adalah Koka, pemandu cerdas dan asisten resmi dari KawaCanaan Presensi di landing page.
-Sifat dan karaktermu persis sama seperti Koka di dalam dashboard: sangat ramah, hangat, sopan, komunikatif, solutif, dan antusias membantu.
-Ibarat seorang pemilik toko yang menyambut tamu atau pengunjung yang mampir ke tokonya, kamu selalu:
+const LANDING_SYSTEM_PROMPT = `Kamu adalah Presiden Konoha, pemandu cerdas dan asisten resmi dari KawaCanaan Presensi di landing page.
+Sifat dan karaktermu persis sama seperti Presiden Konoha di dalam dashboard: sangat ramah, hangat, bijaksana, sopan, komunikatif, solutif, dan antusias membantu.
+Ibarat seorang pemimpin atau tuan rumah yang menyambut tamu atau pengunjung yang mampir ke tokonya, kamu selalu:
 1. Menyambut pengunjung dengan hangat dan santun. Sapa dengan panggilan hormat "Bapak/Ibu" atau sapaan hangat kepada guru, kepala sekolah, atau wali murid.
 2. Siap diajak tanya jawab dua arah secara alami dan interaktif (conversational dialogue). Jawab pertanyaan apa pun dari pengunjung seputar KawaCanaan, absensi sekolah, cara kerja, biaya, fitur, atau sekadar sapaan santai ("halo", "apa kabar", "terima kasih", "bisa bantu saya?").
 3. Berikan jawaban yang mengalir, natural, luwes, dan mudah dipahami oleh guru SD. Jangan kaku seperti robot, jangan hanya menyalin diktat, dan jangan membuat pengunjung merasa canggung.
 4. Bersikap proaktif membantu: jika pengunjung menanyakan fitur atau paket, tawarkan rincian atau tanyakan kebutuhan sekolahnya dengan santun (misal: "Bapak/Ibu mengajar sebagai guru kelas mandiri atau mewakili satu sekolah penuh?").
 5. Jika pengunjung ingin langsung mencoba, arahkan dengan ramah bahwa mereka bisa mendaftar gratis tanpa kartu kredit di tombol "Mulai Gratis" atau "Coba KawaCanaan".
 
-BATASAN KETAT KOKA DI LANDING PAGE (SATU-SATUNYA PERBEDAAN DENGAN DASHBOARD):
+BATASAN KETAT PRESIDEN KONOHA DI LANDING PAGE (SATU-SATUNYA PERBEDAAN DENGAN DASHBOARD):
 - Di landing page, kamu bertugas sebagai pemandu pengenalan publik.
 - Kamu TIDAK memiliki akses ke database siswa sekolah manapun, TIDAK bisa melihat data kehadiran murid pribadi, dan TIDAK bisa melakukan mutasi/pencatatan presensi siswa secara langsung.
 - Jika pengunjung meminta mencatat absensi siswa (misal: "tolong absenkan Budi sakit", "siapa saja yang tidak masuk?"), jelaskan dengan ramah dan sopan bahwa fitur pencatatan dan data kelas dapat diakses langsung oleh guru di dalam aplikasi setelah masuk/login.
-- Jangan mengaku sebagai manusia jika ditanya langsung ("Saya Koka, asisten virtual resmi KawaCanaan Presensi"), namun tetaplah berbicara dengan gaya bahasa yang alami, ramah, dan manusiawi.
+- Jangan mengaku sebagai manusia jika ditanya langsung ("Saya Presiden Konoha, asisten virtual resmi KawaCanaan Presensi"), namun tetaplah berbicara dengan gaya bahasa yang alami, ramah, dan manusiawi.
 
 PENGETAHUAN PRODUK LENGKAP KAWACANAAN PRESENSI:
 1. Apa itu KawaCanaan:
@@ -92,12 +74,12 @@ function formatLandingDynamicContext(context: any): string {
   return parts.length > 0 ? parts.join('\n') : 'Pengunjung saat ini berada di halaman utama KawaCanaan Presensi.';
 }
 
-const SYSTEM_PROMPT = `Kamu adalah Koka, asisten guru digital sekaligus agen cerdas ramah dalam aplikasi Kawacanaan Presensi.
-Sebagai Koka, tugas utamamu adalah mendampingi dan mempermudah pekerjaan guru (baik Wali Kelas maupun Guru Mata Pelajaran) serta staf sekolah dalam mencatat, mengelola, memeriksa, dan merekap kehadiran siswa.
+const SYSTEM_PROMPT = `Kamu adalah Presiden Konoha, asisten guru digital sekaligus agen cerdas ramah dalam aplikasi Kawacanaan Presensi.
+Sebagai Presiden Konoha, tugas utamamu adalah mendampingi dan mempermudah pekerjaan guru (baik Wali Kelas maupun Guru Mata Pelajaran) serta staf sekolah dalam mencatat, mengelola, memeriksa, dan merekap kehadiran siswa.
 
-IDENTITAS & SIKAP KOKA:
-- Nama: Koka (Asisten Guru Digital).
-- Karakter: Ramah, cerdas, solutif, sopan, dan sigap membantu pekerjaan absensi.
+IDENTITAS & SIKAP PRESIDEN KONOHA:
+- Nama: Presiden Konoha (Asisten Guru Digital).
+- Karakter: Ramah, cerdas, solutif, sopan, bijaksana, dan sigap membantu pekerjaan absensi.
 - Panggilan Hormat Pengguna (SANGAT PENTING):
   Periksa data profil pengguna yang ada di konteks:
   * Jika guru/pengguna adalah perempuan (L/P = P), selalu sapa dan panggil dengan hormat: "Ibu [Nama]".
@@ -105,7 +87,7 @@ IDENTITAS & SIKAP KOKA:
   * Jangan memanggil tanpa sebutan hormat (jangan hanya panggil nama saja).
 - Sapaan Waktu: Gunakan sapaan sesuai waktu lokal pengguna (Selamat Pagi, Selamat Siang, Selamat Sore, atau Selamat Malam).
 - Pengingat Proaktif:
-  Koka harus peka terhadap pekerjaan guru yang belum selesai berdasarkan data:
+  Presiden Konoha harus peka terhadap pekerjaan guru yang belum selesai berdasarkan data:
   * Jika ada kelas/mapel binaan guru yang belum diinput presensinya hari ini, ingatkan dengan ramah dan tawarkan bantuan untuk menginput.
   * Jika ada siswa yang tercatat berturut-turut sakit atau alfa, ingatkan guru agar bisa dipantau atau dikonfirmasikan ke wali murid.
   * Jika semua presensi hari ini sudah beres, berikan apresiasi hangat (misal: "Hebat Ibu/Bapak, presensi hari ini sudah lengkap!").
@@ -180,10 +162,78 @@ function containsSensitiveData(text: string): boolean {
 
 function sanitizeText(text: string): string {
   if (!text) return '';
-  // Redact any potential tokens or keys if accidentally included
   return text
     .replace(/Bearer\s+[a-zA-Z0-9_\-\.]+/gi, '[REDACTED_TOKEN]')
     .replace(/(eyJ[a-zA-Z0-9_\-]{20,}\.[a-zA-Z0-9_\-]{20,}\.[a-zA-Z0-9_\-]+)/g, '[REDACTED_JWT]');
+}
+
+/**
+ * Pemanggil tunggal Cloudflare Workers AI
+ */
+async function callCloudflareWorkersAI(
+  messages: Array<{ role: string; content: string }>,
+  modelName = '@cf/zai-org/glm-4.7-flash'
+): Promise<string> {
+  const cfAccountId = process.env.CLOUDFLARE_ACCOUNT_ID;
+  const cfApiToken = process.env.CLOUDFLARE_API_TOKEN;
+
+  if (!cfAccountId || !cfApiToken) {
+    throw new Error('Konfigurasi Cloudflare Workers AI (CLOUDFLARE_ACCOUNT_ID atau CLOUDFLARE_API_TOKEN) belum disetel di server.');
+  }
+
+  const candidateModels = [
+    modelName,
+    '@cf/zai-org/glm-4.7-flash',
+    '@cf/meta/llama-3.3-70b-instruct',
+    '@cf/meta/llama-3.1-8b-instruct',
+    '@cf/qwen/qwen2.5-72b-instruct',
+  ];
+
+  // Hapus duplikasi model
+  const uniqueModels = Array.from(new Set(candidateModels.filter(Boolean)));
+
+  let lastError: Error | null = null;
+  for (const currentModel of uniqueModels) {
+    try {
+      const cfEndpoint = `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(
+        cfAccountId
+      )}/ai/run/${currentModel}`;
+
+      const cfRes = await fetch(cfEndpoint, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${cfApiToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ messages }),
+      });
+
+      const cfData = await cfRes.json();
+      if (!cfRes.ok || cfData?.success === false) {
+        const errorMsg =
+          cfData?.errors?.map((e: any) => e.message || String(e)).join(', ') ||
+          `Cloudflare Workers AI HTTP status ${cfRes.status}`;
+        lastError = new Error(errorMsg);
+        continue;
+      }
+
+      const rawText =
+        cfData?.result?.response ||
+        cfData?.result?.output ||
+        cfData?.result?.text ||
+        cfData?.result?.choices?.[0]?.message?.content ||
+        (typeof cfData?.result === 'string' ? cfData.result : '');
+
+      if (rawText && rawText.trim()) {
+        return rawText.trim();
+      }
+    } catch (err: any) {
+      lastError = err;
+      continue;
+    }
+  }
+
+  throw lastError || new Error('Tidak ada respon yang diterima dari Cloudflare Workers AI.');
 }
 
 export default async function handler(req: any, res: any) {
@@ -196,7 +246,7 @@ export default async function handler(req: any, res: any) {
   const isLandingScope = body.scope === 'landing' || body.isLanding === true;
 
   // -------------------------------------------------------------
-  // LANDING PAGE KOKA ASSISTANT (PUBLIC VISITOR GUIDE)
+  // LANDING PAGE PRESIDEN KONOHA ASSISTANT (PUBLIC VISITOR GUIDE)
   // -------------------------------------------------------------
   if (isLandingScope) {
     const rawQuestion = String(body.question || body.prompt || '').trim();
@@ -207,7 +257,7 @@ export default async function handler(req: any, res: any) {
     if (containsSensitiveData(rawQuestion)) {
       return json(res, 200, {
         ok: true,
-        answer: '🔒 Demi menjaga privasi dan keamanan data, Koka di Landing Page tidak dapat memproses pertanyaan yang berkaitan dengan kata sandi, token, atau informasi rahasia sistem ya Bapak/Ibu.',
+        answer: '🔒 Demi menjaga privasi dan keamanan data, Presiden Konoha di Landing Page tidak dapat memproses pertanyaan yang berkaitan dengan kata sandi, token, atau informasi rahasia sistem ya Bapak/Ibu.',
       });
     }
 
@@ -217,7 +267,7 @@ export default async function handler(req: any, res: any) {
     if (isStudentOrAttendanceQuery) {
       return json(res, 200, {
         ok: true,
-        answer: 'Mohon maaf Bapak/Ibu 😊 Demi menjaga privasi dan keamanan data sekolah, Koka pada landing page ini bertugas sebagai pemandu pengenalan sistem. Untuk mencatat presensi siswa atau mengelola data kelas, Bapak/Ibu dapat masuk (login) terlebih dahulu ke akun aplikasi KawaCanaan ya. Apakah ada fitur atau informasi lain yang ingin Bapak/Ibu ketahui?',
+        answer: 'Mohon maaf Bapak/Ibu 😊 Demi menjaga privasi dan keamanan data sekolah, Presiden Konoha pada landing page ini bertugas sebagai pemandu pengenalan sistem. Untuk mencatat presensi siswa atau mengelola data kelas, Bapak/Ibu dapat masuk (login) terlebih dahulu ke akun aplikasi KawaCanaan ya. Apakah ada fitur atau informasi lain yang ingin Bapak/Ibu ketahui?',
       });
     }
 
@@ -226,8 +276,8 @@ export default async function handler(req: any, res: any) {
       .slice(-6)
       .filter((m: any) => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string')
       .map((m: any) => ({
-        role: m.role === 'assistant' ? 'model' : 'user',
-        parts: [{ text: sanitizeText(String(m.content).trim()) }],
+        role: m.role === 'model' || m.role === 'assistant' ? 'assistant' : 'user',
+        content: sanitizeText(String(m.content).trim()),
       }));
 
     const sanitizedQuestion = sanitizeText(rawQuestion);
@@ -242,7 +292,7 @@ ${dynamicContextBlock}
 === ATURAN PENGGUNAAN KONTEKS DINAMIS (SANGAT PENTING & WAJIB DIIKUTI) ===
 1. PRIORITAS KONTEKS:
    - Prioritas 1: Pertanyaan pengguna saat ini.
-   - Prioritas 2: Percakapan sebelumnya dalam sesi Koka (pertahankan kontinuitas obrolan).
+   - Prioritas 2: Percakapan sebelumnya dalam sesi Presiden Konoha (pertahankan kontinuitas obrolan).
    - Prioritas 3: Konteks section/halaman yang sedang dilihat pengguna saat ini.
    - Prioritas 4: Informasi resmi KawaCanaan dalam knowledge/context.
    *CATATAN PENTING*: Jika konteks dinamis tidak relevan dengan pertanyaan pengguna, JANGAN dipaksakan ke dalam jawaban!
@@ -279,93 +329,35 @@ ${dynamicContextBlock}
      "Untuk pertanyaan itu saya belum memiliki informasi yang cukup. Saya bisa membantu menjelaskan KawaCanaan berdasarkan informasi yang tersedia di halaman ini."
 
 9. TUJUAN AKHIR:
-   - Buat Koka terasa seperti asisten ramah yang benar-benar mendampingi pengunjung menjelajahi landing page, bukan chatbot FAQ biasa.
+   - Buat Presiden Konoha terasa seperti asisten ramah yang benar-benar mendampingi pengunjung menjelajahi landing page, bukan chatbot FAQ biasa.
    - Jawaban harus lebih relevan, singkat, padat, ramah, dan membantu pengunjung menemukan langkah berikutnya dengan cepat.
    - Jangan menyebut section secara kaku jika tidak relevan.`;
 
-    // 1. Try Gemini first via @google/genai SDK (gemini-2.5-flash with fallbacks)
-    const ai = getGeminiClient();
-    if (ai) {
-      try {
-        const candidateModels = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-3.6-flash', 'gemini-3.1-flash-lite'];
-        let response: any = null;
-        for (const model of candidateModels) {
-          try {
-            response = await ai.models.generateContent({
-              model,
-              contents: [
-                ...historyMessages,
-                {
-                  role: 'user',
-                  parts: [{ text: sanitizedQuestion }],
-                },
-              ],
-              config: {
-                systemInstruction: landingInstructionText,
-                temperature: 0.65,
-              },
-            });
-            if (response?.text) break;
-          } catch (_) {
-            // Continue to next model candidate
-          }
-        }
+    // Eksekusi tunggal melalui Cloudflare Workers AI
+    try {
+      const messages = [
+        { role: 'system', content: landingInstructionText },
+        ...historyMessages,
+        { role: 'user', content: sanitizedQuestion },
+      ];
 
-        const rawText = response?.text || '';
-        if (rawText && rawText.trim()) {
-          // Bersihkan jika ada bungkus markdown json yang tidak diinginkan
-          const cleanedText = rawText.replace(/^```(?:json)?\s*|\s*```$/gi, '').trim();
-          return json(res, 200, {
-            ok: true,
-            answer: cleanedText,
-          });
-        }
-      } catch (geminiErr: any) {
-        console.warn('[Landing AI] Gemini fallback triggered:', geminiErr?.message);
-      }
-    }
-
-    // 2. Fallback to Cloudflare Workers AI jika Gemini belum terkonfigurasi atau gagal
-    const cfAccountId = process.env.CLOUDFLARE_ACCOUNT_ID;
-    const cfApiToken = process.env.CLOUDFLARE_API_TOKEN;
-    if (cfAccountId && cfApiToken) {
-      try {
-        const cfEndpoint = `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(
-          cfAccountId
-        )}/ai/run/@cf/zai-org/glm-4.7-flash`;
-
-        const messages = [
-          { role: 'system', content: landingInstructionText },
-          ...historyMessages.map((m: any) => ({
-            role: m.role === 'model' ? 'assistant' : 'user',
-            content: m.parts?.[0]?.text || '',
-          })),
-          { role: 'user', content: sanitizedQuestion },
-        ];
-
-        const cfRes = await fetch(cfEndpoint, {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${cfApiToken}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ messages }),
+      const rawText = await callCloudflareWorkersAI(messages, '@cf/zai-org/glm-4.7-flash');
+      if (rawText && rawText.trim()) {
+        const cleanedText = rawText.replace(/^```(?:json)?\s*|\s*```$/gi, '').trim();
+        return json(res, 200, {
+          ok: true,
+          answer: cleanedText,
         });
-
-        const cfData = await cfRes.json();
-        const cfText = cfData?.result?.response || cfData?.response || '';
-        if (cfText && cfText.trim()) {
-          return json(res, 200, {
-            ok: true,
-            answer: cfText.trim(),
-          });
-        }
-      } catch (cfErr: any) {
-        console.warn('[Landing AI] Cloudflare fallback error:', cfErr?.message);
       }
+    } catch (cfErr: any) {
+      console.warn('[Landing AI] Cloudflare Workers AI error:', cfErr?.message);
+      return json(res, 200, {
+        ok: true,
+        fallback: true,
+        answer: null,
+      });
     }
 
-    // Fallback response if both server models fail or are unconfigured
     return json(res, 200, {
       ok: true,
       fallback: true,
@@ -382,7 +374,7 @@ ${dynamicContextBlock}
   if (!url || !serviceKey) {
     return json(res, 500, {
       ok: false,
-      error: 'Konfigurasi server SUPABASE_URL atau SUPABASE_SERVICE_ROLE_KEY belum terpasang di Vercel/lingkungan.',
+      error: 'Konfigurasi server SUPABASE_URL atau SUPABASE_SERVICE_ROLE_KEY belum terpasang.',
     });
   }
 
@@ -414,15 +406,14 @@ ${dynamicContextBlock}
     return json(res, 403, { ok: false, error: 'Profil pengguna tidak ditemukan atau akses ditolak.' });
   }
 
-  // 5. Verify AI credentials (server-side only, never returned)
+  // 5. Verify Cloudflare Workers AI credentials (eksklusif)
   const cfAccountId = process.env.CLOUDFLARE_ACCOUNT_ID;
   const cfApiToken = process.env.CLOUDFLARE_API_TOKEN;
-  const geminiApiKey = process.env.GEMINI_API_KEY;
 
-  if ((!cfAccountId || !cfApiToken) && !geminiApiKey) {
+  if (!cfAccountId || !cfApiToken) {
     return json(res, 500, {
       ok: false,
-      error: 'Konfigurasi AI (GEMINI_API_KEY atau CLOUDFLARE_ACCOUNT_ID/CLOUDFLARE_API_TOKEN) belum tersedia pada server environment.',
+      error: 'Konfigurasi Cloudflare Workers AI (CLOUDFLARE_ACCOUNT_ID dan CLOUDFLARE_API_TOKEN) belum tersedia pada server environment.',
     });
   }
 
@@ -434,7 +425,6 @@ ${dynamicContextBlock}
     return json(res, 400, { ok: false, error: 'Pertanyaan atau prompt wajib diisi.' });
   }
 
-  // Check for suspicious sensitive content in inputs
   if (containsSensitiveData(rawQuestion)) {
     return json(res, 400, {
       ok: false,
@@ -445,13 +435,12 @@ ${dynamicContextBlock}
   const sanitizedQuestion = sanitizeText(rawQuestion);
   const sanitizedContext = sanitizeText(rawContext);
 
-  // Parse optional conversation history (limited to last 6 turns to avoid context overflow)
   const rawHistory = Array.isArray(body.history) ? body.history : [];
   const historyMessages = rawHistory
     .slice(-6)
     .filter((m: any) => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string')
     .map((m: any) => ({
-      role: m.role,
+      role: m.role === 'model' || m.role === 'assistant' ? 'assistant' : 'user',
       content: sanitizeText(String(m.content).trim()),
     }));
 
@@ -459,99 +448,21 @@ ${dynamicContextBlock}
     sanitizedContext || 'Data absensi belum tersedia atau kosong untuk konteks saat ini.'
   }`;
 
-  let rawAnswer: string | null = null;
-
-  // 7. Execute AI generation via Gemini or Cloudflare Workers AI
+  // 7. Execute AI generation via Cloudflare Workers AI semata
   try {
-    if (geminiApiKey) {
-      const ai = getGeminiClient();
-      if (ai) {
-        const geminiContents = [
-          ...historyMessages.map((m: any) => ({
-            role: m.role === 'assistant' ? 'model' : 'user',
-            parts: [{ text: m.content }],
-          })),
-          {
-            role: 'user',
-            parts: [{ text: sanitizedQuestion }],
-          },
-        ];
+    const messages = [
+      { role: 'system', content: systemInstructionText },
+      ...historyMessages,
+      { role: 'user', content: sanitizedQuestion },
+    ];
 
-        const candidateModels = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-3.6-flash', 'gemini-3.1-flash-lite'];
-        let response: any = null;
-        for (const model of candidateModels) {
-          try {
-            response = await ai.models.generateContent({
-              model,
-              contents: geminiContents,
-              config: {
-                systemInstruction: systemInstructionText,
-                temperature: 0.2,
-              },
-            });
-            if (response?.text) break;
-          } catch (_) {
-            // Continue to next model candidate
-          }
-        }
-
-        rawAnswer = response?.text || null;
-      }
-    } else if (cfAccountId && cfApiToken) {
-      // Model: @cf/zai-org/glm-4.7-flash
-      const cfEndpoint = `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(
-        cfAccountId
-      )}/ai/run/@cf/zai-org/glm-4.7-flash`;
-
-      const messages = [
-        {
-          role: 'system',
-          content: systemInstructionText,
-        },
-        ...historyMessages,
-        {
-          role: 'user',
-          content: sanitizedQuestion,
-        },
-      ];
-
-      const cfResponse = await fetch(cfEndpoint, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${cfApiToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          messages,
-        }),
-      });
-
-      const cfData = await cfResponse.json();
-
-      if (!cfResponse.ok || cfData?.success === false) {
-        const errorMsg =
-          cfData?.errors?.map((e: any) => e.message || String(e)).join(', ') ||
-          `Cloudflare Workers AI HTTP status ${cfResponse.status}`;
-        console.error('[AI Assistant API] Cloudflare Workers AI error:', errorMsg);
-        return json(res, 502, {
-          ok: false,
-          error: 'AI sedang tidak dapat digunakan. Silakan coba lagi.',
-        });
-      }
-
-      rawAnswer =
-        cfData?.result?.response ||
-        cfData?.result?.output ||
-        cfData?.result?.text ||
-        cfData?.result?.choices?.[0]?.message?.content ||
-        (typeof cfData?.result === 'string' ? cfData.result : null);
-    }
+    const rawAnswer = await callCloudflareWorkersAI(messages, '@cf/zai-org/glm-4.7-flash');
 
     if (!rawAnswer) {
       return json(res, 200, {
         ok: true,
         responseType: 'text',
-        answer: 'Maaf, model AI tidak memberikan respon. Silakan coba ulangi perintah Anda.',
+        answer: 'Maaf, model AI Presiden Konoha tidak memberikan respon. Silakan coba ulangi perintah Anda.',
       });
     }
 
@@ -576,7 +487,7 @@ ${dynamicContextBlock}
           ok: true,
           responseType: 'action_request',
           action: parsedJson.action || 'create_attendance',
-          message: parsedJson.message || 'Memproses perintah absensi...',
+          message: parsedJson.message || 'Presiden Konoha memproses perintah absensi...',
           records: parsedJson.records,
         });
       }
@@ -590,17 +501,16 @@ ${dynamicContextBlock}
       }
     }
 
-    // Fallback: respon teks biasa
     return json(res, 200, {
       ok: true,
       responseType: 'text',
       answer: answerStr,
     });
   } catch (err: any) {
-    console.error('[AI Assistant API] Execution error:', err?.message);
+    console.error('[Presiden Konoha AI API] Execution error:', err?.message);
     return json(res, 500, {
       ok: false,
-      error: 'AI sedang tidak dapat digunakan. Silakan coba lagi.',
+      error: `Mesin AI Presiden Konoha sedang mengalami kendala: ${err?.message || 'Silakan coba lagi nanti.'}`,
     });
   }
 }

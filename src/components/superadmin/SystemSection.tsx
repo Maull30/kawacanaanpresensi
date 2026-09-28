@@ -93,8 +93,8 @@ export const SystemSection: React.FC<SystemSectionProps> = ({
     },
     {
       id: 'koka-ai',
-      label: 'Mesin AI Koka',
-      sublabel: 'Gemini Engine & Kuota',
+      label: 'Mesin AI Presiden Konoha',
+      sublabel: 'Cloudflare AI & Kuota',
       icon: Sparkles,
       color: 'violet',
     },

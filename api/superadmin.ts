@@ -1,5 +1,4 @@
 import { createClient } from '@supabase/supabase-js';
-import { GoogleGenAI } from '@google/genai';
 
 const json = (res:any,status:number,body:unknown)=>res.status(status).setHeader('Content-Type','application/json').end(JSON.stringify(body));
 
@@ -1949,15 +1948,18 @@ export default async function handler(req:any,res:any){
         ...(integrations.platform_config || {}),
       };
 
+      const cfAccountId = process.env.CLOUDFLARE_ACCOUNT_ID;
+      const cfApiToken = process.env.CLOUDFLARE_API_TOKEN;
       const defaultKokaConfig = {
         enabled_landing: true,
         enabled_dashboard: true,
-        active_model: 'gemini-3.8-flash',
+        active_model: '@cf/zai-org/glm-4.7-flash',
         temperature: 0.7,
-        system_persona: 'Kamu adalah Koka, asisten virtual cerdas, ramah, dan profesional untuk sistem presensi sekolah dasar Kawacanaan. Bantulah guru, tenaga kependidikan, dan wali murid dengan ramah, berbasis data presensi yang akurat dan sopan.',
+        system_persona: 'Kamu adalah Presiden Konoha, asisten virtual cerdas, ramah, dan profesional untuk sistem presensi sekolah dasar Kawacanaan. Bantulah guru, tenaga kependidikan, dan wali murid dengan ramah, berbasis data presensi yang akurat dan sopan.',
         max_tokens: 1024,
         daily_limit_per_tenant: 100,
-        has_gemini_key: Boolean(process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.trim().length > 0),
+        has_cloudflare_config: Boolean(cfAccountId && cfApiToken),
+        has_gemini_key: false,
         ...(integrations.koka_config || {}),
       };
 
@@ -2220,65 +2222,62 @@ export default async function handler(req:any,res:any){
     }
 
     if(action==='test_koka_ai'){
-      const apiKey = process.env.GEMINI_API_KEY;
-      if (!apiKey) {
+      const cfAccountId = process.env.CLOUDFLARE_ACCOUNT_ID;
+      const cfApiToken = process.env.CLOUDFLARE_API_TOKEN;
+      if (!cfAccountId || !cfApiToken) {
         return json(res, 400, {
           ok: false,
-          error: 'GEMINI_API_KEY belum disetel di environment server. Fitur Koka AI memerlukan kunci API Gemini.',
+          error: 'CLOUDFLARE_ACCOUNT_ID atau CLOUDFLARE_API_TOKEN belum disetel di environment server. Fitur Presiden Konoha AI memerlukan Cloudflare Workers AI.',
         });
       }
 
-      const prompt = req.body.prompt || 'Halo Koka, tolong berikan satu salam sapaan singkat dan semangat untuk guru sekolah dasar Indonesia!';
-      const requestedModel = req.body.model || 'gemini-3.8-flash';
+      const prompt = req.body.prompt || 'Halo Presiden Konoha, tolong berikan satu salam sapaan singkat dan semangat untuk guru sekolah dasar Indonesia!';
+      const requestedModel = req.body.model || '@cf/zai-org/glm-4.7-flash';
       const t0 = Date.now();
       try {
-        const ai = new GoogleGenAI({
-          apiKey,
-          httpOptions: {
-            headers: {
-              'User-Agent': 'aistudio-build',
-            },
+        const cfEndpoint = `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(
+          cfAccountId
+        )}/ai/run/${requestedModel}`;
+
+        const cfRes = await fetch(cfEndpoint, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${cfApiToken}`,
+            'Content-Type': 'application/json',
           },
+          body: JSON.stringify({
+            messages: [
+              { role: 'system', content: 'Kamu adalah Presiden Konoha, asisten ramah guru sekolah dasar di Kawacanaan.' },
+              { role: 'user', content: prompt }
+            ]
+          }),
         });
 
-        let response;
-        let usedModel = requestedModel;
-        try {
-          response = await ai.models.generateContent({
-            model: requestedModel,
-            contents: prompt,
+        const cfData = await cfRes.json();
+        const latencyMs = Date.now() - t0;
+        const text = cfData?.result?.response || cfData?.response || cfData?.result?.text || '';
+        if (!cfRes.ok || cfData?.success === false) {
+          const errDetail = cfData?.errors?.[0]?.message || 'Gagal menghubungi Cloudflare Workers AI';
+          return json(res, 502, {
+            ok: false,
+            latencyMs,
+            error: errDetail,
           });
-        } catch (firstErr: any) {
-          try {
-            usedModel = 'gemini-3.6-flash';
-            response = await ai.models.generateContent({
-              model: 'gemini-3.6-flash',
-              contents: prompt,
-            });
-          } catch (secErr: any) {
-            usedModel = 'gemini-3.1-flash-lite';
-            response = await ai.models.generateContent({
-              model: 'gemini-3.1-flash-lite',
-              contents: prompt,
-            });
-          }
         }
 
-        const latencyMs = Date.now() - t0;
-        const text = response.text || 'Respon berhasil diterima.';
         return json(res, 200, {
           ok: true,
-          model: usedModel,
+          model: requestedModel,
           reply: text,
           latencyMs,
-          message: `Koneksi server Gemini API (${usedModel}) berfungsi optimal!`,
+          message: `Koneksi Cloudflare Workers AI (${requestedModel}) berfungsi optimal!`,
         });
       } catch (err: any) {
         const latencyMs = Date.now() - t0;
         return json(res, 500, {
           ok: false,
           latencyMs,
-          error: `Gagal menghubungi Gemini API: ${err.message}`,
+          error: `Gagal menghubungi Cloudflare Workers AI: ${err.message}`,
         });
       }
     }

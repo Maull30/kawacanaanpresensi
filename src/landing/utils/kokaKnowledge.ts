@@ -1,9 +1,9 @@
 /**
- * Koka Knowledge Base & Privacy Guardrails Engine for KawaCanaan Presensi Landing Page.
+ * Presiden Konoha Knowledge Base & Privacy Guardrails Engine for KawaCanaan Presensi Landing Page.
  *
- * PERAN KOKA:
+ * PERAN PRESIDEN KONOHA:
  * Asisten virtual / pemandu cerdas untuk pengunjung landing page KawaCanaan Presensi.
- * Koka bukan admin sekolah, bukan pengolah data presensi, dan bukan pengganti fitur utama aplikasi.
+ * Presiden Konoha bukan admin sekolah, bukan pengolah data presensi, dan bukan pengganti fitur utama aplikasi.
  * Fokus: Membantu pengunjung mengenal KawaCanaan, memahami fitur, mendapatkan jawaban atas
  * pertanyaan umum, dan diarahkan ke tindakan yang tepat secara natural.
  */
@@ -77,13 +77,13 @@ export function getKokaLandingResponse(
   if (isPrivacyViolation) {
     if (lang === 'EN') {
       return {
-        text: "🔒 **Data Privacy & System Guardrail**\n\nAs Koka on the public landing page, I do not have access to private student records or class attendance. Those features are securely accessible inside the official application after signing in.\n\nIs there anything else regarding KawaCanaan's features or pricing I can help you with?",
+        text: "🔒 **Data Privacy & System Guardrail**\n\nAs Presiden Konoha on the public landing page, I do not have access to private student records or class attendance. Those features are securely accessible inside the official application after signing in.\n\nIs there anything else regarding KawaCanaan's features or pricing I can help you with?",
         category: 'privacy_guarded',
         suggestions: [],
       };
     }
     return {
-      text: "Mohon maaf Bapak/Ibu 😊 Demi menjaga privasi dan keamanan data sekolah, Koka di landing page ini bertugas sebagai pemandu pengenalan sistem. Untuk melihat data siswa atau mencatat kehadiran kelas, Bapak/Ibu dapat masuk (login) terlebih dahulu ke akun aplikasi KawaCanaan ya.\n\nApakah ada fitur atau paket yang ingin Bapak/Ibu ketahui lebih lanjut?",
+      text: "Mohon maaf Bapak/Ibu 😊 Demi menjaga privasi dan keamanan data sekolah, Presiden Konoha di landing page ini bertugas sebagai pemandu pengenalan sistem. Untuk melihat data siswa atau mencatat kehadiran kelas, Bapak/Ibu dapat masuk (login) terlebih dahulu ke akun aplikasi KawaCanaan ya.\n\nApakah ada fitur atau paket yang ingin Bapak/Ibu ketahui lebih lanjut?",
       category: 'privacy_guarded',
       suggestions: [],
     };
@@ -264,16 +264,16 @@ export function getKokaLandingResponse(
   // -------------------------------------------------------------
   // 5. SAPAAN RAMAH & PEMBUKA (SHOPKEEPER WELCOME GREETINGS)
   // -------------------------------------------------------------
-  if (/^(halo|hai|hi|hey|helo|halo\s*koka|hai\s*koka|pagi|siang|sore|malam|selamat\s*(pagi|siang|sore|malam)|assalamu['a]?laikum|sampurasun)/i.test(qLower)) {
+  if (/^(halo|hai|hi|hey|helo|halo\s*koka|hai\s*koka|halo\s*presiden|hai\s*presiden|pagi|siang|sore|malam|selamat\s*(pagi|siang|sore|malam)|assalamu['a]?laikum|sampurasun)/i.test(qLower)) {
     if (lang === 'EN') {
       return {
-        text: "Hello! Welcome to KawaCanaan Presensi 👋 I am Koka, your smart guide. How can I help you today? Feel free to ask about our features, pricing, or how our digital attendance system works for elementary schools!",
+        text: "Hello! Welcome to KawaCanaan Presensi 👋 I am Presiden Konoha, your smart guide. How can I help you today? Feel free to ask about our features, pricing, or how our digital attendance system works for elementary schools!",
         category: 'greeting',
         suggestions: [],
       };
     }
     return {
-      text: "Halo! Selamat datang di KawaCanaan Presensi 👋 Saya Koka, pemandu cerdas di sini. Senang sekali bisa menyapa Bapak/Ibu!\n\nAda yang bisa Koka bantu jelaskan hari ini seputar aplikasi presensi sekolah kami? Silakan tanyakan apa saja ya 😊",
+      text: "Halo! Selamat datang di KawaCanaan Presensi 👋 Saya Presiden Konoha, pemandu cerdas di sini. Senang sekali bisa menyapa Bapak/Ibu!\n\nAda yang bisa Presiden Konoha bantu jelaskan hari ini seputar aplikasi presensi sekolah kami? Silakan tanyakan apa saja ya 😊",
       category: 'greeting',
       suggestions: [],
     };
@@ -288,10 +288,10 @@ export function getKokaLandingResponse(
     };
   }
 
-  // PERTANYAAN IDENTITAS KOKA
-  if (/siapa\s*(kamu|anda|koka)|kamu\s*siapa|koka\s*itu\s*apa|tentang\s*koka/i.test(qLower)) {
+  // PERTANYAAN IDENTITAS PRESIDEN KONOHA
+  if (/siapa\s*(kamu|anda|koka|presiden|konoha)|kamu\s*siapa|presiden\s*konoha|koka\s*itu\s*apa|tentang\s*(koka|presiden)/i.test(qLower)) {
     return {
-      text: "Halo! Saya Koka, asisten virtual dan pemandu cerdas dari KawaCanaan Presensi 😊\n\nIbarat tuan rumah atau pemilik toko, tugas saya adalah menyambut dan mendampingi Bapak/Ibu pengunjung untuk mengenal fitur, cara kerja, biaya paket, maupun tips kemudahan presensi digital untuk sekolah dasar. Ada yang ingin Bapak/Ibu tanyakan?",
+      text: "Halo! Saya Presiden Konoha, asisten virtual dan pemandu cerdas dari KawaCanaan Presensi 😊\n\nIbarat tuan rumah atau pemimpin yang ramah, tugas saya adalah menyambut dan mendampingi Bapak/Ibu pengunjung untuk mengenal fitur, cara kerja, biaya paket, maupun tips kemudahan presensi digital untuk sekolah dasar. Ada yang ingin Bapak/Ibu tanyakan?",
       category: 'identity',
       suggestions: [],
     };

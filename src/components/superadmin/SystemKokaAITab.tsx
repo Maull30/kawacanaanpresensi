@@ -10,9 +10,6 @@ import {
   Sliders,
   MessageSquare,
   Bot,
-  Layers,
-  HelpCircle,
-  Activity,
   Cpu
 } from 'lucide-react';
 
@@ -24,7 +21,7 @@ interface KokaConfig {
   system_persona: string;
   max_tokens: number;
   daily_limit_per_tenant: number;
-  has_gemini_key?: boolean;
+  has_cloudflare_config?: boolean;
 }
 
 interface Props {
@@ -43,7 +40,7 @@ export const SystemKokaAITab: React.FC<Props> = ({
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
   const [testPrompt, setTestPrompt] = useState(
-    'Halo Koka, bagaimana langkah praktis yang bisa diambil wali kelas saat ada siswa yang sering terlambat?'
+    'Halo Presiden Konoha, bagaimana langkah praktis yang bisa diambil wali kelas saat ada siswa yang sering terlambat?'
   );
   const [testResult, setTestResult] = useState<{
     ok: boolean;
@@ -56,14 +53,14 @@ export const SystemKokaAITab: React.FC<Props> = ({
   const [form, setForm] = useState<KokaConfig>(() => ({
     enabled_landing: initialConfig?.enabled_landing ?? true,
     enabled_dashboard: initialConfig?.enabled_dashboard ?? true,
-    active_model: initialConfig?.active_model || 'gemini-3.8-flash',
+    active_model: initialConfig?.active_model || '@cf/zai-org/glm-4.7-flash',
     temperature: initialConfig?.temperature ?? 0.7,
     system_persona:
       initialConfig?.system_persona ||
-      'Kamu adalah Koka, asisten virtual cerdas, ramah, dan profesional untuk sistem presensi sekolah dasar Kawacanaan. Bantulah guru, tenaga kependidikan, dan wali murid dengan ramah, berbasis data presensi yang akurat dan sopan.',
+      'Kamu adalah Presiden Konoha, asisten virtual cerdas, ramah, dan profesional untuk sistem presensi sekolah dasar Kawacanaan. Bantulah guru, tenaga kependidikan, dan wali murid dengan ramah, berbasis data presensi yang akurat dan sopan.',
     max_tokens: initialConfig?.max_tokens || 1024,
     daily_limit_per_tenant: initialConfig?.daily_limit_per_tenant || 100,
-    has_gemini_key: initialConfig?.has_gemini_key ?? true,
+    has_cloudflare_config: initialConfig?.has_cloudflare_config ?? true,
   }));
 
   useEffect(() => {
@@ -71,14 +68,14 @@ export const SystemKokaAITab: React.FC<Props> = ({
       setForm({
         enabled_landing: initialConfig.enabled_landing ?? true,
         enabled_dashboard: initialConfig.enabled_dashboard ?? true,
-        active_model: initialConfig.active_model || 'gemini-3.8-flash',
+        active_model: initialConfig.active_model || '@cf/zai-org/glm-4.7-flash',
         temperature: initialConfig.temperature ?? 0.7,
         system_persona:
           initialConfig.system_persona ||
-          'Kamu adalah Koka, asisten virtual cerdas, ramah, dan profesional untuk sistem presensi sekolah dasar Kawacanaan. Bantulah guru, tenaga kependidikan, dan wali murid dengan ramah, berbasis data presensi yang akurat dan sopan.',
+          'Kamu adalah Presiden Konoha, asisten virtual cerdas, ramah, dan profesional untuk sistem presensi sekolah dasar Kawacanaan. Bantulah guru, tenaga kependidikan, dan wali murid dengan ramah, berbasis data presensi yang akurat dan sopan.',
         max_tokens: initialConfig.max_tokens || 1024,
         daily_limit_per_tenant: initialConfig.daily_limit_per_tenant || 100,
-        has_gemini_key: initialConfig.has_gemini_key ?? true,
+        has_cloudflare_config: initialConfig.has_cloudflare_config ?? true,
       });
     }
   }, [initialConfig]);
@@ -92,13 +89,13 @@ export const SystemKokaAITab: React.FC<Props> = ({
         data: form,
       });
       if (res.ok) {
-        showToast('Konfigurasi mesin Koka AI berhasil diperbarui di server.', 'success');
+        showToast('Konfigurasi mesin AI Presiden Konoha berhasil diperbarui di server.', 'success');
         if (onSaved) onSaved(form);
       } else {
         throw new Error(res.error || 'Gagal menyimpan.');
       }
     } catch (err: any) {
-      showToast(err.message || 'Gagal memperbarui Koka AI.', 'error');
+      showToast(err.message || 'Gagal memperbarui Presiden Konoha AI.', 'error');
     } finally {
       setSaving(false);
     }
@@ -117,14 +114,14 @@ export const SystemKokaAITab: React.FC<Props> = ({
           model: res.model,
           latencyMs: res.latencyMs,
         });
-        showToast(`Koka AI (${res.model}) merespons dalam ${res.latencyMs} ms!`, 'success');
+        showToast(`Presiden Konoha AI (${res.model}) merespons dalam ${res.latencyMs} ms!`, 'success');
       } else {
         setTestResult({
           ok: false,
           error: res.error || 'Gagal menghubungi AI',
           latencyMs: res.latencyMs,
         });
-        showToast(res.error || 'Gagal uji coba Koka AI', 'error');
+        showToast(res.error || 'Gagal uji coba Presiden Konoha AI', 'error');
       }
     } catch (err: any) {
       setTestResult({
@@ -148,13 +145,13 @@ export const SystemKokaAITab: React.FC<Props> = ({
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="text-base font-black tracking-tight">Koka AI Engine</h3>
+                <h3 className="text-base font-black tracking-tight">Presiden Konoha AI Engine</h3>
                 <span className="px-2 py-0.5 rounded-full bg-white/20 text-[10px] font-bold text-amber-200">
-                  Google Gemini 3.8 Flash
+                  Cloudflare Workers AI
                 </span>
               </div>
               <p className="text-xs text-indigo-150 mt-0.5 leading-relaxed">
-                Pusat kendali kecerdasan buatan terpadu untuk analisis presensi guru dan asisten interaktif di Kawacanaan.
+                Pusat kendali kecerdasan buatan terpadu untuk analisis presensi guru dan asisten interaktif Presiden Konoha di Kawacanaan.
               </p>
             </div>
           </div>
@@ -162,29 +159,29 @@ export const SystemKokaAITab: React.FC<Props> = ({
           <div className="flex items-center gap-2 self-start sm:self-center">
             <span
               className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold ${
-                form.has_gemini_key
+                form.has_cloudflare_config
                   ? 'bg-emerald-500/20 text-emerald-100 border border-emerald-400/30'
                   : 'bg-rose-500/20 text-rose-100 border border-rose-400/30'
               }`}
             >
-              {form.has_gemini_key ? <CheckCircle2 size={13} /> : <XCircle size={13} />}
-              <span>{form.has_gemini_key ? 'Server Gemini API Siap' : 'Kunci API Belum Disetel'}</span>
+              {form.has_cloudflare_config ? <CheckCircle2 size={13} /> : <XCircle size={13} />}
+              <span>{form.has_cloudflare_config ? 'Server Cloudflare AI Siap' : 'Kunci Cloudflare Belum Disetel'}</span>
             </span>
           </div>
         </div>
       </div>
 
       <form onSubmit={handleSave} className="space-y-6">
-        {/* Kontrol Sakelar Area Koka */}
+        {/* Kontrol Sakelar Area Presiden Konoha */}
         <div className="bg-white rounded-2xl p-5 sm:p-6 border border-slate-200/80 shadow-xs space-y-4">
           <div className="flex items-center gap-3 pb-3 border-b border-slate-100">
             <div className="w-9 h-9 rounded-xl bg-violet-50 text-violet-600 flex items-center justify-center font-bold">
               <Zap size={18} />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-slate-900">Aktivasi Koka di Antarmuka Pengguna</h3>
+              <h3 className="text-sm font-bold text-slate-900">Aktivasi Presiden Konoha di Antarmuka Pengguna</h3>
               <p className="text-xs text-slate-500">
-                Pilih di mana widget asisten Koka akan tampil bagi pengguna.
+                Pilih di mana widget asisten Presiden Konoha akan tampil bagi pengguna.
               </p>
             </div>
           </div>
@@ -195,7 +192,7 @@ export const SystemKokaAITab: React.FC<Props> = ({
               <div className="pr-3">
                 <div className="flex items-center gap-2 font-bold text-slate-800">
                   <Bot size={15} className="text-violet-600" />
-                  <span>Koka di Halaman Utama (Landing Page)</span>
+                  <span>Presiden Konoha di Halaman Utama (Landing Page)</span>
                 </div>
                 <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">
                   Menjawab pertanyaan calon pengguna, paket sekolah, dan panduan dasar presensi.
@@ -217,7 +214,7 @@ export const SystemKokaAITab: React.FC<Props> = ({
               <div className="pr-3">
                 <div className="flex items-center gap-2 font-bold text-slate-800">
                   <MessageSquare size={15} className="text-indigo-600" />
-                  <span>Koka di Dashboard Guru (Ruang Kerja)</span>
+                  <span>Presiden Konoha di Dashboard Guru (Ruang Kerja)</span>
                 </div>
                 <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">
                   Mendampingi wali kelas dan guru mapel dalam analisis kehadiran & catatan pembinaan.
@@ -243,22 +240,23 @@ export const SystemKokaAITab: React.FC<Props> = ({
               <Sliders size={18} />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-slate-900">Parameter Mesin & Kuota AI</h3>
+              <h3 className="text-sm font-bold text-slate-900">Parameter Mesin & Kuota Cloudflare AI</h3>
               <p className="text-xs text-slate-500">Konfigurasi batas interaksi harian dan instruksi dasar (system persona).</p>
             </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
             <div>
-              <label className="block font-semibold text-slate-700 mb-1.5">Model AI Utama</label>
+              <label className="block font-semibold text-slate-700 mb-1.5">Model Cloudflare AI Utama</label>
               <select
                 value={form.active_model}
                 onChange={(e) => setForm({ ...form, active_model: e.target.value })}
                 className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:border-violet-500 outline-none bg-white font-medium text-slate-800"
               >
-                <option value="gemini-3.6-flash">gemini-3.6-flash (Disarankan - Cepat & Stabil)</option>
-                <option value="gemini-3.8-flash">gemini-3.8-flash (Model Multimodal Terbaru)</option>
-                <option value="gemini-3.1-flash-lite">gemini-3.1-flash-lite (Ultra Ringan & Hemat)</option>
+                <option value="@cf/zai-org/glm-4.7-flash">GLM 4.7 Flash (@cf/zai-org/glm-4.7-flash - Sangat Cepat & Akurat)</option>
+                <option value="@cf/meta/llama-3.3-70b-instruct">Llama 3.3 70B (@cf/meta/llama-3.3-70b-instruct - Komprehensif)</option>
+                <option value="@cf/meta/llama-3.1-8b-instruct">Llama 3.1 8B (@cf/meta/llama-3.1-8b-instruct - Ringan)</option>
+                <option value="@cf/qwen/qwen2.5-72b-instruct">Qwen 2.5 72B (@cf/qwen/qwen2.5-72b-instruct - Multibahasa)</option>
               </select>
             </div>
 
@@ -288,16 +286,16 @@ export const SystemKokaAITab: React.FC<Props> = ({
           </div>
 
           <div className="text-xs">
-            <label className="block font-semibold text-slate-700 mb-1.5">Instruksi Dasar Persona Koka (System Prompt)</label>
+            <label className="block font-semibold text-slate-700 mb-1.5">Instruksi Dasar Persona Presiden Konoha (System Prompt)</label>
             <textarea
               rows={3}
               value={form.system_persona}
               onChange={(e) => setForm({ ...form, system_persona: e.target.value })}
               className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:border-violet-500 outline-none text-slate-800 font-medium leading-relaxed"
-              placeholder="Karakter dan aturan instruksi Koka..."
+              placeholder="Karakter dan aturan instruksi Presiden Konoha..."
             />
             <span className="text-[10px] text-slate-400 mt-1 block">
-              Instruksi ini menjadi pedoman perilaku Koka saat menjawab pertanyaan guru dan pengunjung.
+              Instruksi ini menjadi pedoman perilaku Presiden Konoha saat menjawab pertanyaan guru dan pengunjung.
             </span>
           </div>
 
@@ -308,7 +306,7 @@ export const SystemKokaAITab: React.FC<Props> = ({
               className="px-5 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold transition flex items-center gap-2 cursor-pointer shadow-xs disabled:opacity-50"
             >
               {saving ? <RefreshCw size={14} className="animate-spin" /> : <Save size={14} />}
-              <span>{saving ? 'Menyimpan...' : 'Simpan Pengaturan Koka AI'}</span>
+              <span>{saving ? 'Menyimpan...' : 'Simpan Pengaturan Presiden Konoha AI'}</span>
             </button>
           </div>
         </div>
@@ -321,9 +319,9 @@ export const SystemKokaAITab: React.FC<Props> = ({
             <Cpu size={18} />
           </div>
           <div>
-            <h3 className="text-sm font-bold text-slate-900">Sandbox Uji Coba Langsung Koka AI</h3>
+            <h3 className="text-sm font-bold text-slate-900">Sandbox Uji Coba Langsung Presiden Konoha AI</h3>
             <p className="text-xs text-slate-500">
-              Ketik pertanyaan untuk mengetes respon model Gemini secara langsung dari server.
+              Ketik pertanyaan untuk mengetes respon model Cloudflare Workers AI secara langsung dari server.
             </p>
           </div>
         </div>
@@ -343,7 +341,7 @@ export const SystemKokaAITab: React.FC<Props> = ({
                   }
                 }}
                 className="flex-1 px-3.5 py-2.5 rounded-xl border border-slate-200 focus:border-emerald-500 outline-none text-slate-800 font-medium"
-                placeholder="Tanyakan sesuatu pada Koka..."
+                placeholder="Tanyakan sesuatu pada Presiden Konoha..."
               />
               <button
                 type="button"
@@ -374,7 +372,7 @@ export const SystemKokaAITab: React.FC<Props> = ({
                     <XCircle size={14} className="text-rose-600" />
                   )}
                   <span>
-                    {testResult.ok ? 'Respon Koka AI (Sukses)' : 'Uji Coba Gagal'}
+                    {testResult.ok ? 'Respon Presiden Konoha AI (Sukses)' : 'Uji Coba Gagal'}
                   </span>
                 </span>
                 {testResult.latencyMs && (

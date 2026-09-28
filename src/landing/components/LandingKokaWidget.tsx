@@ -255,14 +255,14 @@ export const LandingKokaWidget: React.FC<LandingKokaWidgetProps> = ({
       }
     } catch (_) {}
 
-    // Pesan perkenalan resmi Koka di Landing Page sesuai instruksi
+    // Pesan perkenalan resmi Presiden Konoha di Landing Page sesuai instruksi
     const initialGreeting: LandingChatMessage = {
-      id: 'koka-welcome',
+      id: 'presiden-konoha-welcome',
       role: 'assistant',
       content:
         lang === 'EN'
-          ? "Halo 👋 Saya Koka. Ada yang ingin Anda ketahui tentang KawaCanaan Presensi?"
-          : "Halo 👋 Saya Koka. Ada yang ingin Anda ketahui tentang KawaCanaan Presensi?",
+          ? "Halo 👋 Saya Presiden Konoha. Ada yang ingin Anda ketahui tentang KawaCanaan Presensi?"
+          : "Halo 👋 Saya Presiden Konoha. Ada yang ingin Anda ketahui tentang KawaCanaan Presensi?",
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       category: 'welcome',
     };
@@ -399,12 +399,12 @@ export const LandingKokaWidget: React.FC<LandingKokaWidgetProps> = ({
 
   const handleClearChat = () => {
     const initialGreeting: LandingChatMessage = {
-      id: `koka-welcome-${Date.now()}`,
+      id: `presiden-konoha-welcome-${Date.now()}`,
       role: 'assistant',
       content:
         lang === 'EN'
-          ? "Halo 👋 Saya Koka. Ada yang ingin Anda ketahui tentang KawaCanaan Presensi?"
-          : "Halo 👋 Saya Koka. Ada yang ingin Anda ketahui tentang KawaCanaan Presensi?",
+          ? "Halo 👋 Saya Presiden Konoha. Ada yang ingin Anda ketahui tentang KawaCanaan Presensi?"
+          : "Halo 👋 Saya Presiden Konoha. Ada yang ingin Anda ketahui tentang KawaCanaan Presensi?",
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     };
     setMessages([initialGreeting]);
@@ -553,7 +553,7 @@ export const LandingKokaWidget: React.FC<LandingKokaWidgetProps> = ({
               <div className="flex items-center gap-1.5">
                 <span className="text-sm">👋</span>
                 <span className="text-xs font-black text-sky-900">
-                  {lang === 'EN' ? "Halo 👋 Saya Koka" : "Halo 👋 Saya Koka"}
+                  {lang === 'EN' ? "Halo 👋 Saya Presiden Konoha" : "Halo 👋 Saya Presiden Konoha"}
                 </span>
               </div>
               <button
@@ -590,7 +590,7 @@ export const LandingKokaWidget: React.FC<LandingKokaWidgetProps> = ({
                 className="px-2.5 py-1 rounded-xl bg-gradient-to-r from-sky-500 to-blue-600 text-white text-[11px] font-bold shadow-xs hover:shadow-md hover:from-sky-600 hover:to-blue-700 transition-all flex items-center gap-1 cursor-pointer"
               >
                 <Sparkles size={11} className="text-amber-200" />
-                <span>Tanya Koka</span>
+                <span>Tanya Presiden Konoha</span>
               </button>
               <button
                 type="button"
@@ -632,7 +632,7 @@ export const LandingKokaWidget: React.FC<LandingKokaWidgetProps> = ({
             transform: `rotate(${flightTilt}deg)`,
             transition: isDragging ? 'none' : 'transform 0.25s ease-out',
           }}
-          title={isOpen ? 'Tutup Koka' : 'Koka - Tarik untuk menerbangkan ke mana saja'}
+          title={isOpen ? 'Tutup Presiden Konoha' : 'Presiden Konoha - Tarik untuk menerbangkan ke mana saja'}
         >
           <div className={`relative ${isDragging ? 'scale-110' : 'animate-koka-float'}`}>
             <div
@@ -650,7 +650,7 @@ export const LandingKokaWidget: React.FC<LandingKokaWidgetProps> = ({
                 <div className="w-full h-full rounded-full overflow-hidden bg-white/95 border-2 border-white flex items-center justify-center shadow-inner relative">
                   <img
                     src="/koka.png"
-                    alt="Koka Asisten Kawacanaan"
+                    alt="Presiden Konoha Asisten Kawacanaan"
                     className="w-full h-full object-contain pointer-events-none select-none scale-105"
                     draggable={false}
                   />
@@ -675,7 +675,7 @@ export const LandingKokaWidget: React.FC<LandingKokaWidgetProps> = ({
             {!isOpen && !isDragging && (
               <div className="hidden sm:group-hover:flex absolute -bottom-7 left-1/2 -translate-x-1/2 px-2.5 py-0.5 rounded-full bg-slate-900/90 text-[10px] text-white font-medium whitespace-nowrap shadow-lg border border-slate-700 items-center gap-1 pointer-events-none">
                 <Sparkles size={10} className="text-yellow-400" />
-                <span>Koka • Tanya Sistem Kawacanaan</span>
+                <span>Presiden Konoha • Tanya Sistem Kawacanaan</span>
               </div>
             )}
           </div>
@@ -698,14 +698,14 @@ export const LandingKokaWidget: React.FC<LandingKokaWidgetProps> = ({
               {/* Avatar Koka */}
               <div className="relative">
                 <div className="w-10 h-10 rounded-2xl bg-white/20 border border-white/40 backdrop-blur-xs flex items-center justify-center p-0.5 shadow-xs overflow-hidden">
-                  <img src="/koka.png" alt="Koka" className="w-full h-full object-contain" />
+                  <img src="/koka.png" alt="Presiden Konoha" className="w-full h-full object-contain" />
                 </div>
                 <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-emerald-400 border-2 border-indigo-900 animate-pulse" />
               </div>
 
               <div>
                 <div className="flex items-center gap-2">
-                  <h3 className="text-sm font-black text-white tracking-tight">Koka</h3>
+                  <h3 className="text-sm font-black text-white tracking-tight">Presiden Konoha</h3>
                   <span className="px-2 py-0.5 rounded-full bg-white/20 text-[9px] font-extrabold uppercase tracking-wider text-blue-100 flex items-center gap-1">
                     <Sparkles size={9} className="text-yellow-300" />
                     Asisten Kawacanaan
@@ -724,7 +724,7 @@ export const LandingKokaWidget: React.FC<LandingKokaWidgetProps> = ({
               <button
                 type="button"
                 onClick={resetPositionToDefault}
-                title="Kembalikan posisi Koka ke sudut layar"
+                title="Kembalikan posisi Presiden Konoha ke sudut layar"
                 className="p-1.5 rounded-lg text-white/80 hover:text-white hover:bg-white/15 transition-colors cursor-pointer"
               >
                 <RotateCcw size={15} />
@@ -790,7 +790,7 @@ export const LandingKokaWidget: React.FC<LandingKokaWidgetProps> = ({
               <button
                 type="button"
                 onClick={() => setIsOpen(false)}
-                title="Tutup obrolan Koka"
+                title="Tutup obrolan Presiden Konoha"
                 className="p-1.5 rounded-lg text-white/80 hover:text-white hover:bg-white/15 transition-colors cursor-pointer"
               >
                 <ChevronDown size={18} />
@@ -803,7 +803,7 @@ export const LandingKokaWidget: React.FC<LandingKokaWidgetProps> = ({
             <div className="flex items-center gap-1.5 min-w-0">
               <ShieldCheck size={14} className="text-blue-600 shrink-0" />
               <span className="font-medium truncate">
-                Ranah Koka: <strong>Sistem, Fitur, & Paket Resmi</strong>
+                Ranah Presiden Konoha: <strong>Sistem, Fitur, & Paket Resmi</strong>
               </span>
             </div>
             <div className="flex items-center gap-1 shrink-0 ml-2">
@@ -827,7 +827,7 @@ export const LandingKokaWidget: React.FC<LandingKokaWidgetProps> = ({
                   {/* Avatar Koka */}
                   {isAssistant && (
                     <div className="w-7 h-7 rounded-xl overflow-hidden bg-white border border-sky-300 flex items-center justify-center shrink-0 shadow-2xs self-start mt-1 p-0.5">
-                      <img src="/koka.png" alt="Koka" className="w-full h-full object-contain" />
+                      <img src="/koka.png" alt="Presiden Konoha" className="w-full h-full object-contain" />
                     </div>
                   )}
 
@@ -841,7 +841,7 @@ export const LandingKokaWidget: React.FC<LandingKokaWidgetProps> = ({
                   >
                     {/* Header Label */}
                     <div className="flex items-center justify-between gap-3 mb-1 text-[10px] opacity-75">
-                      <span className="font-bold">{isAssistant ? 'Koka' : 'Anda'}</span>
+                      <span className="font-bold">{isAssistant ? 'Presiden Konoha' : 'Anda'}</span>
                       <div className="flex items-center gap-1">
                         <span>{msg.timestamp}</span>
                         {isAssistant && (
@@ -868,10 +868,10 @@ export const LandingKokaWidget: React.FC<LandingKokaWidgetProps> = ({
             {isTyping && (
               <div className="flex items-end gap-2.5 justify-start">
                 <div className="w-7 h-7 rounded-xl overflow-hidden bg-white border border-sky-300 flex items-center justify-center shrink-0 shadow-2xs self-start mt-1 p-0.5">
-                  <img src="/koka.png" alt="Koka" className="w-full h-full object-contain" />
+                  <img src="/koka.png" alt="Presiden Konoha" className="w-full h-full object-contain" />
                 </div>
                 <div className="bg-white border border-slate-200/90 rounded-2xl rounded-bl-xs px-3.5 py-2.5 shadow-2xs flex items-center gap-2">
-                  <span className="text-xs text-slate-600 font-medium">Koka sedang mengetik</span>
+                  <span className="text-xs text-slate-600 font-medium">Presiden Konoha sedang mengetik</span>
                   <div className="flex items-center gap-1">
                     <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-bounce [animation-delay:-0.3s]" />
                     <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-bounce [animation-delay:-0.15s]" />
@@ -914,8 +914,8 @@ export const LandingKokaWidget: React.FC<LandingKokaWidgetProps> = ({
                 onChange={(e) => setInputText(e.target.value)}
                 placeholder={
                   lang === 'EN'
-                    ? 'Ask Koka about Kawacanaan features or pricing...'
-                    : 'Tanya Koka tentang fitur, paket, atau cara presensi...'
+                    ? 'Ask Presiden Konoha about Kawacanaan features or pricing...'
+                    : 'Tanya Presiden Konoha tentang fitur, paket, atau cara presensi...'
                 }
                 className="flex-1 bg-slate-100 border border-transparent focus:border-blue-500 focus:bg-white rounded-xl px-3.5 py-2 text-xs text-slate-800 placeholder-slate-400 focus:outline-hidden transition-all"
               />

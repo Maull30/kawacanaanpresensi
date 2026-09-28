@@ -649,7 +649,7 @@ export const LandingKokaWidget: React.FC<LandingKokaWidgetProps> = ({
               ) : (
                 <div className="w-full h-full rounded-full overflow-hidden bg-white/95 border-2 border-white flex items-center justify-center shadow-inner relative">
                   <img
-                    src="/koka.png"
+                    src="/presiden-konoha.png"
                     alt="Presiden Konoha Asisten Kawacanaan"
                     className="w-full h-full object-contain pointer-events-none select-none scale-105"
                     draggable={false}
@@ -695,10 +695,10 @@ export const LandingKokaWidget: React.FC<LandingKokaWidgetProps> = ({
             <div className="absolute top-0 right-0 w-40 h-40 bg-white/10 rounded-full blur-2xl pointer-events-none" />
 
             <div className="flex items-center gap-3 relative z-10">
-              {/* Avatar Koka */}
+              {/* Avatar Presiden Konoha */}
               <div className="relative">
                 <div className="w-10 h-10 rounded-2xl bg-white/20 border border-white/40 backdrop-blur-xs flex items-center justify-center p-0.5 shadow-xs overflow-hidden">
-                  <img src="/koka.png" alt="Presiden Konoha" className="w-full h-full object-contain" />
+                  <img src="/presiden-konoha.png" alt="Presiden Konoha" className="w-full h-full object-contain" />
                 </div>
                 <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-emerald-400 border-2 border-indigo-900 animate-pulse" />
               </div>
@@ -824,10 +824,10 @@ export const LandingKokaWidget: React.FC<LandingKokaWidgetProps> = ({
                   key={msg.id}
                   className={`flex items-end gap-2.5 ${isAssistant ? 'justify-start' : 'justify-end'}`}
                 >
-                  {/* Avatar Koka */}
+                  {/* Avatar Presiden Konoha */}
                   {isAssistant && (
                     <div className="w-7 h-7 rounded-xl overflow-hidden bg-white border border-sky-300 flex items-center justify-center shrink-0 shadow-2xs self-start mt-1 p-0.5">
-                      <img src="/koka.png" alt="Presiden Konoha" className="w-full h-full object-contain" />
+                      <img src="/presiden-konoha.png" alt="Presiden Konoha" className="w-full h-full object-contain" />
                     </div>
                   )}
 
@@ -868,7 +868,7 @@ export const LandingKokaWidget: React.FC<LandingKokaWidgetProps> = ({
             {isTyping && (
               <div className="flex items-end gap-2.5 justify-start">
                 <div className="w-7 h-7 rounded-xl overflow-hidden bg-white border border-sky-300 flex items-center justify-center shrink-0 shadow-2xs self-start mt-1 p-0.5">
-                  <img src="/koka.png" alt="Presiden Konoha" className="w-full h-full object-contain" />
+                  <img src="/presiden-konoha.png" alt="Presiden Konoha" className="w-full h-full object-contain" />
                 </div>
                 <div className="bg-white border border-slate-200/90 rounded-2xl rounded-bl-xs px-3.5 py-2.5 shadow-2xs flex items-center gap-2">
                   <span className="text-xs text-slate-600 font-medium">Presiden Konoha sedang mengoordinasikan jawaban</span>

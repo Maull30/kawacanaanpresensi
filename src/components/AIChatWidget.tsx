@@ -1154,7 +1154,7 @@ export const AIChatWidget: React.FC = () => {
               ) : (
                 <div className="w-full h-full rounded-full overflow-hidden bg-white/95 border-2 border-white flex items-center justify-center shadow-inner relative">
                   <img
-                    src="/koka.png"
+                    src="/presiden-konoha.png"
                     alt="Presiden Konoha Asisten Guru"
                     className="w-full h-full object-contain pointer-events-none select-none scale-105"
                     draggable={false}
@@ -1203,11 +1203,11 @@ export const AIChatWidget: React.FC = () => {
             <div className="absolute top-0 right-0 w-40 h-40 bg-white/10 rounded-full blur-2xl pointer-events-none" />
 
             <div className="flex items-center gap-3 relative z-10">
-              {/* Avatar Koka di Header */}
+              {/* Avatar Presiden Konoha di Header */}
               <div className="relative">
                 <div className="w-10 h-10 rounded-2xl bg-white/20 border border-white/40 backdrop-blur-xs flex items-center justify-center p-0.5 shadow-xs overflow-hidden">
                   <img
-                    src="/koka.png"
+                    src="/presiden-konoha.png"
                     alt="Presiden Konoha"
                     className="w-full h-full object-contain"
                   />
@@ -1338,7 +1338,7 @@ export const AIChatWidget: React.FC = () => {
                     <div
                       className="w-7 h-7 rounded-xl overflow-hidden bg-white border border-sky-300 flex items-center justify-center shrink-0 shadow-2xs self-start mt-1 p-0.5"
                     >
-                      <img src="/koka.png" alt="Presiden Konoha" className="w-full h-full object-contain" />
+                      <img src="/presiden-konoha.png" alt="Presiden Konoha" className="w-full h-full object-contain" />
                     </div>
                   )}
 
@@ -1637,7 +1637,7 @@ export const AIChatWidget: React.FC = () => {
                 <div
                   className="w-7 h-7 rounded-xl overflow-hidden bg-white border border-sky-300 flex items-center justify-center shrink-0 shadow-2xs p-0.5"
                 >
-                  <img src="/koka.png" alt="Presiden Konoha" className="w-full h-full object-contain" />
+                  <img src="/presiden-konoha.png" alt="Presiden Konoha" className="w-full h-full object-contain" />
                 </div>
 
                 {/* Bubble Typing dengan 3 Titik Animasi */}

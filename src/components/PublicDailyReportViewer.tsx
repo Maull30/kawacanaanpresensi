@@ -24,6 +24,7 @@ const isPlaceholderText = (text: string | null | undefined): boolean => {
 };
 
 export interface PublicDailyReportViewerProps {
+  isPublicView?: boolean;
   classId?: string;
   className?: string;
   date?: string;
@@ -39,6 +40,7 @@ export interface PublicDailyReportViewerProps {
 }
 
 export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = ({
+  isPublicView = false,
   classId: propClassId,
   className: propClassName,
   date: propDate,
@@ -68,7 +70,8 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
     [currentUser, ctxClasses, ctxSubjects, ctxTeachers]
   );
 
-  const isInternalUser = Boolean(currentUser && ctxClasses && ctxClasses.length > 0);
+  // Jika isPublicView diset true (dari tautan publik WhatsApp/browser), WAJIB mode publik mandiri tanpa bergantung pada memori sesi
+  const isInternalUser = Boolean(!isPublicView && currentUser && ctxClasses && ctxClasses.length > 0);
 
   // External fetch state (for public visitors via smart link without active session)
   const [loading, setLoading] = useState(!isInternalUser);
@@ -94,11 +97,12 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
 
   const mNum = monthNumberMap[month] || 7;
   const effectiveYear = Number(year) || 2026;
-  const academicYear = propAcademicYear || ctxSchoolProfile?.tahunPelajaran || `${effectiveYear}/${effectiveYear + 1}`;
+  const rawAcademicYear = String(propAcademicYear || externalReportData?.tahunPelajaran || ctxSchoolProfile?.tahunPelajaran || `${effectiveYear}/${effectiveYear + 1}`).trim();
+  const academicYear = rawAcademicYear || `${effectiveYear}/${effectiveYear + 1}`;
 
-  const [startYearStr, endYearStr] = academicYear.split('/');
-  const startYear = parseInt(startYearStr, 10) || effectiveYear;
-  const endYear = parseInt(endYearStr, 10) || (startYear + 1);
+  const yearParts = academicYear.split('/');
+  const startYear = parseInt(yearParts[0] || String(effectiveYear), 10) || effectiveYear;
+  const endYear = parseInt(yearParts[1] || String(startYear + 1), 10) || (startYear + 1);
 
   // Effective days helper
   const getEffectiveDaysForMonth = (yr: number, mIndex: number) => {
@@ -115,7 +119,7 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
   const monthKey = `${effectiveYear}-${String(mNum).padStart(2, '0')}`;
 
   // Week working days - selalu mulai dari hari Senin
-  const weekNum = parseInt(selectedWeek.replace(/\D/g, ''), 10) || 1;
+  const weekNum = parseInt(String(selectedWeek || 'Minggu Ke-1').replace(/\D/g, ''), 10) || 1;
   const weekWorkingDays = useMemo(() => {
     // Tentukan hari Senin pertama untuk bulan terpilih
     const firstOfMonth = new Date(effectiveYear, mNum - 1, 1);
@@ -730,9 +734,9 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
   };
 
   const formatReportDateIndo = (dateStr: string): string => {
-    if (!dateStr) return '';
+    if (!dateStr || typeof dateStr !== 'string') return '-';
     try {
-      const parts = dateStr.split('-');
+      const parts = dateStr.trim().split('-');
       if (parts.length === 3) {
         const months = [
           'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
@@ -741,26 +745,26 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
         const day = parseInt(parts[2], 10);
         const monthIdx = parseInt(parts[1], 10) - 1;
         const yr = parts[0];
-        return `${day} ${months[monthIdx]} ${yr}`;
+        return `${day} ${months[monthIdx] || ''} ${yr}`.trim();
       }
-      return dateStr;
+      return String(dateStr);
     } catch (_) {
-      return dateStr;
+      return String(dateStr || '-');
     }
   };
 
   const getDayNameIndo = (dateStr: string): string => {
-    if (!dateStr) return '';
+    if (!dateStr || typeof dateStr !== 'string') return 'Senin';
     try {
-      const parts = dateStr.split('-');
+      const parts = dateStr.trim().split('-');
       if (parts.length === 3) {
         const d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
         const days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
-        return days[d.getDay()] || '';
+        return days[d.getDay()] || 'Senin';
       }
-      return '';
+      return 'Senin';
     } catch (_) {
-      return '';
+      return 'Senin';
     }
   };
 
@@ -931,26 +935,63 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
   }
 
   // Active School and Teacher Profile Data
-  const schoolName = ctxSchoolProfile?.namaSekolah || externalReportData?.schoolName || 'SATUAN PENDIDIKAN';
-  const pemerintahDaerah = ctxSystemConfig?.pemerintahDaerah || externalReportData?.pemerintahDaerah || '';
-  const dinasPendidikan = ctxSystemConfig?.dinasPendidikan || externalReportData?.dinasPendidikan || '';
-  const npsn = ctxSchoolProfile?.npsn || externalReportData?.npsn || '-';
-  const alamatSekolah = ctxSchoolProfile?.alamat || externalReportData?.alamat || '';
+  const schoolName = !isInternalUser
+    ? (externalReportData?.schoolName || ctxSchoolProfile?.namaSekolah || 'SATUAN PENDIDIKAN')
+    : (ctxSchoolProfile?.namaSekolah || externalReportData?.schoolName || 'SATUAN PENDIDIKAN');
+
+  const pemerintahDaerah = !isInternalUser
+    ? (externalReportData?.pemerintahDaerah || ctxSystemConfig?.pemerintahDaerah || '')
+    : (ctxSystemConfig?.pemerintahDaerah || externalReportData?.pemerintahDaerah || '');
+
+  const dinasPendidikan = !isInternalUser
+    ? (externalReportData?.dinasPendidikan || ctxSystemConfig?.dinasPendidikan || '')
+    : (ctxSystemConfig?.dinasPendidikan || externalReportData?.dinasPendidikan || '');
+
+  const npsn = !isInternalUser
+    ? (externalReportData?.npsn || ctxSchoolProfile?.npsn || '-')
+    : (ctxSchoolProfile?.npsn || externalReportData?.npsn || '-');
+
+  const alamatSekolah = !isInternalUser
+    ? (externalReportData?.alamat || ctxSchoolProfile?.alamat || '')
+    : (ctxSchoolProfile?.alamat || externalReportData?.alamat || '');
+
   const showLetterhead = ctxSystemConfig?.showLetterhead ?? externalReportData?.showLetterhead ?? true;
   const letterheadType = ctxSystemConfig?.letterheadType || externalReportData?.letterheadType || 'standard_text';
   const letterheadImageUrl = ctxSystemConfig?.letterheadImageUrl || externalReportData?.letterheadImageUrl || '';
   const schoolLogoUrl = ctxSystemConfig?.schoolLogoUrl || externalReportData?.logoUrl || '';
 
-  const activeClassName = resolvedClass?.name || externalReportData?.className || 'Kelas';
-  const activeClassClean = activeClassName.replace(/^kelas\s*/i, '');
+  const rawClassName = !isInternalUser
+    ? (externalReportData?.className || propClassName || 'Kelas')
+    : (resolvedClass?.name || externalReportData?.className || propClassName || 'Kelas');
+  const activeClassName = String(rawClassName || 'Kelas');
+  const activeClassClean = activeClassName.replace(/^kelas\s*/i, '') || activeClassName;
   const activeFase = resolvedClass ? getFaseByClassName(resolvedClass.name, resolvedClass.grade) : (externalReportData?.fase || 'Fase A');
-  const principalName = ctxSchoolProfile?.namaKepalaSekolah || resolvedPrincipalTeacher?.nama || externalReportData?.principalName || 'Kepala Sekolah';
-  const principalNip = (ctxSchoolProfile?.nipKepalaSekolah && ctxSchoolProfile.nipKepalaSekolah !== '-')
-    ? ctxSchoolProfile.nipKepalaSekolah
-    : (resolvedPrincipalTeacher?.nip || (currentUser?.role === 'KEPALA SEKOLAH' ? (currentUser.nip || (currentUser.username && /^\d{10,}$/.test(currentUser.username) ? currentUser.username : '')) : '') || externalReportData?.principalNip || '-');
+
+  const principalName = !isInternalUser
+    ? (externalReportData?.principalName || ctxSchoolProfile?.namaKepalaSekolah || 'Kepala Sekolah')
+    : (ctxSchoolProfile?.namaKepalaSekolah || resolvedPrincipalTeacher?.nama || externalReportData?.principalName || 'Kepala Sekolah');
+
+  const principalNip = !isInternalUser
+    ? (externalReportData?.principalNip || ctxSchoolProfile?.nipKepalaSekolah || '-')
+    : ((ctxSchoolProfile?.nipKepalaSekolah && ctxSchoolProfile.nipKepalaSekolah !== '-')
+        ? ctxSchoolProfile.nipKepalaSekolah
+        : (resolvedPrincipalTeacher?.nip || (currentUser?.role === 'KEPALA SEKOLAH' ? (currentUser.nip || (currentUser.username && /^\d{10,}$/.test(currentUser.username) ? currentUser.username : '')) : '') || externalReportData?.principalNip || '-'));
 
   // Penentuan Nama, NIP, dan Jabatan Penandatangan sesuai Role Pengguna & Konteks Dokumen
   const resolvedTeacherInfo = useMemo(() => {
+    // Jalur Cepat & Bersih untuk Pengunjung Publik (Orang Tua / Tamu via WhatsApp)
+    if (!isInternalUser) {
+      const extName = externalReportData?.teacherName;
+      const cleanExtName = (extName && !isPlaceholderText(extName)) ? extName : '( ......................................... )';
+      const extNip = externalReportData?.teacherNip && externalReportData.teacherNip !== '-' ? externalReportData.teacherNip : '-';
+      const extTitle = externalReportData?.teacherTitle || (attendanceType === 'SUBJECT' ? `Guru Mata Pelajaran ${externalReportData?.subjectName || ''}`.trim() : 'Wali Kelas');
+      return {
+        name: cleanExtName,
+        nip: extNip,
+        title: extTitle,
+      };
+    }
+
     const isCurrentUserWaliKelas = Boolean(
       userScope.isWaliKelas ||
       currentUser?.role === 'WALI KELAS' ||
@@ -1266,7 +1307,7 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
                       {isKepsekReport ? (
                         <>NPSN: {npsn} | TAHUN PELAJARAN: {academicYear} | KEPALA SEKOLAH: {principalName}</>
                       ) : (
-                        <>NPSN: {npsn} | KELAS: {activeClassClean} | FASE: {activeFase.toUpperCase()}</>
+                        <>NPSN: {npsn} | KELAS: {activeClassClean} | FASE: {String(activeFase || 'Fase A').toUpperCase()}</>
                       )}
                     </p>
                   </div>
@@ -1292,16 +1333,16 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
             <p className="text-[11px] sm:text-xs text-slate-600 font-bold mt-1 uppercase">
               {isKepsekReport ? (
                 isKepsekSemester
-                  ? <>SEMESTER: {semester.toUpperCase()} | TAHUN PELAJARAN: {academicYear} (KOMPARASI SELURUH KELAS)</>
-                  : <>BULAN: {month.toUpperCase()} {year} | SEMESTER: {semester.toUpperCase()} (KOMPARASI SELURUH KELAS)</>
+                  ? <>SEMESTER: {String(semester || 'Ganjil').toUpperCase()} | TAHUN PELAJARAN: {academicYear} (KOMPARASI SELURUH KELAS)</>
+                  : <>BULAN: {String(month || '').toUpperCase()} {year} | SEMESTER: {String(semester || 'Ganjil').toUpperCase()} (KOMPARASI SELURUH KELAS)</>
               ) : reportType === 'Laporan Harian' ? (
-                <>HARI/TANGGAL: {getDayNameIndo(selectedDate).toUpperCase()}, {formatReportDateIndo(selectedDate).toUpperCase()} | SEMESTER: {semester.toUpperCase()} (TP: {academicYear})</>
+                <>HARI/TANGGAL: {String(getDayNameIndo(selectedDate) || 'Senin').toUpperCase()}, {String(formatReportDateIndo(selectedDate) || '-').toUpperCase()} | SEMESTER: {String(semester || 'Ganjil').toUpperCase()} (TP: {academicYear})</>
               ) : reportType === 'Laporan Mingguan' ? (
-                <>PERIODE: {selectedWeek.toUpperCase()} ({month.toUpperCase()} {year}) | KELAS: {activeClassClean} (TP: {academicYear})</>
+                <>PERIODE: {String(selectedWeek || 'Minggu Ke-1').toUpperCase()} ({String(month || '').toUpperCase()} {year}) | KELAS: {activeClassClean} (TP: {academicYear})</>
               ) : reportType === 'Laporan Bulanan' ? (
-                <>BULAN: {month.toUpperCase()} {year} | SEMESTER: {semester.toUpperCase()} (TP: {academicYear})</>
+                <>BULAN: {String(month || '').toUpperCase()} {year} | SEMESTER: {String(semester || 'Ganjil').toUpperCase()} (TP: {academicYear})</>
               ) : (
-                <>SEMESTER: {semester.toUpperCase()} | TAHUN PELAJARAN: {academicYear}</>
+                <>SEMESTER: {String(semester || 'Ganjil').toUpperCase()} | TAHUN PELAJARAN: {academicYear}</>
               )}
             </p>
           </div>

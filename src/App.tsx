@@ -26,6 +26,7 @@ import { TeacherUpgradeModal } from './components/TeacherUpgradeModal';
 import { SchoolUpgradeModal } from './components/SchoolUpgradeModal';
 import { PublicDailyReportViewer } from './components/PublicDailyReportViewer';
 import { PublicSmartInvoiceViewer } from './components/PublicSmartInvoiceViewer';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { CheckCircle2, AlertCircle, Info, X } from 'lucide-react';
 import type { ActiveView, UserRole } from './types';
 
@@ -351,6 +352,56 @@ const MainAppContent: React.FC = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  // 0. Public Smart Report Viewer (Link yang diklik oleh orang tua/wali via WhatsApp / Publik)
+  // HARUS DICEK PALING PERTAMA: Pengunjung publik tidak perlu melewati proses login, onboarding, atau recovery apapun!
+  if (publicReportParams) {
+    return (
+      <ErrorBoundary fallbackTitle="Lembar Rekap Presensi">
+        <PublicDailyReportViewer
+          isPublicView={true}
+          classId={publicReportParams.classId}
+          className={publicReportParams.className}
+          date={publicReportParams.date}
+          attendanceType={publicReportParams.attendanceType}
+          subjectId={publicReportParams.subjectId}
+          reportType={publicReportParams.reportType}
+          selectedWeek={publicReportParams.selectedWeek}
+          month={publicReportParams.month}
+          year={publicReportParams.year}
+          semester={publicReportParams.semester}
+          academicYear={publicReportParams.academicYear}
+          onBackToApp={() => {
+            setPublicReportParams(null);
+            try {
+              const url = new URL(window.location.href);
+              url.searchParams.delete('r');
+              url.searchParams.delete('d');
+              url.searchParams.delete('s');
+              url.searchParams.delete('m');
+              url.searchParams.delete('p');
+              url.searchParams.delete('w');
+              url.searchParams.delete('mo');
+              url.searchParams.delete('y');
+              url.searchParams.delete('sem');
+              url.searchParams.delete('ay');
+              url.searchParams.delete('class');
+              url.searchParams.delete('date');
+              url.searchParams.delete('report');
+              url.searchParams.delete('type');
+              url.searchParams.delete('week');
+              url.searchParams.delete('month');
+              url.searchParams.delete('year');
+              url.searchParams.delete('semester');
+              url.searchParams.delete('academicYear');
+              url.searchParams.delete('subjectId');
+              window.history.pushState(null, '', url.pathname + (url.search ? url.search : ''));
+            } catch (_) {}
+          }}
+        />
+      </ErrorBoundary>
+    );
+  }
+
   const isSetupPage = new URLSearchParams(window.location.search).get('page') === 'setup';
 
   if (isSetupPage && !currentUser) return <SetupSuperAdminView />;
@@ -384,52 +435,6 @@ const MainAppContent: React.FC = () => {
   // 4. Jika sedang memeriksa sesi auth saat reload halaman tanpa data cache sesi
   if (isAuthChecking && !currentUser && hasPersistedAuthToken()) {
     return <AppAuthLoadingSkeleton />;
-  }
-
-  // Public Report Viewer (Smart Link accessed by parents/teachers/supervisors)
-  if (publicReportParams) {
-    return (
-      <PublicDailyReportViewer
-        classId={publicReportParams.classId}
-        className={publicReportParams.className}
-        date={publicReportParams.date}
-        attendanceType={publicReportParams.attendanceType}
-        subjectId={publicReportParams.subjectId}
-        reportType={publicReportParams.reportType}
-        selectedWeek={publicReportParams.selectedWeek}
-        month={publicReportParams.month}
-        year={publicReportParams.year}
-        semester={publicReportParams.semester}
-        academicYear={publicReportParams.academicYear}
-        onBackToApp={() => {
-          setPublicReportParams(null);
-          try {
-            const url = new URL(window.location.href);
-            url.searchParams.delete('r');
-            url.searchParams.delete('d');
-            url.searchParams.delete('s');
-            url.searchParams.delete('m');
-            url.searchParams.delete('p');
-            url.searchParams.delete('w');
-            url.searchParams.delete('mo');
-            url.searchParams.delete('y');
-            url.searchParams.delete('sem');
-            url.searchParams.delete('ay');
-            url.searchParams.delete('class');
-            url.searchParams.delete('date');
-            url.searchParams.delete('report');
-            url.searchParams.delete('type');
-            url.searchParams.delete('week');
-            url.searchParams.delete('month');
-            url.searchParams.delete('year');
-            url.searchParams.delete('semester');
-            url.searchParams.delete('academicYear');
-            url.searchParams.delete('subjectId');
-            window.history.pushState(null, '', url.pathname + (url.search ? url.search : ''));
-          } catch (_) {}
-        }}
-      />
-    );
   }
 
   // Smart Link PDF Invoice Viewer (Bisa diakses langsung oleh sekolah, guru, atau auditor via link)

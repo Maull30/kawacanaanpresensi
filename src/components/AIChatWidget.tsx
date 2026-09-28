@@ -277,18 +277,18 @@ export const AIChatWidget: React.FC = () => {
   const greetingSummaryText = useMemo(() => {
     if (attendanceStatus.roleType === 'WALI_KELAS') {
       if (!attendanceStatus.isComplete) {
-        return `Presensi harian untuk ${attendanceStatus.className} belum dicatat hari ini (${attendanceStatus.unrecordedCount} dari ${attendanceStatus.totalStudents} siswa belum terabsen). Mau Presiden Konoha bantu absenkan sekarang?`;
+        return `Hasil pendataan nasional menunjukkan presensi untuk ${attendanceStatus.className} belum dicatat (${attendanceStatus.unrecordedCount} dari ${attendanceStatus.totalStudents} siswa belum terdata). Mohon segera koordinasikan!`;
       }
-      return `Presensi harian ${attendanceStatus.className} hari ini sudah lengkap (${attendanceStatus.hadirCount} Hadir${attendanceStatus.sakitCount > 0 ? `, ${attendanceStatus.sakitCount} Sakit` : ''}${attendanceStatus.izinCount > 0 ? `, ${attendanceStatus.izinCount} Izin` : ''}${attendanceStatus.alfaCount > 0 ? `, ${attendanceStatus.alfaCount} Alfa` : ''}). Selamat mengajar!`;
+      return `Stabilitas absensi ${attendanceStatus.className} hari ini terpantau aman terkendali (${attendanceStatus.hadirCount} Hadir${attendanceStatus.sakitCount > 0 ? `, ${attendanceStatus.sakitCount} Sakit` : ''}${attendanceStatus.izinCount > 0 ? `, ${attendanceStatus.izinCount} Izin` : ''}${attendanceStatus.alfaCount > 0 ? `, ${attendanceStatus.alfaCount} Alfa` : ''}). Jalankan tugas kenegaraan ini dengan tertib!`;
     }
     if (attendanceStatus.roleType === 'GURU_MAPEL') {
       const subNames = (attendanceStatus.subjects || []).map((s: any) => s.name).join(', ') || 'Mata Pelajaran';
       if (!attendanceStatus.isComplete) {
-        return `Ada agenda mengajar ${subNames} hari ini. Presiden Konoha siap membantu mencatat siswa yang hadir, izin, atau sakit.`;
+        return `Tercatat agenda pengajaran ${subNames} hari ini. Presiden Konoha siap menerima disposisi presensi siswa.`;
       }
-      return `Presensi mata pelajaran ${subNames} sudah mulai tersimpan dengan baik hari ini.`;
+      return `Pendataan presensi sesi ${subNames} telah terverifikasi aman hari ini.`;
     }
-    return `Presiden Konoha siap mendampingi kelancaran presensi dan rekapitulasi data sekolah hari ini. Ada yang perlu dibantu?`;
+    return `Presiden Konoha siap mengawal stabilitas presensi dan pendataan sekolah hari ini. Ada urusan yang perlu dikoordinasikan?`;
   }, [attendanceStatus]);
 
   // 3. Posisi Terbang Koka di Layar (Draggable bebas ke mana saja)
@@ -478,18 +478,18 @@ export const AIChatWidget: React.FC = () => {
       }
     } catch (_) {}
 
-    // Sapaan awal ramah & santun dari Koka dengan info presensi
+    // Sapaan awal kenegaraan dari Presiden Konoha dengan info presensi
     let reminderText = '';
     if (attendanceStatus.roleType === 'WALI_KELAS') {
       if (!attendanceStatus.isComplete) {
-        reminderText = `\n\n📌 **Pengingat Hari Ini**: Presensi harian untuk **${attendanceStatus.className}** belum diisi (${attendanceStatus.unrecordedCount} dari ${attendanceStatus.totalStudents} siswa belum terabsen). Anda dapat meminta saya: *"Tolong bantu absenkan ${attendanceStatus.className} hari ini"* atau sebutkan siswa yang berhalangan hadir.`;
+        reminderText = `\n\n📌 **Laporan Pendataan**: Presensi harian untuk **${attendanceStatus.className}** belum dicatat (${attendanceStatus.unrecordedCount} dari ${attendanceStatus.totalStudents} siswa belum terabsen). Anda dapat mendisposisikan: *"Tolong bantu absenkan ${attendanceStatus.className} hari ini"* atau sebutkan siswa yang sakit/izin demi menjaga stabilitas kelas.`;
       } else {
-        reminderText = `\n\n✅ **Catatan Presensi**: Presensi **${attendanceStatus.className}** hari ini sudah lengkap (${attendanceStatus.hadirCount} Hadir${attendanceStatus.sakitCount > 0 ? `, ${attendanceStatus.sakitCount} Sakit` : ''}${attendanceStatus.izinCount > 0 ? `, ${attendanceStatus.izinCount} Izin` : ''}${attendanceStatus.alfaCount > 0 ? `, ${attendanceStatus.alfaCount} Alfa` : ''}). Selamat mendidik generasi penerus, ${teacherShortName}!`;
+        reminderText = `\n\n✅ **Status Stabilitas**: Presensi **${attendanceStatus.className}** hari ini telah lengkap (${attendanceStatus.hadirCount} Hadir${attendanceStatus.sakitCount > 0 ? `, ${attendanceStatus.sakitCount} Sakit` : ''}${attendanceStatus.izinCount > 0 ? `, ${attendanceStatus.izinCount} Izin` : ''}${attendanceStatus.alfaCount > 0 ? `, ${attendanceStatus.alfaCount} Alfa` : ''}). Stabilitas kelas terjaga dengan baik, ${teacherShortName}!`;
       }
     } else if (attendanceStatus.roleType === 'GURU_MAPEL') {
       const subNames = (attendanceStatus.subjects || []).map((s: any) => s.name).join(', ') || 'Mata Pelajaran';
       if (!attendanceStatus.isComplete) {
-        reminderText = `\n\n📌 **Pengingat Mengajar**: Jangan lupa mencatat kehadiran sesi kelas mapel **${subNames}** hari ini. Presiden Konoha siap membantu mencatat siswa yang hadir atau izin.`;
+        reminderText = `\n\n📌 **Laporan Agenda**: Terjadwal agenda mengajar sesi **${subNames}** hari ini. Presiden Konoha siap menerima instruksi pencatatan kehadiran siswa.`;
       }
     }
 
@@ -497,7 +497,7 @@ export const AIChatWidget: React.FC = () => {
       id: `welcome-${Date.now()}`,
       role: 'assistant',
       type: 'text',
-      content: `Halo ${teacherFullName}! 👋 ${getTimeGreeting()}.\n\nSaya **Presiden Konoha**, asisten guru digital dan agen cerdas absensi Anda di Kawacanaan. Saya siap membantu mempermudah dan memperlancar segala urusan pencatatan kehadiran siswa.${reminderText}`,
+      content: `Salam kehormatan ${teacherFullName}! 👋 ${getTimeGreeting()}.\n\nSaya **Presiden Konoha**, aparatur tertinggi pengawal stabilitas presensi Anda di Kawacanaan. Kami memandang urusan absensi ini setara urusan kenegaraan yang amat genting. Silakan sampaikan disposisi kehadiran atau kebutuhan pendataan Anda.${reminderText}`,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     };
     setMessages([initialGreeting]);
@@ -998,7 +998,9 @@ export const AIChatWidget: React.FC = () => {
     } catch (err: any) {
       console.error('[AIChatWidget] error:', err);
       setIsTyping(false);
-      const safeErrorMsg = err.message || 'AI sedang tidak dapat digunakan. Silakan coba lagi.';
+      const safeErrorMsg = err?.message && err.message.includes('koordinasi')
+        ? err.message
+        : 'Permasalahan sedang dalam tahap koordinasi lintas sistem. Mohon tetap tenang.';
       setErrorMessage(safeErrorMsg);
 
       const errAssistantMsg: ChatMessage = {
@@ -1641,7 +1643,7 @@ export const AIChatWidget: React.FC = () => {
                 {/* Bubble Typing dengan 3 Titik Animasi */}
                 <div className="bg-white border border-slate-200/90 rounded-2xl rounded-bl-xs px-3.5 py-2.5 shadow-2xs flex items-center gap-2 text-slate-500">
                   <span className="text-[11px] font-semibold text-slate-600">
-                    Presiden Konoha sedang memproses
+                    Presiden Konoha sedang mengoordinasikan data
                   </span>
                   <div className="flex items-center gap-1">
                     <span className="w-1.5 h-1.5 rounded-full bg-indigo-600 animate-bounce [animation-delay:-0.3s]" />

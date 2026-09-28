@@ -77,13 +77,13 @@ export function getKokaLandingResponse(
   if (isPrivacyViolation) {
     if (lang === 'EN') {
       return {
-        text: "🔒 **Data Privacy & System Guardrail**\n\nAs Presiden Konoha on the public landing page, I do not have access to private student records or class attendance. Those features are securely accessible inside the official application after signing in.\n\nIs there anything else regarding KawaCanaan's features or pricing I can help you with?",
+        text: "🔒 **National Privacy Protocol & System Guardrail**\n\nAs Presiden Konoha on the public podium, I do not have constitutional authority to disclose or alter private student records. Official attendance disposition is securely accessible inside the application after formal sign-in.\n\nIs there any feature or pricing regulation I can coordinate with you?",
         category: 'privacy_guarded',
         suggestions: [],
       };
     }
     return {
-      text: "Mohon maaf Bapak/Ibu 😊 Demi menjaga privasi dan keamanan data sekolah, Presiden Konoha di landing page ini bertugas sebagai pemandu pengenalan sistem. Untuk melihat data siswa atau mencatat kehadiran kelas, Bapak/Ibu dapat masuk (login) terlebih dahulu ke akun aplikasi KawaCanaan ya.\n\nApakah ada fitur atau paket yang ingin Bapak/Ibu ketahui lebih lanjut?",
+      text: "🔒 **Protokol Kerahasiaan Negara & Dekrit Privasi**\n\nDemi menjaga stabilitas dan kerahasiaan data sekolah, Presiden Konoha di mimbar terbuka landing page ini tidak berwenang membuka ataupun mendisposisikan data privat siswa. Seluruh pendataan presensi wajib diproses secara tertib melalui login resmi aplikasi KawaCanaan.\n\nApakah ada regulasi fitur atau paket resmi yang ingin kita koordinasikan lebih lanjut, Bapak/Ibu?",
       category: 'privacy_guarded',
       suggestions: [],
     };
@@ -262,18 +262,18 @@ export function getKokaLandingResponse(
   }
 
   // -------------------------------------------------------------
-  // 5. SAPAAN RAMAH & PEMBUKA (SHOPKEEPER WELCOME GREETINGS)
+  // 5. SAPAAN RESMI KENEGARAAN (WELCOME GREETINGS)
   // -------------------------------------------------------------
-  if (/^(halo|hai|hi|hey|helo|halo\s*koka|hai\s*koka|halo\s*presiden|hai\s*presiden|pagi|siang|sore|malam|selamat\s*(pagi|siang|sore|malam)|assalamu['a]?laikum|sampurasun)/i.test(qLower)) {
+  if (/^(halo|hai|hi|hey|helo|halo\s*koka|hai\s*koka|halo\s*presiden|hai\s*presiden|pagi|siang|sore|malam|selamat\s*(pagi|siang|sore|malam)|assalamu['a]?laikum|sampurasun|salam)/i.test(qLower)) {
     if (lang === 'EN') {
       return {
-        text: "Hello! Welcome to KawaCanaan Presensi 👋 I am Presiden Konoha, your smart guide. How can I help you today? Feel free to ask about our features, pricing, or how our digital attendance system works for elementary schools!",
+        text: "State greetings! Welcome to the official KawaCanaan Presensi portal 👋 I am Presiden Konoha. We regard attendance discipline as a vital matter of state stability. How may I assist in coordinating your school's attendance system today?",
         category: 'greeting',
         suggestions: [],
       };
     }
     return {
-      text: "Halo! Selamat datang di KawaCanaan Presensi 👋 Saya Presiden Konoha, pemandu cerdas di sini. Senang sekali bisa menyapa Bapak/Ibu!\n\nAda yang bisa Presiden Konoha bantu jelaskan hari ini seputar aplikasi presensi sekolah kami? Silakan tanyakan apa saja ya 😊",
+      text: "Salam kenegaraan! Selamat datang di kawasan resmi KawaCanaan Presensi 👋 Saya Presiden Konoha. Kami memandang urusan ketertiban absensi generasi bangsa setara urusan stabilitas nasional.\n\nAda agenda sistem presensi sekolah atau regulasi paket yang ingin dikoordinasikan hari ini? Silakan sampaikan, Bapak/Ibu!",
       category: 'greeting',
       suggestions: [],
     };
@@ -282,7 +282,7 @@ export function getKokaLandingResponse(
   // UCAPAN TERIMA KASIH
   if (/terima\s*kasih|makasih|thanks|thank\s*you|syukron|matur\s*nuwun|nuhun/i.test(qLower)) {
     return {
-      text: "Sama-sama Bapak/Ibu! Senang sekali bisa membantu 😊 Jangan ragu bertanya lagi jika ada hal lain yang ingin diketahui atau jika ingin langsung mencoba aplikasinya ya!",
+      text: "Terima kasih kembali Bapak/Ibu! Koordinasi ini berjalan sangat produktif 🫡 Tetap jaga stabilitas administrasi sekolah, dan sampaikan jika ada hal lain yang perlu diproses!",
       category: 'courtesy',
       suggestions: [],
     };
@@ -291,7 +291,7 @@ export function getKokaLandingResponse(
   // PERTANYAAN IDENTITAS PRESIDEN KONOHA
   if (/siapa\s*(kamu|anda|koka|presiden|konoha)|kamu\s*siapa|presiden\s*konoha|koka\s*itu\s*apa|tentang\s*(koka|presiden)/i.test(qLower)) {
     return {
-      text: "Halo! Saya Presiden Konoha, asisten virtual dan pemandu cerdas dari KawaCanaan Presensi 😊\n\nIbarat tuan rumah atau pemimpin yang ramah, tugas saya adalah menyambut dan mendampingi Bapak/Ibu pengunjung untuk mengenal fitur, cara kerja, biaya paket, maupun tips kemudahan presensi digital untuk sekolah dasar. Ada yang ingin Bapak/Ibu tanyakan?",
+      text: "Salam kehormatan! Saya adalah Presiden Konoha, aparatur cerdas tertinggi pengawal stabilitas presensi di KawaCanaan 🇮🇩🏛️\n\nTugas kenegaraan saya adalah memastikan seluruh pendataan, rekapitulasi, dan pelaporan absensi berjalan tertib tanpa kecurangan titip absen. Ada perihal fitur atau paket yang ingin kita bahas dalam koordinasi ini?",
       category: 'identity',
       suggestions: [],
     };
@@ -397,17 +397,17 @@ export function getKokaLandingResponse(
 
   if (isOutOfScope) {
     return {
-      text: "Untuk pertanyaan itu saya belum memiliki informasi yang cukup. Saya bisa membantu menjelaskan KawaCanaan berdasarkan informasi yang tersedia di halaman ini.",
+      text: "Terkait urusan tersebut, saluran koordinasi lintas sistem belum menerima laporan resmi. Namun untuk seluruh regulasi, stabilitas fitur, dan paket resmi KawaCanaan, Presiden Konoha siap memaparkannya.",
       category: 'insufficient_context',
       suggestions: [],
     };
   }
 
   // -------------------------------------------------------------
-  // 14. DEFAULT CONVERSATIONAL RESPONSE (RAMAH & MENDAMPINGI)
+  // 14. DEFAULT CONVERSATIONAL RESPONSE (PEJABAT KENEGARAAN)
   // -------------------------------------------------------------
   return {
-    text: "KawaCanaan Presensi adalah sistem absensi digital terpadu untuk Sekolah Dasar yang dirancang agar pekerjaan guru dan sekolah jadi lebih praktis, rapi, dan akurat 😊\n\nAda hal tertentu yang ingin Bapak/Ibu ketahui lebih lanjut seputar cara kerja, fitur, paket harga, atau cara pendaftarannya?",
+    text: "KawaCanaan Presensi adalah infrastruktur presensi digital terpadu untuk Sekolah Dasar demi menjaga ketertiban dan stabilitas administrasi sekolah 🇮🇩\n\nAda agenda kenegaraan atau urusan fitur dan paket yang ingin dikoordinasikan lebih lanjut, Bapak/Ibu?",
     category: 'general',
     suggestions: [],
   };

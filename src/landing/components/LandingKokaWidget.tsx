@@ -261,8 +261,8 @@ export const LandingKokaWidget: React.FC<LandingKokaWidgetProps> = ({
       role: 'assistant',
       content:
         lang === 'EN'
-          ? "Halo 👋 Saya Presiden Konoha. Ada yang ingin Anda ketahui tentang KawaCanaan Presensi?"
-          : "Halo 👋 Saya Presiden Konoha. Ada yang ingin Anda ketahui tentang KawaCanaan Presensi?",
+          ? "Salam kenegaraan! 👋 Saya Presiden Konoha. Ada urusan sistem presensi atau koordinasi paket yang ingin Anda ketahui?"
+          : "Salam kenegaraan! 👋 Saya Presiden Konoha. Ada urusan sistem presensi atau koordinasi paket yang ingin Anda ketahui?",
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       category: 'welcome',
     };
@@ -553,7 +553,7 @@ export const LandingKokaWidget: React.FC<LandingKokaWidgetProps> = ({
               <div className="flex items-center gap-1.5">
                 <span className="text-sm">👋</span>
                 <span className="text-xs font-black text-sky-900">
-                  {lang === 'EN' ? "Halo 👋 Saya Presiden Konoha" : "Halo 👋 Saya Presiden Konoha"}
+                  {lang === 'EN' ? "Salam Kenegaraan 👋 Saya Presiden Konoha" : "Salam Kenegaraan 👋 Saya Presiden Konoha"}
                 </span>
               </div>
               <button
@@ -573,8 +573,8 @@ export const LandingKokaWidget: React.FC<LandingKokaWidgetProps> = ({
 
             <p className="text-[11.5px] text-slate-600 leading-relaxed">
               {lang === 'EN'
-                ? 'Ada yang ingin Anda ketahui tentang KawaCanaan Presensi?'
-                : 'Ada yang ingin Anda ketahui tentang KawaCanaan Presensi?'}
+                ? 'Ada agenda atau urusan stabilitas presensi sekolah yang ingin dikoordinasikan?'
+                : 'Ada agenda atau urusan stabilitas presensi sekolah yang ingin dikoordinasikan?'}
             </p>
 
             <div className="mt-2.5 pt-2 border-t border-sky-100 flex items-center justify-between gap-2">
@@ -803,7 +803,7 @@ export const LandingKokaWidget: React.FC<LandingKokaWidgetProps> = ({
             <div className="flex items-center gap-1.5 min-w-0">
               <ShieldCheck size={14} className="text-blue-600 shrink-0" />
               <span className="font-medium truncate">
-                Ranah Presiden Konoha: <strong>Sistem, Fitur, & Paket Resmi</strong>
+                Ranah Presiden Konoha: <strong>Stabilitas Sistem, Regulasi Fitur, & Paket Resmi</strong>
               </span>
             </div>
             <div className="flex items-center gap-1 shrink-0 ml-2">
@@ -871,7 +871,7 @@ export const LandingKokaWidget: React.FC<LandingKokaWidgetProps> = ({
                   <img src="/koka.png" alt="Presiden Konoha" className="w-full h-full object-contain" />
                 </div>
                 <div className="bg-white border border-slate-200/90 rounded-2xl rounded-bl-xs px-3.5 py-2.5 shadow-2xs flex items-center gap-2">
-                  <span className="text-xs text-slate-600 font-medium">Presiden Konoha sedang mengetik</span>
+                  <span className="text-xs text-slate-600 font-medium">Presiden Konoha sedang mengoordinasikan jawaban</span>
                   <div className="flex items-center gap-1">
                     <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-bounce [animation-delay:-0.3s]" />
                     <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-bounce [animation-delay:-0.15s]" />
@@ -914,8 +914,8 @@ export const LandingKokaWidget: React.FC<LandingKokaWidgetProps> = ({
                 onChange={(e) => setInputText(e.target.value)}
                 placeholder={
                   lang === 'EN'
-                    ? 'Ask Presiden Konoha about Kawacanaan features or pricing...'
-                    : 'Tanya Presiden Konoha tentang fitur, paket, atau cara presensi...'
+                    ? 'Coordinate with Presiden Konoha on features or pricing...'
+                    : 'Koordinasikan pertanyaan tentang fitur, paket, atau stabilitas presensi...'
                 }
                 className="flex-1 bg-slate-100 border border-transparent focus:border-blue-500 focus:bg-white rounded-xl px-3.5 py-2 text-xs text-slate-800 placeholder-slate-400 focus:outline-hidden transition-all"
               />

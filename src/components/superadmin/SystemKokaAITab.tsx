@@ -40,7 +40,7 @@ export const SystemKokaAITab: React.FC<Props> = ({
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
   const [testPrompt, setTestPrompt] = useState(
-    'Halo Presiden Konoha, bagaimana langkah praktis yang bisa diambil wali kelas saat ada siswa yang sering terlambat?'
+    'Siapa yang belum absen?'
   );
   const [testResult, setTestResult] = useState<{
     ok: boolean;
@@ -50,14 +50,15 @@ export const SystemKokaAITab: React.FC<Props> = ({
     error?: string;
   } | null>(null);
 
+  const defaultOfficialPersona =
+    'Kamu adalah Presiden Konoha AI. Berbicara seperti pejabat negara yang sangat formal dan berwibawa, tetapi lucu dan nyeleneh. Menganggap urusan absensi sekolah sebagai urusan negara. Sering menggunakan istilah birokrasi seperti koordinasi, disposisi, pendataan, dan stabilitas tanpa berlebihan. Tetap ramah, singkat, dan membantu guru. Selalu prioritaskan ketepatan data dan tindakan nyata dibanding humor.';
+
   const [form, setForm] = useState<KokaConfig>(() => ({
     enabled_landing: initialConfig?.enabled_landing ?? true,
     enabled_dashboard: initialConfig?.enabled_dashboard ?? true,
     active_model: initialConfig?.active_model || '@cf/zai-org/glm-4.7-flash',
     temperature: initialConfig?.temperature ?? 0.7,
-    system_persona:
-      initialConfig?.system_persona ||
-      'Kamu adalah Presiden Konoha, asisten virtual cerdas, ramah, dan profesional untuk sistem presensi sekolah dasar Kawacanaan. Bantulah guru, tenaga kependidikan, dan wali murid dengan ramah, berbasis data presensi yang akurat dan sopan.',
+    system_persona: initialConfig?.system_persona || defaultOfficialPersona,
     max_tokens: initialConfig?.max_tokens || 1024,
     daily_limit_per_tenant: initialConfig?.daily_limit_per_tenant || 100,
     has_cloudflare_config: initialConfig?.has_cloudflare_config ?? true,
@@ -70,9 +71,7 @@ export const SystemKokaAITab: React.FC<Props> = ({
         enabled_dashboard: initialConfig.enabled_dashboard ?? true,
         active_model: initialConfig.active_model || '@cf/zai-org/glm-4.7-flash',
         temperature: initialConfig.temperature ?? 0.7,
-        system_persona:
-          initialConfig.system_persona ||
-          'Kamu adalah Presiden Konoha, asisten virtual cerdas, ramah, dan profesional untuk sistem presensi sekolah dasar Kawacanaan. Bantulah guru, tenaga kependidikan, dan wali murid dengan ramah, berbasis data presensi yang akurat dan sopan.',
+        system_persona: initialConfig.system_persona || defaultOfficialPersona,
         max_tokens: initialConfig.max_tokens || 1024,
         daily_limit_per_tenant: initialConfig.daily_limit_per_tenant || 100,
         has_cloudflare_config: initialConfig.has_cloudflare_config ?? true,

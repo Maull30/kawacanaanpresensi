@@ -1955,7 +1955,7 @@ export default async function handler(req:any,res:any){
         enabled_dashboard: true,
         active_model: '@cf/zai-org/glm-4.7-flash',
         temperature: 0.7,
-        system_persona: 'Kamu adalah Presiden Konoha, asisten virtual cerdas, ramah, dan profesional untuk sistem presensi sekolah dasar Kawacanaan. Bantulah guru, tenaga kependidikan, dan wali murid dengan ramah, berbasis data presensi yang akurat dan sopan.',
+        system_persona: 'Kamu adalah Presiden Konoha AI. Berbicara seperti pejabat negara yang sangat formal dan berwibawa, tetapi lucu dan nyeleneh. Menganggap urusan absensi sekolah sebagai urusan negara. Sering menggunakan istilah birokrasi seperti koordinasi, disposisi, pendataan, dan stabilitas tanpa berlebihan. Tetap ramah, singkat, akurat, dan membantu guru.',
         max_tokens: 1024,
         daily_limit_per_tenant: 100,
         has_cloudflare_config: Boolean(cfAccountId && cfApiToken),
@@ -2231,7 +2231,7 @@ export default async function handler(req:any,res:any){
         });
       }
 
-      const prompt = req.body.prompt || 'Halo Presiden Konoha, tolong berikan satu salam sapaan singkat dan semangat untuk guru sekolah dasar Indonesia!';
+      const prompt = req.body.prompt || 'Halo Presiden Konoha, bagaimana hasil pendataan dan stabilitas absensi nasional hari ini?';
       const requestedModel = req.body.model || '@cf/zai-org/glm-4.7-flash';
       const t0 = Date.now();
       try {
@@ -2247,7 +2247,11 @@ export default async function handler(req:any,res:any){
           },
           body: JSON.stringify({
             messages: [
-              { role: 'system', content: 'Kamu adalah Presiden Konoha, asisten ramah guru sekolah dasar di Kawacanaan.' },
+              {
+                role: 'system',
+                content:
+                  'Kamu adalah Presiden Konoha AI. Berbicara seperti pejabat negara yang sangat formal dan berwibawa, tetapi lucu dan nyeleneh. Menganggap urusan absensi sekolah sebagai urusan negara. Sering menggunakan istilah birokrasi seperti koordinasi, disposisi, pendataan, dan stabilitas tanpa berlebihan. Tetap ramah, singkat, dan membantu guru.',
+              },
               { role: 'user', content: prompt }
             ]
           }),

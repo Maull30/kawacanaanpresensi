@@ -641,6 +641,9 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
   else if (kepsekSchoolPctHadir < 85) kepsekSchoolPredicate = 'Cukup';
   else if (kepsekSchoolPctHadir < 95) kepsekSchoolPredicate = 'Baik';
 
+  // State untuk retry / muat ulang
+  const [retryCount, setRetryCount] = useState(0);
+
   // Fallback fetching for external visitor via URL
   useEffect(() => {
     if (isInternalUser) {
@@ -648,11 +651,7 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
       return;
     }
     let isMounted = true;
-    const safetyTimer = setTimeout(() => {
-      if (isMounted) {
-        setLoading(false);
-      }
-    }, 3500);
+    const abortController = new AbortController();
 
     const fetchReport = async () => {
       setLoading(true);
@@ -664,6 +663,7 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
         const res = await fetch('/api/onboarding', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          signal: abortController.signal,
           body: JSON.stringify({
             action: 'get_public_daily_report',
             classId: propClassId,
@@ -680,22 +680,22 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
           }),
         });
 
-        const json = await res.json();
+        const json = await res.json().catch(() => ({}));
         if (isMounted) {
           if (res.ok && json.ok && json.report) {
             setExternalReportData(json.report);
+            setError(null);
           } else {
             setError(json.error || 'Data rekap kehadiran untuk rombel dan periode ini belum tersedia di sistem.');
             setExternalReportData(null);
           }
         }
       } catch (err: any) {
-        if (isMounted) {
-          setError('Gagal memuat dokumen rekap kehadiran. Silakan muat ulang halaman atau hubungi pihak sekolah.');
+        if (isMounted && err?.name !== 'AbortError') {
+          setError('Gagal memuat dokumen rekap kehadiran. Silakan periksa jaringan internet Anda atau muat ulang halaman.');
           setExternalReportData(null);
         }
       } finally {
-        clearTimeout(safetyTimer);
         if (isMounted) {
           setLoading(false);
         }
@@ -705,9 +705,9 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
     fetchReport();
     return () => {
       isMounted = false;
-      clearTimeout(safetyTimer);
+      abortController.abort();
     };
-  }, [isInternalUser, propClassId, selectedDate, attendanceType, subjectId]);
+  }, [isInternalUser, propClassId, propClassName, selectedDate, attendanceType, subjectId, reportType, selectedWeek, month, year, semester, academicYear, retryCount]);
 
   const handlePrint = () => {
     window.print();
@@ -865,7 +865,7 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
   if (!isInternalUser && (error || !externalReportData)) {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 text-center">
-        <div className="w-14 h-14 rounded-2xl bg-rose-50 border border-rose-200 flex items-center justify-center text-rose-600 mb-4">
+        <div className="w-14 h-14 rounded-2xl bg-rose-50 border border-rose-200 flex items-center justify-center text-rose-600 mb-4 shadow-xs">
           <AlertCircle size={28} />
         </div>
         <h2 className="text-base sm:text-lg font-black text-slate-900 tracking-tight">
@@ -874,13 +874,21 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
         <p className="text-xs sm:text-sm text-slate-600 mt-2 max-w-md leading-relaxed">
           {error || 'Data rekap kehadiran untuk rombel dan periode ini belum diterbitkan oleh pihak sekolah.'}
         </p>
-        <div className="mt-6 flex items-center gap-3">
+        <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+          <button
+            type="button"
+            onClick={() => setRetryCount((c) => c + 1)}
+            className="px-5 py-2.5 rounded-xl bg-blue-600 text-white font-bold text-xs hover:bg-blue-700 transition-all cursor-pointer shadow-sm active:scale-95 flex items-center gap-2"
+          >
+            <span>Muat Ulang Dokumen</span>
+          </button>
           {onBackToApp && (
             <button
+              type="button"
               onClick={onBackToApp}
-              className="px-5 py-2.5 rounded-xl bg-blue-600 text-white font-bold text-xs hover:bg-blue-700 transition-all cursor-pointer shadow-xs"
+              className="px-5 py-2.5 rounded-xl bg-slate-200 text-slate-700 font-bold text-xs hover:bg-slate-300 transition-all cursor-pointer"
             >
-              Kembali ke Aplikasi
+              Kembali ke Beranda
             </button>
           )}
         </div>
@@ -891,7 +899,7 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
   if (targetStudents.length === 0) {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 text-center">
-        <div className="w-14 h-14 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-600 mb-4">
+        <div className="w-14 h-14 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-600 mb-4 shadow-xs">
           <AlertCircle size={28} />
         </div>
         <h2 className="text-base sm:text-lg font-black text-slate-900 tracking-tight">
@@ -900,13 +908,21 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
         <p className="text-xs sm:text-sm text-slate-600 mt-2 max-w-md leading-relaxed">
           Data siswa atau rekap presensi untuk rombel dan periode ini belum tersedia.
         </p>
-        <div className="mt-6 flex items-center gap-3">
+        <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+          <button
+            type="button"
+            onClick={() => setRetryCount((c) => c + 1)}
+            className="px-5 py-2.5 rounded-xl bg-blue-600 text-white font-bold text-xs hover:bg-blue-700 transition-all cursor-pointer shadow-sm active:scale-95"
+          >
+            Coba Lagi
+          </button>
           {onBackToApp && (
             <button
+              type="button"
               onClick={onBackToApp}
-              className="px-5 py-2.5 rounded-xl bg-blue-600 text-white font-bold text-xs hover:bg-blue-700 transition-all cursor-pointer shadow-xs"
+              className="px-5 py-2.5 rounded-xl bg-slate-200 text-slate-700 font-bold text-xs hover:bg-slate-300 transition-all cursor-pointer"
             >
-              Kembali ke Aplikasi
+              Kembali ke Beranda
             </button>
           )}
         </div>

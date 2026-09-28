@@ -82,17 +82,46 @@ function calculateGuruProTrialPeriod(now: Date = new Date()) {
 }
 
 export default async function handler(req: any, res: any) {
+  // 1. Dukungan Header CORS & Preflight Request (Sangat penting saat diakses via tautan WhatsApp / WebView HP)
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
+  res.setHeader(
+    'Access-Control-Allow-Headers',
+    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization'
+  );
+
+  if (req.method === 'OPTIONS') {
+    res.status(200).end();
+    return;
+  }
+
   if (req.method !== 'POST') {
     return json(res, 405, { error: 'Metode permintaan tidak diizinkan. Gunakan POST.' });
   }
 
   const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '';
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY || '';
+  const serviceKey =
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    process.env.SUPABASE_SECRET_KEY ||
+    process.env.VITE_SUPABASE_SERVICE_ROLE_KEY ||
+    process.env.SERVICE_ROLE_KEY ||
+    process.env.SUPABASE_KEY ||
+    process.env.VITE_SUPABASE_ANON_KEY ||
+    process.env.SUPABASE_ANON_KEY ||
+    '';
 
-  const body = req.body || {};
+  let body = req.body || {};
+  if (typeof body === 'string') {
+    try {
+      body = JSON.parse(body);
+    } catch (_) {
+      body = {};
+    }
+  }
   const action = body.action;
 
-  // Fallback jika kredensial server belum tersedia (mode simulasi/preview)
+  // Fallback jika kredensial server belum tersedia sama sekali
   if (!url || !serviceKey) {
     if (action === 'lookup_school') {
       return json(res, 200, {
@@ -118,9 +147,9 @@ export default async function handler(req: any, res: any) {
     }
 
     if (action === 'get_public_daily_report') {
-      return json(res, 404, {
+      return json(res, 500, {
         ok: false,
-        error: 'Dokumen rekap presensi untuk rombel dan periode ini belum tersedia di sistem.',
+        error: 'Konfigurasi database server belum terhubung. Silakan hubungi admin sekolah.',
       });
     }
 

@@ -199,6 +199,7 @@ const MainAppContent: React.FC = () => {
 
       return {
         classId: r || '',
+        className: p.get('cn') || p.get('className') || '',
         date: d || new Date().toISOString().split('T')[0],
         attendanceType: (p.get('m') === 'subject' || p.get('type') === 'subject') ? ('SUBJECT' as const) : ('DAILY' as const),
         subjectId: p.get('s') || p.get('subjectId') || null,
@@ -262,6 +263,7 @@ const MainAppContent: React.FC = () => {
 
         setPublicReportParams({
           classId: r || '',
+          className: params.get('cn') || params.get('className') || '',
           date: d || new Date().toISOString().split('T')[0],
           attendanceType: (params.get('m') === 'subject' || params.get('type') === 'subject') ? ('SUBJECT' as const) : ('DAILY' as const),
           subjectId: params.get('s') || params.get('subjectId') || null,
@@ -389,6 +391,7 @@ const MainAppContent: React.FC = () => {
     return (
       <PublicDailyReportViewer
         classId={publicReportParams.classId}
+        className={publicReportParams.className}
         date={publicReportParams.date}
         attendanceType={publicReportParams.attendanceType}
         subjectId={publicReportParams.subjectId}

@@ -105,11 +105,19 @@ export default async function handler(req: any, res: any) {
     process.env.SUPABASE_SERVICE_ROLE_KEY ||
     process.env.SUPABASE_SECRET_KEY ||
     process.env.VITE_SUPABASE_SERVICE_ROLE_KEY ||
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    process.env.SUPABASE_SECRET_KEY ||
+    process.env.VITE_SUPABASE_SERVICE_ROLE_KEY ||
+    process.env.SERVICE_ROLE_KEY ||
+    process.env.SUPABASE_KEY ||
     process.env.SERVICE_ROLE_KEY ||
     process.env.SUPABASE_KEY ||
     '';
   const serviceKey =
     serverServiceKey ||
+    process.env.VITE_SUPABASE_ANON_KEY ||
+    process.env.SUPABASE_ANON_KEY ||
+    '';
     process.env.VITE_SUPABASE_ANON_KEY ||
     process.env.SUPABASE_ANON_KEY ||
     '';
@@ -134,6 +142,9 @@ export default async function handler(req: any, res: any) {
     });
   }
 
+  // Fallback jika kredensial server belum tersedia sama sekali
+  if (!url || !serviceKey) {
+    if (action === 'lookup_school') {
   // Fallback jika kredensial server belum tersedia sama sekali
   if (!url || !serviceKey) {
     if (action === 'lookup_school') {
@@ -542,6 +553,49 @@ export default async function handler(req: any, res: any) {
         }
       }
 
+      // 1.c. Fail-Safe: Cek langsung catatan presensi di tanggal tersebut!
+      // Jika guru sudah menyimpan presensi di tanggal ini, lacak kelas dari siswa yang diabsen
+      if (!targetClass && reportDate) {
+        const { data: recentAtt } = await db
+          .from('attendance_records')
+          .select('student_id')
+          .eq('date', reportDate)
+          .limit(5);
+
+        if (recentAtt && recentAtt.length > 0) {
+          const stdIds = recentAtt.map((r: any) => r.student_id);
+          const { data: stdRows } = await db
+            .from('students')
+            .select('class_id')
+            .in('id', stdIds)
+            .limit(1);
+
+          if (stdRows && stdRows[0]?.class_id) {
+            const { data: inferredClass } = await db
+              .from('classes')
+              .select('id, name, grade, academic_year, school_id, wali_kelas_teacher_id')
+              .eq('id', stdRows[0].class_id)
+              .maybeSingle();
+
+            if (inferredClass) {
+              targetClass = inferredClass;
+            }
+          }
+        }
+      }
+          }
+        }
+      }
+
+      // 1.d. Fallback terakhir jika tetap tidak ditemukan
+      if (!targetClass) {
+        const { data: anyClass } = await db
+          .from('classes')
+          .select('id, name, grade, academic_year, school_id, wali_kelas_teacher_id')
+          .limit(1);
+        targetClass = anyClass?.[0];
+      }
+
       if (!targetClass) {
         return json(res, 404, { error: 'Rombel kelas tidak ditemukan di sistem.' });
       }
@@ -775,7 +829,7 @@ export default async function handler(req: any, res: any) {
             notes: r.notes || '',
             type: r.type || 'DAILY',
             subjectId: r.subject_id || null,
-            classId: r.class_id || targetClass.id,
+            classId: r.class_id || targetClass?.id || null,
             teacherId: r.teacher_id || null,
           })),
         },

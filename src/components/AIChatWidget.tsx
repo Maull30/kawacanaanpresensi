@@ -277,18 +277,18 @@ export const AIChatWidget: React.FC = () => {
   const greetingSummaryText = useMemo(() => {
     if (attendanceStatus.roleType === 'WALI_KELAS') {
       if (!attendanceStatus.isComplete) {
-        return `Presensi harian untuk ${attendanceStatus.className} belum dicatat hari ini (${attendanceStatus.unrecordedCount} dari ${attendanceStatus.totalStudents} siswa belum terabsen). Mau Koka bantu absenkan sekarang?`;
+        return `Hasil pendataan nasional menunjukkan presensi untuk ${attendanceStatus.className} belum dicatat (${attendanceStatus.unrecordedCount} dari ${attendanceStatus.totalStudents} siswa belum terdata). Mohon segera koordinasikan!`;
       }
-      return `Presensi harian ${attendanceStatus.className} hari ini sudah lengkap (${attendanceStatus.hadirCount} Hadir${attendanceStatus.sakitCount > 0 ? `, ${attendanceStatus.sakitCount} Sakit` : ''}${attendanceStatus.izinCount > 0 ? `, ${attendanceStatus.izinCount} Izin` : ''}${attendanceStatus.alfaCount > 0 ? `, ${attendanceStatus.alfaCount} Alfa` : ''}). Selamat mengajar!`;
+      return `Stabilitas absensi ${attendanceStatus.className} hari ini terpantau aman terkendali (${attendanceStatus.hadirCount} Hadir${attendanceStatus.sakitCount > 0 ? `, ${attendanceStatus.sakitCount} Sakit` : ''}${attendanceStatus.izinCount > 0 ? `, ${attendanceStatus.izinCount} Izin` : ''}${attendanceStatus.alfaCount > 0 ? `, ${attendanceStatus.alfaCount} Alfa` : ''}). Jalankan tugas kenegaraan ini dengan tertib!`;
     }
     if (attendanceStatus.roleType === 'GURU_MAPEL') {
       const subNames = (attendanceStatus.subjects || []).map((s: any) => s.name).join(', ') || 'Mata Pelajaran';
       if (!attendanceStatus.isComplete) {
-        return `Ada agenda mengajar ${subNames} hari ini. Koka siap membantu mencatat siswa yang hadir, izin, atau sakit.`;
+        return `Tercatat agenda pengajaran ${subNames} hari ini. Presiden Konoha siap menerima disposisi presensi siswa.`;
       }
-      return `Presensi mata pelajaran ${subNames} sudah mulai tersimpan dengan baik hari ini.`;
+      return `Pendataan presensi sesi ${subNames} telah terverifikasi aman hari ini.`;
     }
-    return `Koka siap mendampingi kelancaran presensi dan rekapitulasi data sekolah hari ini. Ada yang perlu dibantu?`;
+    return `Presiden Konoha siap mengawal stabilitas presensi dan pendataan sekolah hari ini. Ada urusan yang perlu dikoordinasikan?`;
   }, [attendanceStatus]);
 
   // 3. Posisi Terbang Koka di Layar (Draggable bebas ke mana saja)
@@ -344,7 +344,7 @@ export const AIChatWidget: React.FC = () => {
       localStorage.setItem('koka_flight_pos_v2', JSON.stringify(defaultPos));
     } catch (_) {}
     if (showToast) {
-      showToast('Posisi Koka dikembalikan ke sudut layar', 'info');
+      showToast('Posisi Presiden Konoha dikembalikan ke sudut layar', 'info');
     }
   };
 
@@ -478,18 +478,18 @@ export const AIChatWidget: React.FC = () => {
       }
     } catch (_) {}
 
-    // Sapaan awal ramah & santun dari Koka dengan info presensi
+    // Sapaan awal kenegaraan dari Presiden Konoha dengan info presensi
     let reminderText = '';
     if (attendanceStatus.roleType === 'WALI_KELAS') {
       if (!attendanceStatus.isComplete) {
-        reminderText = `\n\n📌 **Pengingat Hari Ini**: Presensi harian untuk **${attendanceStatus.className}** belum diisi (${attendanceStatus.unrecordedCount} dari ${attendanceStatus.totalStudents} siswa belum terabsen). Anda dapat meminta saya: *"Tolong bantu absenkan ${attendanceStatus.className} hari ini"* atau sebutkan siswa yang berhalangan hadir.`;
+        reminderText = `\n\n📌 **Laporan Pendataan**: Presensi harian untuk **${attendanceStatus.className}** belum dicatat (${attendanceStatus.unrecordedCount} dari ${attendanceStatus.totalStudents} siswa belum terabsen). Anda dapat mendisposisikan: *"Tolong bantu absenkan ${attendanceStatus.className} hari ini"* atau sebutkan siswa yang sakit/izin demi menjaga stabilitas kelas.`;
       } else {
-        reminderText = `\n\n✅ **Catatan Presensi**: Presensi **${attendanceStatus.className}** hari ini sudah lengkap (${attendanceStatus.hadirCount} Hadir${attendanceStatus.sakitCount > 0 ? `, ${attendanceStatus.sakitCount} Sakit` : ''}${attendanceStatus.izinCount > 0 ? `, ${attendanceStatus.izinCount} Izin` : ''}${attendanceStatus.alfaCount > 0 ? `, ${attendanceStatus.alfaCount} Alfa` : ''}). Selamat mendidik generasi penerus, ${teacherShortName}!`;
+        reminderText = `\n\n✅ **Status Stabilitas**: Presensi **${attendanceStatus.className}** hari ini telah lengkap (${attendanceStatus.hadirCount} Hadir${attendanceStatus.sakitCount > 0 ? `, ${attendanceStatus.sakitCount} Sakit` : ''}${attendanceStatus.izinCount > 0 ? `, ${attendanceStatus.izinCount} Izin` : ''}${attendanceStatus.alfaCount > 0 ? `, ${attendanceStatus.alfaCount} Alfa` : ''}). Stabilitas kelas terjaga dengan baik, ${teacherShortName}!`;
       }
     } else if (attendanceStatus.roleType === 'GURU_MAPEL') {
       const subNames = (attendanceStatus.subjects || []).map((s: any) => s.name).join(', ') || 'Mata Pelajaran';
       if (!attendanceStatus.isComplete) {
-        reminderText = `\n\n📌 **Pengingat Mengajar**: Jangan lupa mencatat kehadiran sesi kelas mapel **${subNames}** hari ini. Koka siap membantu mencatat siswa yang hadir atau izin.`;
+        reminderText = `\n\n📌 **Laporan Agenda**: Terjadwal agenda mengajar sesi **${subNames}** hari ini. Presiden Konoha siap menerima instruksi pencatatan kehadiran siswa.`;
       }
     }
 
@@ -497,7 +497,7 @@ export const AIChatWidget: React.FC = () => {
       id: `welcome-${Date.now()}`,
       role: 'assistant',
       type: 'text',
-      content: `Halo ${teacherFullName}! 👋 ${getTimeGreeting()}.\n\nSaya **Koka**, asisten guru digital dan agen cerdas absensi Anda di Kawacanaan. Saya siap membantu mempermudah dan memperlancar segala urusan pencatatan kehadiran siswa.${reminderText}`,
+      content: `Salam kehormatan ${teacherFullName}! 👋 ${getTimeGreeting()}.\n\nSaya **Presiden Konoha**, aparatur tertinggi pengawal stabilitas presensi Anda di Kawacanaan. Kami memandang urusan absensi ini setara urusan kenegaraan yang amat genting. Silakan sampaikan disposisi kehadiran atau kebutuhan pendataan Anda.${reminderText}`,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     };
     setMessages([initialGreeting]);
@@ -580,9 +580,11 @@ export const AIChatWidget: React.FC = () => {
 
     window.addEventListener('open-koka-ai-chat', handleOpenChat);
     window.addEventListener('open-kawa-ai-chat', handleOpenChat);
+    window.addEventListener('open-presiden-konoha-ai-chat', handleOpenChat);
     return () => {
       window.removeEventListener('open-koka-ai-chat', handleOpenChat);
       window.removeEventListener('open-kawa-ai-chat', handleOpenChat);
+      window.removeEventListener('open-presiden-konoha-ai-chat', handleOpenChat);
     };
   }, [currentUser, activeWorkspace, students, classes, teachers, subjects, attendanceRecords]);
 
@@ -996,7 +998,9 @@ export const AIChatWidget: React.FC = () => {
     } catch (err: any) {
       console.error('[AIChatWidget] error:', err);
       setIsTyping(false);
-      const safeErrorMsg = err.message || 'AI sedang tidak dapat digunakan. Silakan coba lagi.';
+      const safeErrorMsg = err?.message && err.message.includes('koordinasi')
+        ? err.message
+        : 'Permasalahan sedang dalam tahap koordinasi lintas sistem. Mohon tetap tenang.';
       setErrorMessage(safeErrorMsg);
 
       const errAssistantMsg: ChatMessage = {
@@ -1096,7 +1100,7 @@ export const AIChatWidget: React.FC = () => {
                 className="px-2.5 py-1 rounded-xl bg-gradient-to-r from-sky-500 to-blue-600 text-white text-[11px] font-bold shadow-xs hover:shadow-md hover:from-sky-600 hover:to-blue-700 transition-all flex items-center gap-1 cursor-pointer"
               >
                 <Sparkles size={11} className="text-amber-200" />
-                <span>Buka Koka</span>
+                <span>Buka Presiden Konoha</span>
               </button>
               <button
                 type="button"
@@ -1133,7 +1137,7 @@ export const AIChatWidget: React.FC = () => {
             transform: `rotate(${flightTilt}deg)`,
             transition: isDragging ? 'none' : 'transform 0.25s ease-out',
           }}
-          title={isOpen ? 'Tutup obrolan Koka' : 'Koka - Tarik untuk menerbangkan ke mana saja'}
+          title={isOpen ? 'Tutup obrolan Presiden Konoha' : 'Presiden Konoha - Tarik untuk menerbangkan ke mana saja'}
         >
           <div className={`relative ${isDragging ? 'scale-110' : 'animate-koka-float'}`}>
             <div
@@ -1150,8 +1154,8 @@ export const AIChatWidget: React.FC = () => {
               ) : (
                 <div className="w-full h-full rounded-full overflow-hidden bg-white/95 border-2 border-white flex items-center justify-center shadow-inner relative">
                   <img
-                    src="/koka.png"
-                    alt="Koka Asisten Guru"
+                    src="/presiden-konoha.png"
+                    alt="Presiden Konoha Asisten Guru"
                     className="w-full h-full object-contain pointer-events-none select-none scale-105"
                     draggable={false}
                   />
@@ -1178,7 +1182,7 @@ export const AIChatWidget: React.FC = () => {
                 className={`hidden sm:group-hover:flex absolute -bottom-7 left-1/2 -translate-x-1/2 px-2.5 py-0.5 rounded-full bg-slate-900/90 text-[10px] text-white font-medium whitespace-nowrap shadow-lg border border-slate-700 items-center gap-1 pointer-events-none`}
               >
                 <Sparkles size={10} className="text-yellow-400" />
-                <span>Koka • Tarik untuk terbang</span>
+                <span>Presiden Konoha • Tarik untuk terbang</span>
               </div>
             )}
           </div>
@@ -1199,12 +1203,12 @@ export const AIChatWidget: React.FC = () => {
             <div className="absolute top-0 right-0 w-40 h-40 bg-white/10 rounded-full blur-2xl pointer-events-none" />
 
             <div className="flex items-center gap-3 relative z-10">
-              {/* Avatar Koka di Header */}
+              {/* Avatar Presiden Konoha di Header */}
               <div className="relative">
                 <div className="w-10 h-10 rounded-2xl bg-white/20 border border-white/40 backdrop-blur-xs flex items-center justify-center p-0.5 shadow-xs overflow-hidden">
                   <img
-                    src="/koka.png"
-                    alt="Koka"
+                    src="/presiden-konoha.png"
+                    alt="Presiden Konoha"
                     className="w-full h-full object-contain"
                   />
                 </div>
@@ -1213,7 +1217,7 @@ export const AIChatWidget: React.FC = () => {
 
               <div>
                 <div className="flex items-center gap-2">
-                  <h3 className="text-sm font-black text-white tracking-tight">Koka</h3>
+                  <h3 className="text-sm font-black text-white tracking-tight">Presiden Konoha</h3>
                   <span className="px-2 py-0.5 rounded-full bg-white/20 text-[9px] font-extrabold uppercase tracking-wider text-blue-100 flex items-center gap-1">
                     <Sparkles size={9} className="text-yellow-300" />
                     Asisten Guru
@@ -1228,11 +1232,11 @@ export const AIChatWidget: React.FC = () => {
 
             {/* Header Control Buttons */}
             <div className="flex items-center gap-1 relative z-10">
-              {/* Reset Posisi Terbang Koka */}
+              {/* Reset Posisi Terbang Presiden Konoha */}
               <button
                 type="button"
                 onClick={resetPositionToDefault}
-                title="Kembalikan posisi Koka ke sudut layar"
+                title="Kembalikan posisi Presiden Konoha ke sudut layar"
                 className="p-1.5 rounded-lg text-white/80 hover:text-white hover:bg-white/15 transition-colors cursor-pointer"
               >
                 <RotateCcw size={15} />
@@ -1329,12 +1333,12 @@ export const AIChatWidget: React.FC = () => {
                   key={msg.id}
                   className={`flex items-end gap-2.5 ${isAssistant ? 'justify-start' : 'justify-end'}`}
                 >
-                  {/* Avatar Koka di Sebelah Kiri */}
+                  {/* Avatar Presiden Konoha di Sebelah Kiri */}
                   {isAssistant && (
                     <div
                       className="w-7 h-7 rounded-xl overflow-hidden bg-white border border-sky-300 flex items-center justify-center shrink-0 shadow-2xs self-start mt-1 p-0.5"
                     >
-                      <img src="/koka.png" alt="Koka" className="w-full h-full object-contain" />
+                      <img src="/presiden-konoha.png" alt="Presiden Konoha" className="w-full h-full object-contain" />
                     </div>
                   )}
 
@@ -1349,7 +1353,7 @@ export const AIChatWidget: React.FC = () => {
                     {/* Header Label Bubble */}
                     <div className="flex items-center justify-between gap-3 mb-1 text-[10px] opacity-75">
                       <span className="font-bold tracking-tight">
-                        {isAssistant ? 'Koka' : 'Anda'}
+                        {isAssistant ? 'Presiden Konoha' : 'Anda'}
                       </span>
                       <span>{msg.timestamp}</span>
                     </div>
@@ -1629,17 +1633,17 @@ export const AIChatWidget: React.FC = () => {
             {/* ANIMASI INDIKATOR "SEDANG MENGETIK..." (TYPING INDICATOR) */}
             {isTyping && (
               <div className="flex items-end gap-2.5 justify-start animate-in fade-in duration-200">
-                {/* Avatar Koka di Sebelah Kiri */}
+                {/* Avatar Presiden Konoha di Sebelah Kiri */}
                 <div
                   className="w-7 h-7 rounded-xl overflow-hidden bg-white border border-sky-300 flex items-center justify-center shrink-0 shadow-2xs p-0.5"
                 >
-                  <img src="/koka.png" alt="Koka" className="w-full h-full object-contain" />
+                  <img src="/presiden-konoha.png" alt="Presiden Konoha" className="w-full h-full object-contain" />
                 </div>
 
                 {/* Bubble Typing dengan 3 Titik Animasi */}
                 <div className="bg-white border border-slate-200/90 rounded-2xl rounded-bl-xs px-3.5 py-2.5 shadow-2xs flex items-center gap-2 text-slate-500">
                   <span className="text-[11px] font-semibold text-slate-600">
-                    Koka sedang memproses
+                    Presiden Konoha sedang mengoordinasikan data
                   </span>
                   <div className="flex items-center gap-1">
                     <span className="w-1.5 h-1.5 rounded-full bg-indigo-600 animate-bounce [animation-delay:-0.3s]" />
@@ -1748,7 +1752,7 @@ export const AIChatWidget: React.FC = () => {
             </form>
             <div className="mt-1.5 flex items-center justify-between text-[10px] text-slate-400 px-1">
               <span>Tekan Enter untuk mengirim</span>
-              <span>Koka Function Calling</span>
+              <span>Presiden Konoha Function Calling</span>
             </div>
           </div>
         </div>

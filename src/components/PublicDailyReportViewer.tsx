@@ -766,20 +766,10 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
 
   // Determine current active metrics for the summary cards
   const activeMetrics = useMemo(() => {
-    if (!isInternalUser && externalReportData) {
-      const stats = externalReportData.stats || {};
-      const total = stats.totalStudents || (Array.isArray(externalReportData.students) ? externalReportData.students.length : 1) || 1;
-      const h = Number(stats.hadir) || 0;
-      const s = Number(stats.sakit) || 0;
-      const i = Number(stats.izin) || 0;
-      const a = Number(stats.alfa) || 0;
-      return {
-        pctHadir: formatPct((h / total) * 100),
-        pctSakit: formatPct((s / total) * 100),
-        pctIzin: formatPct((i / total) * 100),
-        pctAlfa: formatPct((a / total) * 100),
-      };
-    }
+    // Untuk laporan harian, baik cetak internal maupun Smart Link harus
+    // menghitung ringkasan dari dailyStudentRows yang sama. Jangan memakai
+    // stats endpoint sebagai jalur perhitungan kedua karena itu dapat memberi
+    // hasil berbeda (mis. Terlambat atau siswa Belum Diabsen).
     if (isKepsekReport) {
       return {
         pctHadir: formatPct(kepsekSchoolPctHadir),
@@ -819,8 +809,6 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
       pctAlfa: formatPct(dailyPctAlfa),
     };
   }, [
-    isInternalUser,
-    externalReportData,
     isKepsekReport,
     reportType,
     dailyPctHadir,
@@ -1363,7 +1351,7 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
                   </tr>
                 </thead>
                 <tbody>
-                  {(isInternalUser ? dailyStudentRows : (externalReportData?.students || [])).map((s: any, idx: number) => (
+                  {dailyStudentRows.map((s: any, idx: number) => (
                     <tr key={idx} className="border-b border-slate-300">
                       <td className="border border-slate-300 p-1 text-center font-semibold">{s.no || (idx + 1)}</td>
                       <td className="border border-slate-300 p-1 text-center font-mono">{s.nisn || '-'}</td>

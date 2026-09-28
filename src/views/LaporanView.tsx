@@ -1439,9 +1439,9 @@ export const LaporanView: React.FC = () => {
                 </div>
               </div>
 
-              {/* Action Buttons: WhatsApp Broadcast Group & Cetak PDF (Side-by-side) */}
+              {/* Action Buttons: WhatsApp Broadcast Group (Hanya Periode Laporan Harian) & Cetak PDF */}
               <div className="pt-2 flex items-center gap-3">
-                {systemConfig.whatsappBroadcastEnabled !== false && (
+                {systemConfig.whatsappBroadcastEnabled !== false && reportType === 'Laporan Harian' && (
                   <button
                     type="button"
                     onClick={() => {
@@ -1451,7 +1451,7 @@ export const LaporanView: React.FC = () => {
                     }}
                     id="btn-broadcast-whatsapp-group"
                     className="w-12 h-12 sm:w-[50px] sm:h-[50px] p-0 rounded-2xl flex items-center justify-center shadow-md hover:shadow-xl hover:scale-105 active:scale-95 transition-all cursor-pointer shrink-0 border-0 focus:outline-hidden focus:ring-2 focus:ring-emerald-400 focus:ring-offset-2 overflow-hidden"
-                    title="Kirim Rekapitulasi ke WhatsApp Group"
+                    title="Kirim Rekapitulasi Harian ke WhatsApp Group"
                     aria-label="Kirim ke WhatsApp Group"
                   >
                     <WhatsAppIcon size="100%" className="w-full h-full" />

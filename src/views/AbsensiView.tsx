@@ -1637,7 +1637,9 @@ export const AbsensiView: React.FC = () => {
           subjectId={attendanceMode === 'SUBJECT' ? selectedSubjectId : null}
           subjectName={activeSubject?.name || null}
           records={records}
+          students={students.filter((s) => s.classId === selectedClassId)}
           initialType={broadcastInitialType}
+          reportType="Laporan Harian"
           onOpenPdfPreview={() => {
             setIsBroadcastModalOpen(false);
             setIsPrintModalOpen(true);

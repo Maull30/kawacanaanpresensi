@@ -1494,6 +1494,8 @@ export const LaporanView: React.FC = () => {
           attendanceType={attendanceType}
           subjectId={attendanceType === 'SUBJECT' ? effectiveSubjectId : null}
           subjectName={selectedSubjectObj?.name || null}
+          records={relevantRecords}
+          students={filteredStudents}
           initialType={broadcastInitialType}
           reportType={reportType}
           selectedWeek={selectedWeek}

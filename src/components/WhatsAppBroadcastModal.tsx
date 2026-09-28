@@ -46,6 +46,7 @@ interface WhatsAppBroadcastModalProps {
   academicYear?: string;
   onOpenPdfPreview?: () => void;
   onOpenSmartReport?: () => void;
+  pdfUrl?: string | null;
 }
 
 export const WhatsAppBroadcastModal: React.FC<WhatsAppBroadcastModalProps> = ({
@@ -68,6 +69,7 @@ export const WhatsAppBroadcastModal: React.FC<WhatsAppBroadcastModalProps> = ({
   academicYear,
   onOpenPdfPreview,
   onOpenSmartReport,
+  pdfUrl,
 }) => {
   const attendanceType: AttendanceType = (rawAttendanceType as AttendanceType) || 'DAILY';
   const {
@@ -143,6 +145,27 @@ export const WhatsAppBroadcastModal: React.FC<WhatsAppBroadcastModalProps> = ({
     );
   }, [currentUser, attendanceType, teachers, schoolProfile.namaWaliKelas]);
 
+  // Check whether attendance records / document data actually exists for this class and period
+  const isDocumentAvailable = useMemo(() => {
+    // 1. If explicit pdfUrl is passed, check if it's non-empty
+    if (pdfUrl !== undefined) {
+      return Boolean(pdfUrl && pdfUrl.trim() !== '');
+    }
+    // 2. Class and students check
+    if (!effectiveClassId || targetStudents.length === 0) {
+      return false;
+    }
+    // 3. Records check: must have records
+    if (targetRecords.length === 0) {
+      return false;
+    }
+    // 4. Must have at least one valid recorded attendance status (not all empty or all "Belum Diabsen")
+    const hasRecordedStatus = targetRecords.some(
+      (r) => r.status && r.status !== 'Belum Diabsen'
+    );
+    return hasRecordedStatus;
+  }, [pdfUrl, effectiveClassId, targetStudents.length, targetRecords]);
+
   // Dynamic Smart Link directly from application domain: https://[domain-aplikasi]/?r=[id_kelas]&d=[tanggal]
   const smartLinkUrl = useMemo(() => {
     let period: 'daily' | 'weekly' | 'monthly' | 'semester' | 'kepsek' = 'daily';
@@ -150,6 +173,16 @@ export const WhatsAppBroadcastModal: React.FC<WhatsAppBroadcastModalProps> = ({
     else if (reportType === 'Laporan Bulanan') period = 'monthly';
     else if (reportType === 'Laporan Semester') period = 'semester';
     else if (reportType?.startsWith('Laporan Kepala Sekolah')) period = 'kepsek';
+
+    const dObj = new Date(date);
+    const monthNames = [
+      'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+      'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+    ];
+    const resolvedMonth = month || (!isNaN(dObj.getTime()) ? monthNames[dObj.getMonth()] : 'Juli');
+    const resolvedYear = year || (!isNaN(dObj.getTime()) ? String(dObj.getFullYear()) : '2026');
+    const resolvedSemester = semester || (!isNaN(dObj.getTime()) && dObj.getMonth() <= 5 ? 'Genap' : 'Ganjil');
+    const resolvedAcademicYear = academicYear || schoolProfile.tahunPelajaran || `${resolvedYear}/${Number(resolvedYear) + 1}`;
 
     return generateSmartReportLink(
       effectiveClassId,
@@ -159,10 +192,10 @@ export const WhatsAppBroadcastModal: React.FC<WhatsAppBroadcastModalProps> = ({
       period,
       {
         week: selectedWeek,
-        month,
-        year,
-        semester,
-        academicYear,
+        month: resolvedMonth,
+        year: resolvedYear,
+        semester: resolvedSemester,
+        academicYear: resolvedAcademicYear,
       }
     );
   }, [
@@ -176,14 +209,24 @@ export const WhatsAppBroadcastModal: React.FC<WhatsAppBroadcastModalProps> = ({
     year,
     semester,
     academicYear,
+    schoolProfile.tahunPelajaran,
   ]);
+
+  const effectivePdfUrl = useMemo(() => {
+    if (pdfUrl && pdfUrl.trim() !== '') return pdfUrl;
+    return smartLinkUrl;
+  }, [pdfUrl, smartLinkUrl]);
 
   const handleOpenSmartReportDocument = (e?: React.MouseEvent, targetUrl?: string) => {
     if (e) {
       e.preventDefault();
       e.stopPropagation();
     }
-    const finalUrl = targetUrl || smartLinkUrl;
+    if (!isDocumentAvailable) {
+      showToast('Dokumen belum tersedia', 'error');
+      return;
+    }
+    const finalUrl = targetUrl || effectivePdfUrl;
 
     // 1. If parent component provided onOpenSmartReport or onOpenPdfPreview, open directly in-app!
     if (onOpenSmartReport) {
@@ -204,6 +247,18 @@ export const WhatsAppBroadcastModal: React.FC<WhatsAppBroadcastModalProps> = ({
       try {
         window.location.href = finalUrl;
       } catch (_) {}
+    }
+  };
+
+  const handleOpenPdf = () => {
+    if (!isDocumentAvailable) {
+      showToast('Dokumen belum tersedia', 'error');
+      return;
+    }
+    if (onOpenPdfPreview) {
+      onOpenPdfPreview();
+    } else {
+      handleOpenSmartReportDocument();
     }
   };
 
@@ -229,7 +284,8 @@ export const WhatsAppBroadcastModal: React.FC<WhatsAppBroadcastModalProps> = ({
       customNote,
       includeStudentList,
       includeSmartLink,
-      smartLinkUrl,
+      smartLinkUrl: isDocumentAvailable ? effectivePdfUrl : '',
+      isDocumentAvailable,
     });
   }, [
     broadcastType,
@@ -247,7 +303,8 @@ export const WhatsAppBroadcastModal: React.FC<WhatsAppBroadcastModalProps> = ({
     customNote,
     includeStudentList,
     includeSmartLink,
-    smartLinkUrl,
+    effectivePdfUrl,
+    isDocumentAvailable,
   ]);
 
   if (!isOpen) return null;
@@ -401,6 +458,22 @@ export const WhatsAppBroadcastModal: React.FC<WhatsAppBroadcastModalProps> = ({
               {/* WhatsApp Speech Bubble */}
               <div className="relative bg-white text-slate-800 rounded-2xl p-4 shadow-sm max-w-full text-xs font-mono sm:text-[13px] leading-relaxed whitespace-pre-wrap border border-slate-200/80">
                 {messageText.split('\n').map((line, lIdx) => {
+                  if (line.includes('Dokumen Rekap Resmi:') && line.includes('Dokumen belum tersedia')) {
+                    return (
+                      <div key={lIdx} className="break-all flex flex-wrap items-center gap-1.5 py-0.5">
+                        <span>📄 Dokumen Rekap Resmi:</span>
+                        <button
+                          type="button"
+                          onClick={() => showToast('Dokumen belum tersedia', 'error')}
+                          className="inline-flex items-center gap-1 font-bold text-amber-800 bg-amber-100 hover:bg-amber-200 border border-amber-300 px-2 py-0.5 rounded text-xs transition-colors cursor-pointer"
+                          title="Dokumen belum tersedia"
+                        >
+                          <AlertCircle size={12} className="text-amber-600 shrink-0" />
+                          <span>Dokumen belum tersedia</span>
+                        </button>
+                      </div>
+                    );
+                  }
                   const urlMatch = line.match(/(https?:\/\/[^\s]+)/);
                   if (urlMatch) {
                     const url = urlMatch[1];
@@ -410,7 +483,15 @@ export const WhatsAppBroadcastModal: React.FC<WhatsAppBroadcastModalProps> = ({
                         <span>{before}</span>
                         <button
                           type="button"
-                          onClick={(e) => handleOpenSmartReportDocument(e, url)}
+                          onClick={(e) => {
+                            if (!isDocumentAvailable) {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              showToast('Dokumen belum tersedia', 'error');
+                              return;
+                            }
+                            handleOpenSmartReportDocument(e, url);
+                          }}
                           className="inline-flex items-center gap-1 font-bold text-emerald-700 hover:text-emerald-900 underline bg-emerald-50 px-1 py-0.5 rounded cursor-pointer transition-colors text-left break-all"
                           title="Klik untuk membuka tautan dokumen rekap resmi"
                         >
@@ -464,23 +545,51 @@ export const WhatsAppBroadcastModal: React.FC<WhatsAppBroadcastModalProps> = ({
             </div>
 
             {/* Smart Link Live Access Card */}
-            {includeSmartLink && smartLinkUrl && (
-              <div className="p-3 bg-emerald-50/90 border border-emerald-300/80 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 mt-2">
+            {includeSmartLink && (
+              <div
+                className={`p-3 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 mt-2 transition-all ${
+                  isDocumentAvailable
+                    ? 'bg-emerald-50/90 border-emerald-300/80'
+                    : 'bg-amber-50/90 border-amber-300/80'
+                }`}
+              >
                 <div className="flex items-start sm:items-center gap-2.5 min-w-0">
-                  <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center shrink-0 mt-0.5 sm:mt-0 shadow-2xs">
-                    <FileText size={16} />
+                  <div
+                    className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 mt-0.5 sm:mt-0 shadow-2xs ${
+                      isDocumentAvailable
+                        ? 'bg-emerald-100 text-emerald-800'
+                        : 'bg-amber-100 text-amber-800'
+                    }`}
+                  >
+                    {isDocumentAvailable ? <FileText size={16} /> : <AlertCircle size={16} />}
                   </div>
                   <div className="min-w-0">
                     <div className="flex items-center gap-1.5">
-                      <span className="text-xs font-black text-emerald-950">
+                      <span
+                        className={`text-xs font-black ${
+                          isDocumentAvailable ? 'text-emerald-950' : 'text-amber-950'
+                        }`}
+                      >
                         Tautan Dokumen Rekap Resmi
                       </span>
-                      <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-emerald-200 text-emerald-900">
-                        Siap Dibuka
-                      </span>
+                      {isDocumentAvailable ? (
+                        <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-emerald-200 text-emerald-900">
+                          Siap Dibuka
+                        </span>
+                      ) : (
+                        <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-200 text-amber-900">
+                          Dokumen belum tersedia
+                        </span>
+                      )}
                     </div>
-                    <span className="text-[11px] text-emerald-700 font-mono block truncate max-w-sm sm:max-w-md">
-                      {smartLinkUrl}
+                    <span
+                      className={`text-[11px] font-mono block truncate max-w-sm sm:max-w-md ${
+                        isDocumentAvailable ? 'text-emerald-700' : 'text-amber-800 font-semibold'
+                      }`}
+                    >
+                      {isDocumentAvailable
+                        ? effectivePdfUrl
+                        : 'Dokumen belum tersedia (Belum ada data presensi yang tercatat)'}
                     </span>
                   </div>
                 </div>
@@ -488,12 +597,24 @@ export const WhatsAppBroadcastModal: React.FC<WhatsAppBroadcastModalProps> = ({
                 <div className="flex items-center gap-2 shrink-0">
                   <button
                     type="button"
-                    onClick={(e) => handleOpenSmartReportDocument(e, smartLinkUrl)}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 active:scale-95 text-white font-bold text-xs rounded-xl shadow-xs transition-all cursor-pointer"
-                    title="Buka dokumen rekap resmi"
+                    onClick={(e) => {
+                      if (!isDocumentAvailable) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        showToast('Dokumen belum tersedia', 'error');
+                        return;
+                      }
+                      handleOpenSmartReportDocument(e, effectivePdfUrl);
+                    }}
+                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 font-bold text-xs rounded-xl shadow-xs transition-all cursor-pointer ${
+                      isDocumentAvailable
+                        ? 'bg-emerald-700 hover:bg-emerald-800 active:scale-95 text-white'
+                        : 'bg-amber-600 hover:bg-amber-700 active:scale-95 text-white'
+                    }`}
+                    title={isDocumentAvailable ? 'Buka dokumen rekap resmi' : 'Dokumen belum tersedia'}
                   >
                     <ExternalLink size={13} />
-                    <span>Buka Tautan Resmi</span>
+                    <span>{isDocumentAvailable ? 'Buka Tautan Resmi' : 'Dokumen Belum Tersedia'}</span>
                   </button>
                 </div>
               </div>
@@ -515,12 +636,22 @@ export const WhatsAppBroadcastModal: React.FC<WhatsAppBroadcastModalProps> = ({
         {/* Modal Commercial Action Footer */}
         <div className="p-3.5 sm:p-5 bg-white border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0">
           <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-            {includeSmartLink && smartLinkUrl && (
+            {includeSmartLink && (
               <button
                 type="button"
-                onClick={(e) => handleOpenSmartReportDocument(e, smartLinkUrl)}
-                className="px-3.5 py-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 min-h-[40px] cursor-pointer shadow-2xs"
-                title="Buka langsung tautan dokumen rekap resmi"
+                onClick={(e) => {
+                  if (!isDocumentAvailable) {
+                    showToast('Dokumen belum tersedia', 'error');
+                    return;
+                  }
+                  handleOpenSmartReportDocument(e, effectivePdfUrl);
+                }}
+                className={`px-3.5 py-2.5 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 min-h-[40px] cursor-pointer shadow-2xs ${
+                  isDocumentAvailable
+                    ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300'
+                    : 'bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300'
+                }`}
+                title={isDocumentAvailable ? 'Buka langsung tautan dokumen rekap resmi' : 'Dokumen belum tersedia'}
               >
                 <ExternalLink size={14} />
                 <span>Buka Tautan Rekap</span>
@@ -530,9 +661,13 @@ export const WhatsAppBroadcastModal: React.FC<WhatsAppBroadcastModalProps> = ({
             {onOpenPdfPreview && (
               <button
                 type="button"
-                onClick={onOpenPdfPreview}
-                className="px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 min-h-[40px] cursor-pointer"
-                title="Buka pratinjau lembar cetak PDF resmi"
+                onClick={handleOpenPdf}
+                className={`px-3.5 py-2.5 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 min-h-[40px] cursor-pointer ${
+                  isDocumentAvailable
+                    ? 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                    : 'bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200'
+                }`}
+                title={isDocumentAvailable ? 'Buka pratinjau lembar cetak PDF resmi' : 'Dokumen belum tersedia'}
               >
                 <FileText size={15} />
                 <span>Lihat PDF</span>

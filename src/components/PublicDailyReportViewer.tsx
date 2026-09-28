@@ -950,6 +950,32 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
     );
   }
 
+  if (targetStudents.length === 0) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 text-center">
+        <div className="w-14 h-14 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-600 mb-4">
+          <AlertCircle size={28} />
+        </div>
+        <h2 className="text-base sm:text-lg font-black text-slate-900 tracking-tight">
+          Dokumen Belum Tersedia
+        </h2>
+        <p className="text-xs sm:text-sm text-slate-600 mt-2 max-w-md leading-relaxed">
+          Data siswa atau rekap presensi untuk rombel dan periode ini belum tersedia.
+        </p>
+        <div className="mt-6 flex items-center gap-3">
+          {onBackToApp && (
+            <button
+              onClick={onBackToApp}
+              className="px-5 py-2.5 rounded-xl bg-blue-600 text-white font-bold text-xs hover:bg-blue-700 transition-all cursor-pointer shadow-xs"
+            >
+              Kembali ke Aplikasi
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   // Active School and Teacher Profile Data
   const schoolName = ctxSchoolProfile?.namaSekolah || externalReportData?.schoolName || 'SD NEGERI CONTOH';
   const pemerintahDaerah = ctxSystemConfig?.pemerintahDaerah || externalReportData?.pemerintahDaerah || 'PEMERINTAH PROVINSI DAERAH KHUSUS IBUKOTA JAKARTA';

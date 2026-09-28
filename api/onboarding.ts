@@ -82,17 +82,59 @@ function calculateGuruProTrialPeriod(now: Date = new Date()) {
 }
 
 export default async function handler(req: any, res: any) {
+  // 1. Dukungan Header CORS & Preflight Request (Sangat penting saat diakses via tautan WhatsApp / WebView HP)
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
+  res.setHeader(
+    'Access-Control-Allow-Headers',
+    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization'
+  );
+
+  if (req.method === 'OPTIONS') {
+    res.status(200).end();
+    return;
+  }
+
   if (req.method !== 'POST') {
     return json(res, 405, { error: 'Metode permintaan tidak diizinkan. Gunakan POST.' });
   }
 
   const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '';
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY || '';
+  const serverServiceKey =
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    process.env.SUPABASE_SECRET_KEY ||
+    process.env.VITE_SUPABASE_SERVICE_ROLE_KEY ||
+    process.env.SERVICE_ROLE_KEY ||
+    process.env.SUPABASE_KEY ||
+    '';
+  const serviceKey =
+    serverServiceKey ||
+    process.env.VITE_SUPABASE_ANON_KEY ||
+    process.env.SUPABASE_ANON_KEY ||
+    '';
 
-  const body = req.body || {};
+  let body = req.body || {};
+  if (typeof body === 'string') {
+    try {
+      body = JSON.parse(body);
+    } catch (_) {
+      body = {};
+    }
+  }
   const action = body.action;
 
-  // Fallback jika kredensial server belum tersedia (mode simulasi/preview)
+  // Dokumen Rekap Resmi harus selalu membaca database melalui credential
+  // server. Jangan pernah menurunkan endpoint laporan ke anon key karena
+  // hasilnya harus identik dengan data yang dipakai aplikasi saat mencetak.
+  if (action === 'get_public_daily_report' && !serverServiceKey) {
+    return json(res, 500, {
+      ok: false,
+      error: 'Konfigurasi database server untuk Dokumen Rekap Resmi belum tersedia. Pastikan SUPABASE_SERVICE_ROLE_KEY terpasang.',
+    });
+  }
+
+  // Fallback jika kredensial server belum tersedia sama sekali
   if (!url || !serviceKey) {
     if (action === 'lookup_school') {
       return json(res, 200, {
@@ -118,9 +160,9 @@ export default async function handler(req: any, res: any) {
     }
 
     if (action === 'get_public_daily_report') {
-      return json(res, 404, {
+      return json(res, 500, {
         ok: false,
-        error: 'Dokumen rekap presensi untuk rombel dan periode ini belum tersedia di sistem.',
+        error: 'Konfigurasi database server belum terhubung. Silakan hubungi admin sekolah.',
       });
     }
 
@@ -451,43 +493,52 @@ export default async function handler(req: any, res: any) {
     // -------------------------------------------------------------
     if (action === 'get_public_daily_report') {
       const classIdOrName = String(body.classId || '').trim();
+      const explicitClassName = String(body.className || body.cn || '').trim();
       const reportDate = String(body.date || new Date().toISOString().slice(0, 10)).trim();
       const attType = String(body.attendanceType || 'DAILY').toUpperCase() === 'SUBJECT' ? 'SUBJECT' : 'DAILY';
       const subjectId = body.subjectId || null;
 
-      // 1. Cari kelas berdasarkan ID atau Nama (Aman dari crash invalid UUID)
+      // 1. Resolve kelas secara deterministik. Smart Link membawa UUID kelas
+      // yang sama dengan kelas yang dipilih saat guru mencetak laporan.
+      // Untuk dokumen resmi, jangan pernah mengganti UUID yang tidak ditemukan
+      // dengan kelas lain atau kelas pertama.
       let targetClass: any = null;
-      if (classIdOrName && classIdOrName !== 'default' && classIdOrName !== 'all') {
-        let clsQuery = db.from('classes').select('id, name, grade, academic_year, school_id, wali_kelas_teacher_id');
-        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(classIdOrName);
-        if (isUuid) {
-          clsQuery = clsQuery.eq('id', classIdOrName);
-        } else {
-          clsQuery = clsQuery.ilike('name', `%${classIdOrName}%`);
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(classIdOrName);
+
+      if (isUuid) {
+        const { data: cls, error: clsErr } = await db
+          .from('classes')
+          .select('id, name, grade, academic_year, school_id, wali_kelas_teacher_id')
+          .eq('id', classIdOrName)
+          .maybeSingle();
+        if (clsErr) {
+          console.error('[get_public_daily_report] class lookup error:', clsErr.message);
+          return json(res, 500, { ok: false, error: 'Gagal membaca data rombel untuk Dokumen Rekap Resmi.' });
         }
-
-        const { data: clsRows } = await clsQuery.limit(1);
-        targetClass = clsRows?.[0];
-
-        if (!targetClass && !isUuid) {
-          // Fallback: pencarian fleksibel dengan wildcard
-          const cleanName = classIdOrName.replace(/^kelas\s*/i, '').trim();
-          const { data: fallbackRows } = await db
+        targetClass = cls || null;
+      } else {
+        const candidateNames = [explicitClassName, classIdOrName].filter(
+          (n) => n && n !== 'default' && n !== 'all'
+        );
+        for (const rawName of candidateNames) {
+          const cleanName = rawName.replace(/^cls[-_]?/i, '').replace(/^kelas\s*/i, '').trim();
+          if (!cleanName) continue;
+          const { data: found, error: nameErr } = await db
             .from('classes')
             .select('id, name, grade, academic_year, school_id, wali_kelas_teacher_id')
-            .or(`name.ilike.%${classIdOrName}%,name.ilike.%${cleanName}%`)
-            .limit(1);
-          targetClass = fallbackRows?.[0];
-        }
-      }
-
-      if (!targetClass) {
-        if (!classIdOrName || classIdOrName === 'default') {
-          const { data: anyClass } = await db
-            .from('classes')
-            .select('id, name, grade, academic_year, school_id, wali_kelas_teacher_id')
-            .limit(1);
-          targetClass = anyClass?.[0];
+            .or(`name.ilike.%${cleanName}%,name.ilike.%${rawName}%`)
+            .limit(2);
+          if (nameErr) {
+            console.error('[get_public_daily_report] class name lookup error:', nameErr.message);
+            return json(res, 500, { ok: false, error: 'Gagal membaca data rombel untuk Dokumen Rekap Resmi.' });
+          }
+          if (found && found.length === 1) {
+            targetClass = found[0];
+            break;
+          }
+          if (found && found.length > 1) {
+            return json(res, 409, { ok: false, error: 'Rombel tidak dapat ditentukan secara unik. Gunakan tautan Dokumen Rekap Resmi yang terbaru.' });
+          }
         }
       }
 
@@ -498,18 +549,32 @@ export default async function handler(req: any, res: any) {
       const schoolId = targetClass.school_id;
 
       // 2. Ambil profil sekolah dan konfigurasi sistem
-      const [{ data: sp }, { data: sc }, { data: teachersList }] = await Promise.all([
+      const [schoolResult, configResult, teachersResult] = await Promise.all([
         db.from('school_profile').select('*').eq('school_id', schoolId).maybeSingle(),
         db.from('system_config').select('*').eq('school_id', schoolId).maybeSingle(),
         db.from('teachers').select('id, nama, nip, tugas_utama').eq('school_id', schoolId),
       ]);
+      if (schoolResult.error || configResult.error || teachersResult.error) {
+        console.error('[get_public_daily_report] profile/config/teacher read error:',
+          schoolResult.error?.message || configResult.error?.message || teachersResult.error?.message);
+        return json(res, 500, { ok: false, error: 'Gagal membaca data pendukung Dokumen Rekap Resmi.' });
+      }
+      const sp = schoolResult.data;
+      const sc = configResult.data;
+      const teachersList = teachersResult.data || [];
 
-      // 3. Ambil daftar siswa kelas tersebut
-      const { data: studentRows } = await db
+      // 3. Ambil daftar siswa kelas tersebut. Urutan dan identitas siswa
+      // disamakan dengan sumber data laporan internal aplikasi.
+      const { data: studentRows, error: studentErr } = await db
         .from('students')
         .select('id, nisn, nama, gender')
+        .eq('school_id', schoolId)
         .eq('class_id', targetClass.id)
         .order('nama', { ascending: true });
+      if (studentErr) {
+        console.error('[get_public_daily_report] student read error:', studentErr.message);
+        return json(res, 500, { ok: false, error: 'Gagal membaca daftar siswa untuk Dokumen Rekap Resmi.' });
+      }
 
       const students = studentRows || [];
       const studentIds = students.map((s: any) => s.id);
@@ -519,9 +584,11 @@ export default async function handler(req: any, res: any) {
       if (studentIds.length > 0) {
         let attQuery = db
           .from('attendance_records')
-          .select('id, student_id, teacher_id, status, check_in_time, check_out_time, notes, type, subject_id')
-          .eq('date', reportDate)
+          .select('id, student_id, teacher_id, status, check_in_time, check_out_time, notes, type, subject_id, date')
           .in('student_id', studentIds);
+
+        // Jika request memuat tanggal spesifik
+        attQuery = attQuery.eq('date', reportDate);
 
         if (attType === 'SUBJECT') {
           attQuery = attQuery.eq('type', 'SUBJECT');
@@ -534,7 +601,8 @@ export default async function handler(req: any, res: any) {
 
         const { data: recordsData, error: recordsErr } = await attQuery;
         if (recordsErr) {
-          console.warn('[get_public_daily_report] attQuery error:', recordsErr.message);
+          console.error('[get_public_daily_report] attendance read error:', recordsErr.message);
+          return json(res, 500, { ok: false, error: 'Gagal membaca data presensi untuk Dokumen Rekap Resmi.' });
         }
         attRecords = recordsData || [];
       }
@@ -634,14 +702,15 @@ export default async function handler(req: any, res: any) {
         }
 
         return {
+          id: s.id,
           no: idx + 1,
           nisn: s.nisn || '',
           nama: s.nama,
           gender: s.gender || 'L',
-          status,
-          checkInTime: rec?.check_in_time || '',
-          checkOutTime: rec?.check_out_time || '',
-          notes: rec?.notes || '',
+          status: status === '-' ? 'Belum Diabsen' : status,
+          checkInTime: rec?.check_in_time ? String(rec.check_in_time).slice(0, 5) : '-',
+          checkOutTime: rec?.check_out_time ? String(rec.check_out_time).slice(0, 5) : '-',
+          notes: rec?.notes || '-',
         };
       });
 
@@ -693,6 +762,22 @@ export default async function handler(req: any, res: any) {
             persentase,
           },
           students: studentList,
+          records: attRecords.map((r: any) => ({
+            id: r.id,
+            studentId: r.student_id,
+            studentName: students.find((s: any) => s.id === r.student_id)?.nama || '',
+            date: r.date || reportDate,
+            status: r.status,
+            // Sama dengan dbAttendance() di AppContext: hasil cetak internal
+            // menggunakan format jam HH:MM, bukan timestamp mentah.
+            checkInTime: r.check_in_time ? String(r.check_in_time).slice(0, 5) : '-',
+            checkOutTime: r.check_out_time ? String(r.check_out_time).slice(0, 5) : '-',
+            notes: r.notes || '',
+            type: r.type || 'DAILY',
+            subjectId: r.subject_id || null,
+            classId: r.class_id || targetClass.id,
+            teacherId: r.teacher_id || null,
+          })),
         },
       });
     }

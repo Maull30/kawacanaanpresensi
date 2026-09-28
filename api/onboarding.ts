@@ -451,44 +451,86 @@ export default async function handler(req: any, res: any) {
     // -------------------------------------------------------------
     if (action === 'get_public_daily_report') {
       const classIdOrName = String(body.classId || '').trim();
+      const explicitClassName = String(body.className || body.cn || '').trim();
       const reportDate = String(body.date || new Date().toISOString().slice(0, 10)).trim();
       const attType = String(body.attendanceType || 'DAILY').toUpperCase() === 'SUBJECT' ? 'SUBJECT' : 'DAILY';
       const subjectId = body.subjectId || null;
 
-      // 1. Cari kelas berdasarkan ID atau Nama (Aman dari crash invalid UUID)
+      // 1. Cari kelas secara cerdas & bertingkat (Aman dari ketidakcocokan ID/UUID)
       let targetClass: any = null;
-      if (classIdOrName && classIdOrName !== 'default' && classIdOrName !== 'all') {
-        let clsQuery = db.from('classes').select('id, name, grade, academic_year, school_id, wali_kelas_teacher_id');
-        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(classIdOrName);
-        if (isUuid) {
-          clsQuery = clsQuery.eq('id', classIdOrName);
-        } else {
-          clsQuery = clsQuery.ilike('name', `%${classIdOrName}%`);
-        }
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(classIdOrName);
 
-        const { data: clsRows } = await clsQuery.limit(1);
-        targetClass = clsRows?.[0];
+      // 1.a. Jika parameter classId adalah UUID yang valid
+      if (isUuid) {
+        const { data: clsRows } = await db
+          .from('classes')
+          .select('id, name, grade, academic_year, school_id, wali_kelas_teacher_id')
+          .eq('id', classIdOrName)
+          .limit(1);
+        targetClass = clsRows?.[0] || null;
+      }
 
-        if (!targetClass && !isUuid) {
-          // Fallback: pencarian fleksibel dengan wildcard
-          const cleanName = classIdOrName.replace(/^kelas\s*/i, '').trim();
-          const { data: fallbackRows } = await db
+      // 1.b. Pencarian berdasarkan nama kelas atau explicitClassName
+      if (!targetClass) {
+        const candidateNames = [explicitClassName, classIdOrName].filter(
+          (n) => n && n !== 'default' && n !== 'all'
+        );
+
+        for (const rawName of candidateNames) {
+          // Bersihkan prefix seperti "cls-", "class-", "kelas "
+          const cleanName = rawName.replace(/^cls[-_]?/i, '').replace(/^kelas\s*/i, '').trim();
+
+          const { data: found } = await db
             .from('classes')
             .select('id, name, grade, academic_year, school_id, wali_kelas_teacher_id')
-            .or(`name.ilike.%${classIdOrName}%,name.ilike.%${cleanName}%`)
+            .or(`name.ilike.%${cleanName}%,name.ilike.%${rawName}%`)
             .limit(1);
-          targetClass = fallbackRows?.[0];
+
+          if (found && found.length > 0) {
+            targetClass = found[0];
+            break;
+          }
         }
       }
 
-      if (!targetClass) {
-        if (!classIdOrName || classIdOrName === 'default') {
-          const { data: anyClass } = await db
-            .from('classes')
-            .select('id, name, grade, academic_year, school_id, wali_kelas_teacher_id')
+      // 1.c. Fail-Safe: Cek langsung catatan presensi di tanggal tersebut!
+      // Jika guru sudah menyimpan presensi di tanggal ini, lacak kelas dari siswa yang diabsen
+      if (!targetClass && reportDate) {
+        const { data: recentAtt } = await db
+          .from('attendance_records')
+          .select('student_id')
+          .eq('date', reportDate)
+          .limit(5);
+
+        if (recentAtt && recentAtt.length > 0) {
+          const stdIds = recentAtt.map((r: any) => r.student_id);
+          const { data: stdRows } = await db
+            .from('students')
+            .select('class_id')
+            .in('id', stdIds)
             .limit(1);
-          targetClass = anyClass?.[0];
+
+          if (stdRows && stdRows[0]?.class_id) {
+            const { data: inferredClass } = await db
+              .from('classes')
+              .select('id, name, grade, academic_year, school_id, wali_kelas_teacher_id')
+              .eq('id', stdRows[0].class_id)
+              .maybeSingle();
+
+            if (inferredClass) {
+              targetClass = inferredClass;
+            }
+          }
         }
+      }
+
+      // 1.d. Fallback terakhir jika tetap tidak ditemukan
+      if (!targetClass) {
+        const { data: anyClass } = await db
+          .from('classes')
+          .select('id, name, grade, academic_year, school_id, wali_kelas_teacher_id')
+          .limit(1);
+        targetClass = anyClass?.[0];
       }
 
       if (!targetClass) {
@@ -519,9 +561,11 @@ export default async function handler(req: any, res: any) {
       if (studentIds.length > 0) {
         let attQuery = db
           .from('attendance_records')
-          .select('id, student_id, teacher_id, status, check_in_time, check_out_time, notes, type, subject_id')
-          .eq('date', reportDate)
+          .select('id, student_id, teacher_id, status, check_in_time, check_out_time, notes, type, subject_id, date')
           .in('student_id', studentIds);
+
+        // Jika request memuat tanggal spesifik
+        attQuery = attQuery.eq('date', reportDate);
 
         if (attType === 'SUBJECT') {
           attQuery = attQuery.eq('type', 'SUBJECT');
@@ -634,6 +678,7 @@ export default async function handler(req: any, res: any) {
         }
 
         return {
+          id: s.id,
           no: idx + 1,
           nisn: s.nisn || '',
           nama: s.nama,
@@ -693,6 +738,17 @@ export default async function handler(req: any, res: any) {
             persentase,
           },
           students: studentList,
+          records: attRecords.map((r: any) => ({
+            id: r.id,
+            studentId: r.student_id,
+            date: r.date || reportDate,
+            status: r.status,
+            checkInTime: r.check_in_time || '',
+            checkOutTime: r.check_out_time || '',
+            notes: r.notes || '',
+            type: r.type || 'DAILY',
+            subjectId: r.subject_id || null,
+          })),
         },
       });
     }

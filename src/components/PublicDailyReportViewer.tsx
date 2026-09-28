@@ -25,6 +25,7 @@ const isPlaceholderText = (text: string | null | undefined): boolean => {
 
 export interface PublicDailyReportViewerProps {
   classId?: string;
+  className?: string;
   date?: string;
   attendanceType?: 'DAILY' | 'SUBJECT';
   subjectId?: string | null;
@@ -39,6 +40,7 @@ export interface PublicDailyReportViewerProps {
 
 export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = ({
   classId: propClassId,
+  className: propClassName,
   date: propDate,
   attendanceType = 'DAILY',
   subjectId = null,
@@ -656,15 +658,25 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
       setLoading(true);
       setError(null);
       try {
+        const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+        const resolvedClassName = propClassName || urlParams?.get('cn') || urlParams?.get('className') || '';
+
         const res = await fetch('/api/onboarding', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             action: 'get_public_daily_report',
             classId: propClassId,
+            className: resolvedClassName,
             date: selectedDate,
             attendanceType,
             subjectId,
+            period: reportType,
+            week: selectedWeek,
+            month,
+            year,
+            semester,
+            academicYear,
           }),
         });
 

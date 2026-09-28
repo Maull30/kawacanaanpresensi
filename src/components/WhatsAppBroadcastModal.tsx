@@ -252,6 +252,7 @@ export const WhatsAppBroadcastModal: React.FC<WhatsAppBroadcastModalProps> = ({
       subjectId,
       period,
       {
+        className: effectiveClassName,
         week: selectedWeek,
         month: resolvedMonth,
         year: resolvedYear,
@@ -261,6 +262,7 @@ export const WhatsAppBroadcastModal: React.FC<WhatsAppBroadcastModalProps> = ({
     );
   }, [
     effectiveClassId,
+    effectiveClassName,
     date,
     attendanceType,
     subjectId,

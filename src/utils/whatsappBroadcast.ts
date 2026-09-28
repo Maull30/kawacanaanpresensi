@@ -119,6 +119,7 @@ export const generateSmartReportLink = (
   subjectId?: string | null,
   period?: 'daily' | 'weekly' | 'monthly' | 'semester' | 'kepsek',
   extraParams?: {
+    className?: string;
     week?: string;
     month?: string;
     year?: string;
@@ -132,6 +133,7 @@ export const generateSmartReportLink = (
   const effectiveR = (classId && classId.trim()) || 'default';
   params.set('r', effectiveR);
   params.set('report', 'true');
+  if (extraParams?.className) params.set('cn', extraParams.className);
   if (date) params.set('d', date);
   if (period) params.set('p', period);
   if (extraParams?.week) params.set('w', extraParams.week);
@@ -272,11 +274,11 @@ export const generateWhatsAppBroadcastMessage = (
 
   // 7. Smart Link Dokumen Rekap Resmi sesuai kesepakatan: 📄 Dokumen Rekap Resmi: https://[domain-aplikasi]/?r=[id_kelas]&d=[tanggal]
   if (includeSmartLink) {
-    if (!isDocumentAvailable) {
-      lines.push('📄 Dokumen Rekap Resmi: Dokumen belum tersedia');
-      lines.push('');
-    } else if (smartLinkUrl) {
+    if (smartLinkUrl) {
       lines.push(`📄 Dokumen Rekap Resmi: ${smartLinkUrl}`);
+      lines.push('');
+    } else if (!isDocumentAvailable) {
+      lines.push('📄 Dokumen Rekap Resmi: Dokumen belum tersedia');
       lines.push('');
     }
   }

@@ -385,19 +385,43 @@ export const AbsensiView: React.FC = () => {
     }
     setIsDirty(true);
     isDirtyRef.current = true;
+
+    const fallbackCheckIn =
+      attendanceMode === 'DAILY'
+        ? systemConfig.defaultCheckInTime
+        : activeSubject?.lessonPeriod || '07:30';
+
+    let preservedCount = 0;
+    let newlyMarkedCount = 0;
+
     setRecords((prev) => {
-      const updated = prev.map((r) => ({
-        ...r,
-        status: 'Hadir',
-        checkInTime: systemConfig.defaultCheckInTime,
-        checkOutTime: r.checkOutTime || '',
-      }));
+      const updated = prev.map((r) => {
+        const hasExistingCheckIn = Boolean(r.checkInTime && r.checkInTime.trim() !== '');
+        if (hasExistingCheckIn) {
+          preservedCount++;
+        } else {
+          newlyMarkedCount++;
+        }
+
+        return {
+          ...r,
+          status: 'Hadir',
+          // PERTAHANKAN WAKTU SCAN QR: Hanya isi jam default jika siswa belum memiliki catatan jam masuk
+          checkInTime: hasExistingCheckIn ? r.checkInTime : fallbackCheckIn,
+          checkOutTime: r.checkOutTime || '',
+        };
+      });
       try {
         sessionStorage.setItem(draftStorageKey, JSON.stringify(updated));
       } catch (_) {}
       return updated;
     });
-    showToast('Semua siswa diatur ke status Hadir');
+
+    if (preservedCount > 0) {
+      showToast(`Semua siswa diatur Hadir (${preservedCount} jam scan QR tetap dipertahankan)`);
+    } else {
+      showToast('Semua siswa diatur ke status Hadir');
+    }
   };
 
   const handlePulangMasal = () => {
@@ -411,11 +435,19 @@ export const AbsensiView: React.FC = () => {
     }
     setIsDirty(true);
     isDirtyRef.current = true;
+
     setRecords((prev) => {
-      const updated = prev.map((r) => ({
-        ...r,
-        checkOutTime: systemConfig.defaultCheckOutTime,
-      }));
+      const updated = prev.map((r) => {
+        // Hanya terapkan jam pulang default bagi siswa yang Hadir
+        if (r.status !== 'Hadir') return r;
+
+        // Pertahankan jika sudah ada jam checkout riil (misal scan QR pulang)
+        const hasExistingCheckOut = Boolean(r.checkOutTime && r.checkOutTime.trim() !== '');
+        return {
+          ...r,
+          checkOutTime: hasExistingCheckOut ? r.checkOutTime : systemConfig.defaultCheckOutTime,
+        };
+      });
       try {
         sessionStorage.setItem(draftStorageKey, JSON.stringify(updated));
       } catch (_) {}
@@ -1016,6 +1048,7 @@ export const AbsensiView: React.FC = () => {
           onClick={handleHadirSemua}
           disabled={isDateLocked || isSaving}
           id="btn-hadir-semua"
+          title="Atur semua siswa ke status Hadir. Siswa yang sudah scan QR akan tetap mempertahankan waktu aslinya."
           className={`py-2 px-3 rounded-xl border font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-2xs min-h-[40px] ${
             isDateLocked || isSaving
               ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
@@ -1032,6 +1065,7 @@ export const AbsensiView: React.FC = () => {
             onClick={handlePulangMasal}
             disabled={isDateLocked || isSaving}
             id="btn-pulang-masal"
+            title="Terapkan jam pulang standar bagi siswa hadir yang belum memiliki jam pulang (waktu checkout riil tetap dipertahankan)."
             className={`py-2 px-3 rounded-xl border font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-2xs min-h-[40px] ${
               isDateLocked || isSaving
                 ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'

@@ -283,44 +283,35 @@ ${dynamicContextBlock}
    - Jawaban harus lebih relevan, singkat, padat, ramah, dan membantu pengunjung menemukan langkah berikutnya dengan cepat.
    - Jangan menyebut section secara kaku jika tidak relevan.`;
 
-    // 1. Try Gemini first via @google/genai SDK (gemini-3.6-flash / gemini-3.8-flash)
+    // 1. Try Gemini first via @google/genai SDK (gemini-2.5-flash with fallbacks)
     const ai = getGeminiClient();
     if (ai) {
       try {
-        let response;
-        try {
-          response = await ai.models.generateContent({
-            model: 'gemini-3.6-flash',
-            contents: [
-              ...historyMessages,
-              {
-                role: 'user',
-                parts: [{ text: sanitizedQuestion }],
+        const candidateModels = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-3.6-flash', 'gemini-3.1-flash-lite'];
+        let response: any = null;
+        for (const model of candidateModels) {
+          try {
+            response = await ai.models.generateContent({
+              model,
+              contents: [
+                ...historyMessages,
+                {
+                  role: 'user',
+                  parts: [{ text: sanitizedQuestion }],
+                },
+              ],
+              config: {
+                systemInstruction: landingInstructionText,
+                temperature: 0.65,
               },
-            ],
-            config: {
-              systemInstruction: landingInstructionText,
-              temperature: 0.65,
-            },
-          });
-        } catch (mErr: any) {
-          response = await ai.models.generateContent({
-            model: 'gemini-3.1-flash-lite',
-            contents: [
-              ...historyMessages,
-              {
-                role: 'user',
-                parts: [{ text: sanitizedQuestion }],
-              },
-            ],
-            config: {
-              systemInstruction: landingInstructionText,
-              temperature: 0.65,
-            },
-          });
+            });
+            if (response?.text) break;
+          } catch (_) {
+            // Continue to next model candidate
+          }
         }
 
-        const rawText = response.text || '';
+        const rawText = response?.text || '';
         if (rawText && rawText.trim()) {
           // Bersihkan jika ada bungkus markdown json yang tidak diinginkan
           const cleanedText = rawText.replace(/^```(?:json)?\s*|\s*```$/gi, '').trim();
@@ -486,28 +477,25 @@ ${dynamicContextBlock}
           },
         ];
 
-        let response;
-        try {
-          response = await ai.models.generateContent({
-            model: 'gemini-3.6-flash',
-            contents: geminiContents,
-            config: {
-              systemInstruction: systemInstructionText,
-              temperature: 0.2,
-            },
-          });
-        } catch (mErr: any) {
-          response = await ai.models.generateContent({
-            model: 'gemini-3.1-flash-lite',
-            contents: geminiContents,
-            config: {
-              systemInstruction: systemInstructionText,
-              temperature: 0.2,
-            },
-          });
+        const candidateModels = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-3.6-flash', 'gemini-3.1-flash-lite'];
+        let response: any = null;
+        for (const model of candidateModels) {
+          try {
+            response = await ai.models.generateContent({
+              model,
+              contents: geminiContents,
+              config: {
+                systemInstruction: systemInstructionText,
+                temperature: 0.2,
+              },
+            });
+            if (response?.text) break;
+          } catch (_) {
+            // Continue to next model candidate
+          }
         }
 
-        rawAnswer = response.text || null;
+        rawAnswer = response?.text || null;
       }
     } else if (cfAccountId && cfApiToken) {
       // Model: @cf/zai-org/glm-4.7-flash

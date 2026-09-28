@@ -16,6 +16,7 @@ export interface WhatsAppBroadcastOptions {
   includeStudentList?: boolean;
   includeSmartLink?: boolean;
   smartLinkUrl?: string;
+  isDocumentAvailable?: boolean;
 }
 
 export interface AttendanceSummaryStats {
@@ -128,7 +129,9 @@ export const generateSmartReportLink = (
   if (typeof window === 'undefined') return '';
   const origin = window.location.origin;
   const params = new URLSearchParams();
-  if (classId) params.set('r', classId);
+  const effectiveR = (classId && classId.trim()) || 'default';
+  params.set('r', effectiveR);
+  params.set('report', 'true');
   if (date) params.set('d', date);
   if (period) params.set('p', period);
   if (extraParams?.week) params.set('w', extraParams.week);
@@ -165,6 +168,7 @@ export const generateWhatsAppBroadcastMessage = (
     includeStudentList = systemConfig.broadcastIncludeStudentList ?? true,
     includeSmartLink = systemConfig.broadcastIncludeSmartLink ?? true,
     smartLinkUrl,
+    isDocumentAvailable = true,
   } = options;
 
   const stats = calculateAttendanceStats(records, students);
@@ -267,9 +271,14 @@ export const generateWhatsAppBroadcastMessage = (
   }
 
   // 7. Smart Link Dokumen Rekap Resmi sesuai kesepakatan: 📄 Dokumen Rekap Resmi: https://[domain-aplikasi]/?r=[id_kelas]&d=[tanggal]
-  if (includeSmartLink && smartLinkUrl) {
-    lines.push(`📄 Dokumen Rekap Resmi: ${smartLinkUrl}`);
-    lines.push('');
+  if (includeSmartLink) {
+    if (!isDocumentAvailable) {
+      lines.push('📄 Dokumen Rekap Resmi: Dokumen belum tersedia');
+      lines.push('');
+    } else if (smartLinkUrl) {
+      lines.push(`📄 Dokumen Rekap Resmi: ${smartLinkUrl}`);
+      lines.push('');
+    }
   }
 
   // 8. Catatan Penutup

@@ -32,6 +32,7 @@ import { isFeatureAccessibleInPackage } from "../utils/featureRegistry";
 import { getServerNow, formatServerTimeString } from "../utils/serverTime";
 import { isUserInActiveSchoolPlan } from "../utils/tenantLifecycle";
 import { normalizePlan, normalizeWorkspaceType } from "../utils/packageSystem";
+import { normalizeClassToken } from "../utils/documentParser";
 
 interface Toast {
   id: string;
@@ -612,7 +613,7 @@ const dbConfig = (c: any): SystemConfig => ({
   defaultCheckInTime: c.default_check_in_time || "06:30 AM",
   defaultCheckOutTime: c.default_check_out_time || "12:20 PM",
   reportPlace: c.report_place || "",
-  reportDate: c.report_date || new Date().toISOString().slice(0, 10),
+  reportDate: c.report_date || "",
   activeStudyDays: c.active_study_days || [1, 2, 3, 4, 5],
   studentSelfAttendanceEnabled: c.student_self_attendance_enabled ?? false,
   checkInStartTime: String(c.check_in_start_time || "06:00").slice(0, 5),
@@ -3286,8 +3287,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
           show_letterhead: c.showLetterhead ?? true,
           default_check_in_time: c.defaultCheckInTime,
           default_check_out_time: c.defaultCheckOutTime,
-          report_place: c.reportPlace,
-          report_date: c.reportDate,
+          report_place: c.reportPlace || "",
+          report_date: c.reportDate ? c.reportDate.trim() : null,
           active_study_days:
             Array.isArray(c.activeStudyDays) && c.activeStudyDays.length > 0
               ? c.activeStudyDays
@@ -6850,8 +6851,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     const targetType: AttendanceType = options?.type || "DAILY";
     const targetSubjectId = options?.subjectId || null;
     const targetClassId = options?.classId || null;
+    const targetClassObj = targetClassId
+      ? classes.find((c) => c.id === targetClassId || normalizeClassToken(c.name) === normalizeClassToken(targetClassId))
+      : null;
     const targetStudents = targetClassId
-      ? students.filter((s) => s.classId === targetClassId)
+      ? students.filter((s) => {
+          if (s.classId === targetClassId) return true;
+          if (targetClassObj && (s.classId === targetClassObj.id || (s.className && normalizeClassToken(s.className) === normalizeClassToken(targetClassObj.name)))) return true;
+          return false;
+        })
       : students;
     const sortedStudents = [...targetStudents].sort((a, b) =>
       a.nama.localeCompare(b.nama, "id"),

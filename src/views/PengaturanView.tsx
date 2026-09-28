@@ -1144,19 +1144,47 @@ export const PengaturanView: React.FC = () => {
 
             {/* Tanggal Cetak Laporan */}
             <div>
-              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">
-                TANGGAL CETAK LAPORAN
-              </label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+                  TANGGAL CETAK LAPORAN
+                </label>
+                {formData.reportDate ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFormData((prev) => ({ ...prev, reportDate: '' }));
+                      showToast('Tanggal cetak dikosongkan. Mengikuti tanggal berjalan (default).', 'info');
+                    }}
+                    className="text-[10px] font-bold text-rose-600 hover:text-rose-700 hover:underline cursor-pointer"
+                  >
+                    Hapus (Pakai Tanggal Berjalan)
+                  </button>
+                ) : (
+                  <span className="text-[10px] font-extrabold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                    Tanggal Berjalan (Default)
+                  </span>
+                )}
+              </div>
               <div className="relative flex items-center">
                 <input
                   type="date"
                   name="reportDate"
-                  value={formData.reportDate}
+                  value={formData.reportDate || ''}
                   onChange={handleChange}
-                  required
                   className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 focus:border-blue-600 focus:bg-white focus:ring-2 focus:ring-blue-500/10 rounded-xl text-xs sm:text-sm font-semibold text-slate-900 outline-none transition-all min-h-[42px]"
                 />
               </div>
+              <p className="text-[11px] text-slate-500 mt-1.5 leading-relaxed">
+                {formData.reportDate ? (
+                  <span className="text-blue-700 font-medium">
+                    ✓ Tanggal cetak manual aktif: <strong>{formData.reportDate}</strong>. Seluruh cetakan laporan mengikuti tanggal ini. Kosongkan untuk kembali ke tanggal berjalan.
+                  </span>
+                ) : (
+                  <span className="text-emerald-700 font-medium">
+                    ✓ Default aktif: Tanggal berjalan (Hari ini: <strong>{new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</strong>). Laporan akan otomatis menggunakan tanggal saat dicetak.
+                  </span>
+                )}
+              </p>
             </div>
           </div>
         </div>

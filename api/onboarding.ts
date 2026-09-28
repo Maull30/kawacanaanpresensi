@@ -116,6 +116,14 @@ export default async function handler(req: any, res: any) {
         ],
       });
     }
+
+    if (action === 'get_public_daily_report') {
+      return json(res, 404, {
+        ok: false,
+        error: 'Dokumen rekap presensi untuk rombel dan periode ini belum tersedia di sistem.',
+      });
+    }
+
     return json(res, 200, {
       ok: true,
       success: true,
@@ -443,35 +451,44 @@ export default async function handler(req: any, res: any) {
     // -------------------------------------------------------------
     if (action === 'get_public_daily_report') {
       const classIdOrName = String(body.classId || '').trim();
-      const reportDate = String(body.date || '').trim();
+      const reportDate = String(body.date || new Date().toISOString().slice(0, 10)).trim();
       const attType = String(body.attendanceType || 'DAILY').toUpperCase() === 'SUBJECT' ? 'SUBJECT' : 'DAILY';
       const subjectId = body.subjectId || null;
 
-      if (!classIdOrName || !reportDate) {
-        return json(res, 400, { error: 'ID Kelas dan Tanggal Laporan wajib disertakan.' });
+      // 1. Cari kelas berdasarkan ID atau Nama (Aman dari crash invalid UUID)
+      let targetClass: any = null;
+      if (classIdOrName && classIdOrName !== 'default' && classIdOrName !== 'all') {
+        let clsQuery = db.from('classes').select('id, name, grade, academic_year, school_id, wali_kelas_teacher_id');
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(classIdOrName);
+        if (isUuid) {
+          clsQuery = clsQuery.eq('id', classIdOrName);
+        } else {
+          clsQuery = clsQuery.ilike('name', `%${classIdOrName}%`);
+        }
+
+        const { data: clsRows } = await clsQuery.limit(1);
+        targetClass = clsRows?.[0];
+
+        if (!targetClass && !isUuid) {
+          // Fallback: pencarian fleksibel dengan wildcard
+          const cleanName = classIdOrName.replace(/^kelas\s*/i, '').trim();
+          const { data: fallbackRows } = await db
+            .from('classes')
+            .select('id, name, grade, academic_year, school_id, wali_kelas_teacher_id')
+            .or(`name.ilike.%${classIdOrName}%,name.ilike.%${cleanName}%`)
+            .limit(1);
+          targetClass = fallbackRows?.[0];
+        }
       }
 
-      // 1. Cari kelas berdasarkan ID atau Nama
-      let clsQuery = db.from('classes').select('id, name, grade, academic_year, school_id, wali_kelas_teacher_id');
-      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(classIdOrName);
-      if (isUuid) {
-        clsQuery = clsQuery.eq('id', classIdOrName);
-      } else {
-        clsQuery = clsQuery.or(`id.eq.${classIdOrName},name.ilike.${classIdOrName}`);
-      }
-
-      const { data: clsRows } = await clsQuery.limit(1);
-      let targetClass = clsRows?.[0];
-
-      if (!targetClass && !isUuid) {
-        // Fallback: pencarian fleksibel dengan wildcard
-        const cleanName = classIdOrName.replace(/^kelas\s*/i, '').trim();
-        const { data: fallbackRows } = await db
-          .from('classes')
-          .select('id, name, grade, academic_year, school_id, wali_kelas_teacher_id')
-          .or(`name.ilike.%${classIdOrName}%,name.ilike.%${cleanName}%`)
-          .limit(1);
-        targetClass = fallbackRows?.[0];
+      if (!targetClass) {
+        if (!classIdOrName || classIdOrName === 'default') {
+          const { data: anyClass } = await db
+            .from('classes')
+            .select('id, name, grade, academic_year, school_id, wali_kelas_teacher_id')
+            .limit(1);
+          targetClass = anyClass?.[0];
+        }
       }
 
       if (!targetClass) {
@@ -665,7 +682,7 @@ export default async function handler(req: any, res: any) {
           principalName,
           principalNip,
           reportPlace: sc?.report_place || 'Jakarta',
-          reportDateOfficial: sc?.report_date || reportDate,
+          reportDateOfficial: sc?.report_date?.trim() || new Date().toISOString().slice(0, 10),
           stats: {
             totalStudents: students.length,
             hadir,

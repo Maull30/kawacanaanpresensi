@@ -8,6 +8,7 @@ import {
   formatDateToIndoLong,
   openWhatsAppBroadcast,
 } from '../utils/whatsappBroadcast';
+import { normalizeClassToken } from '../utils/documentParser';
 import { WhatsAppIcon } from './WhatsAppIcon';
 import {
   X,
@@ -38,7 +39,15 @@ interface WhatsAppBroadcastModalProps {
   records?: AttendanceRecord[];
   students?: Student[];
   initialType?: 'MASUK' | 'PULANG';
+  reportType?: string;
+  selectedWeek?: string;
+  month?: string;
+  year?: string;
+  semester?: 'Ganjil' | 'Genap';
+  academicYear?: string;
   onOpenPdfPreview?: () => void;
+  onOpenSmartReport?: () => void;
+  pdfUrl?: string | null;
 }
 
 export const WhatsAppBroadcastModal: React.FC<WhatsAppBroadcastModalProps> = ({
@@ -53,7 +62,15 @@ export const WhatsAppBroadcastModal: React.FC<WhatsAppBroadcastModalProps> = ({
   records: propRecords,
   students: propStudents,
   initialType = 'MASUK',
+  reportType,
+  selectedWeek,
+  month,
+  year,
+  semester,
+  academicYear,
   onOpenPdfPreview,
+  onOpenSmartReport,
+  pdfUrl,
 }) => {
   const attendanceType: AttendanceType = (rawAttendanceType as AttendanceType) || 'DAILY';
   const {
@@ -62,6 +79,7 @@ export const WhatsAppBroadcastModal: React.FC<WhatsAppBroadcastModalProps> = ({
     currentUser,
     attendanceRecords,
     students: contextStudents,
+    classes: contextClasses,
     teachers,
     showToast,
   } = useApp();
@@ -76,47 +94,234 @@ export const WhatsAppBroadcastModal: React.FC<WhatsAppBroadcastModalProps> = ({
   );
   const [customNote, setCustomNote] = useState('');
 
-  // Target students in class
-  const targetStudents = useMemo(() => {
-    if (propStudents && propStudents.length > 0) return propStudents;
-    if (classId) return contextStudents.filter((s) => s.classId === classId);
-    return contextStudents;
-  }, [propStudents, classId, contextStudents]);
+  // Robust resolution of target class
+  const effectiveClass = useMemo(() => {
+    if (classId) {
+      const byId = contextClasses.find((c) => c.id === classId);
+      if (byId) return byId;
+      const byNormId = contextClasses.find((c) => normalizeClassToken(c.name) === normalizeClassToken(classId));
+      if (byNormId) return byNormId;
+      const byName = contextClasses.find((c) => c.name.toLowerCase() === classId.toLowerCase());
+      if (byName) return byName;
+    }
+    if (className) {
+      const byNorm = contextClasses.find((c) => normalizeClassToken(c.name) === normalizeClassToken(className));
+      if (byNorm) return byNorm;
+      const byName = contextClasses.find((c) => c.name.toLowerCase() === className.toLowerCase() || c.name.toLowerCase().includes(className.toLowerCase()));
+      if (byName) return byName;
+    }
+    if (currentUser?.classIds && currentUser.classIds.length > 0) {
+      const byUserClass = contextClasses.find((c) => c.id === currentUser.classIds![0]);
+      if (byUserClass) return byUserClass;
+    }
+    return contextClasses[0] || null;
+  }, [classId, className, currentUser, contextClasses]);
 
-  // Target records for selected date, class, and attendance mode
+  const effectiveClassId = effectiveClass?.id || classId || '';
+  const effectiveClassName = effectiveClass?.name || className || 'Kelas';
+
+  // Target students strictly belonging to the active/selected class
+  const targetStudents = useMemo(() => {
+    if (propStudents && propStudents.length > 0) {
+      if (effectiveClass) {
+        const strictMatch = propStudents.filter((s) => {
+          if (s.classId && s.classId === effectiveClass.id) return true;
+          if (s.className && normalizeClassToken(s.className) === normalizeClassToken(effectiveClass.name)) return true;
+          return false;
+        });
+        if (strictMatch.length > 0) {
+          return strictMatch.sort((a, b) => a.nama.localeCompare(b.nama, 'id'));
+        }
+      }
+      return propStudents.sort((a, b) => a.nama.localeCompare(b.nama, 'id'));
+    }
+
+    if (effectiveClass) {
+      return contextStudents
+        .filter((s) => {
+          if (s.classId && s.classId === effectiveClass.id) return true;
+          if (s.className && normalizeClassToken(s.className) === normalizeClassToken(effectiveClass.name)) return true;
+          return false;
+        })
+        .sort((a, b) => a.nama.localeCompare(b.nama, 'id'));
+    }
+
+    return [];
+  }, [propStudents, effectiveClass, contextStudents]);
+
+  // Target records strictly for the active class's students on selected date
   const targetRecords = useMemo(() => {
-    if (propRecords && propRecords.length > 0) return propRecords;
+    const studentIds = new Set(targetStudents.map((s) => s.id));
+    if (studentIds.size === 0) return [];
+
+    if (propRecords && propRecords.length > 0) {
+      return propRecords.filter((r) => studentIds.has(r.studentId) && r.date === date);
+    }
+
     return attendanceRecords.filter((r) => {
       if (r.date !== date) return false;
+      if (!studentIds.has(r.studentId)) return false;
       if (attendanceType === 'SUBJECT') {
         if (r.type !== 'SUBJECT') return false;
         if (subjectId && r.subjectId !== subjectId) return false;
       } else {
         if (r.type === 'SUBJECT') return false;
       }
-      if (classId && r.classId && r.classId !== classId) return false;
       return true;
     });
-  }, [propRecords, attendanceRecords, date, attendanceType, subjectId, classId]);
+  }, [propRecords, attendanceRecords, date, attendanceType, subjectId, targetStudents]);
 
-  // Teacher name resolution
+  // Teacher name resolution: strictly uses the actual teacher / wali kelas of this class
   const resolvedTeacherName = useMemo(() => {
     if (currentUser?.role === 'GURU MAPEL' || attendanceType === 'SUBJECT') {
+      if (subjectId) {
+        const matchedSubj = (contextClasses as any)?._subjects?.find((s: any) => s.id === subjectId);
+        if (matchedSubj?.teacherName) return matchedSubj.teacherName;
+      }
       return currentUser?.name || 'Guru Mata Pelajaran';
     }
-    const matchedTeacher = teachers.find((t) => t.id === currentUser?.teacherId);
-    return (
-      matchedTeacher?.nama ||
-      currentUser?.name ||
-      schoolProfile.namaWaliKelas ||
-      'Wali Kelas'
+
+    // Prioritaskan wali kelas definitif dari data kelas yang aktif
+    if (effectiveClass?.waliKelasTeacherId) {
+      const matched = teachers.find((t) => t.id === effectiveClass.waliKelasTeacherId);
+      if (matched?.nama) return matched.nama;
+    }
+    if (effectiveClass?.waliKelasName && effectiveClass.waliKelasName.trim() && effectiveClass.waliKelasName !== '-') {
+      return effectiveClass.waliKelasName;
+    }
+    // Jika currentUser adalah wali kelas yang mengampu rombel ini
+    if (currentUser?.role === 'WALI KELAS') {
+      const userClassIds = [
+        ...(currentUser.classIds || []),
+        ...((currentUser as any).assignedClassIds || []),
+      ];
+      if (effectiveClass && (userClassIds.length === 0 || userClassIds.includes(effectiveClass.id))) {
+        return currentUser.name;
+      }
+    }
+    // Fallback profil sekolah
+    if (schoolProfile.namaWaliKelas && schoolProfile.namaWaliKelas.trim() && schoolProfile.namaWaliKelas !== '-') {
+      return schoolProfile.namaWaliKelas;
+    }
+    return 'Wali Kelas';
+  }, [currentUser, attendanceType, teachers, effectiveClass, schoolProfile.namaWaliKelas, subjectId, contextClasses]);
+
+  // Check whether attendance records / document data actually exists for this class and period
+  const isDocumentAvailable = useMemo(() => {
+    // 1. If explicit pdfUrl is passed, check if it's non-empty
+    if (pdfUrl !== undefined) {
+      return Boolean(pdfUrl && pdfUrl.trim() !== '');
+    }
+    // 2. Class and students check
+    if (!effectiveClassId || targetStudents.length === 0) {
+      return false;
+    }
+    // 3. Records check: must have records
+    if (targetRecords.length === 0) {
+      return false;
+    }
+    // 4. Must have at least one valid recorded attendance status (not all empty or all "Belum Diabsen")
+    const hasRecordedStatus = targetRecords.some(
+      (r) => r.status && r.status !== 'Belum Diabsen'
     );
-  }, [currentUser, attendanceType, teachers, schoolProfile.namaWaliKelas]);
+    return hasRecordedStatus;
+  }, [pdfUrl, effectiveClassId, targetStudents.length, targetRecords]);
 
   // Dynamic Smart Link directly from application domain: https://[domain-aplikasi]/?r=[id_kelas]&d=[tanggal]
   const smartLinkUrl = useMemo(() => {
-    return generateSmartReportLink(classId, date, attendanceType, subjectId);
-  }, [classId, date, attendanceType, subjectId]);
+    let period: 'daily' | 'weekly' | 'monthly' | 'semester' | 'kepsek' = 'daily';
+    if (reportType === 'Laporan Mingguan') period = 'weekly';
+    else if (reportType === 'Laporan Bulanan') period = 'monthly';
+    else if (reportType === 'Laporan Semester') period = 'semester';
+    else if (reportType?.startsWith('Laporan Kepala Sekolah')) period = 'kepsek';
+
+    const dObj = new Date(date);
+    const monthNames = [
+      'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+      'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+    ];
+    const resolvedMonth = month || (!isNaN(dObj.getTime()) ? monthNames[dObj.getMonth()] : 'Juli');
+    const resolvedYear = year || (!isNaN(dObj.getTime()) ? String(dObj.getFullYear()) : '2026');
+    const resolvedSemester = semester || (!isNaN(dObj.getTime()) && dObj.getMonth() <= 5 ? 'Genap' : 'Ganjil');
+    const resolvedAcademicYear = academicYear || schoolProfile.tahunPelajaran || `${resolvedYear}/${Number(resolvedYear) + 1}`;
+
+    return generateSmartReportLink(
+      effectiveClassId,
+      date,
+      attendanceType,
+      subjectId,
+      period,
+      {
+        week: selectedWeek,
+        month: resolvedMonth,
+        year: resolvedYear,
+        semester: resolvedSemester,
+        academicYear: resolvedAcademicYear,
+      }
+    );
+  }, [
+    effectiveClassId,
+    date,
+    attendanceType,
+    subjectId,
+    reportType,
+    selectedWeek,
+    month,
+    year,
+    semester,
+    academicYear,
+    schoolProfile.tahunPelajaran,
+  ]);
+
+  const effectivePdfUrl = useMemo(() => {
+    if (pdfUrl && pdfUrl.trim() !== '') return pdfUrl;
+    return smartLinkUrl;
+  }, [pdfUrl, smartLinkUrl]);
+
+  const handleOpenSmartReportDocument = (e?: React.MouseEvent, targetUrl?: string) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    if (!isDocumentAvailable) {
+      showToast('Dokumen belum tersedia', 'error');
+      return;
+    }
+    const finalUrl = targetUrl || effectivePdfUrl;
+
+    // 1. If parent component provided onOpenSmartReport or onOpenPdfPreview, open directly in-app!
+    if (onOpenSmartReport) {
+      onOpenSmartReport();
+      return;
+    }
+    if (onOpenPdfPreview) {
+      onOpenPdfPreview();
+      return;
+    }
+
+    // 2. Open smoothly in-app via popstate routing (avoids iframe about:blank white screen)
+    try {
+      window.history.pushState(null, '', finalUrl);
+      window.dispatchEvent(new PopStateEvent('popstate'));
+      onClose();
+    } catch (_) {
+      try {
+        window.location.href = finalUrl;
+      } catch (_) {}
+    }
+  };
+
+  const handleOpenPdf = () => {
+    if (!isDocumentAvailable) {
+      showToast('Dokumen belum tersedia', 'error');
+      return;
+    }
+    if (onOpenPdfPreview) {
+      onOpenPdfPreview();
+    } else {
+      handleOpenSmartReportDocument();
+    }
+  };
 
   // Computed summary statistics
   const stats = useMemo(() => {
@@ -129,7 +334,7 @@ export const WhatsAppBroadcastModal: React.FC<WhatsAppBroadcastModalProps> = ({
       type: broadcastType,
       date,
       schoolName: schoolProfile.namaSekolah || 'SATUAN PENDIDIKAN',
-      className: className || schoolProfile.kelas || 'Kelas',
+      className: effectiveClassName,
       teacherName: resolvedTeacherName,
       teacherRole: currentUser?.role || 'WALI_KELAS',
       subjectName,
@@ -140,14 +345,14 @@ export const WhatsAppBroadcastModal: React.FC<WhatsAppBroadcastModalProps> = ({
       customNote,
       includeStudentList,
       includeSmartLink,
-      smartLinkUrl,
+      smartLinkUrl: isDocumentAvailable ? effectivePdfUrl : '',
+      isDocumentAvailable,
     });
   }, [
     broadcastType,
     date,
     schoolProfile.namaSekolah,
-    className,
-    schoolProfile.kelas,
+    effectiveClassName,
     resolvedTeacherName,
     currentUser?.role,
     subjectName,
@@ -158,7 +363,8 @@ export const WhatsAppBroadcastModal: React.FC<WhatsAppBroadcastModalProps> = ({
     customNote,
     includeStudentList,
     includeSmartLink,
-    smartLinkUrl,
+    effectivePdfUrl,
+    isDocumentAvailable,
   ]);
 
   if (!isOpen) return null;
@@ -211,7 +417,7 @@ export const WhatsAppBroadcastModal: React.FC<WhatsAppBroadcastModalProps> = ({
                 </span>
               </div>
               <p className="text-xs text-emerald-100 font-medium">
-                {className || 'Kelas'} • {formatDateToIndoLong(date)}
+                {effectiveClassName} • {resolvedTeacherName} • {targetStudents.length} Siswa Terdaftar • {formatDateToIndoLong(date)}
               </p>
             </div>
           </div>
@@ -310,8 +516,54 @@ export const WhatsAppBroadcastModal: React.FC<WhatsAppBroadcastModalProps> = ({
 
             <div className="relative bg-[#EFEAE2] p-3.5 sm:p-4 rounded-2xl border border-slate-300 shadow-inner">
               {/* WhatsApp Speech Bubble */}
-              <div className="relative bg-white text-slate-800 rounded-2xl p-4 shadow-sm max-w-full text-xs font-mono sm:text-[13px] leading-relaxed whitespace-pre-wrap select-all border border-slate-200/80">
-                {messageText}
+              <div className="relative bg-white text-slate-800 rounded-2xl p-4 shadow-sm max-w-full text-xs font-mono sm:text-[13px] leading-relaxed whitespace-pre-wrap border border-slate-200/80">
+                {messageText.split('\n').map((line, lIdx) => {
+                  if (line.includes('Dokumen Rekap Resmi:') && line.includes('Dokumen belum tersedia')) {
+                    return (
+                      <div key={lIdx} className="break-all flex flex-wrap items-center gap-1.5 py-0.5">
+                        <span>📄 Dokumen Rekap Resmi:</span>
+                        <button
+                          type="button"
+                          onClick={() => showToast('Dokumen belum tersedia', 'error')}
+                          className="inline-flex items-center gap-1 font-bold text-amber-800 bg-amber-100 hover:bg-amber-200 border border-amber-300 px-2 py-0.5 rounded text-xs transition-colors cursor-pointer"
+                          title="Dokumen belum tersedia"
+                        >
+                          <AlertCircle size={12} className="text-amber-600 shrink-0" />
+                          <span>Dokumen belum tersedia</span>
+                        </button>
+                      </div>
+                    );
+                  }
+                  const urlMatch = line.match(/(https?:\/\/[^\s]+)/);
+                  if (urlMatch) {
+                    const url = urlMatch[1];
+                    const [before, after] = line.split(url);
+                    return (
+                      <div key={lIdx} className="break-all">
+                        <span>{before}</span>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            if (!isDocumentAvailable) {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              showToast('Dokumen belum tersedia', 'error');
+                              return;
+                            }
+                            handleOpenSmartReportDocument(e, url);
+                          }}
+                          className="inline-flex items-center gap-1 font-bold text-emerald-700 hover:text-emerald-900 underline bg-emerald-50 px-1 py-0.5 rounded cursor-pointer transition-colors text-left break-all"
+                          title="Klik untuk membuka tautan dokumen rekap resmi"
+                        >
+                          <span>{url}</span>
+                          <ExternalLink size={12} className="shrink-0" />
+                        </button>
+                        <span>{after}</span>
+                      </div>
+                    );
+                  }
+                  return <div key={lIdx}>{line || '\u00A0'}</div>;
+                })}
 
                 <div className="mt-2 pt-2 border-t border-slate-100 flex items-center justify-end gap-1.5 text-[10px] text-slate-400 font-sans">
                   <span>Hari ini</span>
@@ -352,6 +604,82 @@ export const WhatsAppBroadcastModal: React.FC<WhatsAppBroadcastModalProps> = ({
               </label>
             </div>
 
+            {/* Smart Link Live Access Card */}
+            {includeSmartLink && (
+              <div
+                className={`p-3 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 mt-2 transition-all ${
+                  isDocumentAvailable
+                    ? 'bg-emerald-50/90 border-emerald-300/80'
+                    : 'bg-amber-50/90 border-amber-300/80'
+                }`}
+              >
+                <div className="flex items-start sm:items-center gap-2.5 min-w-0">
+                  <div
+                    className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 mt-0.5 sm:mt-0 shadow-2xs ${
+                      isDocumentAvailable
+                        ? 'bg-emerald-100 text-emerald-800'
+                        : 'bg-amber-100 text-amber-800'
+                    }`}
+                  >
+                    {isDocumentAvailable ? <FileText size={16} /> : <AlertCircle size={16} />}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <span
+                        className={`text-xs font-black ${
+                          isDocumentAvailable ? 'text-emerald-950' : 'text-amber-950'
+                        }`}
+                      >
+                        Tautan Dokumen Rekap Resmi
+                      </span>
+                      {isDocumentAvailable ? (
+                        <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-emerald-200 text-emerald-900">
+                          Siap Dibuka
+                        </span>
+                      ) : (
+                        <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-200 text-amber-900">
+                          Dokumen belum tersedia
+                        </span>
+                      )}
+                    </div>
+                    <span
+                      className={`text-[11px] font-mono block truncate max-w-sm sm:max-w-md ${
+                        isDocumentAvailable ? 'text-emerald-700' : 'text-amber-800 font-semibold'
+                      }`}
+                    >
+                      {isDocumentAvailable
+                        ? effectivePdfUrl
+                        : 'Dokumen belum tersedia (Belum ada data presensi yang tercatat)'}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      if (!isDocumentAvailable) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        showToast('Dokumen belum tersedia', 'error');
+                        return;
+                      }
+                      handleOpenSmartReportDocument(e, effectivePdfUrl);
+                    }}
+                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 font-bold text-xs rounded-xl shadow-xs transition-all cursor-pointer ${
+                      isDocumentAvailable
+                        ? 'bg-emerald-700 hover:bg-emerald-800 active:scale-95 text-white'
+                        : 'bg-amber-600 hover:bg-amber-700 active:scale-95 text-white'
+                    }`}
+                    title={isDocumentAvailable ? 'Buka dokumen rekap resmi' : 'Dokumen belum tersedia'}
+                  >
+                    <ExternalLink size={13} />
+                    <span>{isDocumentAvailable ? 'Buka Tautan Resmi' : 'Dokumen Belum Tersedia'}</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Custom Announcement / Teacher's Note */}
             <div className="pt-1">
               <input
@@ -367,13 +695,39 @@ export const WhatsAppBroadcastModal: React.FC<WhatsAppBroadcastModalProps> = ({
 
         {/* Modal Commercial Action Footer */}
         <div className="p-3.5 sm:p-5 bg-white border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0">
-          <div className="flex items-center gap-2 w-full sm:w-auto">
+          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+            {includeSmartLink && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  if (!isDocumentAvailable) {
+                    showToast('Dokumen belum tersedia', 'error');
+                    return;
+                  }
+                  handleOpenSmartReportDocument(e, effectivePdfUrl);
+                }}
+                className={`px-3.5 py-2.5 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 min-h-[40px] cursor-pointer shadow-2xs ${
+                  isDocumentAvailable
+                    ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300'
+                    : 'bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300'
+                }`}
+                title={isDocumentAvailable ? 'Buka langsung tautan dokumen rekap resmi' : 'Dokumen belum tersedia'}
+              >
+                <ExternalLink size={14} />
+                <span>Buka Tautan Rekap</span>
+              </button>
+            )}
+
             {onOpenPdfPreview && (
               <button
                 type="button"
-                onClick={onOpenPdfPreview}
-                className="px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 min-h-[40px] cursor-pointer"
-                title="Buka pratinjau lembar cetak PDF resmi"
+                onClick={handleOpenPdf}
+                className={`px-3.5 py-2.5 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 min-h-[40px] cursor-pointer ${
+                  isDocumentAvailable
+                    ? 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                    : 'bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200'
+                }`}
+                title={isDocumentAvailable ? 'Buka pratinjau lembar cetak PDF resmi' : 'Dokumen belum tersedia'}
               >
                 <FileText size={15} />
                 <span>Lihat PDF</span>

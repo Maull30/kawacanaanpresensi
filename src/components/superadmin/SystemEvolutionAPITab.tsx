@@ -55,58 +55,49 @@ export const SystemEvolutionAPITab: React.FC<Props> = ({
     error?: string;
   } | null>(null);
 
-  const getCachedConfig = (): Partial<EvolutionConfig> | null => {
-    try {
-      const saved = localStorage.getItem('kawacanaan_evolution_config');
-      if (saved) return JSON.parse(saved);
-    } catch (_) {}
-    return null;
-  };
-
-  const [form, setForm] = useState<EvolutionConfig>(() => {
-    const cached = getCachedConfig();
-    return {
-      server_url: initialConfig?.server_url || cached?.server_url || '',
-      instance_name: initialConfig?.instance_name || cached?.instance_name || 'kawacanaan-notif',
-      is_enabled: initialConfig?.is_enabled ?? cached?.is_enabled ?? false,
-      sender_phone: initialConfig?.sender_phone || cached?.sender_phone || '',
-      notify_on_present: initialConfig?.notify_on_present ?? cached?.notify_on_present ?? false,
-      notify_on_late: initialConfig?.notify_on_late ?? cached?.notify_on_late ?? true,
-      notify_on_leave_approval: initialConfig?.notify_on_leave_approval ?? cached?.notify_on_leave_approval ?? true,
-      template_present:
-        initialConfig?.template_present ||
-        cached?.template_present ||
-        'Halo Bapak/Ibu Wali dari {nama_siswa}, ananda telah terdata HADIR tepat waktu di sekolah ({kelas}) pada {tanggal} pukul {jam}. Terima kasih.',
-      template_late:
-        initialConfig?.template_late ||
-        cached?.template_late ||
-        'Pemberitahuan: Ananda {nama_siswa} ({kelas}) terdata HADIR TERLAMBAT pada {tanggal} pukul {jam}. Mohon kerja sama Bapak/Ibu untuk mendampingi ananda berangkat lebih awal.',
-      template_leave_approved:
-        initialConfig?.template_leave_approved ||
-        cached?.template_leave_approved ||
-        'Surat permohonan izin sakit ananda {nama_siswa} ({kelas}) untuk tanggal {tanggal} telah DISETUJUI oleh Wali Kelas. Semoga lekas pulih dan sehat kembali.',
-      is_api_key_configured: initialConfig?.is_api_key_configured ?? cached?.is_api_key_configured ?? false,
-      api_key: initialConfig?.is_api_key_configured ? '••••••••••••••••' : (cached?.api_key || ''),
-    };
-  });
+  const [form, setForm] = useState<EvolutionConfig>(() => ({
+    server_url: initialConfig?.server_url || '',
+    instance_name: initialConfig?.instance_name || 'kawacanaan-notif',
+    is_enabled: initialConfig?.is_enabled ?? false,
+    sender_phone: initialConfig?.sender_phone || '',
+    notify_on_present: initialConfig?.notify_on_present ?? false,
+    notify_on_late: initialConfig?.notify_on_late ?? true,
+    notify_on_leave_approval: initialConfig?.notify_on_leave_approval ?? true,
+    template_present:
+      initialConfig?.template_present ||
+      'Halo Bapak/Ibu Wali dari {nama_siswa}, ananda telah terdata HADIR tepat waktu di sekolah ({kelas}) pada {tanggal} pukul {jam}. Terima kasih.',
+    template_late:
+      initialConfig?.template_late ||
+      'Pemberitahuan: Ananda {nama_siswa} ({kelas}) terdata HADIR TERLAMBAT pada {tanggal} pukul {jam}. Mohon kerja sama Bapak/Ibu untuk mendampingi ananda berangkat lebih awal.',
+    template_leave_approved:
+      initialConfig?.template_leave_approved ||
+      'Surat permohonan izin sakit ananda {nama_siswa} ({kelas}) untuk tanggal {tanggal} telah DISETUJUI oleh Wali Kelas. Semoga lekas pulih dan sehat kembali.',
+    is_api_key_configured: initialConfig?.is_api_key_configured ?? false,
+    api_key: initialConfig?.is_api_key_configured ? '••••••••••••••••' : '',
+  }));
 
   useEffect(() => {
-    if (initialConfig && (initialConfig.server_url || initialConfig.is_api_key_configured)) {
-      setForm((prev) => ({
-        ...prev,
-        server_url: initialConfig.server_url || prev.server_url,
-        instance_name: initialConfig.instance_name || prev.instance_name,
-        is_enabled: initialConfig.is_enabled ?? prev.is_enabled,
-        sender_phone: initialConfig.sender_phone || prev.sender_phone,
-        notify_on_present: initialConfig.notify_on_present ?? prev.notify_on_present,
-        notify_on_late: initialConfig.notify_on_late ?? prev.notify_on_late,
-        notify_on_leave_approval: initialConfig.notify_on_leave_approval ?? prev.notify_on_leave_approval,
-        template_present: initialConfig.template_present || prev.template_present,
-        template_late: initialConfig.template_late || prev.template_late,
-        template_leave_approved: initialConfig.template_leave_approved || prev.template_leave_approved,
-        is_api_key_configured: initialConfig.is_api_key_configured ?? prev.is_api_key_configured,
-        api_key: initialConfig.is_api_key_configured ? '••••••••••••••••' : prev.api_key,
-      }));
+    if (initialConfig) {
+      setForm({
+        server_url: initialConfig.server_url || '',
+        instance_name: initialConfig.instance_name || 'kawacanaan-notif',
+        is_enabled: initialConfig.is_enabled ?? false,
+        sender_phone: initialConfig.sender_phone || '',
+        notify_on_present: initialConfig.notify_on_present ?? false,
+        notify_on_late: initialConfig.notify_on_late ?? true,
+        notify_on_leave_approval: initialConfig.notify_on_leave_approval ?? true,
+        template_present:
+          initialConfig.template_present ||
+          'Halo Bapak/Ibu Wali dari {nama_siswa}, ananda telah terdata HADIR tepat waktu di sekolah ({kelas}) pada {tanggal} pukul {jam}. Terima kasih.',
+        template_late:
+          initialConfig.template_late ||
+          'Pemberitahuan: Ananda {nama_siswa} ({kelas}) terdata HADIR TERLAMBAT pada {tanggal} pukul {jam}. Mohon kerja sama Bapak/Ibu untuk mendampingi ananda berangkat lebih awal.',
+        template_leave_approved:
+          initialConfig.template_leave_approved ||
+          'Surat permohonan izin sakit ananda {nama_siswa} ({kelas}) untuk tanggal {tanggal} telah DISETUJUI oleh Wali Kelas. Semoga lekas pulih dan sehat kembali.',
+        is_api_key_configured: initialConfig.is_api_key_configured ?? false,
+        api_key: initialConfig.is_api_key_configured ? '••••••••••••••••' : '',
+      });
     }
   }, [initialConfig]);
 
@@ -172,18 +163,6 @@ export const SystemEvolutionAPITab: React.FC<Props> = ({
       if (payload.api_key && payload.api_key.includes('••••')) {
         delete payload.api_key;
       }
-
-      // Simpan juga ke cache lokal browser sebagai pengaman redundan
-      try {
-        localStorage.setItem(
-          'kawacanaan_evolution_config',
-          JSON.stringify({
-            ...form,
-            api_key: form.api_key && !form.api_key.includes('••••') ? form.api_key : undefined,
-          })
-        );
-      } catch (_) {}
-
       const res = await call('update_system_settings', {
         section: 'evolution_api',
         data: payload,

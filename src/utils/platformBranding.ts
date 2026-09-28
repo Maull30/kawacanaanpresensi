@@ -36,7 +36,9 @@ let currentName: string = (() => {
  */
 export function updateFavicon(logoUrl?: string) {
   if (typeof document === 'undefined') return;
-  const targetUrl = logoUrl && logoUrl.trim() ? logoUrl.trim() : DEFAULT_PLATFORM_LOGO;
+  // Jika logo adalah default atau kosong, gunakan favicon.png yang sudah teroptimasi (12 KB)
+  const isDefault = !logoUrl || !logoUrl.trim() || logoUrl === DEFAULT_PLATFORM_LOGO || logoUrl === '/lk.png' || logoUrl === '/kawacanaan-logo.png';
+  const targetUrl = isDefault ? '/favicon.png' : logoUrl.trim();
 
   try {
     // Cari atau buat link icon

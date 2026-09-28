@@ -3,6 +3,7 @@ import { useApp } from '../context/AppContext';
 import { PublicDailyReportViewer } from '../components/PublicDailyReportViewer';
 import { getUserRoleScope } from '../utils/userScope';
 import { getFaseByClassName, formatClassDisplay } from '../utils/faseKurikulum';
+import { normalizeClassToken } from '../utils/documentParser';
 import {
   ArrowLeft,
   FileText,
@@ -85,6 +86,9 @@ export const LaporanView: React.FC = () => {
     if (userScope.isWaliKelas && userScope.assignedWaliClassId) {
       return userScope.assignedWaliClassId;
     }
+    if (userScope.isWaliKelas && userScope.assignedWaliClass?.id) {
+      return userScope.assignedWaliClass.id;
+    }
     if (userScope.isGuruMapel && userScope.accessibleClasses.length > 0) {
       return userScope.accessibleClasses[0].id;
     }
@@ -108,8 +112,15 @@ export const LaporanView: React.FC = () => {
     if (userScope.isWaliKelas) {
       setViewScopeMode('CLASS');
       setAttendanceType('DAILY');
-      if (userScope.assignedWaliClassId) {
-        setSelectedClassId(userScope.assignedWaliClassId);
+      const waliId =
+        userScope.assignedWaliClassId ||
+        userScope.assignedWaliClass?.id ||
+        userScope.accessibleClasses[0]?.id ||
+        classes.find((c) => c.name.toLowerCase() === (userScope.assignedWaliClassName || '').toLowerCase())?.id ||
+        classes[0]?.id ||
+        '';
+      if (waliId && (!selectedClassId || !classes.some((c) => c.id === selectedClassId))) {
+        setSelectedClassId(waliId);
       }
     } else if (userScope.isGuruMapel) {
       setViewScopeMode('CLASS');
@@ -117,13 +128,13 @@ export const LaporanView: React.FC = () => {
       if (userScope.assignedSubjects.length > 0 && !userScope.assignedSubjects.some((s) => s.id === selectedSubjectId)) {
         setSelectedSubjectId(userScope.assignedSubjects[0].id);
       }
-      if (userScope.accessibleClasses.length > 0 && !userScope.accessibleClasses.some((c) => c.id === selectedClassId)) {
+      if (userScope.accessibleClasses.length > 0 && (!selectedClassId || !userScope.accessibleClasses.some((c) => c.id === selectedClassId))) {
         setSelectedClassId(userScope.accessibleClasses[0].id);
       }
     } else if (userScope.isKepalaSekolah) {
       setViewScopeMode('KEPSEK');
     }
-  }, [userScope]);
+  }, [userScope, classes, selectedClassId, selectedSubjectId]);
 
   // Specialized subjects for current user
   const specializedSubjects = useMemo(() => {
@@ -155,13 +166,38 @@ export const LaporanView: React.FC = () => {
     return classes;
   }, [userScope, classes]);
 
+  const effectiveClassId = useMemo(() => {
+    if (selectedClassId) return selectedClassId;
+    if (userScope.isWaliKelas) {
+      return (
+        userScope.assignedWaliClassId ||
+        userScope.assignedWaliClass?.id ||
+        classes.find((c) => c.name.toLowerCase() === (userScope.assignedWaliClassName || '').toLowerCase())?.id ||
+        classes[0]?.id ||
+        ''
+      );
+    }
+    if (userScope.isGuruMapel) {
+      return userScope.accessibleClasses[0]?.id || classes[0]?.id || '';
+    }
+    return classes[0]?.id || '';
+  }, [selectedClassId, userScope, classes]);
+
+  const effectiveSubjectId = useMemo(() => {
+    if (selectedSubjectId) return selectedSubjectId;
+    if (userScope.isGuruMapel) {
+      return userScope.assignedSubjects[0]?.id || specializedSubjects[0]?.id || subjects[0]?.id || '';
+    }
+    return '';
+  }, [selectedSubjectId, userScope, specializedSubjects, subjects]);
+
   const selectedSubjectObj = useMemo(() => {
-    return subjects.find((s) => s.id === selectedSubjectId) || null;
-  }, [subjects, selectedSubjectId]);
+    return subjects.find((s) => s.id === (effectiveSubjectId || selectedSubjectId)) || null;
+  }, [subjects, effectiveSubjectId, selectedSubjectId]);
 
   const selectedClassObj = useMemo(() => {
-    return classes.find((c) => c.id === selectedClassId) || null;
-  }, [classes, selectedClassId]);
+    return classes.find((c) => c.id === (effectiveClassId || selectedClassId)) || null;
+  }, [classes, effectiveClassId, selectedClassId]);
 
   // Auto-sync year based on semester
   React.useEffect(() => {
@@ -192,11 +228,18 @@ export const LaporanView: React.FC = () => {
   const monthKey = `${year}-${String(mNum).padStart(2, '0')}`;
   const effectiveDays = getEffectiveDaysForMonth(Number(year) || 2026, mNum);
 
-  // Filter students by selected class
+  // Filter students strictly by selected class (never leak all students or other classes)
   const filteredStudents = useMemo(() => {
-    if (!selectedClassId) return students;
-    return students.filter((s) => s.classId === selectedClassId);
-  }, [students, selectedClassId]);
+    const targetClass = selectedClassObj || classes.find((c) => c.id === effectiveClassId || c.id === selectedClassId);
+    if (!targetClass) return [];
+    return students
+      .filter((s) => {
+        if (s.classId && s.classId === targetClass.id) return true;
+        if (s.className && normalizeClassToken(s.className) === normalizeClassToken(targetClass.name)) return true;
+        return false;
+      })
+      .sort((a, b) => a.nama.localeCompare(b.nama, 'id'));
+  }, [students, selectedClassObj, classes, effectiveClassId, selectedClassId]);
 
   // Semester calculation for Class View
   const isSemesterGenap = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni'].includes(month);
@@ -232,24 +275,21 @@ export const LaporanView: React.FC = () => {
     );
   }, [semesterMonths, semYear, getEffectiveDaysForMonth]);
 
-  // Filter attendance records based on selected class, subject, and students
+  // Filter attendance records based strictly on selected class students
   const relevantRecords = useMemo(() => {
     const studentIds = new Set(filteredStudents.map((s) => s.id));
+    if (studentIds.size === 0) return [];
     return attendanceRecords.filter((r) => {
+      if (!studentIds.has(r.studentId)) return false;
       if (attendanceType === 'SUBJECT') {
         if (r.type !== 'SUBJECT') return false;
         if (selectedSubjectId && r.subjectId !== selectedSubjectId) return false;
       } else {
         if (r.type === 'SUBJECT') return false;
       }
-      if (selectedClassId) {
-        if (r.classId && r.classId === selectedClassId) return true;
-        if (studentIds.has(r.studentId)) return true;
-        return false;
-      }
       return true;
     });
-  }, [attendanceRecords, attendanceType, selectedSubjectId, selectedClassId, filteredStudents]);
+  }, [attendanceRecords, attendanceType, selectedSubjectId, filteredStudents]);
 
   // 1. DATA COMPUTATION: LAPORAN HARIAN
   const dailyRows = useMemo(() => {
@@ -667,10 +707,10 @@ export const LaporanView: React.FC = () => {
   if (isPrintModalOpen) {
     return (
       <PublicDailyReportViewer
-        classId={viewScopeMode === 'KEPSEK' ? (classes[0]?.id || '') : (selectedClassId || '')}
+        classId={viewScopeMode === 'KEPSEK' ? (classes[0]?.id || '') : (effectiveClassId || selectedClassId || '')}
         date={selectedDate}
         attendanceType={viewScopeMode === 'KEPSEK' ? 'DAILY' : attendanceType}
-        subjectId={viewScopeMode === 'KEPSEK' ? null : (selectedSubjectId || null)}
+        subjectId={viewScopeMode === 'KEPSEK' ? null : (effectiveSubjectId || selectedSubjectId || null)}
         reportType={viewScopeMode === 'KEPSEK' ? kepsekPeriodData.reportTypeModal : reportType}
         selectedWeek={selectedWeek}
         month={month}
@@ -1401,7 +1441,7 @@ export const LaporanView: React.FC = () => {
 
               {/* Action Buttons: WhatsApp Broadcast Group & Cetak PDF (Side-by-side) */}
               <div className="pt-2 flex items-center gap-3">
-                {reportType === 'Laporan Harian' && systemConfig.whatsappBroadcastEnabled !== false && (
+                {systemConfig.whatsappBroadcastEnabled !== false && (
                   <button
                     type="button"
                     onClick={() => {
@@ -1438,9 +1478,9 @@ export const LaporanView: React.FC = () => {
               <div className="pt-0.5">
                 <span className="font-bold text-[#7D6608]">Informasi Tanggal Cetak:</span> Laporan akan dicetak dengan keterangan lokasi dan tanggal{' '}
                 <span className="font-bold underline text-[#4A235A]">
-                  {systemConfig.reportPlace || 'Jakarta'}, {formatReportDateIndo(systemConfig.reportDate || '2026-06-27')}
+                  {systemConfig.reportPlace || 'Jakarta'}, {formatReportDateIndo(systemConfig.reportDate?.trim() || new Date().toISOString().slice(0, 10))}
                 </span>{' '}
-                sesuai pengaturan sistem.
+                {systemConfig.reportDate?.trim() ? '(sesuai pengaturan admin)' : '(mengikuti tanggal berjalan default)'}.
               </div>
             </div>
 
@@ -1453,14 +1493,26 @@ export const LaporanView: React.FC = () => {
         <WhatsAppBroadcastModal
           isOpen={isBroadcastModalOpen}
           onClose={() => setIsBroadcastModalOpen(false)}
-          date={selectedDate}
-          classId={selectedClassId}
-          className={selectedClassObj?.name || 'Kelas'}
+          date={reportType === 'Laporan Harian' ? selectedDate : (selectedDate || new Date().toISOString().slice(0, 10))}
+          classId={effectiveClassId}
+          className={selectedClassObj?.name || userScope.assignedWaliClassName || schoolProfile.kelas || 'Kelas'}
           attendanceType={attendanceType}
-          subjectId={attendanceType === 'SUBJECT' ? selectedSubjectId : null}
+          subjectId={attendanceType === 'SUBJECT' ? effectiveSubjectId : null}
           subjectName={selectedSubjectObj?.name || null}
+          records={relevantRecords}
+          students={filteredStudents}
           initialType={broadcastInitialType}
+          reportType={reportType}
+          selectedWeek={selectedWeek}
+          month={month}
+          year={year}
+          semester={classSemester}
+          academicYear={schoolProfile.tahunPelajaran || `${startYear}/${endYear}`}
           onOpenPdfPreview={() => {
+            setIsBroadcastModalOpen(false);
+            setIsPrintModalOpen(true);
+          }}
+          onOpenSmartReport={() => {
             setIsBroadcastModalOpen(false);
             setIsPrintModalOpen(true);
           }}

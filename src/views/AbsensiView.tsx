@@ -3,6 +3,7 @@ import { useApp } from '../context/AppContext';
 import { AttendanceRecord, AttendanceStatus, AttendanceType } from '../types';
 import { getUserRoleScope } from '../utils/userScope';
 import { getFaseByClassName, formatClassDisplay } from '../utils/faseKurikulum';
+import { normalizeClassToken } from '../utils/documentParser';
 import {
   ArrowLeft,
   ClipboardList,
@@ -34,6 +35,7 @@ import {
 import { ClassQrModal } from '../components/ClassQrModal';
 import { WhatsAppBroadcastModal } from '../components/WhatsAppBroadcastModal';
 import { WhatsAppIcon } from '../components/WhatsAppIcon';
+import { PublicDailyReportViewer } from '../components/PublicDailyReportViewer';
 
 export const AbsensiView: React.FC = () => {
   const {
@@ -60,6 +62,15 @@ export const AbsensiView: React.FC = () => {
     () => getUserRoleScope(currentUser, classes, subjects, teachers),
     [currentUser, classes, subjects, teachers]
   );
+
+  const isTeacherOrWali = useMemo(() => {
+    return (
+      currentUser?.role === 'WALI KELAS' ||
+      currentUser?.role === 'GURU MAPEL' ||
+      userScope.isWaliKelas ||
+      userScope.isGuruMapel
+    );
+  }, [currentUser?.role, userScope.isWaliKelas, userScope.isGuruMapel]);
 
   const initialMode: AttendanceType = userScope.isGuruMapel ? 'SUBJECT' : 'DAILY';
 
@@ -90,6 +101,7 @@ export const AbsensiView: React.FC = () => {
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [isClassQrOpen, setIsClassQrOpen] = useState<boolean>(false);
   const [isBroadcastModalOpen, setIsBroadcastModalOpen] = useState<boolean>(false);
+  const [isPrintModalOpen, setIsPrintModalOpen] = useState<boolean>(false);
   const [broadcastInitialType, setBroadcastInitialType] = useState<'MASUK' | 'PULANG'>('MASUK');
   const [justSavedPrompt, setJustSavedPrompt] = useState<boolean>(false);
   const [isDirty, setIsDirty] = useState<boolean>(false);
@@ -479,7 +491,7 @@ export const AbsensiView: React.FC = () => {
           sessionStorage.removeItem(draftStorageKey);
         } catch (_) {}
 
-        if (systemConfig.whatsappBroadcastEnabled !== false) {
+        if (systemConfig.whatsappBroadcastEnabled !== false && !isTeacherOrWali) {
           const nowHour = new Date().getHours();
           setBroadcastInitialType(nowHour >= 11 ? 'PULANG' : 'MASUK');
           setJustSavedPrompt(true);
@@ -551,6 +563,34 @@ export const AbsensiView: React.FC = () => {
   };
 
   const currentSelectedClassName = classes.find((c) => c.id === selectedClassId)?.name || 'Semua Kelas';
+
+  if (isPrintModalOpen) {
+    const monthNames = [
+      'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+      'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember',
+    ];
+    const dateObj = new Date(date);
+    const mIdx = !isNaN(dateObj.getTime()) ? dateObj.getMonth() : 6;
+    const yVal = !isNaN(dateObj.getTime()) ? String(dateObj.getFullYear()) : '2026';
+    const monthName = monthNames[mIdx] || 'Juli';
+    const sem = (mIdx >= 0 && mIdx <= 5) ? 'Genap' : 'Ganjil';
+
+    const activeClsId = selectedClassId || activeTargetClass?.id || '';
+    return (
+      <PublicDailyReportViewer
+        classId={activeClsId}
+        date={date}
+        attendanceType={attendanceMode}
+        subjectId={attendanceMode === 'SUBJECT' ? selectedSubjectId : null}
+        reportType="Laporan Harian"
+        month={monthName}
+        year={yVal}
+        semester={sem}
+        academicYear={schoolProfile.tahunPelajaran}
+        onBackToApp={() => setIsPrintModalOpen(false)}
+      />
+    );
+  }
 
   return (
     <div className="w-full max-w-6xl 2xl:max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-3.5 sm:py-5 space-y-3.5 sm:space-y-5 animate-in fade-in duration-200 pb-28">
@@ -1470,8 +1510,8 @@ export const AbsensiView: React.FC = () => {
         </div>
       </div>
 
-      {/* Just-Saved 1-Langkah Otomatis Prompt Banner */}
-      {justSavedPrompt && systemConfig.whatsappBroadcastEnabled !== false && (
+      {/* Just-Saved 1-Langkah Otomatis Prompt Banner (Khusus Admin, disembunyikan untuk Wali Kelas & Guru Mapel) */}
+      {justSavedPrompt && systemConfig.whatsappBroadcastEnabled !== false && !isTeacherOrWali && (
         <div className="sticky bottom-20 z-30 animate-in slide-in-from-bottom-3 duration-300">
           <div className="bg-gradient-to-r from-emerald-600 via-teal-600 to-green-700 text-white rounded-2xl p-3 sm:p-4 shadow-xl border border-emerald-400/40 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <div className="flex items-center gap-3">
@@ -1538,8 +1578,8 @@ export const AbsensiView: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end">
-          {/* WhatsApp Broadcast Button Matching Uploaded Icon */}
-          {systemConfig.whatsappBroadcastEnabled !== false && (
+          {/* WhatsApp Broadcast Button (Khusus Admin, disembunyikan untuk Wali Kelas & Guru Mapel) */}
+          {systemConfig.whatsappBroadcastEnabled !== false && !isTeacherOrWali && (
             <button
               type="button"
               onClick={() => {
@@ -1593,13 +1633,28 @@ export const AbsensiView: React.FC = () => {
           isOpen={isBroadcastModalOpen}
           onClose={() => setIsBroadcastModalOpen(false)}
           date={date}
-          classId={selectedClassId}
-          className={activeTargetClass?.name || schoolProfile.kelas || 'Kelas'}
+          classId={selectedClassId || activeTargetClass?.id || ''}
+          className={activeTargetClass?.name || 'Kelas'}
           attendanceType={attendanceMode}
           subjectId={attendanceMode === 'SUBJECT' ? selectedSubjectId : null}
           subjectName={activeSubject?.name || null}
           records={records}
+          students={students.filter((s) => {
+            const targetId = selectedClassId || activeTargetClass?.id;
+            if (targetId && s.classId === targetId) return true;
+            if (activeTargetClass && s.className && normalizeClassToken(s.className) === normalizeClassToken(activeTargetClass.name)) return true;
+            return false;
+          })}
           initialType={broadcastInitialType}
+          reportType="Laporan Harian"
+          onOpenPdfPreview={() => {
+            setIsBroadcastModalOpen(false);
+            setIsPrintModalOpen(true);
+          }}
+          onOpenSmartReport={() => {
+            setIsBroadcastModalOpen(false);
+            setIsPrintModalOpen(true);
+          }}
         />
       )}
       {/* Class QR Attendance Code Modal */}

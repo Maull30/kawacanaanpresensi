@@ -5,6 +5,7 @@ import { useApp } from '../context/AppContext';
 import { getFaseByClassName } from '../utils/faseKurikulum';
 import { generateSmartReportLink } from '../utils/whatsappBroadcast';
 import { getUserRoleScope } from '../utils/userScope';
+import { normalizeClassToken } from '../utils/documentParser';
 
 const isPlaceholderText = (text: string | null | undefined): boolean => {
   if (!text) return true;
@@ -71,6 +72,14 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
   const [loading, setLoading] = useState(!isInternalUser);
   const [error, setError] = useState<string | null>(null);
   const [externalReportData, setExternalReportData] = useState<any | null>(null);
+  const [copiedLink, setCopiedLink] = useState(false);
+
+  // Sync loading state immediately when internal data is ready
+  useEffect(() => {
+    if (isInternalUser) {
+      setLoading(false);
+    }
+  }, [isInternalUser]);
 
   const selectedDate = propDate || new Date().toISOString().split('T')[0];
   const isKepsekReport = reportType.startsWith('Laporan Kepala Sekolah');
@@ -176,17 +185,30 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
     return semesterMonthList.reduce((acc, m) => acc + getEffectiveDaysForMonth(m.year, m.num), 0);
   }, [semesterMonthList]);
 
-  // Target class resolution
+  // Target class resolution - strictly resolves the requested or active class
   const resolvedClass = useMemo(() => {
     if (!isInternalUser) return null;
     if (propClassId) {
       const byId = ctxClasses.find((c) => c.id === propClassId);
       if (byId) return byId;
+      const byNormId = ctxClasses.find((c) => normalizeClassToken(c.name) === normalizeClassToken(propClassId));
+      if (byNormId) return byNormId;
       const byName = ctxClasses.find((c) => c.name.toLowerCase() === propClassId.toLowerCase());
       if (byName) return byName;
+      const cleanTarget = propClassId.replace(/^kelas\s*/i, '').trim().toLowerCase();
+      const byClean = ctxClasses.find((c) => c.name.replace(/^kelas\s*/i, '').trim().toLowerCase() === cleanTarget);
+      if (byClean) return byClean;
+      // Do not substitute an unrelated class if specific class was requested!
+      return null;
+    }
+    if (userScope.isWaliKelas && userScope.assignedWaliClass) {
+      return userScope.assignedWaliClass;
+    }
+    if (userScope.isGuruMapel && userScope.accessibleClasses.length > 0) {
+      return userScope.accessibleClasses[0];
     }
     return ctxClasses[0] || null;
-  }, [isInternalUser, propClassId, ctxClasses]);
+  }, [isInternalUser, propClassId, ctxClasses, userScope]);
 
   const resolvedSubject = useMemo(() => {
     if (!isInternalUser) return null;
@@ -205,7 +227,7 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
 
   const resolvedWaliKelas = useMemo(() => {
     if (!isInternalUser || !resolvedClass) return null;
-    // 1. Match by waliKelasTeacherId
+    // 1. Match by waliKelasTeacherId in teachers master
     if (resolvedClass.waliKelasTeacherId) {
       const t = ctxTeachers.find((tch) => tch.id === resolvedClass.waliKelasTeacherId);
       if (t) return t;
@@ -216,16 +238,16 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
       const t = ctxTeachers.find((tch) => tch.nama.trim().toLowerCase() === cleanName);
       if (t) return t;
     }
-    // 3. Fallback: if currentUser is WALI KELAS
+    // 3. Fallback: if currentUser is WALI KELAS assigned to THIS specific class
     if (userScope.isWaliKelas || currentUser?.role === 'WALI KELAS') {
       const userClassIds = [
         ...(currentUser?.classIds || []),
         ...((currentUser as any)?.assignedClassIds || []),
       ];
       const isAssigned =
-        userClassIds.length === 0 ||
         userClassIds.includes(resolvedClass.id) ||
-        userScope.assignedWaliClassId === resolvedClass.id;
+        userScope.assignedWaliClassId === resolvedClass.id ||
+        normalizeClassToken(userScope.assignedWaliClassName || '') === normalizeClassToken(resolvedClass.name);
       if (isAssigned) {
         if (userScope.currentTeacher) return userScope.currentTeacher;
         if (currentUser?.teacherId) {
@@ -240,14 +262,8 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
         };
       }
     }
-    // 4. Fallback: match by ctxSchoolProfile.namaWaliKelas
-    if (ctxSchoolProfile?.namaWaliKelas && !isPlaceholderText(ctxSchoolProfile.namaWaliKelas)) {
-      const cleanWali = ctxSchoolProfile.namaWaliKelas.trim().toLowerCase();
-      const t = ctxTeachers.find((tch) => tch.nama.trim().toLowerCase() === cleanWali);
-      if (t) return t;
-    }
     return null;
-  }, [isInternalUser, resolvedClass, ctxTeachers, currentUser, userScope, ctxSchoolProfile]);
+  }, [isInternalUser, resolvedClass, ctxTeachers, currentUser, userScope]);
 
   const resolvedSubjectTeacher = useMemo(() => {
     // 1. By subject.teacherId
@@ -302,17 +318,52 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
 
   // Target students
   const targetStudents = useMemo(() => {
-    if (!isInternalUser) return [];
+    if (!isInternalUser) {
+      if (externalReportData?.students && Array.isArray(externalReportData.students) && externalReportData.students.length > 0) {
+        return externalReportData.students.map((s: any, idx: number) => ({
+          id: s.id || `ext-std-${idx}`,
+          nama: s.nama || 'Siswa',
+          nisn: s.nisn || '-',
+          gender: s.gender === 'Perempuan' || s.gender === 'P' ? 'P' : 'L',
+          classId: propClassId || '',
+          className: externalReportData?.className || '',
+        }));
+      }
+      return [];
+    }
     if (isKepsekReport) return ctxStudents;
-    if (!resolvedClass) return ctxStudents;
+    if (!resolvedClass) return [];
     return ctxStudents
-      .filter((s) => s.classId === resolvedClass.id || s.className === resolvedClass.name)
-      .sort((a, b) => a.nama.localeCompare(b.nama));
-  }, [isInternalUser, isKepsekReport, resolvedClass, ctxStudents]);
+      .filter((s) => {
+        if (s.classId && s.classId === resolvedClass.id) return true;
+        if (s.className && normalizeClassToken(s.className) === normalizeClassToken(resolvedClass.name)) return true;
+        return false;
+      })
+      .sort((a, b) => a.nama.localeCompare(b.nama, 'id'));
+  }, [isInternalUser, externalReportData, isKepsekReport, resolvedClass, ctxStudents, propClassId]);
 
   // Target records
   const targetRecords = useMemo(() => {
-    if (!isInternalUser) return [];
+    if (!isInternalUser) {
+      if (externalReportData?.records && Array.isArray(externalReportData.records)) {
+        return externalReportData.records;
+      }
+      if (externalReportData?.students && Array.isArray(externalReportData.students)) {
+        return externalReportData.students.map((s: any, idx: number) => ({
+          id: `ext-rec-${idx}`,
+          studentId: s.id || `ext-std-${idx}`,
+          studentName: s.nama,
+          date: selectedDate,
+          status: s.status || 'Hadir',
+          checkInTime: s.checkInTime || '',
+          checkOutTime: s.checkOutTime || '',
+          notes: s.notes || '',
+          type: attendanceType,
+          subjectId: subjectId || null,
+        }));
+      }
+      return [];
+    }
     const studentIds = new Set(targetStudents.map((s) => s.id));
     return ctxAttendanceRecords.filter((r) => {
       const matchesStudent = studentIds.has(r.studentId);
@@ -322,7 +373,7 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
       }
       return r.type === 'DAILY' || !r.type;
     });
-  }, [isInternalUser, targetStudents, ctxAttendanceRecords, attendanceType, subjectId]);
+  }, [isInternalUser, externalReportData, selectedDate, attendanceType, subjectId, targetStudents, ctxAttendanceRecords]);
 
   const formatPct = (val: number) => (val % 1 === 0 ? val.toFixed(0) : val.toFixed(1));
 
@@ -589,8 +640,17 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
 
   // Fallback fetching for external visitor via URL
   useEffect(() => {
-    if (isInternalUser) return;
+    if (isInternalUser) {
+      setLoading(false);
+      return;
+    }
     let isMounted = true;
+    const safetyTimer = setTimeout(() => {
+      if (isMounted) {
+        setLoading(false);
+      }
+    }, 3500);
+
     const fetchReport = async () => {
       setLoading(true);
       setError(null);
@@ -608,18 +668,21 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
         });
 
         const json = await res.json();
-        if (!res.ok || !json.ok) {
-          throw new Error(json.error || 'Gagal memuat dokumen rekap kehadiran.');
-        }
-
         if (isMounted) {
-          setExternalReportData(json.report);
+          if (res.ok && json.ok && json.report) {
+            setExternalReportData(json.report);
+          } else {
+            setError(json.error || 'Data rekap kehadiran untuk rombel dan periode ini belum tersedia di sistem.');
+            setExternalReportData(null);
+          }
         }
       } catch (err: any) {
         if (isMounted) {
-          setError(err.message || 'Terjadi kesalahan saat memuat dokumen rekapitulasi.');
+          setError('Gagal memuat dokumen rekap kehadiran. Silakan muat ulang halaman atau hubungi pihak sekolah.');
+          setExternalReportData(null);
         }
       } finally {
+        clearTimeout(safetyTimer);
         if (isMounted) {
           setLoading(false);
         }
@@ -629,6 +692,7 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
     fetchReport();
     return () => {
       isMounted = false;
+      clearTimeout(safetyTimer);
     };
   }, [isInternalUser, propClassId, selectedDate, attendanceType, subjectId]);
 
@@ -646,7 +710,8 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
         }).catch(() => {});
       } else {
         navigator.clipboard?.writeText(shareUrl);
-        alert('Tautan dokumen smart link berhasil disalin ke papan klip!');
+        setCopiedLink(true);
+        setTimeout(() => setCopiedLink(false), 2500);
       }
     }
   };
@@ -689,12 +754,17 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
   // Determine current active metrics for the summary cards
   const activeMetrics = useMemo(() => {
     if (!isInternalUser && externalReportData) {
-      const total = externalReportData.stats?.totalStudents || externalReportData.students?.length || 1;
+      const stats = externalReportData.stats || {};
+      const total = stats.totalStudents || (Array.isArray(externalReportData.students) ? externalReportData.students.length : 1) || 1;
+      const h = Number(stats.hadir) || 0;
+      const s = Number(stats.sakit) || 0;
+      const i = Number(stats.izin) || 0;
+      const a = Number(stats.alfa) || 0;
       return {
-        pctHadir: formatPct((externalReportData.stats.hadir / total) * 100),
-        pctSakit: formatPct((externalReportData.stats.sakit / total) * 100),
-        pctIzin: formatPct((externalReportData.stats.izin / total) * 100),
-        pctAlfa: formatPct((externalReportData.stats.alfa / total) * 100),
+        pctHadir: formatPct((h / total) * 100),
+        pctSakit: formatPct((s / total) * 100),
+        pctIzin: formatPct((i / total) * 100),
+        pctAlfa: formatPct((a / total) * 100),
       };
     }
     if (isKepsekReport) {
@@ -805,12 +875,38 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
     );
   }
 
+  if (targetStudents.length === 0) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 text-center">
+        <div className="w-14 h-14 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-600 mb-4">
+          <AlertCircle size={28} />
+        </div>
+        <h2 className="text-base sm:text-lg font-black text-slate-900 tracking-tight">
+          Dokumen Belum Tersedia
+        </h2>
+        <p className="text-xs sm:text-sm text-slate-600 mt-2 max-w-md leading-relaxed">
+          Data siswa atau rekap presensi untuk rombel dan periode ini belum tersedia.
+        </p>
+        <div className="mt-6 flex items-center gap-3">
+          {onBackToApp && (
+            <button
+              onClick={onBackToApp}
+              className="px-5 py-2.5 rounded-xl bg-blue-600 text-white font-bold text-xs hover:bg-blue-700 transition-all cursor-pointer shadow-xs"
+            >
+              Kembali ke Aplikasi
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   // Active School and Teacher Profile Data
-  const schoolName = ctxSchoolProfile?.namaSekolah || externalReportData?.schoolName || 'SD NEGERI CONTOH';
-  const pemerintahDaerah = ctxSystemConfig?.pemerintahDaerah || externalReportData?.pemerintahDaerah || 'PEMERINTAH PROVINSI DAERAH KHUSUS IBUKOTA JAKARTA';
-  const dinasPendidikan = ctxSystemConfig?.dinasPendidikan || externalReportData?.dinasPendidikan || 'DINAS PENDIDIKAN';
-  const npsn = ctxSchoolProfile?.npsn || externalReportData?.npsn || '20104501';
-  const alamatSekolah = ctxSchoolProfile?.alamat || externalReportData?.alamat || 'Jl. Pendidikan No. 123, Kel. Merdeka, Kec. Nusantara, Kota Jakarta';
+  const schoolName = ctxSchoolProfile?.namaSekolah || externalReportData?.schoolName || 'SATUAN PENDIDIKAN';
+  const pemerintahDaerah = ctxSystemConfig?.pemerintahDaerah || externalReportData?.pemerintahDaerah || '';
+  const dinasPendidikan = ctxSystemConfig?.dinasPendidikan || externalReportData?.dinasPendidikan || '';
+  const npsn = ctxSchoolProfile?.npsn || externalReportData?.npsn || '-';
+  const alamatSekolah = ctxSchoolProfile?.alamat || externalReportData?.alamat || '';
   const showLetterhead = ctxSystemConfig?.showLetterhead ?? externalReportData?.showLetterhead ?? true;
   const letterheadType = ctxSystemConfig?.letterheadType || externalReportData?.letterheadType || 'standard_text';
   const letterheadImageUrl = ctxSystemConfig?.letterheadImageUrl || externalReportData?.letterheadImageUrl || '';
@@ -819,7 +915,7 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
   const activeClassName = resolvedClass?.name || externalReportData?.className || 'Kelas';
   const activeClassClean = activeClassName.replace(/^kelas\s*/i, '');
   const activeFase = resolvedClass ? getFaseByClassName(resolvedClass.name, resolvedClass.grade) : (externalReportData?.fase || 'Fase A');
-  const principalName = ctxSchoolProfile?.namaKepalaSekolah || resolvedPrincipalTeacher?.nama || externalReportData?.principalName || 'Nama Kepala Sekolah';
+  const principalName = ctxSchoolProfile?.namaKepalaSekolah || resolvedPrincipalTeacher?.nama || externalReportData?.principalName || 'Kepala Sekolah';
   const principalNip = (ctxSchoolProfile?.nipKepalaSekolah && ctxSchoolProfile.nipKepalaSekolah !== '-')
     ? ctxSchoolProfile.nipKepalaSekolah
     : (resolvedPrincipalTeacher?.nip || (currentUser?.role === 'KEPALA SEKOLAH' ? (currentUser.nip || (currentUser.username && /^\d{10,}$/.test(currentUser.username) ? currentUser.username : '')) : '') || externalReportData?.principalNip || '-');
@@ -839,30 +935,7 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
       };
     }
 
-    // KASUS 2: USER YANG LOGIN ADALAH WALI KELAS (Role Wali Kelas)
-    if (userScope.isWaliKelas || currentUser?.role === 'WALI KELAS') {
-      const userClassIds = [
-        ...(currentUser?.classIds || []),
-        ...((currentUser as any)?.assignedClassIds || []),
-      ];
-      const isAssigned =
-        !resolvedClass ||
-        userClassIds.length === 0 ||
-        userClassIds.includes(resolvedClass.id) ||
-        userScope.assignedWaliClassId === resolvedClass.id;
-      if (isAssigned) {
-        const rawName = userScope.currentTeacher?.nama || currentUser?.name || '';
-        const name = isPlaceholderText(rawName) ? '' : rawName;
-        const nip = userScope.currentTeacher?.nip || currentUser?.nip || (currentUser?.username && /^\d{10,}$/.test(currentUser.username) ? currentUser.username : '') || '-';
-        return {
-          name,
-          nip,
-          title: `Wali ${activeClassName}`,
-        };
-      }
-    }
-
-    // KASUS 3: DOKUMEN ADALAH PRESENSI MATA PELAJARAN (dilihat oleh Admin/Kepsek/Tamu/Wali Kelas)
+    // KASUS 2: DOKUMEN ADALAH PRESENSI MATA PELAJARAN (dilihat oleh Admin/Kepsek/Tamu/Wali Kelas)
     if (attendanceType === 'SUBJECT' || resolvedSubject) {
       let name = '';
       let nip = '-';
@@ -893,21 +966,44 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
       };
     }
 
-    // KASUS 4: DOKUMEN ADALAH PRESENSI HARIAN / WALI KELAS (dilihat oleh Admin/Kepsek/Tamu)
+    // KASUS 3: DOKUMEN ADALAH PRESENSI HARIAN / WALI KELAS (Harus sesuai rombel/kelas aktif yang dipilih!)
     let name = '';
     let nip = '-';
 
-    if (resolvedWaliKelas?.nama && !isPlaceholderText(resolvedWaliKelas.nama)) {
-      name = resolvedWaliKelas.nama;
-      nip = resolvedWaliKelas.nip || '-';
-    } else if (resolvedClass?.waliKelasName && !isPlaceholderText(resolvedClass.waliKelasName)) {
+    // 1. Wali kelas definitif dari kelas yang aktif
+    if (resolvedClass?.waliKelasTeacherId) {
+      const matched = ctxTeachers.find((t) => t.id === resolvedClass.waliKelasTeacherId);
+      if (matched?.nama) {
+        name = matched.nama;
+        nip = matched.nip || '-';
+      }
+    }
+    if (!name && resolvedClass?.waliKelasName && !isPlaceholderText(resolvedClass.waliKelasName)) {
       name = resolvedClass.waliKelasName;
       const matched = ctxTeachers.find((t) => t.nama.trim().toLowerCase() === resolvedClass.waliKelasName!.trim().toLowerCase());
       if (matched?.nip) nip = matched.nip;
-    } else if (ctxSchoolProfile?.namaWaliKelas && !isPlaceholderText(ctxSchoolProfile.namaWaliKelas)) {
-      name = ctxSchoolProfile.namaWaliKelas;
-      nip = ctxSchoolProfile.nipWaliKelas || '-';
-    } else if (externalReportData?.teacherName && !isPlaceholderText(externalReportData.teacherName)) {
+    }
+
+    // 2. Jika currentUser adalah Wali Kelas dari kelas yang aktif ini
+    if (!name && (userScope.isWaliKelas || currentUser?.role === 'WALI KELAS')) {
+      const userClassIds = [
+        ...(currentUser?.classIds || []),
+        ...((currentUser as any)?.assignedClassIds || []),
+      ];
+      const isAssigned =
+        resolvedClass &&
+        (userClassIds.includes(resolvedClass.id) ||
+         userScope.assignedWaliClassId === resolvedClass.id ||
+         normalizeClassToken(userScope.assignedWaliClassName || '') === normalizeClassToken(resolvedClass.name));
+      if (isAssigned) {
+        const rawName = userScope.currentTeacher?.nama || currentUser?.name || '';
+        name = isPlaceholderText(rawName) ? '' : rawName;
+        nip = userScope.currentTeacher?.nip || currentUser?.nip || (currentUser?.username && /^\d{10,}$/.test(currentUser.username) ? currentUser.username : '') || '-';
+      }
+    }
+
+    // 3. Jika dari data external (smart link publik)
+    if (!name && externalReportData?.teacherName && !isPlaceholderText(externalReportData.teacherName)) {
       name = externalReportData.teacherName;
       nip = externalReportData.teacherNip || '-';
     }
@@ -923,10 +1019,8 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
     resolvedClass,
     resolvedSubject,
     resolvedSubjectTeacher,
-    resolvedWaliKelas,
     activeClassName,
     attendanceType,
-    ctxSchoolProfile,
     ctxTeachers,
     externalReportData,
   ]);
@@ -937,7 +1031,63 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
     ? 'Koordinator Kurikulum / Tim Presensi'
     : resolvedTeacherInfo.title;
   const reportPlace = ctxSystemConfig?.reportPlace || externalReportData?.reportPlace || 'Jakarta';
-  const reportDateOfficial = ctxSystemConfig?.reportDate || externalReportData?.reportDateOfficial || selectedDate;
+  const reportDateOfficial = (ctxSystemConfig?.reportDate && ctxSystemConfig.reportDate.trim())
+    ? ctxSystemConfig.reportDate.trim()
+    : (externalReportData?.reportDateOfficial || new Date().toISOString().slice(0, 10));
+
+  // Metadata Display Helpers for Hasil Cetak Presensi
+  const semesterDisplay = useMemo(() => {
+    const semVal = semester || ctxSchoolProfile?.semester || externalReportData?.semester || 'Ganjil';
+    const clean = String(semVal).trim();
+    if (clean.toLowerCase().startsWith('semester')) return clean;
+    return `Semester ${clean}`;
+  }, [semester, ctxSchoolProfile?.semester, externalReportData?.semester]);
+
+  const classNameDisplay = useMemo(() => {
+    if (isKepsekReport) {
+      const rombelCount = ctxClasses?.length || externalReportData?.classesCount || 0;
+      return `Semua Rombel (${rombelCount > 0 ? `${rombelCount} Kelas` : 'Paralel 1-6'})`;
+    }
+    return `${activeClassName}${activeFase ? ` (${activeFase})` : ''}`;
+  }, [isKepsekReport, ctxClasses?.length, externalReportData?.classesCount, activeClassName, activeFase]);
+
+  const displayEffectiveDays = useMemo(() => {
+    if (reportType === 'Laporan Semester' || isKepsekSemester) {
+      return `${semesterTotalEffectiveDays} Hari`;
+    }
+    if (reportType === 'Laporan Mingguan') {
+      return `${weekWorkingDays.length} Hari`;
+    }
+    return `${effectiveDays} Hari`;
+  }, [reportType, isKepsekSemester, semesterTotalEffectiveDays, weekWorkingDays.length, effectiveDays]);
+
+  const displayPeriodText = useMemo(() => {
+    if (reportType === 'Laporan Harian') {
+      return formatReportDateIndo(selectedDate);
+    }
+    if (reportType === 'Laporan Mingguan') {
+      return `${selectedWeek} (${month} ${year})`;
+    }
+    if (reportType === 'Laporan Bulanan') {
+      return `${month} ${year}`;
+    }
+    if (isKepsekReport) {
+      return isKepsekSemester ? `Semester ${semester} (${academicYear})` : `${month} ${year}`;
+    }
+    return `${month} ${year}`;
+  }, [reportType, isKepsekReport, isKepsekSemester, selectedDate, selectedWeek, month, year, semester, academicYear]);
+
+  // Update document.title so when user prints or saves as PDF, the PDF filename matches the active class
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    const originalTitle = document.title;
+    const cleanCls = isKepsekReport ? 'Supervisi_Kepala_Sekolah' : (activeClassClean || 'Kelas');
+    const cleanPeriod = (displayPeriodText || 'Laporan').replace(/[^a-zA-Z0-9_-]/g, '_');
+    document.title = `Laporan_Presensi_${cleanCls}_${cleanPeriod}`;
+    return () => {
+      document.title = originalTitle;
+    };
+  }, [activeClassClean, isKepsekReport, displayPeriodText]);
 
   return (
     <div className="min-h-screen bg-slate-200/70 text-slate-900 antialiased print:bg-white print:p-0 font-sans">
@@ -974,11 +1124,15 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
             <button
               type="button"
               onClick={handleShare}
-              className="p-2 sm:px-3 sm:py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
+              className={`p-2 sm:px-3 sm:py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                copiedLink
+                  ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                  : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+              }`}
               title="Bagikan Tautan Smart Link Dokumen"
             >
-              <Share2 size={15} />
-              <span className="hidden sm:inline">Bagikan</span>
+              {copiedLink ? <CheckCircle2 size={15} className="text-emerald-600" /> : <Share2 size={15} />}
+              <span className="hidden sm:inline">{copiedLink ? 'Tersalin!' : 'Bagikan'}</span>
             </button>
 
             {/* Tombol biru Cetak / Unduh dengan teks persis "Cetak / Unduh" */}
@@ -1088,54 +1242,38 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-4 text-xs font-sans mb-4 border border-slate-200 p-3 rounded-lg bg-slate-50/50">
             <div>
               <p>
-                <span className="font-semibold text-slate-600">Satuan Pendidikan:</span> {schoolName}
+                <span className="font-semibold text-slate-600">Nama Sekolah:</span> {schoolName}
               </p>
-              {isKepsekReport ? (
-                <>
-                  <p><span className="font-semibold text-slate-600">NPSN:</span> {npsn}</p>
-                  <p><span className="font-semibold text-slate-600">Kepala Sekolah:</span> {principalName}</p>
-                </>
-              ) : (
-                <>
-                  <p><span className="font-semibold text-slate-600">Kelas / Fase:</span> {activeClassName} / {activeFase}</p>
-                  {attendanceType === 'SUBJECT' || userScope.isGuruMapel ? (
-                    <>
-                      <p>
-                        <span className="font-semibold text-slate-600">Mata Pelajaran:</span>{' '}
-                        <strong className="text-blue-900">{resolvedSubject?.name || currentUser?.subjectName || 'Mata Pelajaran'}</strong>
-                      </p>
-                      <p>
-                        <span className="font-semibold text-slate-600">Guru Mapel:</span>{' '}
-                        <strong>{teacherName}</strong>
-                      </p>
-                    </>
-                  ) : (
-                    <p><span className="font-semibold text-slate-600">Wali Kelas:</span> <strong>{teacherName}</strong></p>
-                  )}
-                </>
-              )}
+              <p>
+                <span className="font-semibold text-slate-600">Tahun Ajaran:</span> {academicYear}
+              </p>
+              <p>
+                <span className="font-semibold text-slate-600">Semester:</span> {semesterDisplay}
+              </p>
             </div>
             <div>
               <p>
-                <span className="font-semibold text-slate-600">
-                  {reportType === 'Laporan Harian' ? 'Tanggal Presensi:' : 'Periode Presensi:'}
-                </span>{' '}
-                {reportType === 'Laporan Harian' && formatReportDateIndo(selectedDate)}
-                {reportType === 'Laporan Mingguan' && `${selectedWeek} (${month} ${year})`}
-                {reportType === 'Laporan Bulanan' && `${month} ${year}`}
-                {reportType === 'Laporan Semester' && `Semester ${semester} (${academicYear})`}
-                {isKepsekReport && (isKepsekSemester ? `Semester ${semester} (${academicYear})` : `${month} ${year}`)}
+                <span className="font-semibold text-slate-600">Kelas:</span> {classNameDisplay}
               </p>
               <p>
-                <span className="font-semibold text-slate-600">
-                  {isKepsekReport ? 'Total Rombel:' : 'Total Siswa:'}
-                </span>{' '}
-                {isKepsekReport ? `${ctxClasses.length} Rombel` : `${targetStudents.length || externalReportData?.students?.length || 0} Siswa`}
+                <span className="font-semibold text-slate-600">Hari Efektif:</span> {displayEffectiveDays}
               </p>
               <p>
-                <span className="font-semibold text-slate-600">Tahun Pelajaran:</span> {academicYear}
+                <span className="font-semibold text-slate-600">Periode Presensi:</span> {displayPeriodText}
               </p>
             </div>
+            {(attendanceType === 'SUBJECT' || userScope.isGuruMapel || subjectId) && (
+              <div className="col-span-1 sm:col-span-2 pt-2 border-t border-slate-200 flex flex-wrap items-center gap-4 text-xs font-sans">
+                <p>
+                  <span className="font-semibold text-slate-600">Mata Pelajaran:</span>{' '}
+                  <strong className="text-blue-900">{resolvedSubject?.name || currentUser?.subjectName || externalReportData?.subjectName || 'Mata Pelajaran'}</strong>
+                </p>
+                <p>
+                  <span className="font-semibold text-slate-600">Guru Pengajar:</span>{' '}
+                  <strong>{teacherName}</strong>
+                </p>
+              </div>
+            )}
           </div>
 
           {/* 4. TABEL PRESENSI (KOLOM TIDAK DIUBAH SAMA SEKALI - TETAP & DIPERTAHANKAN) */}

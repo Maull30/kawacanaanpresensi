@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { PublicDailyReportViewer } from '../components/PublicDailyReportViewer';
 import { getFaseByClassName, formatClassDisplay } from '../utils/faseKurikulum';
+import { normalizeClassToken } from '../utils/documentParser';
 
 export const RekapitulasiView: React.FC = () => {
   const {
@@ -175,24 +176,33 @@ export const RekapitulasiView: React.FC = () => {
     '12': 'Desember',
   };
 
-  // Filtered Students and Attendance Records
+  // Filtered Students and Attendance Records strictly for selected/active class
   const targetStudents = useMemo(() => {
-    if (!selectedClassId) return students;
-    return students.filter((s) => s.classId === selectedClassId);
-  }, [students, selectedClassId]);
+    const targetClass = selectedClassObj || classes.find((c) => c.id === selectedClassId);
+    if (!targetClass) return [];
+    return students
+      .filter((s) => {
+        if (s.classId && s.classId === targetClass.id) return true;
+        if (s.className && normalizeClassToken(s.className) === normalizeClassToken(targetClass.name)) return true;
+        return false;
+      })
+      .sort((a, b) => a.nama.localeCompare(b.nama, 'id'));
+  }, [students, selectedClassId, selectedClassObj, classes]);
 
   const targetRecords = useMemo(() => {
+    const studentIds = new Set(targetStudents.map((s) => s.id));
+    if (studentIds.size === 0) return [];
     return attendanceRecords.filter((r) => {
+      if (!studentIds.has(r.studentId)) return false;
       if (attendanceType === 'SUBJECT') {
         if (r.type !== 'SUBJECT') return false;
         if (selectedSubjectId && r.subjectId !== selectedSubjectId) return false;
       } else {
         if (r.type === 'SUBJECT') return false;
       }
-      if (selectedClassId && r.classId && r.classId !== selectedClassId) return false;
       return true;
     });
-  }, [attendanceRecords, attendanceType, selectedSubjectId, selectedClassId]);
+  }, [attendanceRecords, attendanceType, selectedSubjectId, targetStudents]);
 
   // ==========================================
   // 1. REKAP BULANAN CALCULATION

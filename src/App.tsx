@@ -351,6 +351,41 @@ const MainAppContent: React.FC = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  const isSetupPage = new URLSearchParams(window.location.search).get('page') === 'setup';
+
+  if (isSetupPage && !currentUser) return <SetupSuperAdminView />;
+
+  if (passwordRecovery) {
+    return <ResetPasswordView />;
+  }
+
+  // 1. Jika user sedang dalam proses Onboarding (mis. registrasi akun pertama via Google / Baru)
+  if (isOnboarding) {
+    return (
+      <div className="min-h-screen bg-[#F8FAFC]">
+        <OnboardingView onCompleted={(userId) => void loadUserDataAfterOnboarding(userId)} />
+        <ToastContainer />
+      </div>
+    );
+  }
+
+  // 2. Jika sedang dalam proses login awal (kredensial / Google OAuth) dan profil belum ter-hydrate,
+  // tampilkan LoginView dengan overlay loading screen di tengah sehingga background halaman login tetap terlihat dengan blur ringan.
+  // BUKAN saat reload dashboard biasa.
+  if ((isLoginPreparing || isAuthCallbackUrl()) && !currentUser) {
+    return (
+      <>
+        <LoginView onBackToLanding={handleBackToLanding} onEnterDashboard={handleEnterDashboard} />
+        <ToastContainer />
+      </>
+    );
+  }
+
+  // 4. Jika sedang memeriksa sesi auth saat reload halaman tanpa data cache sesi
+  if (isAuthChecking && !currentUser && hasPersistedAuthToken()) {
+    return <AppAuthLoadingSkeleton />;
+  }
+
   // Public Report Viewer (Smart Link accessed by parents/teachers/supervisors)
   if (publicReportParams) {
     return (
@@ -395,42 +430,6 @@ const MainAppContent: React.FC = () => {
         }}
       />
     );
-  }
-
-
-  const isSetupPage = new URLSearchParams(window.location.search).get('page') === 'setup';
-
-  if (isSetupPage && !currentUser) return <SetupSuperAdminView />;
-
-  if (passwordRecovery) {
-    return <ResetPasswordView />;
-  }
-
-  // 1. Jika user sedang dalam proses Onboarding (mis. registrasi akun pertama via Google / Baru)
-  if (isOnboarding) {
-    return (
-      <div className="min-h-screen bg-[#F8FAFC]">
-        <OnboardingView onCompleted={(userId) => void loadUserDataAfterOnboarding(userId)} />
-        <ToastContainer />
-      </div>
-    );
-  }
-
-  // 2. Jika sedang dalam proses login awal (kredensial / Google OAuth) dan profil belum ter-hydrate,
-  // tampilkan LoginView dengan overlay loading screen di tengah sehingga background halaman login tetap terlihat dengan blur ringan.
-  // BUKAN saat reload dashboard biasa.
-  if ((isLoginPreparing || isAuthCallbackUrl()) && !currentUser) {
-    return (
-      <>
-        <LoginView onBackToLanding={handleBackToLanding} onEnterDashboard={handleEnterDashboard} />
-        <ToastContainer />
-      </>
-    );
-  }
-
-  // 4. Jika sedang memeriksa sesi auth saat reload halaman tanpa data cache sesi
-  if (isAuthChecking && !currentUser && hasPersistedAuthToken()) {
-    return <AppAuthLoadingSkeleton />;
   }
 
   // Smart Link PDF Invoice Viewer (Bisa diakses langsung oleh sekolah, guru, atau auditor via link)

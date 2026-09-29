@@ -74,27 +74,32 @@ export function buildCanonicalReportUrl(params: CanonicalReportParams): string {
   // Flag wajib dokumen presensi
   searchParams.set('report', 'attendance');
 
-  if (params.classId) {
-    searchParams.set('r', params.classId);
+  const cleanClassId = String(params.classId || '').trim();
+  if (cleanClassId && cleanClassId !== 'null' && cleanClassId !== 'undefined') {
+    searchParams.set('r', cleanClassId);
   }
-  if (params.className) {
-    searchParams.set('cn', params.className);
+
+  const cleanClassName = String(params.className || '').trim();
+  if (cleanClassName && cleanClassName !== 'null' && cleanClassName !== 'undefined') {
+    searchParams.set('cn', cleanClassName);
   }
-  if (params.schoolId) {
-    searchParams.set('sid', params.schoolId);
+
+  const cleanSchoolId = String(params.schoolId || '').trim();
+  if (cleanSchoolId && cleanSchoolId !== 'null' && cleanSchoolId !== 'undefined') {
+    searchParams.set('sid', cleanSchoolId);
   }
 
   const effectiveDate = params.date || new Date().toISOString().split('T')[0];
   searchParams.set('d', effectiveDate);
 
   const periodCode = reportTypeToPeriodCode(params.reportType);
-  if (periodCode !== 'daily') {
+  if (periodCode && periodCode !== 'daily') {
     searchParams.set('p', periodCode);
   }
 
   if (params.attendanceType === 'SUBJECT') {
     searchParams.set('m', 'subject');
-    if (params.subjectId) {
+    if (params.subjectId && params.subjectId !== 'null') {
       searchParams.set('s', params.subjectId);
     }
   }
@@ -124,11 +129,15 @@ export function buildCanonicalReportUrl(params: CanonicalReportParams): string {
  */
 export function parseCanonicalReportParams(searchParams: URLSearchParams): CanonicalReportParams | null {
   const isExplicitReport = searchParams.get('report') === 'attendance' || searchParams.get('report') === 'true';
-  const classId = searchParams.get('r') || searchParams.get('class') || searchParams.get('classId') || '';
+  const rawClassId = searchParams.get('r') || searchParams.get('class') || searchParams.get('classId') || '';
+  const classId = (rawClassId === 'null' || rawClassId === 'undefined') ? '' : rawClassId;
   const dateParam = searchParams.get('d') || searchParams.get('date') || '';
   const periodParam = searchParams.get('p') || searchParams.get('period') || '';
   const isSubjectMode = searchParams.get('m') === 'subject' || searchParams.get('type') === 'subject';
-  const subjectId = searchParams.get('s') || searchParams.get('subjectId') || null;
+  const rawSubjectId = searchParams.get('s') || searchParams.get('subjectId') || null;
+  const subjectId = (rawSubjectId === 'null' || rawSubjectId === 'undefined') ? null : rawSubjectId;
+  const rawSchoolId = searchParams.get('sid') || searchParams.get('schoolId') || searchParams.get('school_id') || null;
+  const schoolId = (rawSchoolId === 'null' || rawSchoolId === 'undefined') ? null : rawSchoolId;
 
   // Deteksi apakah link ini merupakan Smart Link Dokumen Presensi
   const isReportLink = Boolean(
@@ -143,11 +152,13 @@ export function parseCanonicalReportParams(searchParams: URLSearchParams): Canon
   const resolvedReportType = periodCodeToReportType(periodParam);
   const now = new Date();
   const defaultYear = String(now.getFullYear());
+  const rawClassName = searchParams.get('cn') || searchParams.get('className') || '';
+  const className = (rawClassName === 'null' || rawClassName === 'undefined') ? '' : rawClassName;
 
   return {
     classId: classId || '',
-    className: searchParams.get('cn') || searchParams.get('className') || '',
-    schoolId: searchParams.get('sid') || searchParams.get('schoolId') || searchParams.get('school_id') || null,
+    className,
+    schoolId,
     date: dateParam || now.toISOString().split('T')[0],
     attendanceType: isSubjectMode ? 'SUBJECT' : 'DAILY',
     subjectId,
@@ -161,19 +172,35 @@ export function parseCanonicalReportParams(searchParams: URLSearchParams): Canon
 }
 
 /**
- * Ekspor dokumen presensi resmi ke format PDF A4 beresolusi tinggi dengan penomoran halaman otomatis.
+ * Ekspor dokumen presensi resmi langsung ke berkas PDF A4 beresolusi tinggi.
+ * Selalu mengunduh file secara langsung ke folder unduhan pengguna tanpa membuka dialog cetak browser.
  */
-export async function exportReportToPdf(element: HTMLElement, filename = 'Laporan_Presensi.pdf'): Promise<void> {
+export async function exportReportToPdf(element: HTMLElement, filename = 'Laporan_Presensi.pdf'): Promise<boolean> {
+  const safeFilename = filename.endsWith('.pdf') ? filename : `${filename}.pdf`;
+
+  const triggerDownload = (blob: Blob, name: string) => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+  };
+
   try {
     const canvas = await html2canvas(element, {
       scale: 2,
       useCORS: true,
+      allowTaint: false,
       logging: false,
       backgroundColor: '#ffffff',
       windowWidth: 850,
+      imageTimeout: 8000,
     });
 
-    const imgData = canvas.toDataURL('image/png');
+    const imgData = canvas.toDataURL('image/jpeg', 0.95);
     const pdf = new jsPDF({
       orientation: 'portrait',
       unit: 'mm',
@@ -191,22 +218,87 @@ export async function exportReportToPdf(element: HTMLElement, filename = 'Lapora
     let position = 0;
 
     // Halaman 1
-    pdf.addImage(imgData, 'PNG', 0, position, renderWidth, renderHeight);
+    pdf.addImage(imgData, 'JPEG', 0, position, renderWidth, renderHeight);
     heightLeft -= pdfHeight;
 
     // Halaman selanjutnya jika dokumen panjang
     while (heightLeft > 0) {
       position -= pdfHeight;
       pdf.addPage();
-      pdf.addImage(imgData, 'PNG', 0, position, renderWidth, renderHeight);
+      pdf.addImage(imgData, 'JPEG', 0, position, renderWidth, renderHeight);
       heightLeft -= pdfHeight;
     }
 
-    const safeFilename = filename.endsWith('.pdf') ? filename : `${filename}.pdf`;
-    pdf.save(safeFilename);
+    try {
+      pdf.save(safeFilename);
+    } catch (_) {
+      const blob = pdf.output('blob');
+      triggerDownload(blob, safeFilename);
+    }
+    return true;
   } catch (err) {
-    console.error('[Export Report PDF Error]', err);
-    // Fallback ke browser native print jika canvas error
-    window.print();
+    console.error('[Export Report PDF Error - Using Clean Fallback]', err);
+    try {
+      // Fallback tanpa gambar external jika terjadi CORS taint
+      const cleanClone = element.cloneNode(true) as HTMLElement;
+      cleanClone.querySelectorAll('img').forEach((img) => img.remove());
+      cleanClone.style.position = 'fixed';
+      cleanClone.style.left = '-9999px';
+      cleanClone.style.top = '0';
+      cleanClone.style.width = '850px';
+      cleanClone.style.backgroundColor = '#ffffff';
+      document.body.appendChild(cleanClone);
+      try {
+        const fallbackCanvas = await html2canvas(cleanClone, {
+          scale: 2,
+          logging: false,
+          backgroundColor: '#ffffff',
+          windowWidth: 850,
+        });
+        const imgData = fallbackCanvas.toDataURL('image/jpeg', 0.95);
+        const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+        const pdfWidth = pdf.internal.pageSize.getWidth();
+        const pdfHeight = pdf.internal.pageSize.getHeight();
+        const imgProps = pdf.getImageProperties(imgData);
+        const renderWidth = pdfWidth;
+        const renderHeight = (imgProps.height * pdfWidth) / imgProps.width;
+        let heightLeft = renderHeight;
+        let position = 0;
+        pdf.addImage(imgData, 'JPEG', 0, position, renderWidth, renderHeight);
+        heightLeft -= pdfHeight;
+        while (heightLeft > 0) {
+          position -= pdfHeight;
+          pdf.addPage();
+          pdf.addImage(imgData, 'JPEG', 0, position, renderWidth, renderHeight);
+          heightLeft -= pdfHeight;
+        }
+        try {
+          pdf.save(safeFilename);
+        } catch (_) {
+          const blob = pdf.output('blob');
+          triggerDownload(blob, safeFilename);
+        }
+        return true;
+      } finally {
+        document.body.removeChild(cleanClone);
+      }
+    } catch (cleanErr) {
+      console.error('[Clean Clone PDF Error - Using Direct Text PDF]', cleanErr);
+      // Fallback pasti terunduh sebagai berkas PDF
+      try {
+        const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+        const text = element.innerText || 'Laporan Rekapitulasi Presensi';
+        const lines = pdf.splitTextToSize(text, 180);
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(9);
+        pdf.text(lines.slice(0, 70), 15, 20);
+        const blob = pdf.output('blob');
+        triggerDownload(blob, safeFilename);
+        return true;
+      } catch (lastErr) {
+        console.error('[Direct PDF Fallback Failed]', lastErr);
+        return false;
+      }
+    }
   }
 }

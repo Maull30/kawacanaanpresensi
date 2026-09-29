@@ -490,6 +490,21 @@ export default async function handler(req: any, res: any) {
       const year = String(body.year || body.y || new Date().getFullYear()).trim();
       const semester = String(body.semester || body.sem || 'Ganjil').trim();
 
+      const monthNumberMap: Record<string, number> = {
+        Januari: 1,
+        Februari: 2,
+        Maret: 3,
+        April: 4,
+        Mei: 5,
+        Juni: 6,
+        Juli: 7,
+        Agustus: 8,
+        September: 9,
+        Oktober: 10,
+        November: 11,
+        Desember: 12,
+      };
+
       // 1. Cari kelas secara aman dengan isolasi tenant sekolah (Aman dari cross-tenant leak)
       let targetClass: any = null;
       const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(classIdOrName);
@@ -510,11 +525,10 @@ export default async function handler(req: any, res: any) {
       // 1.b. Pencarian berdasarkan nama kelas atau explicitClassName (terkunci per sekolah jika schoolId ada)
       if (!targetClass) {
         const candidateNames = [explicitClassName, classIdOrName].filter(
-          (n) => n && n !== 'default' && n !== 'all'
+          (n) => n && n !== 'default' && n !== 'all' && n !== 'null' && n !== 'undefined'
         );
 
         for (const rawName of candidateNames) {
-          // Bersihkan prefix seperti "cls-", "class-", "kelas "
           const cleanName = rawName.replace(/^cls[-_]?/i, '').replace(/^kelas\s*/i, '').trim();
 
           let foundQuery = db
@@ -534,7 +548,18 @@ export default async function handler(req: any, res: any) {
         }
       }
 
-      // Validasi ketat: Jika kelas tidak ditemukan, kembalikan 404 (TIDAK ADA fallback antar sekolah!)
+      // 1.c. Jika masih belum ditemukan namun scopedSchoolId ada (misal pada laporan supervisi kepala sekolah atau kelas default)
+      if (!targetClass && scopedSchoolId) {
+        const { data: fallbackClasses } = await db
+          .from('classes')
+          .select('id, name, grade, academic_year, school_id, wali_kelas_teacher_id')
+          .eq('school_id', scopedSchoolId)
+          .order('grade', { ascending: true })
+          .limit(1);
+        targetClass = fallbackClasses?.[0] || null;
+      }
+
+      // Validasi ketat: Jika kelas tidak ditemukan, kembalikan 404
       if (!targetClass) {
         return json(res, 404, {
           ok: false,
@@ -542,23 +567,68 @@ export default async function handler(req: any, res: any) {
         });
       }
 
-      const schoolId = targetClass.school_id;
+      const schoolId = targetClass.school_id || scopedSchoolId;
 
-      // 2. Ambil profil sekolah dan konfigurasi sistem
-      const [{ data: sp }, { data: sc }, { data: teachersList }] = await Promise.all([
+      // 2. Ambil profil sekolah, konfigurasi sistem, data sekolah master, dan guru
+      const [{ data: sp }, { data: sc }, { data: teachersList }, { data: schoolRow }] = await Promise.all([
         db.from('school_profile').select('*').eq('school_id', schoolId).maybeSingle(),
         db.from('system_config').select('*').eq('school_id', schoolId).maybeSingle(),
         db.from('teachers').select('id, nama, nip, tugas_utama').eq('school_id', schoolId),
+        db.from('schools').select('*').eq('id', schoolId).maybeSingle(),
       ]);
 
-      // 3. Ambil daftar siswa kelas tersebut
-      const { data: studentRows } = await db
-        .from('students')
-        .select('id, nisn, nama, gender')
-        .eq('class_id', targetClass.id)
-        .order('nama', { ascending: true });
+      // Ekstraksi data alamat & profil dari format JSON terstruktur (__EXTJSON__:)
+      let extJson: any = {};
+      const rawAlamat = sp?.alamat || '';
+      if (rawAlamat.startsWith('__EXTJSON__:') || rawAlamat.startsWith('{')) {
+        try {
+          const jsonText = rawAlamat.startsWith('__EXTJSON__:') ? rawAlamat.slice(12) : rawAlamat;
+          extJson = JSON.parse(jsonText);
+        } catch (_) {}
+      }
 
-      const students = studentRows || [];
+      const cleanAlamat = extJson.full || (rawAlamat.startsWith('__EXTJSON__:') || rawAlamat.startsWith('{') ? '' : rawAlamat) || [extJson.jalan, extJson.desaKelurahan, extJson.kecamatan, extJson.kabupatenKota, extJson.provinsi].filter(Boolean).join(', ') || '';
+
+      const schoolName = sp?.nama_sekolah || extJson.namaSekolah || schoolRow?.name || 'SD NEGERI';
+      const npsn = sp?.npsn || extJson.npsn || schoolRow?.npsn || '';
+
+      // Tentukan Pemerintah Daerah secara akurat berdasarkan data profil sekolah (bukan hardcoded Jakarta)
+      let resolvedPemda = sc?.pemerintah_daerah || '';
+      if (!resolvedPemda) {
+        const rawKab = extJson.kabupatenKota || sp?.kabupaten_kota || '';
+        const rawProv = extJson.provinsi || sp?.provinsi || '';
+        if (rawKab) {
+          const upperKab = rawKab.trim().toUpperCase();
+          resolvedPemda = (upperKab.startsWith('KOTA') || upperKab.startsWith('KABUPATEN'))
+            ? `PEMERINTAH ${upperKab}`
+            : `PEMERINTAH KABUPATEN/KOTA ${upperKab}`;
+        } else if (rawProv) {
+          resolvedPemda = `PEMERINTAH PROVINSI ${rawProv.trim().toUpperCase()}`;
+        }
+      }
+      const dinasPendidikan = sc?.dinas_pendidikan || 'DINAS PENDIDIKAN';
+
+      // 3. Ambil daftar siswa kelas tersebut (atau seluruh siswa jika laporan kepala sekolah)
+      const isKepsek = period.includes('kepsek');
+      let students: any[] = [];
+
+      if (isKepsek) {
+        const { data: allStus } = await db
+          .from('students')
+          .select('id, nisn, nama, gender, class_id')
+          .eq('school_id', schoolId)
+          .order('nama', { ascending: true });
+        students = allStus || [];
+      } else {
+        const { data: studentRows } = await db
+          .from('students')
+          .select('id, nisn, nama, gender, class_id')
+          .or(`class_id.eq.${targetClass.id},class_name.ilike.%${targetClass.name}%`)
+          .eq('school_id', schoolId)
+          .order('nama', { ascending: true });
+        students = studentRows || [];
+      }
+
       const studentIds = students.map((s: any) => s.id);
 
       // 4. Ambil catatan absensi sesuai cakupan periode laporan (Harian, Mingguan, Bulanan, Semester)
@@ -569,26 +639,11 @@ export default async function handler(req: any, res: any) {
           .select('id, student_id, teacher_id, status, check_in_time, check_out_time, notes, type, subject_id, date')
           .in('student_id', studentIds);
 
-        const monthNumberMap: Record<string, number> = {
-          Januari: 1,
-          Februari: 2,
-          Maret: 3,
-          April: 4,
-          Mei: 5,
-          Juni: 6,
-          Juli: 7,
-          Agustus: 8,
-          September: 9,
-          Oktober: 10,
-          November: 11,
-          Desember: 12,
-        };
-
-        if (period.includes('bulanan') || period === 'monthly') {
+        if (period.includes('bulanan') || period === 'monthly' || period === 'kepsek' || period === 'kepsek_monthly') {
           const mNum = monthNumberMap[month] || 7;
           const monthPrefix = `${year}-${String(mNum).padStart(2, '0')}`;
           attQuery = attQuery.gte('date', `${monthPrefix}-01`).lte('date', `${monthPrefix}-31`);
-        } else if (period.includes('semester')) {
+        } else if (period.includes('semester') || period === 'kepsek_semester') {
           if (semester === 'Genap') {
             attQuery = attQuery.gte('date', `${year}-01-01`).lte('date', `${year}-06-30`);
           } else {
@@ -598,9 +653,9 @@ export default async function handler(req: any, res: any) {
           try {
             const refD = new Date(reportDate);
             const minD = new Date(refD);
-            minD.setDate(refD.getDate() - 7);
+            minD.setDate(refD.getDate() - 14);
             const maxD = new Date(refD);
-            maxD.setDate(refD.getDate() + 7);
+            maxD.setDate(refD.getDate() + 14);
             attQuery = attQuery.gte('date', minD.toISOString().slice(0, 10)).lte('date', maxD.toISOString().slice(0, 10));
           } catch (_) {
             attQuery = attQuery.eq('date', reportDate);
@@ -616,7 +671,8 @@ export default async function handler(req: any, res: any) {
             attQuery = attQuery.eq('subject_id', subjectId);
           }
         } else {
-          attQuery = attQuery.or('type.eq.DAILY,type.is.null');
+          // Seluruh absensi harian umum
+          attQuery = attQuery.neq('type', 'SUBJECT');
         }
 
         const { data: recordsData, error: recordsErr } = await attQuery;
@@ -663,14 +719,15 @@ export default async function handler(req: any, res: any) {
           teacherName = wk.nama;
           teacherNip = wk.nip || '';
         }
-      } else if (sp?.nama_wali_kelas) {
-        const wk = (teachersList || []).find((t: any) => t.nama && t.nama.trim().toLowerCase() === sp.nama_wali_kelas.trim().toLowerCase());
+      } else if (sp?.nama_wali_kelas || extJson.namaWaliKelas) {
+        const candidateWali = sp?.nama_wali_kelas || extJson.namaWaliKelas;
+        const wk = (teachersList || []).find((t: any) => t.nama && t.nama.trim().toLowerCase() === candidateWali.trim().toLowerCase());
         if (wk) {
           teacherName = wk.nama;
           teacherNip = wk.nip || '';
         } else {
-          teacherName = sp.nama_wali_kelas;
-          teacherNip = sp.nip_wali_kelas || '';
+          teacherName = candidateWali;
+          teacherNip = sp?.nip_wali_kelas || extJson.nipWaliKelas || '';
         }
       }
 
@@ -685,19 +742,28 @@ export default async function handler(req: any, res: any) {
         }
       }
 
-      let principalName = sp?.nama_kepala_sekolah || 'Kepala Sekolah';
-      let principalNip = sp?.nip_kepala_sekolah || '';
+      let principalName = sp?.nama_kepala_sekolah || extJson.namaKepalaSekolah || 'Kepala Sekolah';
+      let principalNip = sp?.nip_kepala_sekolah || extJson.nipKepalaSekolah || '';
       if (!principalNip && principalName) {
         const pt = (teachersList || []).find((t: any) => t.nama && t.nama.trim().toLowerCase() === principalName.trim().toLowerCase());
         if (pt?.nip) {
           principalNip = pt.nip;
         }
       }
+      if (!principalNip) {
+        const ptByTugas = (teachersList || []).find((t: any) => t.tugas_utama && t.tugas_utama.toLowerCase().includes('kepala'));
+        if (ptByTugas) {
+          if (!principalName || principalName === 'Kepala Sekolah') principalName = ptByTugas.nama;
+          principalNip = ptByTugas.nip || '';
+        }
+      }
 
-      // Ringkasan kehadiran
+      // Ringkasan kehadiran harian
       const recordMap = new Map<string, any>();
       attRecords.forEach((r: any) => {
-        recordMap.set(r.student_id, r);
+        if (!recordMap.has(r.student_id) || r.date === reportDate) {
+          recordMap.set(r.student_id, r);
+        }
       });
 
       let hadir = 0;
@@ -725,7 +791,7 @@ export default async function handler(req: any, res: any) {
           no: idx + 1,
           nisn: s.nisn || '',
           nama: s.nama,
-          gender: s.gender || 'L',
+          gender: s.gender === 'P' || s.gender === 'Perempuan' ? 'P' : 'L',
           status,
           checkInTime: rec?.check_in_time || '',
           checkOutTime: rec?.check_out_time || '',
@@ -735,6 +801,82 @@ export default async function handler(req: any, res: any) {
 
       const totalStudents = students.length || 1;
       const persentase = Math.round((hadir / totalStudents) * 100);
+
+      // Data komparasi kelas untuk Laporan Kepala Sekolah (Supervisi)
+      let kepsekClassesData: any[] = [];
+      if (isKepsek) {
+        const { data: allCls } = await db
+          .from('classes')
+          .select('id, name, grade, academic_year, school_id, wali_kelas_teacher_id')
+          .eq('school_id', schoolId)
+          .order('grade', { ascending: true })
+          .order('name', { ascending: true });
+
+        const daysInMonth = new Date(Number(year) || 2026, monthNumberMap[month] || 7, 0).getDate();
+        let effDaysCount = 0;
+        for (let d = 1; d <= daysInMonth; d++) {
+          const dow = new Date(Number(year) || 2026, (monthNumberMap[month] || 7) - 1, d).getDay();
+          if (dow >= 1 && dow <= 5) effDaysCount++;
+        }
+        if (effDaysCount === 0) effDaysCount = 20;
+
+        kepsekClassesData = (allCls || []).map((cls: any) => {
+          const clsStudents = students.filter((s: any) => s.class_id === cls.id);
+          const clsStudentIds = new Set(clsStudents.map((s: any) => s.id));
+          const clsRecords = attRecords.filter((r: any) => clsStudentIds.has(r.student_id));
+
+          const maleCount = clsStudents.filter((s: any) => s.gender === 'L' || s.gender === 'Laki-laki').length;
+          const femaleCount = clsStudents.filter((s: any) => s.gender === 'P' || s.gender === 'Perempuan').length;
+          const totalClsStudents = clsStudents.length;
+
+          const clsHadir = clsRecords.filter((r: any) => r.status === 'Hadir' || r.status === 'Terlambat').length;
+          const clsSakit = clsRecords.filter((r: any) => r.status === 'Sakit').length;
+          const clsIzin = clsRecords.filter((r: any) => r.status === 'Izin').length;
+          const clsAlfa = clsRecords.filter((r: any) => r.status === 'Alfa').length;
+          const totalRecorded = clsHadir + clsSakit + clsIzin + clsAlfa;
+
+          const denom = (totalClsStudents * effDaysCount) || totalRecorded || 1;
+          const pctHadir = (clsHadir / denom) * 100;
+
+          let predicate = 'Sangat Baik';
+          if (pctHadir < 75) predicate = 'Perlu Pembinaan';
+          else if (pctHadir < 85) predicate = 'Cukup';
+          else if (pctHadir < 95) predicate = 'Baik';
+
+          let waliName = '-';
+          if (cls.wali_kelas_teacher_id) {
+            const tch = (teachersList || []).find((t: any) => t.id === cls.wali_kelas_teacher_id);
+            if (tch) waliName = tch.nama;
+          }
+
+          let clsFase = 'A';
+          const gNum = parseInt(String(cls.grade).replace(/[^0-9]/g, ''), 10) || 1;
+          if (gNum >= 1 && gNum <= 2) clsFase = 'A';
+          else if (gNum >= 3 && gNum <= 4) clsFase = 'B';
+          else if (gNum >= 5 && gNum <= 6) clsFase = 'C';
+          else if (gNum >= 7 && gNum <= 9) clsFase = 'D';
+          else if (gNum === 10) clsFase = 'E';
+          else if (gNum >= 11 && gNum <= 12) clsFase = 'F';
+
+          return {
+            classId: cls.id,
+            className: String(cls.name || '').replace(/^kelas\s*/i, ''),
+            grade: cls.grade,
+            fase: `Fase ${clsFase}`,
+            waliKelasName: waliName,
+            maleCount,
+            femaleCount,
+            totalStudents: totalClsStudents,
+            hadir: clsHadir,
+            sakit: clsSakit,
+            izin: clsIzin,
+            alfa: clsAlfa,
+            totalRecorded,
+            pctHadir: (pctHadir % 1 === 0 ? pctHadir.toFixed(0) : pctHadir.toFixed(1)),
+            predicate,
+          };
+        });
+      }
 
       let resolvedFase = 'A';
       const gradeNum = parseInt(String(targetClass.grade).replace(/[^0-9]/g, ''), 10);
@@ -748,11 +890,13 @@ export default async function handler(req: any, res: any) {
       return json(res, 200, {
         ok: true,
         report: {
-          schoolName: sp?.nama_sekolah || 'SD NEGERI CONTOH',
-          pemerintahDaerah: sc?.pemerintah_daerah || 'PEMERINTAH PROVINSI DAERAH KHUSUS IBUKOTA JAKARTA',
-          dinasPendidikan: sc?.dinas_pendidikan || 'DINAS PENDIDIKAN',
-          npsn: sp?.npsn || '',
-          alamat: sp?.alamat || '',
+          schoolId,
+          classId: targetClass.id,
+          schoolName,
+          pemerintahDaerah: resolvedPemda,
+          dinasPendidikan,
+          npsn,
+          alamat: cleanAlamat,
           logoUrl: sc?.school_logo_url || null,
           letterheadType: sc?.letterhead_type || 'standard_text',
           letterheadImageUrl: sc?.letterhead_image_url || null,
@@ -760,8 +904,8 @@ export default async function handler(req: any, res: any) {
           className: targetClass.name.toLowerCase().startsWith('kelas') ? targetClass.name : `Kelas ${targetClass.name}`,
           grade: targetClass.grade,
           fase: `Fase ${resolvedFase}`,
-          semester: sp?.semester || 'Ganjil',
-          tahunPelajaran: targetClass.academic_year || sp?.tahun_pelajaran || '2026/2027',
+          semester: sp?.semester || extJson.semester || 'Ganjil',
+          tahunPelajaran: targetClass.academic_year || sp?.tahun_pelajaran || extJson.tahunPelajaran || '2026/2027',
           date: reportDate,
           attendanceType: attType,
           subjectName,
@@ -781,6 +925,7 @@ export default async function handler(req: any, res: any) {
             persentase,
           },
           students: studentList,
+          classes: kepsekClassesData,
           records: attRecords.map((r: any) => ({
             id: r.id,
             studentId: r.student_id,
@@ -3132,6 +3277,8 @@ export default async function handler(req: any, res: any) {
         default_check_out_time: body.defaultCheckOutTime || body.default_check_out_time || '12:20',
         report_place: body.reportPlace !== undefined ? body.reportPlace : (body.report_place || ''),
         report_date: body.reportDate !== undefined ? body.reportDate : (body.report_date || ''),
+        pemerintah_daerah: body.pemerintahDaerah !== undefined ? body.pemerintahDaerah : (body.pemerintah_daerah || null),
+        dinas_pendidikan: body.dinasPendidikan !== undefined ? body.dinasPendidikan : (body.dinas_pendidikan || null),
         active_study_days: Array.isArray(body.activeStudyDays) ? body.activeStudyDays : (Array.isArray(body.active_study_days) ? body.active_study_days : [1, 2, 3, 4, 5]),
         student_self_attendance_enabled: body.studentSelfAttendanceEnabled !== undefined ? body.studentSelfAttendanceEnabled : (body.student_self_attendance_enabled !== undefined ? body.student_self_attendance_enabled : false),
         check_in_start_time: body.checkInStartTime || body.check_in_start_time || '06:00',

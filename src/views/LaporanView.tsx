@@ -32,6 +32,7 @@ export const LaporanView: React.FC = () => {
     subjects,
     teachers,
     currentUser,
+    activeWorkspace,
     requestFeatureAccess,
   } = useApp();
 
@@ -700,10 +701,12 @@ export const LaporanView: React.FC = () => {
 
   // Render Smart Link Document Viewer langsung menggantikan modal popup lama
   if (isPrintModalOpen) {
+    const activeSelectedClass = classes.find(c => c.id === (effectiveClassId || selectedClassId));
     return (
       <PublicDailyReportViewer
-        schoolId={schoolProfile.schoolId || currentUser?.schoolId || null}
+        schoolId={currentUser?.schoolId || (activeWorkspace as any)?.workspaceId || null}
         classId={viewScopeMode === 'KEPSEK' ? (classes[0]?.id || '') : (effectiveClassId || selectedClassId || '')}
+        className={viewScopeMode === 'KEPSEK' ? 'Semua Rombel' : (activeSelectedClass?.name || '')}
         date={selectedDate}
         attendanceType={viewScopeMode === 'KEPSEK' ? 'DAILY' : attendanceType}
         subjectId={viewScopeMode === 'KEPSEK' ? null : (attendanceType === 'SUBJECT' ? (effectiveSubjectId || selectedSubjectId || null) : null)}

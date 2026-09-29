@@ -414,8 +414,9 @@ export const RekapitulasiView: React.FC = () => {
   if (isPrintModalOpen) {
     return (
       <PublicDailyReportViewer
-        schoolId={schoolProfile.schoolId || currentUser?.schoolId || null}
+        schoolId={currentUser?.schoolId || (activeWorkspace as any)?.workspaceId || null}
         classId={selectedClassId || ''}
+        className={selectedClassObj?.name || ''}
         date={`${selectedYear}-${selectedMonth}-01`}
         attendanceType={attendanceType}
         subjectId={attendanceType === 'SUBJECT' ? (selectedSubjectId || null) : null}

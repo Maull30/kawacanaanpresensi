@@ -1,11 +1,25 @@
-import React, { useEffect, useState, useMemo } from 'react';
-import { Printer, Share2, CheckCircle2, ArrowLeft, FileText, Loader2, AlertCircle, Download } from 'lucide-react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
+import { Printer, Share2, CheckCircle2, ArrowLeft, FileText, Loader2, AlertCircle, Download, Smartphone } from 'lucide-react';
 import { SchoolLogo } from './SchoolLogo';
 import { useApp } from '../context/AppContext';
 import { getFaseByClassName } from '../utils/faseKurikulum';
 import { getUserRoleScope } from '../utils/userScope';
 import { normalizeClassToken } from '../utils/documentParser';
 import { buildCanonicalReportUrl, exportReportToPdf, CanonicalReportParams } from '../utils/smartReport';
+
+function cleanDisplayAddress(raw: string | undefined | null): string {
+  if (!raw) return '';
+  const str = String(raw).trim();
+  if (str.startsWith('__EXTJSON__:') || str.startsWith('{')) {
+    try {
+      const json = JSON.parse(str.startsWith('__EXTJSON__:') ? str.slice(12) : str);
+      return json.full || json.alamat || [json.jalan, json.desaKelurahan, json.kecamatan, json.kabupatenKota, json.provinsi].filter(Boolean).join(', ') || '';
+    } catch (_) {
+      return '';
+    }
+  }
+  return str;
+}
 
 const isPlaceholderText = (text: string | null | undefined): boolean => {
   if (!text) return true;
@@ -58,6 +72,7 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
 }) => {
   const {
     currentUser,
+    activeWorkspace,
     schoolProfile: ctxSchoolProfile,
     systemConfig: ctxSystemConfig,
     classes: ctxClasses,
@@ -71,6 +86,12 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
     () => getUserRoleScope(currentUser, ctxClasses, ctxSubjects, ctxTeachers),
     [currentUser, ctxClasses, ctxSubjects, ctxTeachers]
   );
+
+  // Mobile responsive scaling state
+  const reportRef = useRef<HTMLDivElement>(null);
+  const [windowWidth, setWindowWidth] = useState<number>(() => (typeof window !== 'undefined' ? window.innerWidth : 1024));
+  const [docHeight, setDocHeight] = useState<number>(1100);
+  const [isFitToScreen, setIsFitToScreen] = useState<boolean>(true);
 
   // Jika isPublicView diset true (dari tautan publik WhatsApp/browser), WAJIB mode publik mandiri tanpa bergantung pada memori sesi
   const isInternalUser = Boolean(!isPublicView && currentUser && ctxClasses && ctxClasses.length > 0);
@@ -88,6 +109,26 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
       setLoading(false);
     }
   }, [isInternalUser]);
+
+  useEffect(() => {
+    const handleResize = () => {
+      if (typeof window !== 'undefined') {
+        setWindowWidth(window.innerWidth);
+      }
+      if (reportRef.current) {
+        setDocHeight(reportRef.current.scrollHeight || reportRef.current.clientHeight || 1100);
+      }
+    };
+    if (typeof window !== 'undefined') {
+      window.addEventListener('resize', handleResize);
+      handleResize();
+      const t = setTimeout(handleResize, 300);
+      return () => {
+        window.removeEventListener('resize', handleResize);
+        clearTimeout(t);
+      };
+    }
+  }, [externalReportData, loading]);
 
   const selectedDate = propDate || new Date().toISOString().split('T')[0];
   const isKepsekReport = reportType.startsWith('Laporan Kepala Sekolah');
@@ -726,29 +767,40 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
 
   // Active School and Teacher Profile Data (Didefinisikan di awal sebelum early return agar konsisten)
   const schoolName = !isInternalUser
-    ? (externalReportData?.schoolName || ctxSchoolProfile?.namaSekolah || 'SATUAN PENDIDIKAN')
+    ? (externalReportData?.schoolName || 'SATUAN PENDIDIKAN')
     : (ctxSchoolProfile?.namaSekolah || externalReportData?.schoolName || 'SATUAN PENDIDIKAN');
 
   const pemerintahDaerah = !isInternalUser
-    ? (externalReportData?.pemerintahDaerah || ctxSystemConfig?.pemerintahDaerah || '')
+    ? (externalReportData?.pemerintahDaerah || '')
     : (ctxSystemConfig?.pemerintahDaerah || externalReportData?.pemerintahDaerah || '');
 
   const dinasPendidikan = !isInternalUser
-    ? (externalReportData?.dinasPendidikan || ctxSystemConfig?.dinasPendidikan || '')
-    : (ctxSystemConfig?.dinasPendidikan || externalReportData?.dinasPendidikan || '');
+    ? (externalReportData?.dinasPendidikan || 'DINAS PENDIDIKAN')
+    : (ctxSystemConfig?.dinasPendidikan || externalReportData?.dinasPendidikan || 'DINAS PENDIDIKAN');
 
   const npsn = !isInternalUser
-    ? (externalReportData?.npsn || ctxSchoolProfile?.npsn || '-')
+    ? (externalReportData?.npsn || '-')
     : (ctxSchoolProfile?.npsn || externalReportData?.npsn || '-');
 
-  const alamatSekolah = !isInternalUser
-    ? (externalReportData?.alamat || ctxSchoolProfile?.alamat || '')
-    : (ctxSchoolProfile?.alamat || externalReportData?.alamat || '');
+  const alamatSekolah = cleanDisplayAddress(!isInternalUser
+    ? (externalReportData?.alamat || '')
+    : (ctxSchoolProfile?.alamat || externalReportData?.alamat || ''));
 
-  const showLetterhead = ctxSystemConfig?.showLetterhead ?? externalReportData?.showLetterhead ?? true;
-  const letterheadType = ctxSystemConfig?.letterheadType || externalReportData?.letterheadType || 'standard_text';
-  const letterheadImageUrl = ctxSystemConfig?.letterheadImageUrl || externalReportData?.letterheadImageUrl || '';
-  const schoolLogoUrl = ctxSystemConfig?.schoolLogoUrl || externalReportData?.logoUrl || '';
+  const showLetterhead = !isInternalUser
+    ? (externalReportData?.showLetterhead ?? true)
+    : (ctxSystemConfig?.showLetterhead ?? externalReportData?.showLetterhead ?? true);
+
+  const letterheadType = !isInternalUser
+    ? (externalReportData?.letterheadType || 'standard_text')
+    : (ctxSystemConfig?.letterheadType || externalReportData?.letterheadType || 'standard_text');
+
+  const letterheadImageUrl = !isInternalUser
+    ? (externalReportData?.letterheadImageUrl || '')
+    : (ctxSystemConfig?.letterheadImageUrl || externalReportData?.letterheadImageUrl || '');
+
+  const schoolLogoUrl = !isInternalUser
+    ? (externalReportData?.logoUrl || '')
+    : (ctxSystemConfig?.schoolLogoUrl || externalReportData?.logoUrl || '');
 
   const rawClassName = !isInternalUser
     ? (externalReportData?.className || propClassName || 'Kelas')
@@ -758,11 +810,11 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
   const activeFase = resolvedClass ? getFaseByClassName(resolvedClass.name, resolvedClass.grade) : (externalReportData?.fase || 'Fase A');
 
   const principalName = !isInternalUser
-    ? (externalReportData?.principalName || ctxSchoolProfile?.namaKepalaSekolah || 'Kepala Sekolah')
+    ? (externalReportData?.principalName || 'Kepala Sekolah')
     : (ctxSchoolProfile?.namaKepalaSekolah || resolvedPrincipalTeacher?.nama || externalReportData?.principalName || 'Kepala Sekolah');
 
   const principalNip = !isInternalUser
-    ? (externalReportData?.principalNip || ctxSchoolProfile?.nipKepalaSekolah || '-')
+    ? (externalReportData?.principalNip || '-')
     : ((ctxSchoolProfile?.nipKepalaSekolah && ctxSchoolProfile.nipKepalaSekolah !== '-')
         ? ctxSchoolProfile.nipKepalaSekolah
         : (resolvedPrincipalTeacher?.nip || (currentUser?.role === 'KEPALA SEKOLAH' ? (currentUser.nip || (currentUser.username && /^\d{10,}$/.test(currentUser.username) ? currentUser.username : '')) : '') || externalReportData?.principalNip || '-'));
@@ -1026,7 +1078,7 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
   const canonicalParams: CanonicalReportParams = useMemo(() => ({
     classId: resolvedClass?.id || propClassId || externalReportData?.classId,
     className: resolvedClass?.name || propClassName || externalReportData?.className || activeClassName,
-    schoolId: propSchoolId || ctxSchoolProfile?.schoolId || externalReportData?.schoolId || currentUser?.schoolId || null,
+    schoolId: propSchoolId || currentUser?.schoolId || (activeWorkspace as any)?.workspaceId || externalReportData?.schoolId || null,
     date: selectedDate,
     attendanceType,
     subjectId,
@@ -1036,7 +1088,7 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
     year,
     semester,
     academicYear,
-  }), [resolvedClass, propClassId, propClassName, externalReportData, activeClassName, propSchoolId, ctxSchoolProfile, currentUser, selectedDate, attendanceType, subjectId, reportType, selectedWeek, month, year, semester, academicYear]);
+  }), [resolvedClass, propClassId, propClassName, externalReportData, activeClassName, propSchoolId, currentUser, activeWorkspace, selectedDate, attendanceType, subjectId, reportType, selectedWeek, month, year, semester, academicYear]);
 
   const canonicalShareUrl = useMemo(() => {
     return buildCanonicalReportUrl(canonicalParams);
@@ -1308,6 +1360,24 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
           </div>
 
           <div className="flex items-center gap-2">
+            {/* Tombol Ukuran Pas Layar HP vs 100% Zoom */}
+            {windowWidth < 768 && (
+              <button
+                type="button"
+                onClick={() => setIsFitToScreen((prev) => !prev)}
+                id="btn-toggle-fit-mobile-report"
+                className={`p-2 sm:px-2.5 sm:py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1 cursor-pointer border ${
+                  isFitToScreen
+                    ? 'bg-blue-50 text-blue-700 border-blue-200'
+                    : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200'
+                }`}
+                title={isFitToScreen ? 'Ubah ke Tampilan Zoom Detail (100%)' : 'Ubah ke Tampilan Pas Layar HP (1 Halaman Penuh)'}
+              >
+                <Smartphone size={15} />
+                <span className="hidden sm:inline">{isFitToScreen ? 'Pas Layar' : '100%'}</span>
+              </button>
+            )}
+
             {/* 1. Tombol Bagikan Smart Link */}
             <button
               type="button"
@@ -1353,11 +1423,27 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
       </header>
 
       {/* Main Printable Document Sheet (Exact Official A4 Layout) */}
-      <main className="max-w-4xl mx-auto p-3 sm:p-6 md:p-8 print:p-0 print:max-w-none">
+      <main className="w-full max-w-4xl mx-auto p-2 sm:p-6 md:p-8 print:p-0 print:max-w-none flex flex-col items-center">
         <div
-          id="printable-report"
-          className="bg-white rounded-xl shadow-xl border border-slate-300 p-5 sm:p-8 md:p-12 font-serif text-slate-900 leading-normal print:p-4 print:shadow-none print:border-none print:rounded-none"
+          style={windowWidth < 768 && isFitToScreen ? {
+            width: `${794 * Math.min(1, Math.max(0.35, (windowWidth - 20) / 794))}px`,
+            height: docHeight ? `${docHeight * Math.min(1, Math.max(0.35, (windowWidth - 20) / 794))}px` : 'auto',
+            overflow: 'hidden',
+          } : undefined}
+          className="transition-all duration-150 print:!w-full print:!h-auto print:!overflow-visible"
         >
+          <div
+            id="printable-report"
+            ref={reportRef}
+            style={windowWidth < 768 && isFitToScreen ? {
+              width: '794px',
+              minWidth: '794px',
+              maxWidth: '794px',
+              transform: `scale(${Math.min(1, Math.max(0.35, (windowWidth - 20) / 794))})`,
+              transformOrigin: 'top left',
+            } : undefined}
+            className="bg-white rounded-xl shadow-xl border border-slate-300 p-5 sm:p-8 md:p-12 font-serif text-slate-900 leading-normal print:p-4 print:shadow-none print:border-none print:rounded-none print:!transform-none print:!w-full print:!max-w-none"
+          >
           {/* 1. Formal Indonesian School Letterhead (Kop Surat) */}
           {showLetterhead && (
             <>
@@ -1868,7 +1954,8 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
             Dokumen Rekapitulasi Presensi Resmi • Diterbitkan oleh Sistem Kawacanaan Presensi
           </div>
         </div>
-      </main>
+      </div>
+    </main>
     </div>
   );
 };

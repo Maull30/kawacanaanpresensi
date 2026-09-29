@@ -173,7 +173,8 @@ export function parseCanonicalReportParams(searchParams: URLSearchParams): Canon
 
 /**
  * Ekspor dokumen presensi resmi langsung ke berkas PDF A4 beresolusi tinggi.
- * Selalu mengunduh file secara langsung ke folder unduhan pengguna tanpa membuka dialog cetak browser.
+ * Menghasilkan tata letak A4 resmi yang rapi, tajam, dan sama persis dengan tampilan aplikasi desktop
+ * meskipun tombol unduh ditekan dari ponsel/HP.
  */
 export async function exportReportToPdf(element: HTMLElement, filename = 'Laporan_Presensi.pdf'): Promise<boolean> {
   const safeFilename = filename.endsWith('.pdf') ? filename : `${filename}.pdf`;
@@ -189,44 +190,101 @@ export async function exportReportToPdf(element: HTMLElement, filename = 'Lapora
     setTimeout(() => URL.revokeObjectURL(url), 4000);
   };
 
+  // Buat wadah klon A4 standar (794px = 210mm @96dpi) di luar viewport
+  // Hal ini menjamin dokumen yang diunduh dari HP tidak gepeng/terpotong, melainkan rapi 100% seperti di PC
+  const sandbox = document.createElement('div');
+  sandbox.style.position = 'fixed';
+  sandbox.style.left = '-9999px';
+  sandbox.style.top = '0';
+  sandbox.style.width = '794px';
+  sandbox.style.minWidth = '794px';
+  sandbox.style.maxWidth = '794px';
+  sandbox.style.zIndex = '-99999';
+  sandbox.style.backgroundColor = '#ffffff';
+
+  const clone = element.cloneNode(true) as HTMLElement;
+  clone.id = 'report-pdf-clone';
+  clone.style.width = '794px';
+  clone.style.minWidth = '794px';
+  clone.style.maxWidth = '794px';
+  clone.style.transform = 'none';
+  clone.style.margin = '0';
+  clone.style.backgroundColor = '#ffffff';
+  clone.style.boxSizing = 'border-box';
+  clone.style.padding = '24px 32px';
+
+  // Bersihkan bayangan & border kartu web agar menjadi kertas cetak resmi
+  clone.classList.remove('shadow-xl', 'shadow-sm', 'shadow-xs', 'border', 'border-slate-300', 'rounded-xl');
+  clone.classList.add('p-8');
+
+  // Pastikan tabel memenuhi lebar halaman tanpa scrollbar
+  clone.querySelectorAll('.overflow-x-auto').forEach((el) => {
+    (el as HTMLElement).style.overflow = 'visible';
+    (el as HTMLElement).style.width = '100%';
+  });
+  clone.querySelectorAll('table').forEach((tbl) => {
+    (tbl as HTMLElement).style.width = '100%';
+    (tbl as HTMLElement).style.minWidth = '100%';
+  });
+
+  // Izinkan cross-origin untuk gambar logo / kop
+  clone.querySelectorAll('img').forEach((img) => {
+    img.crossOrigin = 'anonymous';
+  });
+
+  sandbox.appendChild(clone);
+  document.body.appendChild(sandbox);
+
   try {
-    const canvas = await html2canvas(element, {
+    // Beri waktu sejenak agar gambar dan font siap
+    await new Promise((resolve) => setTimeout(resolve, 150));
+
+    const canvas = await html2canvas(clone, {
       scale: 2,
       useCORS: true,
-      allowTaint: false,
+      allowTaint: true,
       logging: false,
       backgroundColor: '#ffffff',
-      windowWidth: 850,
-      imageTimeout: 8000,
+      width: 794,
+      windowWidth: 1024,
+      imageTimeout: 10000,
     });
 
-    const imgData = canvas.toDataURL('image/jpeg', 0.95);
+    const imgData = canvas.toDataURL('image/jpeg', 0.96);
     const pdf = new jsPDF({
       orientation: 'portrait',
       unit: 'mm',
       format: 'a4',
+      compress: true,
     });
 
-    const pdfWidth = pdf.internal.pageSize.getWidth();
-    const pdfHeight = pdf.internal.pageSize.getHeight();
+    const pdfPageWidth = 210;
+    const pdfPageHeight = 297;
+    const marginX = 8;
+    const marginY = 8;
+    const printableWidth = pdfPageWidth - (marginX * 2); // 194 mm
+    const printableHeight = pdfPageHeight - (marginY * 2); // 281 mm
 
-    const imgProps = pdf.getImageProperties(imgData);
-    const renderWidth = pdfWidth;
-    const renderHeight = (imgProps.height * pdfWidth) / imgProps.width;
+    const renderHeight = (canvas.height * printableWidth) / canvas.width;
 
-    let heightLeft = renderHeight;
-    let position = 0;
+    // Jika pas 1 halaman atau hanya lebih sedikit (<= 300mm), sesuaikan rasio agar menjadi 1 halaman penuh
+    if (renderHeight <= printableHeight + 15) {
+      const finalHeight = Math.min(renderHeight, printableHeight);
+      pdf.addImage(imgData, 'JPEG', marginX, marginY, printableWidth, finalHeight);
+    } else {
+      // Pembagian halaman multi-halaman rapi
+      let heightLeft = renderHeight;
+      let positionY = marginY;
 
-    // Halaman 1
-    pdf.addImage(imgData, 'JPEG', 0, position, renderWidth, renderHeight);
-    heightLeft -= pdfHeight;
+      pdf.addImage(imgData, 'JPEG', marginX, positionY, printableWidth, renderHeight);
+      heightLeft -= printableHeight;
 
-    // Halaman selanjutnya jika dokumen panjang
-    while (heightLeft > 0) {
-      position -= pdfHeight;
-      pdf.addPage();
-      pdf.addImage(imgData, 'JPEG', 0, position, renderWidth, renderHeight);
-      heightLeft -= pdfHeight;
+      while (heightLeft > 0) {
+        positionY -= printableHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, 'JPEG', marginX, positionY, printableWidth, renderHeight);
+        heightLeft -= printableHeight;
+      }
     }
 
     try {
@@ -237,68 +295,35 @@ export async function exportReportToPdf(element: HTMLElement, filename = 'Lapora
     }
     return true;
   } catch (err) {
-    console.error('[Export Report PDF Error - Using Clean Fallback]', err);
+    console.warn('[Export Report PDF Error - Using Standard Direct Render]', err);
     try {
-      // Fallback tanpa gambar external jika terjadi CORS taint
-      const cleanClone = element.cloneNode(true) as HTMLElement;
-      cleanClone.querySelectorAll('img').forEach((img) => img.remove());
-      cleanClone.style.position = 'fixed';
-      cleanClone.style.left = '-9999px';
-      cleanClone.style.top = '0';
-      cleanClone.style.width = '850px';
-      cleanClone.style.backgroundColor = '#ffffff';
-      document.body.appendChild(cleanClone);
+      // Fallback cadangan langsung
+      const canvasFallback = await html2canvas(element, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        logging: false,
+        backgroundColor: '#ffffff',
+      });
+      const imgData = canvasFallback.toDataURL('image/jpeg', 0.95);
+      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+      const printableWidth = 194;
+      const renderHeight = (canvasFallback.height * printableWidth) / canvasFallback.width;
+      pdf.addImage(imgData, 'JPEG', 8, 8, printableWidth, Math.min(renderHeight, 281));
       try {
-        const fallbackCanvas = await html2canvas(cleanClone, {
-          scale: 2,
-          logging: false,
-          backgroundColor: '#ffffff',
-          windowWidth: 850,
-        });
-        const imgData = fallbackCanvas.toDataURL('image/jpeg', 0.95);
-        const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-        const pdfWidth = pdf.internal.pageSize.getWidth();
-        const pdfHeight = pdf.internal.pageSize.getHeight();
-        const imgProps = pdf.getImageProperties(imgData);
-        const renderWidth = pdfWidth;
-        const renderHeight = (imgProps.height * pdfWidth) / imgProps.width;
-        let heightLeft = renderHeight;
-        let position = 0;
-        pdf.addImage(imgData, 'JPEG', 0, position, renderWidth, renderHeight);
-        heightLeft -= pdfHeight;
-        while (heightLeft > 0) {
-          position -= pdfHeight;
-          pdf.addPage();
-          pdf.addImage(imgData, 'JPEG', 0, position, renderWidth, renderHeight);
-          heightLeft -= pdfHeight;
-        }
-        try {
-          pdf.save(safeFilename);
-        } catch (_) {
-          const blob = pdf.output('blob');
-          triggerDownload(blob, safeFilename);
-        }
-        return true;
-      } finally {
-        document.body.removeChild(cleanClone);
-      }
-    } catch (cleanErr) {
-      console.error('[Clean Clone PDF Error - Using Direct Text PDF]', cleanErr);
-      // Fallback pasti terunduh sebagai berkas PDF
-      try {
-        const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-        const text = element.innerText || 'Laporan Rekapitulasi Presensi';
-        const lines = pdf.splitTextToSize(text, 180);
-        pdf.setFont('helvetica', 'normal');
-        pdf.setFontSize(9);
-        pdf.text(lines.slice(0, 70), 15, 20);
+        pdf.save(safeFilename);
+      } catch (_) {
         const blob = pdf.output('blob');
         triggerDownload(blob, safeFilename);
-        return true;
-      } catch (lastErr) {
-        console.error('[Direct PDF Fallback Failed]', lastErr);
-        return false;
       }
+      return true;
+    } catch (finalErr) {
+      console.error('[PDF Export Fatal]', finalErr);
+      return false;
+    }
+  } finally {
+    if (sandbox.parentNode) {
+      sandbox.parentNode.removeChild(sandbox);
     }
   }
 }

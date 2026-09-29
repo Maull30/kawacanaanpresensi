@@ -1,10 +1,11 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { Printer, Share2, CheckCircle2, ArrowLeft, FileText, Loader2, AlertCircle } from 'lucide-react';
+import { Printer, Share2, CheckCircle2, ArrowLeft, FileText, Loader2, AlertCircle, Download } from 'lucide-react';
 import { SchoolLogo } from './SchoolLogo';
 import { useApp } from '../context/AppContext';
 import { getFaseByClassName } from '../utils/faseKurikulum';
 import { getUserRoleScope } from '../utils/userScope';
 import { normalizeClassToken } from '../utils/documentParser';
+import { buildCanonicalReportUrl, exportReportToPdf, CanonicalReportParams } from '../utils/smartReport';
 
 const isPlaceholderText = (text: string | null | undefined): boolean => {
   if (!text) return true;
@@ -24,6 +25,7 @@ const isPlaceholderText = (text: string | null | undefined): boolean => {
 
 export interface PublicDailyReportViewerProps {
   isPublicView?: boolean;
+  schoolId?: string | null;
   classId?: string;
   className?: string;
   date?: string;
@@ -40,6 +42,7 @@ export interface PublicDailyReportViewerProps {
 
 export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = ({
   isPublicView = false,
+  schoolId: propSchoolId,
   classId: propClassId,
   className: propClassName,
   date: propDate,
@@ -77,6 +80,7 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
   const [error, setError] = useState<string | null>(null);
   const [externalReportData, setExternalReportData] = useState<any | null>(null);
   const [copiedLink, setCopiedLink] = useState(false);
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
 
   // Sync loading state immediately when internal data is ready
   useEffect(() => {
@@ -662,6 +666,7 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
       try {
         const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
         const resolvedClassName = propClassName || urlParams?.get('cn') || urlParams?.get('className') || '';
+        const targetSchoolId = propSchoolId || urlParams?.get('sid') || urlParams?.get('schoolId') || ctxSchoolProfile?.schoolId || currentUser?.schoolId || null;
 
         const res = await fetch('/api/onboarding', {
           method: 'POST',
@@ -669,6 +674,7 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
           signal: abortController.signal,
           body: JSON.stringify({
             action: 'get_public_daily_report',
+            schoolId: targetSchoolId,
             classId: propClassId,
             className: resolvedClassName,
             date: selectedDate,
@@ -716,12 +722,45 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
     window.print();
   };
 
+  // Canonical report params & URL
+  const canonicalParams: CanonicalReportParams = useMemo(() => ({
+    classId: resolvedClass?.id || propClassId || externalReportData?.classId,
+    className: resolvedClass?.name || propClassName || externalReportData?.className,
+    schoolId: propSchoolId || ctxSchoolProfile?.schoolId || externalReportData?.schoolId || currentUser?.schoolId || null,
+    date: selectedDate,
+    attendanceType,
+    subjectId,
+    reportType,
+    selectedWeek,
+    month,
+    year,
+    semester,
+    academicYear,
+  }), [resolvedClass, propClassId, propClassName, propSchoolId, ctxSchoolProfile, externalReportData, currentUser, selectedDate, attendanceType, subjectId, reportType, selectedWeek, month, year, semester, academicYear]);
+
+  const canonicalShareUrl = useMemo(() => {
+    return buildCanonicalReportUrl(canonicalParams);
+  }, [canonicalParams]);
+
+  // Sinkronkan address bar secara halus agar saat URL disalin manual tetap berupa Smart Link dokumen
+  useEffect(() => {
+    if (typeof window !== 'undefined' && canonicalShareUrl) {
+      try {
+        const u = new URL(canonicalShareUrl);
+        window.history.replaceState(null, '', u.pathname + (u.search ? u.search : ''));
+      } catch (_) {}
+    }
+  }, [canonicalShareUrl]);
+
   const handleShare = () => {
     if (typeof window !== 'undefined') {
-      const shareUrl = window.location.href;
+      const shareUrl = canonicalShareUrl || window.location.href;
+      const schoolTitle = ctxSchoolProfile?.namaSekolah || externalReportData?.schoolName || 'Sekolah';
+      const shareTitle = `${reportType} - ${schoolTitle}`;
       if (navigator.share) {
         navigator.share({
-          title: `Laporan Kehadiran - ${ctxSchoolProfile?.namaSekolah || 'Sekolah'}`,
+          title: shareTitle,
+          text: `Dokumen Rekap Kehadiran Resmi: ${schoolTitle} - ${activeClassName || 'Kelas'}`,
           url: shareUrl,
         }).catch(() => {});
       } else {
@@ -729,6 +768,26 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
         setCopiedLink(true);
         setTimeout(() => setCopiedLink(false), 2500);
       }
+    }
+  };
+
+  const handleDownloadPdf = async () => {
+    const el = document.getElementById('printable-report');
+    if (!el) {
+      window.print();
+      return;
+    }
+    setIsExportingPdf(true);
+    try {
+      const cleanCls = (activeClassName || 'Kelas').replace(/[^a-zA-Z0-9_-]/g, '_');
+      const cleanPeriod = (reportType || 'Laporan').replace(/[^a-zA-Z0-9_-]/g, '_');
+      const filename = `${cleanPeriod}_${cleanCls}_${selectedDate}.pdf`;
+      await exportReportToPdf(el, filename);
+    } catch (err) {
+      console.warn('PDF export fallback to browser print:', err);
+      window.print();
+    } finally {
+      setIsExportingPdf(false);
     }
   };
 
@@ -1229,9 +1288,11 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
           </div>
 
           <div className="flex items-center gap-2">
+            {/* 1. Tombol Bagikan Smart Link */}
             <button
               type="button"
               onClick={handleShare}
+              id="btn-bagikan-smart-report"
               className={`p-2 sm:px-3 sm:py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
                 copiedLink
                   ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
@@ -1240,18 +1301,32 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
               title="Bagikan Tautan Smart Link Dokumen"
             >
               {copiedLink ? <CheckCircle2 size={15} className="text-emerald-600" /> : <Share2 size={15} />}
-              <span className="hidden sm:inline">{copiedLink ? 'Tersalin!' : 'Bagikan'}</span>
+              <span className="hidden sm:inline">{copiedLink ? 'Link Tersalin!' : 'Bagikan'}</span>
             </button>
 
-            {/* Tombol biru Cetak / Unduh dengan teks persis "Cetak / Unduh" */}
+            {/* 2. Tombol Unduh PDF Langsung */}
+            <button
+              type="button"
+              onClick={handleDownloadPdf}
+              disabled={isExportingPdf}
+              id="btn-unduh-pdf-smart-report"
+              className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              title="Unduh langsung sebagai berkas file PDF"
+            >
+              {isExportingPdf ? <Loader2 size={15} className="animate-spin text-white" /> : <Download size={15} />}
+              <span className="hidden sm:inline">{isExportingPdf ? 'Menyimpan...' : 'Unduh PDF'}</span>
+            </button>
+
+            {/* 3. Tombol Cetak Browser */}
             <button
               type="button"
               onClick={handlePrint}
               id="btn-cetak-unduh-smart-report"
               className="px-4 py-2 rounded-xl bg-[#1D82F5] hover:bg-blue-600 text-white text-xs font-black transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
+              title="Cetak lembar A4 ke printer fisik atau simpan PDF peramban"
             >
               <Printer size={15} />
-              <span>Cetak / Unduh</span>
+              <span>Cetak</span>
             </button>
           </div>
         </div>

@@ -702,6 +702,7 @@ export const LaporanView: React.FC = () => {
   if (isPrintModalOpen) {
     return (
       <PublicDailyReportViewer
+        schoolId={schoolProfile.schoolId || currentUser?.schoolId || null}
         classId={viewScopeMode === 'KEPSEK' ? (classes[0]?.id || '') : (effectiveClassId || selectedClassId || '')}
         date={selectedDate}
         attendanceType={viewScopeMode === 'KEPSEK' ? 'DAILY' : attendanceType}
@@ -712,7 +713,14 @@ export const LaporanView: React.FC = () => {
         year={year}
         semester={viewScopeMode === 'KEPSEK' ? kepsekSemester : classSemester}
         academicYear={viewScopeMode === 'KEPSEK' ? kepsekAcademicYear : (schoolProfile.tahunPelajaran || `${startYear}/${endYear}`)}
-        onBackToApp={() => setIsPrintModalOpen(false)}
+        onBackToApp={() => {
+          setIsPrintModalOpen(false);
+          try {
+            const url = new URL(window.location.href);
+            url.search = '';
+            window.history.pushState(null, '', url.pathname);
+          } catch (_) {}
+        }}
       />
     );
   }

@@ -481,25 +481,33 @@ export default async function handler(req: any, res: any) {
     if (action === 'get_public_daily_report') {
       const classIdOrName = String(body.classId || '').trim();
       const explicitClassName = String(body.className || body.cn || '').trim();
+      const scopedSchoolId = String(body.schoolId || body.school_id || body.sid || '').trim() || null;
       const reportDate = String(body.date || new Date().toISOString().slice(0, 10)).trim();
       const attType = String(body.attendanceType || 'DAILY').toUpperCase() === 'SUBJECT' ? 'SUBJECT' : 'DAILY';
       const subjectId = body.subjectId || null;
+      const period = String(body.period || body.p || body.reportType || 'Laporan Harian').toLowerCase().trim();
+      const month = String(body.month || body.mo || 'Juli').trim();
+      const year = String(body.year || body.y || new Date().getFullYear()).trim();
+      const semester = String(body.semester || body.sem || 'Ganjil').trim();
 
-      // 1. Cari kelas secara cerdas & bertingkat (Aman dari ketidakcocokan ID/UUID)
+      // 1. Cari kelas secara aman dengan isolasi tenant sekolah (Aman dari cross-tenant leak)
       let targetClass: any = null;
       const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(classIdOrName);
 
       // 1.a. Jika parameter classId adalah UUID yang valid
       if (isUuid) {
-        const { data: clsRows } = await db
+        let clsQuery = db
           .from('classes')
           .select('id, name, grade, academic_year, school_id, wali_kelas_teacher_id')
-          .eq('id', classIdOrName)
-          .limit(1);
+          .eq('id', classIdOrName);
+        if (scopedSchoolId) {
+          clsQuery = clsQuery.eq('school_id', scopedSchoolId);
+        }
+        const { data: clsRows } = await clsQuery.limit(1);
         targetClass = clsRows?.[0] || null;
       }
 
-      // 1.b. Pencarian berdasarkan nama kelas atau explicitClassName
+      // 1.b. Pencarian berdasarkan nama kelas atau explicitClassName (terkunci per sekolah jika schoolId ada)
       if (!targetClass) {
         const candidateNames = [explicitClassName, classIdOrName].filter(
           (n) => n && n !== 'default' && n !== 'all'
@@ -509,12 +517,16 @@ export default async function handler(req: any, res: any) {
           // Bersihkan prefix seperti "cls-", "class-", "kelas "
           const cleanName = rawName.replace(/^cls[-_]?/i, '').replace(/^kelas\s*/i, '').trim();
 
-          const { data: found } = await db
+          let foundQuery = db
             .from('classes')
             .select('id, name, grade, academic_year, school_id, wali_kelas_teacher_id')
-            .or(`name.ilike.%${cleanName}%,name.ilike.%${rawName}%`)
-            .limit(1);
+            .or(`name.ilike.%${cleanName}%,name.ilike.%${rawName}%`);
 
+          if (scopedSchoolId) {
+            foundQuery = foundQuery.eq('school_id', scopedSchoolId);
+          }
+
+          const { data: found } = await foundQuery.limit(1);
           if (found && found.length > 0) {
             targetClass = found[0];
             break;
@@ -522,48 +534,12 @@ export default async function handler(req: any, res: any) {
         }
       }
 
-      // 1.c. Fail-Safe: Cek langsung catatan presensi di tanggal tersebut!
-      // Jika guru sudah menyimpan presensi di tanggal ini, lacak kelas dari siswa yang diabsen
-      if (!targetClass && reportDate) {
-        const { data: recentAtt } = await db
-          .from('attendance_records')
-          .select('student_id')
-          .eq('date', reportDate)
-          .limit(5);
-
-        if (recentAtt && recentAtt.length > 0) {
-          const stdIds = recentAtt.map((r: any) => r.student_id);
-          const { data: stdRows } = await db
-            .from('students')
-            .select('class_id')
-            .in('id', stdIds)
-            .limit(1);
-
-          if (stdRows && stdRows[0]?.class_id) {
-            const { data: inferredClass } = await db
-              .from('classes')
-              .select('id, name, grade, academic_year, school_id, wali_kelas_teacher_id')
-              .eq('id', stdRows[0].class_id)
-              .maybeSingle();
-
-            if (inferredClass) {
-              targetClass = inferredClass;
-            }
-          }
-        }
-      }
-
-      // 1.d. Fallback terakhir jika tetap tidak ditemukan
+      // Validasi ketat: Jika kelas tidak ditemukan, kembalikan 404 (TIDAK ADA fallback antar sekolah!)
       if (!targetClass) {
-        const { data: anyClass } = await db
-          .from('classes')
-          .select('id, name, grade, academic_year, school_id, wali_kelas_teacher_id')
-          .limit(1);
-        targetClass = anyClass?.[0];
-      }
-
-      if (!targetClass) {
-        return json(res, 404, { error: 'Rombel kelas tidak ditemukan di sistem.' });
+        return json(res, 404, {
+          ok: false,
+          error: 'Dokumen rekap kehadiran untuk rombel dan periode ini tidak ditemukan di sistem.',
+        });
       }
 
       const schoolId = targetClass.school_id;
@@ -585,7 +561,7 @@ export default async function handler(req: any, res: any) {
       const students = studentRows || [];
       const studentIds = students.map((s: any) => s.id);
 
-      // 4. Ambil catatan absensi untuk tanggal & siswa tersebut
+      // 4. Ambil catatan absensi sesuai cakupan periode laporan (Harian, Mingguan, Bulanan, Semester)
       let attRecords: any[] = [];
       if (studentIds.length > 0) {
         let attQuery = db
@@ -593,8 +569,46 @@ export default async function handler(req: any, res: any) {
           .select('id, student_id, teacher_id, status, check_in_time, check_out_time, notes, type, subject_id, date')
           .in('student_id', studentIds);
 
-        // Jika request memuat tanggal spesifik
-        attQuery = attQuery.eq('date', reportDate);
+        const monthNumberMap: Record<string, number> = {
+          Januari: 1,
+          Februari: 2,
+          Maret: 3,
+          April: 4,
+          Mei: 5,
+          Juni: 6,
+          Juli: 7,
+          Agustus: 8,
+          September: 9,
+          Oktober: 10,
+          November: 11,
+          Desember: 12,
+        };
+
+        if (period.includes('bulanan') || period === 'monthly') {
+          const mNum = monthNumberMap[month] || 7;
+          const monthPrefix = `${year}-${String(mNum).padStart(2, '0')}`;
+          attQuery = attQuery.gte('date', `${monthPrefix}-01`).lte('date', `${monthPrefix}-31`);
+        } else if (period.includes('semester')) {
+          if (semester === 'Genap') {
+            attQuery = attQuery.gte('date', `${year}-01-01`).lte('date', `${year}-06-30`);
+          } else {
+            attQuery = attQuery.gte('date', `${year}-07-01`).lte('date', `${year}-12-31`);
+          }
+        } else if (period.includes('mingguan') || period === 'weekly') {
+          try {
+            const refD = new Date(reportDate);
+            const minD = new Date(refD);
+            minD.setDate(refD.getDate() - 7);
+            const maxD = new Date(refD);
+            maxD.setDate(refD.getDate() + 7);
+            attQuery = attQuery.gte('date', minD.toISOString().slice(0, 10)).lte('date', maxD.toISOString().slice(0, 10));
+          } catch (_) {
+            attQuery = attQuery.eq('date', reportDate);
+          }
+        } else {
+          // Laporan Harian default
+          attQuery = attQuery.eq('date', reportDate);
+        }
 
         if (attType === 'SUBJECT') {
           attQuery = attQuery.eq('type', 'SUBJECT');

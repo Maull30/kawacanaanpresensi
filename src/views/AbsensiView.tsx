@@ -32,7 +32,6 @@ import {
   X,
 } from 'lucide-react';
 import { ClassQrModal } from '../components/ClassQrModal';
-import { PublicDailyReportViewer } from '../components/PublicDailyReportViewer';
 
 export const AbsensiView: React.FC = () => {
   const {
@@ -97,7 +96,6 @@ export const AbsensiView: React.FC = () => {
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [isClassQrOpen, setIsClassQrOpen] = useState<boolean>(false);
-  const [isPrintModalOpen, setIsPrintModalOpen] = useState<boolean>(false);
   const [isDirty, setIsDirty] = useState<boolean>(false);
   const isDirtyRef = React.useRef<boolean>(false);
   const prevContextKeyRef = React.useRef<string>('');
@@ -583,34 +581,6 @@ export const AbsensiView: React.FC = () => {
   };
 
   const currentSelectedClassName = classes.find((c) => c.id === selectedClassId)?.name || 'Semua Kelas';
-
-  if (isPrintModalOpen) {
-    const monthNames = [
-      'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
-      'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember',
-    ];
-    const dateObj = new Date(date);
-    const mIdx = !isNaN(dateObj.getTime()) ? dateObj.getMonth() : 6;
-    const yVal = !isNaN(dateObj.getTime()) ? String(dateObj.getFullYear()) : '2026';
-    const monthName = monthNames[mIdx] || 'Juli';
-    const sem = (mIdx >= 0 && mIdx <= 5) ? 'Genap' : 'Ganjil';
-
-    const activeClsId = selectedClassId || activeTargetClass?.id || '';
-    return (
-      <PublicDailyReportViewer
-        classId={activeClsId}
-        date={date}
-        attendanceType={attendanceMode}
-        subjectId={attendanceMode === 'SUBJECT' ? selectedSubjectId : null}
-        reportType="Laporan Harian"
-        month={monthName}
-        year={yVal}
-        semester={sem}
-        academicYear={schoolProfile.tahunPelajaran}
-        onBackToApp={() => setIsPrintModalOpen(false)}
-      />
-    );
-  }
 
   return (
     <div className="w-full max-w-6xl 2xl:max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-3.5 sm:py-5 space-y-3.5 sm:space-y-5 animate-in fade-in duration-200 pb-28">

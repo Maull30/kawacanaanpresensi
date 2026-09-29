@@ -26,6 +26,7 @@ import { TeacherUpgradeModal } from './components/TeacherUpgradeModal';
 import { SchoolUpgradeModal } from './components/SchoolUpgradeModal';
 import { PublicDailyReportViewer } from './components/PublicDailyReportViewer';
 import { PublicSmartInvoiceViewer } from './components/PublicSmartInvoiceViewer';
+import { parseCanonicalReportParams } from './utils/smartReport';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { CheckCircle2, AlertCircle, Info, X } from 'lucide-react';
 import type { ActiveView, UserRole } from './types';
@@ -179,40 +180,7 @@ const MainAppContent: React.FC = () => {
   // Check if public smart report link is accessed (e.g. by parents/supervisors clicking link from WhatsApp)
   const [publicReportParams, setPublicReportParams] = React.useState(() => {
     if (typeof window === 'undefined') return null;
-    const p = new URLSearchParams(window.location.search);
-    const r = p.get('r') || p.get('class') || p.get('classId');
-    const d = p.get('d') || p.get('date');
-    const periodParam = (p.get('p') || p.get('period') || '').toLowerCase();
-    const isReportLink = Boolean(r || periodParam || p.get('report') === 'true' || (d && (p.get('m') || p.get('s'))));
-    if (isReportLink) {
-      let resolvedReportType: 'Laporan Harian' | 'Laporan Mingguan' | 'Laporan Bulanan' | 'Laporan Semester' | 'Laporan Kepala Sekolah (Bulanan)' | 'Laporan Kepala Sekolah (Semester)' = 'Laporan Harian';
-      if (periodParam === 'kepsek' || periodParam === 'kepsek_monthly') {
-        resolvedReportType = 'Laporan Kepala Sekolah (Bulanan)';
-      } else if (periodParam === 'kepsek_semester') {
-        resolvedReportType = 'Laporan Kepala Sekolah (Semester)';
-      } else if (periodParam === 'weekly') {
-        resolvedReportType = 'Laporan Mingguan';
-      } else if (periodParam === 'monthly') {
-        resolvedReportType = 'Laporan Bulanan';
-      } else if (periodParam === 'semester') {
-        resolvedReportType = 'Laporan Semester';
-      }
-
-      return {
-        classId: r || '',
-        className: p.get('cn') || p.get('className') || '',
-        date: d || new Date().toISOString().split('T')[0],
-        attendanceType: (p.get('m') === 'subject' || p.get('type') === 'subject') ? ('SUBJECT' as const) : ('DAILY' as const),
-        subjectId: p.get('s') || p.get('subjectId') || null,
-        reportType: resolvedReportType,
-        selectedWeek: p.get('w') || p.get('week') || 'Minggu Ke-1',
-        month: p.get('mo') || p.get('month') || 'Juli',
-        year: p.get('y') || p.get('year') || '2026',
-        semester: (p.get('sem') === 'Genap' || p.get('semester') === 'Genap') ? ('Genap' as const) : ('Ganjil' as const),
-        academicYear: p.get('ay') || p.get('academicYear') || '2025/2026',
-      };
-    }
-    return null;
+    return parseCanonicalReportParams(new URLSearchParams(window.location.search));
   });
 
   // Check if public Smart Link PDF Invoice is accessed
@@ -243,42 +211,10 @@ const MainAppContent: React.FC = () => {
   // Handle browser back / forward navigation (PopState)
   React.useEffect(() => {
     const handlePopState = () => {
+      const parsed = parseCanonicalReportParams(new URLSearchParams(window.location.search));
+      setPublicReportParams(parsed);
+
       const params = new URLSearchParams(window.location.search);
-      const r = params.get('r') || params.get('class') || params.get('classId');
-      const d = params.get('d') || params.get('date');
-      const periodParam = (params.get('p') || params.get('period') || '').toLowerCase();
-      const isReportLink = Boolean(r || periodParam || params.get('report') === 'true' || (d && (params.get('m') || params.get('s'))));
-      if (isReportLink) {
-        let resolvedReportType: 'Laporan Harian' | 'Laporan Mingguan' | 'Laporan Bulanan' | 'Laporan Semester' | 'Laporan Kepala Sekolah (Bulanan)' | 'Laporan Kepala Sekolah (Semester)' = 'Laporan Harian';
-        if (periodParam === 'kepsek' || periodParam === 'kepsek_monthly') {
-          resolvedReportType = 'Laporan Kepala Sekolah (Bulanan)';
-        } else if (periodParam === 'kepsek_semester') {
-          resolvedReportType = 'Laporan Kepala Sekolah (Semester)';
-        } else if (periodParam === 'weekly') {
-          resolvedReportType = 'Laporan Mingguan';
-        } else if (periodParam === 'monthly') {
-          resolvedReportType = 'Laporan Bulanan';
-        } else if (periodParam === 'semester') {
-          resolvedReportType = 'Laporan Semester';
-        }
-
-        setPublicReportParams({
-          classId: r || '',
-          className: params.get('cn') || params.get('className') || '',
-          date: d || new Date().toISOString().split('T')[0],
-          attendanceType: (params.get('m') === 'subject' || params.get('type') === 'subject') ? ('SUBJECT' as const) : ('DAILY' as const),
-          subjectId: params.get('s') || params.get('subjectId') || null,
-          reportType: resolvedReportType,
-          selectedWeek: params.get('w') || params.get('week') || 'Minggu Ke-1',
-          month: params.get('mo') || params.get('month') || 'Juli',
-          year: params.get('y') || params.get('year') || '2026',
-          semester: (params.get('sem') === 'Genap' || params.get('semester') === 'Genap') ? ('Genap' as const) : ('Ganjil' as const),
-          academicYear: params.get('ay') || params.get('academicYear') || '2025/2026',
-        });
-      } else {
-        setPublicReportParams(null);
-      }
-
       if (
         !currentUser &&
         !hasPersistedAuthToken() &&
@@ -359,6 +295,7 @@ const MainAppContent: React.FC = () => {
       <ErrorBoundary fallbackTitle="Lembar Rekap Presensi">
         <PublicDailyReportViewer
           isPublicView={true}
+          schoolId={publicReportParams.schoolId}
           classId={publicReportParams.classId}
           className={publicReportParams.className}
           date={publicReportParams.date}
@@ -373,28 +310,7 @@ const MainAppContent: React.FC = () => {
           onBackToApp={() => {
             setPublicReportParams(null);
             try {
-              const url = new URL(window.location.href);
-              url.searchParams.delete('r');
-              url.searchParams.delete('d');
-              url.searchParams.delete('s');
-              url.searchParams.delete('m');
-              url.searchParams.delete('p');
-              url.searchParams.delete('w');
-              url.searchParams.delete('mo');
-              url.searchParams.delete('y');
-              url.searchParams.delete('sem');
-              url.searchParams.delete('ay');
-              url.searchParams.delete('class');
-              url.searchParams.delete('date');
-              url.searchParams.delete('report');
-              url.searchParams.delete('type');
-              url.searchParams.delete('week');
-              url.searchParams.delete('month');
-              url.searchParams.delete('year');
-              url.searchParams.delete('semester');
-              url.searchParams.delete('academicYear');
-              url.searchParams.delete('subjectId');
-              window.history.pushState(null, '', url.pathname + (url.search ? url.search : ''));
+              window.history.pushState(null, '', window.location.pathname);
             } catch (_) {}
           }}
         />

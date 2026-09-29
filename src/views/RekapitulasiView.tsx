@@ -414,6 +414,7 @@ export const RekapitulasiView: React.FC = () => {
   if (isPrintModalOpen) {
     return (
       <PublicDailyReportViewer
+        schoolId={schoolProfile.schoolId || currentUser?.schoolId || null}
         classId={selectedClassId || ''}
         date={`${selectedYear}-${selectedMonth}-01`}
         attendanceType={attendanceType}
@@ -429,7 +430,12 @@ export const RekapitulasiView: React.FC = () => {
         year={rekapMode === 'bulanan' ? selectedYear : semesterYear}
         semester={selectedSemester === '2' ? 'Genap' : 'Ganjil'}
         academicYear={schoolProfile.tahunPelajaran}
-        onBackToApp={() => setIsPrintModalOpen(false)}
+        onBackToApp={() => {
+          setIsPrintModalOpen(false);
+          try {
+            window.history.pushState(null, '', window.location.pathname);
+          } catch (_) {}
+        }}
       />
     );
   }

@@ -3,7 +3,6 @@ import { Printer, Share2, CheckCircle2, ArrowLeft, FileText, Loader2, AlertCircl
 import { SchoolLogo } from './SchoolLogo';
 import { useApp } from '../context/AppContext';
 import { getFaseByClassName } from '../utils/faseKurikulum';
-import { generateSmartReportLink } from '../utils/whatsappBroadcast';
 import { getUserRoleScope } from '../utils/userScope';
 import { normalizeClassToken } from '../utils/documentParser';
 

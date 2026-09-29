@@ -18,10 +18,7 @@ import {
   Sparkles,
   Users,
   Check,
-  MessageSquare,
 } from 'lucide-react';
-import { WhatsAppBroadcastModal } from '../components/WhatsAppBroadcastModal';
-import { WhatsAppIcon } from '../components/WhatsAppIcon';
 
 export const LaporanView: React.FC = () => {
   const {
@@ -69,8 +66,6 @@ export const LaporanView: React.FC = () => {
 
   // Class/Standard report state
   const [reportType, setReportType] = useState('Laporan Bulanan');
-  const [isBroadcastModalOpen, setIsBroadcastModalOpen] = useState(false);
-  const [broadcastInitialType, setBroadcastInitialType] = useState<'MASUK' | 'PULANG'>('MASUK');
   const [attendanceType, setAttendanceType] = useState<'DAILY' | 'SUBJECT'>(
     userScope.isGuruMapel ? 'SUBJECT' : 'DAILY'
   );
@@ -1439,25 +1434,8 @@ export const LaporanView: React.FC = () => {
                 </div>
               </div>
 
-              {/* Action Buttons: WhatsApp Broadcast Group (Hanya Periode Laporan Harian) & Cetak PDF */}
+              {/* Action Buttons: Cetak PDF */}
               <div className="pt-2 flex items-center gap-3">
-                {systemConfig.whatsappBroadcastEnabled !== false && reportType === 'Laporan Harian' && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const nowHour = new Date().getHours();
-                      setBroadcastInitialType(nowHour >= 11 ? 'PULANG' : 'MASUK');
-                      setIsBroadcastModalOpen(true);
-                    }}
-                    id="btn-broadcast-whatsapp-group"
-                    className="w-12 h-12 sm:w-[50px] sm:h-[50px] p-0 rounded-2xl flex items-center justify-center shadow-md hover:shadow-xl hover:scale-105 active:scale-95 transition-all cursor-pointer shrink-0 border-0 focus:outline-hidden focus:ring-2 focus:ring-emerald-400 focus:ring-offset-2 overflow-hidden"
-                    title="Kirim Rekapitulasi Harian ke WhatsApp Group"
-                    aria-label="Kirim ke WhatsApp Group"
-                  >
-                    <WhatsAppIcon size="100%" className="w-full h-full" />
-                  </button>
-                )}
-
                 <button
                   type="submit"
                   id="btn-cetak-laporan-pdf"
@@ -1486,37 +1464,6 @@ export const LaporanView: React.FC = () => {
 
           </div>
         </div>
-      )}
-
-      {/* WhatsApp Broadcast Group Modal */}
-      {isBroadcastModalOpen && (
-        <WhatsAppBroadcastModal
-          isOpen={isBroadcastModalOpen}
-          onClose={() => setIsBroadcastModalOpen(false)}
-          date={reportType === 'Laporan Harian' ? selectedDate : (selectedDate || new Date().toISOString().slice(0, 10))}
-          classId={effectiveClassId}
-          className={selectedClassObj?.name || userScope.assignedWaliClassName || schoolProfile.kelas || 'Kelas'}
-          attendanceType={attendanceType}
-          subjectId={attendanceType === 'SUBJECT' ? effectiveSubjectId : null}
-          subjectName={selectedSubjectObj?.name || null}
-          records={relevantRecords}
-          students={filteredStudents}
-          initialType={broadcastInitialType}
-          reportType={reportType}
-          selectedWeek={selectedWeek}
-          month={month}
-          year={year}
-          semester={classSemester}
-          academicYear={schoolProfile.tahunPelajaran || `${startYear}/${endYear}`}
-          onOpenPdfPreview={() => {
-            setIsBroadcastModalOpen(false);
-            setIsPrintModalOpen(true);
-          }}
-          onOpenSmartReport={() => {
-            setIsBroadcastModalOpen(false);
-            setIsPrintModalOpen(true);
-          }}
-        />
       )}
     </div>
   );

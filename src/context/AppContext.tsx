@@ -620,15 +620,6 @@ const dbConfig = (c: any): SystemConfig => ({
   checkInDeadlineTime: String(c.check_in_deadline_time || "07:00").slice(0, 5),
   checkOutStartTime: String(c.check_out_start_time || "12:30").slice(0, 5),
   autoMarkLate: c.auto_mark_late ?? true,
-  whatsappBroadcastEnabled: c.whatsapp_broadcast_enabled ?? c.whatsappBroadcastEnabled ?? INITIAL_SYSTEM_CONFIG.whatsappBroadcastEnabled,
-  broadcastMasukHeader: c.broadcast_masuk_header || c.broadcastMasukHeader || INITIAL_SYSTEM_CONFIG.broadcastMasukHeader,
-  broadcastMasukOpening: c.broadcast_masuk_opening || c.broadcastMasukOpening || INITIAL_SYSTEM_CONFIG.broadcastMasukOpening,
-  broadcastMasukClosing: c.broadcast_masuk_closing || c.broadcastMasukClosing || INITIAL_SYSTEM_CONFIG.broadcastMasukClosing,
-  broadcastPulangHeader: c.broadcast_pulang_header || c.broadcastPulangHeader || INITIAL_SYSTEM_CONFIG.broadcastPulangHeader,
-  broadcastPulangOpening: c.broadcast_pulang_opening || c.broadcastPulangOpening || INITIAL_SYSTEM_CONFIG.broadcastPulangOpening,
-  broadcastPulangClosing: c.broadcast_pulang_closing || c.broadcastPulangClosing || INITIAL_SYSTEM_CONFIG.broadcastPulangClosing,
-  broadcastIncludeStudentList: c.broadcast_include_student_list ?? c.broadcastIncludeStudentList ?? INITIAL_SYSTEM_CONFIG.broadcastIncludeStudentList,
-  broadcastIncludeSmartLink: c.broadcast_include_smart_link ?? c.broadcastIncludeSmartLink ?? INITIAL_SYSTEM_CONFIG.broadcastIncludeSmartLink,
 });
 
 const CACHE_USER_SESSION_KEY = "kawacanaan_cached_user_session";
@@ -3303,25 +3294,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       } catch (err: any) {
         return showToast(err.message || "Gagal menyimpan pengaturan sistem", "error");
       }
-    }
-
-    if (schoolId) {
-      try {
-        localStorage.setItem(
-          "kawacanaan_whatsapp_config_" + schoolId,
-          JSON.stringify({
-            whatsappBroadcastEnabled: c.whatsappBroadcastEnabled,
-            broadcastMasukHeader: c.broadcastMasukHeader,
-            broadcastMasukOpening: c.broadcastMasukOpening,
-            broadcastMasukClosing: c.broadcastMasukClosing,
-            broadcastPulangHeader: c.broadcastPulangHeader,
-            broadcastPulangOpening: c.broadcastPulangOpening,
-            broadcastPulangClosing: c.broadcastPulangClosing,
-            broadcastIncludeStudentList: c.broadcastIncludeStudentList,
-            broadcastIncludeSmartLink: c.broadcastIncludeSmartLink,
-          })
-        );
-      } catch (_) {}
     }
 
     setSystemConfig(c);

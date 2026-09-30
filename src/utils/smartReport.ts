@@ -172,6 +172,44 @@ export function parseCanonicalReportParams(searchParams: URLSearchParams): Canon
 }
 
 /**
+ * Pemicu unduh file blob yang aman dan kompatibel dengan semua jenis browser (Desktop, Android, iOS Safari, PWA)
+ */
+export function triggerPdfDownload(blob: Blob, name: string): void {
+  const safeName = name.endsWith('.pdf') ? name : `${name}.pdf`;
+  try {
+    if (typeof window !== 'undefined' && (window.navigator as any)?.msSaveOrOpenBlob) {
+      (window.navigator as any).msSaveOrOpenBlob(blob, safeName);
+      return;
+    }
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.style.position = 'fixed';
+    a.style.left = '-9999px';
+    a.style.opacity = '0';
+    a.href = url;
+    a.download = safeName;
+    a.rel = 'noopener noreferrer';
+    a.target = '_self';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => {
+      try {
+        if (a.parentNode) {
+          document.body.removeChild(a);
+        }
+        URL.revokeObjectURL(url);
+      } catch (_) {}
+    }, 10000);
+  } catch (e) {
+    console.error('[triggerPdfDownload Error]', e);
+    try {
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank');
+    } catch (_) {}
+  }
+}
+
+/**
  * Ekspor dokumen presensi resmi langsung ke berkas PDF A4 beresolusi tinggi.
  * Menghasilkan tata letak A4 resmi yang rapi, tajam, dan sama persis dengan tampilan aplikasi desktop
  * meskipun tombol unduh ditekan dari ponsel/HP.
@@ -179,27 +217,20 @@ export function parseCanonicalReportParams(searchParams: URLSearchParams): Canon
 export async function exportReportToPdf(element: HTMLElement, filename = 'Laporan_Presensi.pdf'): Promise<boolean> {
   const safeFilename = filename.endsWith('.pdf') ? filename : `${filename}.pdf`;
 
-  const triggerDownload = (blob: Blob, name: string) => {
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = name;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    setTimeout(() => URL.revokeObjectURL(url), 4000);
-  };
-
-  // Buat wadah klon A4 standar (794px = 210mm @96dpi) di luar viewport
-  // Hal ini menjamin dokumen yang diunduh dari HP tidak gepeng/terpotong, melainkan rapi 100% seperti di PC
+  // Buat wadah klon A4 standar (794px = 210mm @96dpi)
+  // Diposisikan fixed pada (0,0) dengan opacity:0 & pointer-events:none
+  // agar html2canvas dapat menghitung koordinat elemen secara presisi tanpa pemotongan negatif
   const sandbox = document.createElement('div');
+  sandbox.id = 'smart-report-pdf-sandbox';
   sandbox.style.position = 'fixed';
-  sandbox.style.left = '-9999px';
+  sandbox.style.left = '0';
   sandbox.style.top = '0';
   sandbox.style.width = '794px';
   sandbox.style.minWidth = '794px';
   sandbox.style.maxWidth = '794px';
   sandbox.style.zIndex = '-99999';
+  sandbox.style.opacity = '0';
+  sandbox.style.pointerEvents = 'none';
   sandbox.style.backgroundColor = '#ffffff';
 
   const clone = element.cloneNode(true) as HTMLElement;
@@ -208,10 +239,13 @@ export async function exportReportToPdf(element: HTMLElement, filename = 'Lapora
   clone.style.minWidth = '794px';
   clone.style.maxWidth = '794px';
   clone.style.transform = 'none';
+  clone.style.transformOrigin = 'top left';
   clone.style.margin = '0';
   clone.style.backgroundColor = '#ffffff';
   clone.style.boxSizing = 'border-box';
   clone.style.padding = '24px 32px';
+  clone.style.display = 'block';
+  clone.style.visibility = 'visible';
 
   // Bersihkan bayangan & border kartu web agar menjadi kertas cetak resmi
   clone.classList.remove('shadow-xl', 'shadow-sm', 'shadow-xs', 'border', 'border-slate-300', 'rounded-xl');
@@ -237,7 +271,7 @@ export async function exportReportToPdf(element: HTMLElement, filename = 'Lapora
 
   try {
     // Beri waktu sejenak agar gambar dan font siap
-    await new Promise((resolve) => setTimeout(resolve, 150));
+    await new Promise((resolve) => setTimeout(resolve, 200));
 
     const canvas = await html2canvas(clone, {
       scale: 2,
@@ -246,8 +280,12 @@ export async function exportReportToPdf(element: HTMLElement, filename = 'Lapora
       logging: false,
       backgroundColor: '#ffffff',
       width: 794,
-      windowWidth: 1024,
-      imageTimeout: 10000,
+      windowWidth: 794,
+      x: 0,
+      y: 0,
+      scrollX: 0,
+      scrollY: 0,
+      imageTimeout: 12000,
     });
 
     const imgData = canvas.toDataURL('image/jpeg', 0.96);
@@ -291,7 +329,7 @@ export async function exportReportToPdf(element: HTMLElement, filename = 'Lapora
       pdf.save(safeFilename);
     } catch (_) {
       const blob = pdf.output('blob');
-      triggerDownload(blob, safeFilename);
+      triggerPdfDownload(blob, safeFilename);
     }
     return true;
   } catch (err) {
@@ -314,7 +352,7 @@ export async function exportReportToPdf(element: HTMLElement, filename = 'Lapora
         pdf.save(safeFilename);
       } catch (_) {
         const blob = pdf.output('blob');
-        triggerDownload(blob, safeFilename);
+        triggerPdfDownload(blob, safeFilename);
       }
       return true;
     } catch (finalErr) {

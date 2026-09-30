@@ -1123,9 +1123,14 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
     }
   };
 
-  const handleDownloadPdf = async () => {
-    const el = document.getElementById('printable-report');
+  const handleDownloadPdf = async (e?: React.MouseEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    const el = reportRef.current || document.getElementById('printable-report');
     if (!el) {
+      console.warn('Report element not found for PDF export');
       return;
     }
     setIsExportingPdf(true);
@@ -1133,9 +1138,13 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
       const cleanCls = (activeClassName || 'Kelas').replace(/[^a-zA-Z0-9_-]/g, '_');
       const cleanPeriod = (reportType || 'Laporan').replace(/[^a-zA-Z0-9_-]/g, '_');
       const filename = `${cleanPeriod}_${cleanCls}_${selectedDate}.pdf`;
-      await exportReportToPdf(el, filename);
+      const ok = await exportReportToPdf(el, filename);
+      if (!ok) {
+        window.print();
+      }
     } catch (err) {
-      console.warn('PDF export failed:', err);
+      console.warn('PDF export failed, falling back to print:', err);
+      window.print();
     } finally {
       setIsExportingPdf(false);
     }
@@ -1397,14 +1406,18 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
             {/* 2. Tombol Unduh PDF Langsung */}
             <button
               type="button"
-              onClick={handleDownloadPdf}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                void handleDownloadPdf(e);
+              }}
               disabled={isExportingPdf}
               id="btn-unduh-pdf-smart-report"
-              className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-900 active:scale-95 text-white text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
               title="Unduh langsung sebagai berkas file PDF"
             >
               {isExportingPdf ? <Loader2 size={15} className="animate-spin text-white" /> : <Download size={15} />}
-              <span className="hidden sm:inline">{isExportingPdf ? 'Menyimpan...' : 'Unduh PDF'}</span>
+              <span className="inline text-xs">{isExportingPdf ? 'Menyimpan...' : 'Unduh PDF'}</span>
             </button>
 
             {/* 3. Tombol Cetak Browser */}
@@ -1920,30 +1933,30 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
             </div>
           </div>
 
-          {/* 6. Lembar Pengesahan Tanda Tangan Resmi */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 sm:gap-8 text-xs font-sans pt-4 break-inside-avoid">
+          {/* 6. Lembar Pengesahan Tanda Tangan Resmi - Sejajar di Ponsel Maupun Layar Lebar */}
+          <div className="grid grid-cols-2 gap-3 sm:gap-8 text-[11px] sm:text-xs font-sans pt-4 break-inside-avoid">
             <div className="text-center">
-              <p>Mengetahui,</p>
-              <p className="font-bold">Kepala {schoolName}</p>
-              <div className="h-14 sm:h-20" />
-              <p className="font-bold underline text-sm">{principalName}</p>
-              <p className="text-slate-600 font-mono">
+              <p className="text-[11px] sm:text-xs">Mengetahui,</p>
+              <p className="font-bold text-[11px] sm:text-xs leading-tight">Kepala {schoolName}</p>
+              <div className="h-12 sm:h-20" />
+              <p className="font-bold underline text-xs sm:text-sm">{principalName}</p>
+              <p className="text-slate-600 font-mono text-[10px] sm:text-xs">
                 {principalNip && principalNip !== '-' ? `NIP. ${principalNip}` : 'NIP. -'}
               </p>
             </div>
 
             <div className="text-center">
-              <p>
+              <p className="text-[11px] sm:text-xs">
                 {reportPlace}, {formatReportDateIndo(reportDateOfficial)}
               </p>
-              <p className="font-bold">
+              <p className="font-bold text-[11px] sm:text-xs leading-tight">
                 {teacherSignatureTitle}
               </p>
-              <div className="h-14 sm:h-20" />
-              <p className="font-bold underline text-sm">
+              <div className="h-12 sm:h-20" />
+              <p className="font-bold underline text-xs sm:text-sm">
                 {isKepsekReport ? (ctxSchoolProfile?.namaWaliKelas || teacherName) : teacherName}
               </p>
-              <p className="text-slate-600 font-mono">
+              <p className="text-slate-600 font-mono text-[10px] sm:text-xs">
                 {teacherNip && teacherNip !== '-' ? `NIP. ${teacherNip}` : 'NIP. -'}
               </p>
             </div>

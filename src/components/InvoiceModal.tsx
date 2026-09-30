@@ -9,6 +9,7 @@ import {
   Share2,
   FileText,
   Sparkles,
+  Loader2,
 } from 'lucide-react';
 import { InvoiceDocument, InvoiceItemData } from './InvoiceDocument';
 import { getSmartInvoiceUrl, copySmartInvoiceLink, exportInvoiceToPdf, openSmartInvoiceTab } from '../utils/smartInvoice';
@@ -55,7 +56,11 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
     window.print();
   };
 
-  const handleDownloadPdf = async () => {
+  const handleDownloadPdf = async (e?: React.MouseEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     if (!printContainerRef.current) {
       window.print();
       return;
@@ -130,11 +135,16 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
             <button
               type="button"
               disabled={isExporting}
-              onClick={handleDownloadPdf}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                void handleDownloadPdf(e);
+              }}
+              id="btn-unduh-pdf-invoice-modal"
               className="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-95"
               title="Unduh file PDF A4 resmi"
             >
-              <Download size={14} />
+              {isExporting ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
               <span>{isExporting ? 'Membuat PDF...' : 'Unduh PDF'}</span>
             </button>
 

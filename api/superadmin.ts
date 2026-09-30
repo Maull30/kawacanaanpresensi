@@ -156,6 +156,37 @@ export default async function handler(req:any,res:any){
       });
     }
 
+    if (action === 'ensure_public_storage' || action === 'init_storage') {
+      const publicBuckets = ['smartlink', 'smartlinks', 'smartlink-pdf', 'reports', 'pdf', 'invoices'];
+      const results: Record<string, string> = {};
+      try {
+        const { data: existing } = await admin.storage.listBuckets();
+        const existingNames = new Set((existing || []).map((b) => b.name));
+
+        for (const bucketName of publicBuckets) {
+          try {
+            if (!existingNames.has(bucketName)) {
+              const { error: cErr } = await admin.storage.createBucket(bucketName, {
+                public: true,
+                fileSizeLimit: 52428800,
+              });
+              results[bucketName] = cErr ? `error: ${cErr.message}` : 'created_public';
+            } else {
+              const { error: uErr } = await admin.storage.updateBucket(bucketName, {
+                public: true,
+              });
+              results[bucketName] = uErr ? `error: ${uErr.message}` : 'updated_public';
+            }
+          } catch (bErr: any) {
+            results[bucketName] = `exception: ${bErr?.message || bErr}`;
+          }
+        }
+      } catch (err: any) {
+        return json(res, 500, { ok: false, error: err?.message || 'Storage error' });
+      }
+      return json(res, 200, { ok: true, buckets: results });
+    }
+
     if(action==='login_activity'||action==='login_history'){
       const limit=Math.min(Number(req.body.limit||100),300);
       const {data,error}=await admin.from('audit_logs').select('*, schools(name)').ilike('action','%LOGIN%').order('created_at',{ascending:false}).limit(limit);

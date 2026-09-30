@@ -1,5 +1,6 @@
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
+import { triggerPdfDownload } from './smartReport';
 
 /**
  * Buat Smart Link URL publik untuk invoice
@@ -99,7 +100,13 @@ export async function exportInvoiceToPdf(element: HTMLElement, filename = 'Invoi
     const yOffset = 0;
 
     pdf.addImage(imgData, 'PNG', xOffset, yOffset, renderWidth, renderHeight);
-    pdf.save(filename.endsWith('.pdf') ? filename : `${filename}.pdf`);
+    const safeName = filename.endsWith('.pdf') ? filename : `${filename}.pdf`;
+    try {
+      pdf.save(safeName);
+    } catch (_) {
+      const blob = pdf.output('blob');
+      triggerPdfDownload(blob, safeName);
+    }
   } catch (err) {
     console.error('[Export Invoice PDF Error]', err);
     // Fallback ke browser print jika canvas gagal

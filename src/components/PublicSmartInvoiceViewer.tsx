@@ -109,7 +109,11 @@ export const PublicSmartInvoiceViewer: React.FC<PublicSmartInvoiceViewerProps> =
     window.print();
   };
 
-  const handleDownloadPdf = async () => {
+  const handleDownloadPdf = async (e?: React.MouseEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     if (!invoiceContainerRef.current) {
       window.print();
       return;
@@ -176,10 +180,16 @@ export const PublicSmartInvoiceViewer: React.FC<PublicSmartInvoiceViewerProps> =
             <button
               type="button"
               disabled={isExporting || loading}
-              onClick={handleDownloadPdf}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                void handleDownloadPdf(e);
+              }}
+              id="btn-unduh-pdf-smart-invoice"
               className="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-95 disabled:opacity-50"
+              title="Unduh langsung sebagai berkas file PDF"
             >
-              <Download size={14} />
+              {isExporting ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
               <span>{isExporting ? 'Memproses PDF...' : 'Unduh PDF'}</span>
             </button>
 

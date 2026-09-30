@@ -494,8 +494,14 @@ export const RekapitulasiView: React.FC = () => {
           </button>
 
           <button
-            onClick={handlePrint}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              handlePrint();
+            }}
+            id="btn-cetak-rekap-pdf"
             className="px-4 py-2 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-extrabold text-xs rounded-xl shadow-md transition-all flex items-center gap-2 cursor-pointer min-h-[38px]"
+            title={`Buka dokumen resmi rekapitulasi ${rekapMode === 'bulanan' ? 'bulanan' : 'semester'} untuk diunduh sebagai PDF atau dicetak`}
           >
             <Download size={15} />
             <span>Cetak {rekapMode === 'bulanan' ? 'Bulanan' : 'Semester'}</span>

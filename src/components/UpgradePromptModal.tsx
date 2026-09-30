@@ -5,15 +5,15 @@ import {
   X,
   ArrowRight,
   ShieldCheck,
-  Zap,
   CreditCard,
   Check,
   RefreshCw,
   ExternalLink,
-  MessageCircle,
-  HelpCircle,
   Clock,
   Building2,
+  Heart,
+  Calendar,
+  Sprout,
 } from 'lucide-react';
 import { SYSTEM_FEATURES } from '../utils/featureRegistry';
 import { useApp } from '../context/AppContext';
@@ -131,12 +131,11 @@ export const UpgradePromptModal: React.FC<UpgradePromptModalProps> = ({
     ? SYSTEM_FEATURES.find((f) => f.id === featureId)
     : null;
 
-  const resolvedFeatureName = customTitle || featureInfo?.name || 'Fitur ini';
+  const resolvedFeatureName = customTitle || featureInfo?.name;
 
   const monthlyPrice = 5000;
   const yearlyPrice = 60000;
-  const baseAmount = billingCycle === 'yearly' ? yearlyPrice : monthlyPrice;
-  const currentPrice = baseAmount;
+  const currentPrice = billingCycle === 'yearly' ? yearlyPrice : monthlyPrice;
 
   // 1. Launch Midtrans Snap directly
   const handleLaunchSnap = (token: string, orderId: string) => {
@@ -175,7 +174,7 @@ export const UpgradePromptModal: React.FC<UpgradePromptModalProps> = ({
         orderId: resData.order_id,
         snapToken: resData.snap_token || null,
         amount: resData.amount ?? currentPrice,
-        planTitle: resData.plan_title || `Paket Guru (${billingCycle === 'yearly' ? '1 Tahun' : '1 Bulan'})`,
+        planTitle: resData.plan_title || `Dukungan Pengembangan (${billingCycle === 'yearly' ? '12 Bulan' : '1 Bulan'})`,
         billingCycle,
       };
 
@@ -237,110 +236,103 @@ export const UpgradePromptModal: React.FC<UpgradePromptModalProps> = ({
     }
   };
 
-
-
-  const whatsappMessage = encodeURIComponent(
-    `Halo Tim Pendamping Kawacanaan, saya ingin bertanya seputar upgrade ke Paket Guru untuk akun presensi saya. Mohon bantuannya.`
-  );
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3.5 sm:p-4 bg-slate-950/70 backdrop-blur-xs animate-in fade-in duration-200 overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3.5 sm:p-5 bg-slate-950/65 backdrop-blur-xs animate-in fade-in duration-200 overflow-y-auto">
       <div
-        className="bg-white w-full max-w-lg rounded-3xl shadow-2xl border border-slate-100 overflow-hidden text-left animate-in zoom-in-95 duration-200 my-auto"
+        className="bg-white w-full max-w-[500px] rounded-[32px] shadow-2xl border border-slate-100/90 overflow-hidden text-left animate-in zoom-in-95 duration-200 my-auto relative"
         id="modal-upgrade-prompt"
       >
-        {/* STEP 1: NOTIFIKASI SINGKAT & RAMAH + UPGRADE BUTTON */}
+        {/* STEP 1: SESUAI ACUAN REFERENSI GAMBAR */}
         {step === 'prompt' && (
-          <div>
-            {/* Header Bersih & Terarah */}
-            <div className="relative bg-gradient-to-r from-blue-700 via-indigo-700 to-sky-700 p-5 sm:p-6 text-white">
-              <button
-                type="button"
-                onClick={onClose}
-                className="absolute top-4 right-4 w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 text-white flex items-center justify-center transition-colors cursor-pointer"
-                id="btn-close-upgrade-modal"
-              >
-                <X size={18} />
-              </button>
+          <div className="p-5 sm:p-7 space-y-5">
+            {/* Top Close Button */}
+            <button
+              type="button"
+              onClick={onClose}
+              className="absolute top-5 right-5 sm:top-6 sm:right-6 w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center transition-colors cursor-pointer z-10"
+              id="btn-close-upgrade-modal"
+              aria-label="Tutup"
+            >
+              <X size={17} strokeWidth={2.5} />
+            </button>
 
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/20 text-white text-[11px] font-bold tracking-wide uppercase mb-2">
-                <Sparkles size={12} className="text-amber-300" />
-                <span>Paket Guru</span>
+            {/* Header Section: Badge, Title, Subtitle, and Right Laptop Illustration */}
+            <div className="relative pt-1 flex items-start justify-between gap-3">
+              <div className="max-w-[270px] sm:max-w-[290px]">
+                {/* Pill Badge: Red Heart + DUKUNG PENGEMBANGAN */}
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#1D68F2] text-white text-[11px] font-black tracking-wider uppercase mb-3 shadow-xs">
+                  <Heart size={12} className="fill-red-500 text-red-500 shrink-0" />
+                  <span>DUKUNG PENGEMBANGAN</span>
+                </div>
+
+                {/* Title */}
+                <h2 className="text-[25px] sm:text-[29px] font-black leading-[1.15] tracking-tight">
+                  <span className="text-slate-900 block">Bantu Kami</span>
+                  <span className="text-[#1D68F2] block">Terus Berkembang</span>
+                </h2>
+
+                {/* Subtitle */}
+                <p className="text-xs sm:text-[13px] text-slate-600 leading-relaxed mt-2.5 font-medium">
+                  Dukungan kecil dari Anda membantu kami menjaga aplikasi tetap aktif, aman, dan terus dikembangkan untuk kebutuhan sekolah.
+                </p>
+                {resolvedFeatureName && (
+                  <p className="text-[11px] text-blue-700 bg-blue-50/80 px-2 py-0.5 rounded-md inline-block font-semibold mt-1.5">
+                    Akses fitur: {resolvedFeatureName}
+                  </p>
+                )}
               </div>
 
-              <h3 className="text-lg sm:text-xl font-black leading-snug">
-                Fitur ini tersedia di Paket Guru.
-              </h3>
-              {featureId && (
-                <p className="text-xs text-blue-100 mt-1">
-                  Akses ke: <span className="font-semibold underline underline-offset-2">{resolvedFeatureName}</span>
-                </p>
-              )}
+              {/* Top-Right 3D Illustration */}
+              <div className="w-28 sm:w-36 h-28 sm:h-32 shrink-0 relative flex items-center justify-center overflow-hidden rounded-2xl">
+                <img
+                  src="/images/laptop_books_plant_3d.jpg"
+                  alt="Dukungan Pendidikan"
+                  className="w-full h-full object-cover rounded-2xl"
+                  onError={(e) => {
+                    // Fallback visual illustration if image fails to load
+                    (e.target as HTMLElement).style.display = 'none';
+                  }}
+                />
+              </div>
             </div>
 
-            {/* Content Body */}
-            <div className="p-5 sm:p-6 space-y-4">
-              {/* Notifikasi Teks Utama Ramah & Solutif Sesuai Request */}
-              <div className="bg-blue-50/80 border border-blue-100 rounded-2xl p-4">
-                <p className="text-sm font-bold text-slate-800 leading-relaxed">
-                  Upgrade sekarang untuk akses penuh: tambah kelas, laporan lengkap, dan manajemen guru.
-                </p>
-                <div className="mt-2.5 flex items-center gap-2 text-xs text-emerald-700 font-semibold">
-                  <CheckCircle2 size={15} className="text-emerald-600 shrink-0" />
-                  <span>Semua data dan catatan presensi yang telah Anda buat tetap aman tersimpan.</span>
-                </div>
+            {/* Info Card: "Dukung aplikasi ini agar terus berjalan" */}
+            <div className="bg-[#F0F7FF] border border-[#D8EAFF] rounded-2xl sm:rounded-3xl p-4 sm:p-4.5 flex items-center gap-3.5 sm:gap-4">
+              {/* Graphic Avatar with warm peach circle and hand cradling red heart with sparkles */}
+              <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-full bg-[#FFEFEA] border border-[#FED8CF] flex items-center justify-center shrink-0 shadow-2xs">
+                <svg className="w-8 h-8 sm:w-9 sm:h-9" viewBox="0 0 48 48" fill="none">
+                  {/* Golden Sparkles */}
+                  <path d="M12 13L13.5 9L15 13L19 14.5L15 16L13.5 20L12 16L8 14.5L12 13Z" fill="#F59E0B" />
+                  <path d="M35 11L36 8L37 11L40 12L37 13L36 16L35 13L32 12L35 11Z" fill="#FBBF24" />
+                  <circle cx="39" cy="21" r="1.5" fill="#F59E0B" />
+                  {/* Glowing Red Heart */}
+                  <path d="M24 16.5C22.2 12 16.8 12 14.5 15.2C12.2 18.5 14.5 22.8 24 30.5C33.5 22.8 35.8 18.5 33.5 15.2C31.2 12 25.8 12 24 16.5Z" fill="#EF4444" />
+                  {/* Supportive Blue Hand */}
+                  <path d="M13 29C14.8 27.8 18.5 30 22.5 31.8C25.5 33.2 30.5 32.2 33.5 30.8C35.2 30 36.2 31.2 35.2 32.8C32.5 36.5 26.5 40 21.5 39C17.2 38 13.5 34.5 11.2 32.2C9.5 30.8 10.5 29 13 29Z" fill="#1D68F2" />
+                  <path d="M11.5 32.5L8.5 35.5C7.2 36.8 9 39 10.8 38.2L15.5 36.8" stroke="#1D68F2" strokeWidth="2.5" strokeLinecap="round" />
+                </svg>
               </div>
 
-              {/* Fasilitas yang Terbuka di Paket Guru */}
-              <div className="space-y-2.5">
-                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                  Fitur yang langsung terbuka setelah upgrade:
+              {/* Text content */}
+              <div className="space-y-0.5">
+                <h3 className="font-bold text-[#0F294A] text-[13.5px] sm:text-[15px] leading-snug">
+                  Dukung aplikasi ini agar terus berjalan
+                </h3>
+                <p className="text-[11px] sm:text-[12px] text-slate-600 leading-relaxed font-normal">
+                  Setiap dukungan yang Anda berikan sangat berarti bagi kami untuk menjaga layanan tetap stabil, serta menghadirkan peningkatan dan fitur baru demi kemajuan pendidikan di sekolah.
                 </p>
-                <div className="grid grid-cols-1 gap-2">
-                  <div className="flex items-start gap-2.5 p-2.5 rounded-xl bg-slate-50 border border-slate-100 text-xs text-slate-700">
-                    <div className="w-5 h-5 rounded-md bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0 mt-0.5">
-                      <Check size={13} className="font-black" />
-                    </div>
-                    <div>
-                      <span className="font-bold text-slate-800">Tambah & Kelola Multi-Rombel Kelas:</span>{' '}
-                      Bebas mengelola kelas binaan dan kelas paralel tanpa batasan kuota gratis.
-                    </div>
-                  </div>
-
-                  <div className="flex items-start gap-2.5 p-2.5 rounded-xl bg-slate-50 border border-slate-100 text-xs text-slate-700">
-                    <div className="w-5 h-5 rounded-md bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0 mt-0.5">
-                      <Check size={13} className="font-black" />
-                    </div>
-                    <div>
-                      <span className="font-bold text-slate-800">Laporan Lengkap & Cetak Dokumen PDF Resmi A4:</span>{' '}
-                      Format kedinasan siap cetak rapi dengan lembar tanda tangan & supervisi.
-                    </div>
-                  </div>
-
-                  <div className="flex items-start gap-2.5 p-2.5 rounded-xl bg-slate-50 border border-slate-100 text-xs text-slate-700">
-                    <div className="w-5 h-5 rounded-md bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0 mt-0.5">
-                      <Check size={13} className="font-black" />
-                    </div>
-                    <div>
-                      <span className="font-bold text-slate-800">Manajemen Guru & Pembagian Jadwal:</span>{' '}
-                      Kelola guru mata pelajaran, penugasan rombel, dan rekapitulasi terintegrasi.
-                    </div>
-                  </div>
-                </div>
               </div>
+            </div>
 
             {isSchoolPro ? (
               <div className="space-y-4 pt-1">
-                <div className="bg-blue-50/80 border border-blue-200 rounded-2xl p-4 space-y-2.5">
+                <div className="bg-blue-50/80 border border-blue-200 rounded-2xl p-4 space-y-2">
                   <div className="flex items-center gap-2 text-blue-900 font-bold text-sm">
                     <Building2 size={18} className="text-blue-700 shrink-0" />
                     <span>Sekolah Anda Berlangganan Paket Sekolah</span>
                   </div>
                   <p className="text-xs text-slate-600 leading-relaxed">
-                    Ruang kerja satuan pendidikan <strong>{schoolProfile?.namaSekolah || 'sekolah Anda'}</strong> saat ini memiliki lisensi aktif. Seluruh Kepala Sekolah, Wali Kelas, dan Guru Mapel otomatis memiliki akses fitur profesional penuh.
-                  </p>
-                  <p className="text-[11px] text-amber-800 bg-amber-50 p-2.5 rounded-xl border border-amber-200/70">
-                    ℹ️ Sesuai ketentuan langganan, Anda <strong>tidak perlu dan tidak dapat membeli Paket Guru</strong> karena sudah ditanggung oleh lisensi sekolah.
+                    Ruang kerja satuan pendidikan <strong>{schoolProfile?.namaSekolah || 'sekolah Anda'}</strong> saat ini telah memiliki lisensi aktif. Seluruh fitur profesional telah dibuka secara otomatis.
                   </p>
                 </div>
 
@@ -354,113 +346,159 @@ export const UpgradePromptModal: React.FC<UpgradePromptModalProps> = ({
               </div>
             ) : (
               <>
-                {/* Pilihan Periode Langganan */}
-                <div className="pt-1">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-bold text-slate-700">Pilih Periode Langganan:</span>
-                    {billingCycle === 'yearly' && (
-                      <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-black">
-                        Hemat Rp 30.000 (2 Bulan Gratis)
-                      </span>
-                    )}
+                {/* Section: Bentuk Dukungan */}
+                <div className="space-y-2 pt-1">
+                  <div>
+                    <h3 className="text-base sm:text-lg font-black text-slate-900 leading-tight">
+                      Bentuk Dukungan
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-0.5 font-normal">
+                      Pilih nominal dukungan yang sesuai dengan kemampuan Anda.
+                    </p>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2.5">
+                  {/* 2 Support Options: Bulanan & 12 Bulan */}
+                  <div className="grid grid-cols-2 gap-3 sm:gap-3.5 pt-1.5">
+                    {/* Option 1: Bulanan - Rp 5.000 */}
                     <button
                       type="button"
                       onClick={() => setBillingCycle('monthly')}
-                      className={`p-3 rounded-2xl border text-left transition cursor-pointer flex flex-col justify-between ${
+                      className={`relative p-3.5 sm:p-4 rounded-2xl text-left transition-all cursor-pointer flex flex-col justify-between ${
                         billingCycle === 'monthly'
-                          ? 'border-blue-600 bg-blue-50/60 ring-2 ring-blue-500/20 shadow-xs'
-                          : 'border-slate-200 hover:border-slate-300 bg-white'
+                          ? 'border-2 border-[#1D68F2] bg-[#F2F7FF] shadow-xs'
+                          : 'border border-slate-200 bg-white hover:border-slate-300'
                       }`}
                     >
-                      <span className="text-xs font-medium text-slate-500">Bulanan</span>
-                      <span className="text-sm font-black text-slate-900 mt-1">Rp 5.000</span>
-                      <span className="text-[10px] text-slate-400">per bulan</span>
+                      {/* Top Right Check Indicator */}
+                      <div className="absolute top-3.5 right-3.5">
+                        {billingCycle === 'monthly' ? (
+                          <div className="w-5 h-5 rounded-full bg-[#1D68F2] text-white flex items-center justify-center shadow-xs">
+                            <Check size={12} strokeWidth={3.5} />
+                          </div>
+                        ) : (
+                          <div className="w-5 h-5 rounded-full border-2 border-slate-300" />
+                        )}
+                      </div>
+
+                      {/* Icon */}
+                      <div className="w-10 h-10 rounded-2xl bg-[#E8F1FF] text-[#1D68F2] flex items-center justify-center shrink-0 mb-3">
+                        <Heart size={20} className="fill-[#1D68F2] text-[#1D68F2]" />
+                      </div>
+
+                      {/* Text */}
+                      <div>
+                        <span className="text-base sm:text-lg font-black text-slate-900 block tracking-tight">
+                          Rp 5.000
+                        </span>
+                        <span className="text-xs text-slate-500 font-medium block mt-0.5">
+                          per bulan
+                        </span>
+                      </div>
                     </button>
 
+                    {/* Option 2: Tahunan - Rp 60.000 */}
                     <button
                       type="button"
                       onClick={() => setBillingCycle('yearly')}
-                      className={`p-3 rounded-2xl border text-left transition cursor-pointer flex flex-col justify-between ${
+                      className={`relative p-3.5 sm:p-4 rounded-2xl text-left transition-all cursor-pointer flex flex-col justify-between ${
                         billingCycle === 'yearly'
-                          ? 'border-blue-600 bg-blue-50/60 ring-2 ring-blue-500/20 shadow-xs'
-                          : 'border-slate-200 hover:border-slate-300 bg-white'
+                          ? 'border-2 border-[#1D68F2] bg-[#F2F7FF] shadow-xs'
+                          : 'border border-slate-200 bg-white hover:border-slate-300'
                       }`}
                     >
-                      <span className="text-xs font-medium text-slate-500">Tahunan</span>
-                      <span className="text-sm font-black text-slate-900 mt-1">Rp 60.000</span>
-                      <span className="text-[10px] text-emerald-600 font-semibold">12 bulan aktif</span>
+                      {/* Top Right Check Indicator */}
+                      <div className="absolute top-3.5 right-3.5">
+                        {billingCycle === 'yearly' ? (
+                          <div className="w-5 h-5 rounded-full bg-[#1D68F2] text-white flex items-center justify-center shadow-xs">
+                            <Check size={12} strokeWidth={3.5} />
+                          </div>
+                        ) : (
+                          <div className="w-5 h-5 rounded-full border-2 border-slate-300" />
+                        )}
+                      </div>
+
+                      {/* Icon */}
+                      <div className="w-10 h-10 rounded-2xl bg-[#EFEAFF] text-[#6366F1] flex items-center justify-center shrink-0 mb-3">
+                        <Calendar size={20} className="text-[#6366F1]" />
+                      </div>
+
+                      {/* Text */}
+                      <div>
+                        <span className="text-base sm:text-lg font-black text-slate-900 block tracking-tight">
+                          Rp 60.000
+                        </span>
+                        <span className="text-xs text-slate-500 font-medium block mt-0.5">
+                          12 bulan
+                        </span>
+                      </div>
                     </button>
                   </div>
                 </div>
 
-                {/* RINGKASAN BIAYA */}
-                <div className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3 shadow-xs">
-                  <div className="space-y-1.5 text-xs">
-                    <div className="flex justify-between text-slate-600">
-                      <span>Harga Paket ({billingCycle === 'yearly' ? '1 Tahun' : '1 Bulan'})</span>
-                      <span className="font-semibold">Rp {baseAmount.toLocaleString('id-ID')}</span>
+                {/* Total Dukungan Card */}
+                <div className="bg-[#F0FAF4] border border-[#D5EFE1] rounded-2xl p-3.5 sm:p-4 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-2xl bg-[#D4F4E2] text-emerald-600 flex items-center justify-center shrink-0">
+                      <Sprout size={20} className="text-emerald-600" />
                     </div>
-                    <div className="flex justify-between items-baseline pt-2 text-slate-900 border-t border-dashed border-slate-200">
-                      <span className="font-bold text-slate-700">Total Tagihan:</span>
-                      <span className="font-black text-base text-emerald-700">
-                        Rp {currentPrice.toLocaleString('id-ID')}
+                    <div>
+                      <span className="text-sm font-bold text-slate-800 block">
+                        Total Dukungan
+                      </span>
+                      <span className="text-xs text-slate-500 font-normal block">
+                        ({billingCycle === 'yearly' ? '12 bulan' : '1 bulan'})
                       </span>
                     </div>
                   </div>
+
+                  <span className="text-xl sm:text-2xl font-black text-[#1D68F2] tracking-tight">
+                    Rp {currentPrice.toLocaleString('id-ID')}
+                  </span>
                 </div>
 
-                {/* Action Buttons */}
-                <div className="pt-2 space-y-2">
+                {/* Primary Action Button: "Dukung Sekarang ->" */}
+                <div className="space-y-2.5 pt-1">
                   <button
                     type="button"
                     onClick={handleUpgradeToTeacher}
                     disabled={isSubmitting}
-                    className="w-full py-3 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-black text-sm shadow-md transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
+                    className="w-full py-3.5 sm:py-4 px-6 rounded-2xl bg-[#1D68F2] hover:bg-[#1557CD] active:bg-[#0F47AB] text-white font-bold text-base shadow-lg shadow-blue-500/25 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
                     id="btn-upgrade-to-paket-guru"
                   >
                     {isSubmitting ? (
                       <>
-                        <RefreshCw size={16} className="animate-spin" />
-                        <span>Memproses...</span>
+                        <RefreshCw size={18} className="animate-spin" />
+                        <span>Menyiapkan Pembayaran...</span>
                       </>
                     ) : (
                       <>
-                        <span>Upgrade ke Paket Guru (Rp {currentPrice.toLocaleString('id-ID')})</span>
-                        <ArrowRight size={16} />
+                        <Heart size={18} className="fill-white text-white" />
+                        <span>Dukung Sekarang</span>
+                        <ArrowRight size={18} strokeWidth={2.5} />
                       </>
                     )}
                   </button>
 
-                  <div className="flex items-center justify-center gap-4 text-xs text-slate-500 pt-1">
-                    <div className="flex items-center gap-1">
-                      <ShieldCheck size={14} className="text-emerald-600" />
-                      <span>Pembayaran Aman Midtrans (QRIS, VA, E-Wallet)</span>
-                    </div>
+                  {/* Payment Security Note */}
+                  <div className="flex items-center justify-center gap-1.5 text-xs text-slate-600 font-medium">
+                    <ShieldCheck size={16} className="text-emerald-600 shrink-0" />
+                    <span>Pembayaran aman melalui QRIS, VA & E-Wallet</span>
                   </div>
                 </div>
               </>
             )}
-            </div>
 
-            {/* Footer Dismiss & WhatsApp */}
-            <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
-              <a
-                href={`https://wa.me/6281234567890?text=${whatsappMessage}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-blue-700 font-medium transition"
-              >
-                <MessageCircle size={14} className="text-emerald-600" />
-                <span>Butuh Bantuan?</span>
-              </a>
+            {/* Bottom Footer: Thank you note & "Nanti Saja" */}
+            <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-3 text-xs">
+              <div className="flex items-center gap-2 text-slate-500 italic text-[11px] sm:text-xs">
+                <Heart size={14} className="text-emerald-500 shrink-0 stroke-[2]" />
+                <span>Terima kasih telah ikut mendukung pengembangan aplikasi ini.</span>
+              </div>
 
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-200 transition cursor-pointer"
+                className="text-slate-500 hover:text-slate-800 font-semibold text-xs transition cursor-pointer shrink-0"
                 id="btn-dismiss-upgrade"
               >
                 Nanti Saja
@@ -471,13 +509,13 @@ export const UpgradePromptModal: React.FC<UpgradePromptModalProps> = ({
 
         {/* STEP 2: JENDELA PEMBAYARAN MIDTRANS SEDANG BERJALAN */}
         {step === 'paying' && paymentSession && (
-          <div className="p-6 text-center space-y-5">
-            <div className="w-14 h-14 rounded-2xl bg-blue-100 text-blue-700 flex items-center justify-center mx-auto animate-pulse">
+          <div className="p-6 sm:p-7 text-center space-y-5">
+            <div className="w-14 h-14 rounded-2xl bg-blue-50 text-[#1D68F2] flex items-center justify-center mx-auto animate-pulse">
               <CreditCard size={28} />
             </div>
 
             <div>
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-100 text-amber-900 text-xs font-bold mb-2">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 text-[#1D68F2] text-xs font-bold mb-2">
                 <Clock size={13} className="animate-spin" />
                 <span>Menunggu Pembayaran via Midtrans</span>
               </div>
@@ -492,7 +530,7 @@ export const UpgradePromptModal: React.FC<UpgradePromptModalProps> = ({
             {/* Rincian Transaksi */}
             <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200/80 text-left space-y-2 text-xs">
               <div className="flex justify-between">
-                <span className="text-slate-500">Paket:</span>
+                <span className="text-slate-500">Keterangan:</span>
                 <span className="font-bold text-slate-800">{paymentSession.planTitle}</span>
               </div>
               <div className="flex justify-between">
@@ -501,12 +539,12 @@ export const UpgradePromptModal: React.FC<UpgradePromptModalProps> = ({
               </div>
               <div className="flex justify-between pt-2 border-t border-slate-200 text-sm font-black text-slate-900">
                 <span>Total Pembayaran:</span>
-                <span className="text-blue-700">Rp {paymentSession.amount.toLocaleString('id-ID')}</span>
+                <span className="text-[#1D68F2]">Rp {paymentSession.amount.toLocaleString('id-ID')}</span>
               </div>
             </div>
 
             {paymentStatusText && (
-              <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200/60 rounded-xl p-3 leading-relaxed">
+              <p className="text-xs text-blue-800 bg-blue-50 border border-blue-200/60 rounded-xl p-3 leading-relaxed">
                 {paymentStatusText}
               </p>
             )}
@@ -516,7 +554,7 @@ export const UpgradePromptModal: React.FC<UpgradePromptModalProps> = ({
                 <button
                   type="button"
                   onClick={() => handleLaunchSnap(paymentSession.snapToken!, paymentSession.orderId)}
-                  className="w-full py-3 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-sm transition flex items-center justify-center gap-2 cursor-pointer"
+                  className="w-full py-3 px-4 rounded-xl bg-[#1D68F2] hover:bg-blue-700 text-white font-bold text-xs shadow-sm transition flex items-center justify-center gap-2 cursor-pointer"
                 >
                   <ExternalLink size={15} />
                   <span>Buka Kembali Jendela Midtrans</span>
@@ -546,7 +584,7 @@ export const UpgradePromptModal: React.FC<UpgradePromptModalProps> = ({
 
         {/* STEP 3: CELEBRATION SUKSES & STATUS AKTIF */}
         {step === 'success' && (
-          <div className="p-6 text-center space-y-5">
+          <div className="p-6 sm:p-7 text-center space-y-5">
             <div className="w-16 h-16 rounded-3xl bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto ring-8 ring-emerald-50">
               <CheckCircle2 size={36} />
             </div>
@@ -554,24 +592,24 @@ export const UpgradePromptModal: React.FC<UpgradePromptModalProps> = ({
             <div>
               <div className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-black uppercase mb-2">
                 <Sparkles size={13} />
-                <span>Status Paket Guru Aktif</span>
+                <span>Dukungan Berhasil</span>
               </div>
               <h3 className="text-xl font-black text-slate-900">
-                Pembayaran Berhasil!
+                Terima Kasih Atas Dukungan Anda!
               </h3>
               <p className="text-xs text-slate-600 mt-2 max-w-sm mx-auto leading-relaxed">
-                Selamat! Akun Anda kini resmi memiliki akses <strong>Paket Guru aktif</strong>. Seluruh fasilitas telah terbuka penuh: tambah kelas, laporan lengkap, dan manajemen guru.
+                Dukungan Anda telah berhasil kami terima. Fitur lengkap untuk ruang kerja Anda kini telah aktif sepenuhnya demi kelancaran operasional presensi sekolah.
               </p>
             </div>
 
             <div className="bg-emerald-50 border border-emerald-200/80 rounded-2xl p-4 text-xs text-emerald-800 text-left space-y-1.5">
               <div className="flex items-center gap-2 font-bold">
                 <Check size={14} className="text-emerald-600" />
-                <span>Hak akses fitur pro telah otomatis diperbarui</span>
+                <span>Akses fitur lengkap aktif secara instan</span>
               </div>
               <div className="flex items-center gap-2 font-bold">
                 <Check size={14} className="text-emerald-600" />
-                <span>Status paket di sistem dan superadmin tercatat Aktif</span>
+                <span>Status dukungan tercatat aktif di sistem</span>
               </div>
             </div>
 
@@ -581,7 +619,7 @@ export const UpgradePromptModal: React.FC<UpgradePromptModalProps> = ({
               className="w-full py-3.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-sm shadow-md transition cursor-pointer"
               id="btn-finish-upgrade-success"
             >
-              Mulai Gunakan Fitur Penuh
+              Mulai Gunakan Fitur
             </button>
           </div>
         )}

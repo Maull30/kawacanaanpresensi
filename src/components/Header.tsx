@@ -22,7 +22,8 @@ import {
   PlusCircle,
   Building2,
   UserCheck,
-  ChevronDown
+  ChevronDown,
+  Heart
 } from 'lucide-react';
 import { getTenantLifecycleInfo } from '../utils/tenantLifecycle';
 
@@ -41,7 +42,9 @@ export const Header: React.FC = () => {
     activeWorkspace,
     openOnboarding,
     logout,
-    isSchoolPro
+    isSchoolPro,
+    isTeacherPro,
+    openUpgradeModal
   } = useApp();
 
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
@@ -553,6 +556,27 @@ export const Header: React.FC = () => {
                           <Settings className="w-5 h-5 text-slate-400 group-hover:text-blue-600 transition-colors stroke-[1.75]" />
                           <span className="font-semibold">Ubah Password</span>
                         </button>
+
+                        {/* 3. Dukung Pengembangan (Ruang Kerja Individu - Paket Gratis) */}
+                        {isCurrentlyPersonal && !isTeacherPro && !isSchoolPro && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowProfileDropdown(false);
+                              openUpgradeModal();
+                            }}
+                            className="w-full flex items-center gap-3.5 px-3 py-2.5 rounded-2xl text-sm font-medium text-[#1D68F2] hover:bg-blue-50/80 transition-colors group cursor-pointer"
+                            id="btn-menu-dukung-pengembangan"
+                          >
+                            <div className="w-5 h-5 rounded-full bg-[#1D68F2] text-white flex items-center justify-center shrink-0">
+                              <Heart size={11} className="fill-white text-white" />
+                            </div>
+                            <div className="flex flex-col text-left">
+                              <span className="font-bold text-slate-900 group-hover:text-[#1D68F2]">Dukung Pengembangan</span>
+                              <span className="text-[10px] text-slate-500 font-normal">Bantu kami terus berkembang</span>
+                            </div>
+                          </button>
+                        )}
                       </div>
 
                       {/* Divider */}

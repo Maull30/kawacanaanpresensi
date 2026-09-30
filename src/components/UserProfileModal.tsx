@@ -19,7 +19,8 @@ import {
   UserCheck,
   ArrowRightLeft,
   Sparkles,
-  ChevronRight
+  ChevronRight,
+  Heart
 } from 'lucide-react';
 
 interface UserProfileModalProps {
@@ -41,7 +42,9 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
     students, 
     activeWorkspace, 
     userWorkspaces,
-    isSchoolPro
+    isSchoolPro,
+    isTeacherPro,
+    openUpgradeModal
   } = useApp();
 
   if (!isOpen || !currentUser) return null;
@@ -167,6 +170,38 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                 Ruang kerja ini terikat secara permanen dengan akun Anda.
               </div>
             </div>
+
+            {/* Status Paket & Opsi Dukungan Pengembangan */}
+            {isCurrentlyPersonal && (
+              <div className="p-3 bg-[#F0F7FF] rounded-xl border border-[#D8EAFF] flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-8 h-8 rounded-full bg-[#1D68F2] text-white flex items-center justify-center shrink-0">
+                    <Heart size={14} className="fill-white text-white" />
+                  </div>
+                  <div className="min-w-0">
+                    <span className="text-[10px] uppercase font-bold text-[#1D68F2] block">
+                      Paket Aktif: {isTeacherPro ? 'Paket Guru Pro' : 'Paket Gratis'}
+                    </span>
+                    <span className="text-xs font-semibold text-slate-700 truncate block">
+                      {isTeacherPro ? 'Status Dukungan Aktif' : 'Bantu kami menjaga aplikasi tetap aktif'}
+                    </span>
+                  </div>
+                </div>
+
+                {!isTeacherPro && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onClose();
+                      openUpgradeModal();
+                    }}
+                    className="px-3 py-1.5 rounded-xl bg-[#1D68F2] hover:bg-blue-700 text-white font-bold text-xs shadow-xs transition-colors shrink-0 cursor-pointer"
+                  >
+                    Dukung
+                  </button>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Section: Akun & Akses */}

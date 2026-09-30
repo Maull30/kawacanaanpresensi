@@ -18,7 +18,7 @@ export const HowItWorksSection: React.FC<HowItWorksSectionProps> = ({ lang, onOp
     {
       step: '02',
       title: 'DATA SISWA & PENUGASAN GURU',
-      desc: 'Import data siswa dan NISN dari file Excel atau Dapodik, lalu tugaskan akun Wali Kelas dan Guru Mapel (PJOK & Agama).',
+      desc: 'Import data siswa dan NISN dari file Excel atau Dapodik, lalu tugaskan akun Wali Kelas dan Guru Mata Pelajaran sesuai struktur sekolah.',
       icon: UserPlus,
       tag: 'Sinkronisasi Data'
     },
@@ -40,7 +40,7 @@ export const HowItWorksSection: React.FC<HowItWorksSectionProps> = ({ lang, onOp
     {
       step: '02',
       title: 'STUDENTS & TEACHER ROLES',
-      desc: 'Import student rosters with national IDs from Excel, and assign Homeroom and specialized Subject teachers.',
+      desc: 'Import student rosters with national IDs from Excel, and assign Homeroom and subject teacher accounts tailored to your school.',
       icon: UserPlus,
       tag: 'Data Sync'
     },

@@ -89,8 +89,8 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
             {/* Narrative with Left Blue Border Accent (as in screenshot) */}
             <p className="text-sm sm:text-base lg:text-[16px] text-slate-600 leading-relaxed max-w-xl border-l-[3.5px] border-[#0066FF] pl-4 sm:pl-5 font-normal">
               {isId 
-                ? "Sistem presensi digital terpadu untuk Sekolah Dasar. Mendukung presensi harian oleh Wali Kelas, presensi per mata pelajaran khusus (PJOK & Agama), penghitungan otomatis hari efektif belajar, hingga cetak laporan administrasi format kedinasan."
-                : "Integrated digital attendance platform built specifically for Primary Schools. Supporting daily homeroom check-ins, specialized subject attendance (PE & Religious Studies), automatic effective school day calculations, and official administrative report exports."
+                ? "Sistem presensi digital terpadu untuk Sekolah Dasar. Mendukung presensi harian oleh Wali Kelas, presensi per mata pelajaran yang fleksibel sesuai kebutuhan sekolah masing-masing, penghitungan otomatis hari efektif belajar, hingga cetak laporan administrasi format kedinasan."
+                : "Integrated digital attendance platform built specifically for Primary Schools. Supporting daily homeroom check-ins, flexible subject-based attendance tailored to each school's unique needs, automatic effective school day calculations, and official administrative report exports."
               }
             </p>
 

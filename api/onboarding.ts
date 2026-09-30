@@ -486,6 +486,7 @@ export default async function handler(req: any, res: any) {
       const attType = String(body.attendanceType || 'DAILY').toUpperCase() === 'SUBJECT' ? 'SUBJECT' : 'DAILY';
       const subjectId = body.subjectId || null;
       const period = String(body.period || body.p || body.reportType || 'Laporan Harian').toLowerCase().trim();
+      const weekStr = String(body.week || body.w || body.selectedWeek || 'Minggu Ke-1').trim();
       const cleanMonthRaw = String(body.month || body.mo || '').trim();
       let mNum = new Date().getMonth() + 1;
       if (/^\d+$/.test(cleanMonthRaw)) {
@@ -721,12 +722,40 @@ export default async function handler(req: any, res: any) {
           }
         } else if (period.includes('mingguan') || period === 'weekly') {
           try {
-            const refD = new Date(reportDate);
-            const minD = new Date(refD);
-            minD.setDate(refD.getDate() - 14);
-            const maxD = new Date(refD);
-            maxD.setDate(refD.getDate() + 14);
-            attQuery = attQuery.gte('date', minD.toISOString().slice(0, 10)).lte('date', maxD.toISOString().slice(0, 10)).limit(5000);
+            const weekNum = parseInt(weekStr.replace(/\D/g, ''), 10) || 1;
+
+            // Hari Senin pertama untuk bulan tersebut
+            const firstOfMonth = new Date(cleanYearNum, mNum - 1, 1);
+            const dow = firstOfMonth.getDay();
+            let firstMonday: Date;
+            if (dow === 1) {
+              firstMonday = new Date(cleanYearNum, mNum - 1, 1);
+            } else if (dow === 6) {
+              firstMonday = new Date(cleanYearNum, mNum - 1, 3);
+            } else if (dow === 0) {
+              firstMonday = new Date(cleanYearNum, mNum - 1, 2);
+            } else {
+              firstMonday = new Date(cleanYearNum, mNum - 1, 1 - (dow - 1));
+            }
+
+            const weekMonday = new Date(firstMonday);
+            weekMonday.setDate(firstMonday.getDate() + (weekNum - 1) * 7);
+
+            const weekStart = new Date(weekMonday);
+            const weekEnd = new Date(weekMonday);
+            weekEnd.setDate(weekMonday.getDate() + 6);
+
+            const lastDayOfMonth = new Date(cleanYearNum, mNum, 0).getDate();
+            const monthPrefix = `${cleanYearNum}-${String(mNum).padStart(2, '0')}`;
+
+            const minDateStr = weekStart.toISOString().slice(0, 10) < `${monthPrefix}-01`
+              ? weekStart.toISOString().slice(0, 10)
+              : `${monthPrefix}-01`;
+            const maxDateStr = weekEnd.toISOString().slice(0, 10) > `${monthPrefix}-${String(lastDayOfMonth).padStart(2, '0')}`
+              ? weekEnd.toISOString().slice(0, 10)
+              : `${monthPrefix}-${String(lastDayOfMonth).padStart(2, '0')}`;
+
+            attQuery = attQuery.gte('date', minDateStr).lte('date', maxDateStr).limit(10000);
           } catch (_) {
             attQuery = attQuery.eq('date', reportDate);
           }
@@ -980,6 +1009,7 @@ export default async function handler(req: any, res: any) {
           month: resolvedMonthName,
           year: String(cleanYearNum),
           period,
+          week: weekStr,
           attendanceType: attType,
           subjectName,
           teacherName,

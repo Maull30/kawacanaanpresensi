@@ -516,7 +516,17 @@ export default async function handler(req: any, res: any) {
       ];
       const resolvedMonthName = indonesianMonthNames[mNum - 1] || 'September';
       const cleanYearNum = parseInt(String(body.year || body.y || new Date().getFullYear()).replace(/\D/g, ''), 10) || new Date().getFullYear();
-      const semester = String(body.semester || body.sem || 'Ganjil').trim();
+      const rawSemester = String(body.semester || body.sem || 'Ganjil').trim();
+      const semester = (rawSemester.toLowerCase() === 'genap' || rawSemester === '2') ? 'Genap' : 'Ganjil';
+      const rawAy = String(body.academicYear || body.ay || '').trim();
+      let startYear = cleanYearNum;
+      let endYear = cleanYearNum + 1;
+      if (rawAy.includes('/')) {
+        const parts = rawAy.split('/');
+        startYear = parseInt(parts[0], 10) || startYear;
+        endYear = parseInt(parts[1], 10) || (startYear + 1);
+      }
+      const academicYear = rawAy || `${startYear}/${endYear}`;
 
       // 1. Cari kelas secara aman dengan isolasi tenant sekolah (Aman dari cross-tenant leak)
       let targetClass: any = null;
@@ -708,18 +718,28 @@ export default async function handler(req: any, res: any) {
           .select('id, student_id, teacher_id, status, check_in_time, check_out_time, notes, type, subject_id, date')
           .in('student_id', studentIds);
 
+        let startDate = '';
+        let endDate = '';
+        let semStart = '';
+        let semEnd = '';
+        let minDateStr = '';
+        let maxDateStr = '';
+
         if (period.includes('bulanan') || period === 'monthly' || period === 'kepsek' || period === 'kepsek_monthly') {
           const lastDayOfMonth = new Date(cleanYearNum, mNum, 0).getDate();
           const monthPrefix = `${cleanYearNum}-${String(mNum).padStart(2, '0')}`;
-          const startDate = `${monthPrefix}-01`;
-          const endDate = `${monthPrefix}-${String(lastDayOfMonth).padStart(2, '0')}`;
-          attQuery = attQuery.gte('date', startDate).lte('date', endDate).limit(10000);
+          startDate = `${monthPrefix}-01`;
+          endDate = `${monthPrefix}-${String(lastDayOfMonth).padStart(2, '0')}`;
+          attQuery = attQuery.gte('date', startDate).lte('date', endDate);
         } else if (period.includes('semester') || period === 'kepsek_semester') {
           if (semester === 'Genap') {
-            attQuery = attQuery.gte('date', `${cleanYearNum}-01-01`).lte('date', `${cleanYearNum}-06-30`).limit(10000);
+            semStart = `${startYear}-01-01`;
+            semEnd = `${endYear}-06-30`;
           } else {
-            attQuery = attQuery.gte('date', `${cleanYearNum}-07-01`).lte('date', `${cleanYearNum}-12-31`).limit(10000);
+            semStart = `${startYear}-07-01`;
+            semEnd = `${endYear}-01-15`;
           }
+          attQuery = attQuery.gte('date', semStart).lte('date', semEnd);
         } else if (period.includes('mingguan') || period === 'weekly') {
           try {
             const weekNum = parseInt(weekStr.replace(/\D/g, ''), 10) || 1;
@@ -748,14 +768,14 @@ export default async function handler(req: any, res: any) {
             const lastDayOfMonth = new Date(cleanYearNum, mNum, 0).getDate();
             const monthPrefix = `${cleanYearNum}-${String(mNum).padStart(2, '0')}`;
 
-            const minDateStr = weekStart.toISOString().slice(0, 10) < `${monthPrefix}-01`
+            minDateStr = weekStart.toISOString().slice(0, 10) < `${monthPrefix}-01`
               ? weekStart.toISOString().slice(0, 10)
               : `${monthPrefix}-01`;
-            const maxDateStr = weekEnd.toISOString().slice(0, 10) > `${monthPrefix}-${String(lastDayOfMonth).padStart(2, '0')}`
+            maxDateStr = weekEnd.toISOString().slice(0, 10) > `${monthPrefix}-${String(lastDayOfMonth).padStart(2, '0')}`
               ? weekEnd.toISOString().slice(0, 10)
               : `${monthPrefix}-${String(lastDayOfMonth).padStart(2, '0')}`;
 
-            attQuery = attQuery.gte('date', minDateStr).lte('date', maxDateStr).limit(10000);
+            attQuery = attQuery.gte('date', minDateStr).lte('date', maxDateStr);
           } catch (_) {
             attQuery = attQuery.eq('date', reportDate);
           }
@@ -774,11 +794,45 @@ export default async function handler(req: any, res: any) {
           attQuery = attQuery.or('type.eq.DAILY,type.is.null');
         }
 
-        const { data: recordsData, error: recordsErr } = await attQuery;
+        const { data: recordsData, error: recordsErr } = await attQuery.range(0, 999);
         if (recordsErr) {
           console.warn('[get_public_daily_report] attQuery error:', recordsErr.message);
         }
-        attRecords = recordsData || [];
+        attRecords = recordsData ? [...recordsData] : [];
+
+        // Paginate jika jumlah data mencapai limit 1000 baris (misalnya pada semester dengan ribuan log)
+        if (attRecords.length === 1000) {
+          let page = 1;
+          while (page < 10) {
+            let nextQuery = db
+              .from('attendance_records')
+              .select('id, student_id, teacher_id, status, check_in_time, check_out_time, notes, type, subject_id, date')
+              .in('student_id', studentIds);
+
+            if (period.includes('bulanan') || period === 'monthly' || period === 'kepsek' || period === 'kepsek_monthly') {
+              nextQuery = nextQuery.gte('date', startDate).lte('date', endDate);
+            } else if (period.includes('semester') || period === 'kepsek_semester') {
+              nextQuery = nextQuery.gte('date', semStart).lte('date', semEnd);
+            } else if (period.includes('mingguan') || period === 'weekly') {
+              nextQuery = nextQuery.gte('date', minDateStr).lte('date', maxDateStr);
+            } else {
+              nextQuery = nextQuery.eq('date', reportDate);
+            }
+
+            if (attType === 'SUBJECT') {
+              nextQuery = nextQuery.eq('type', 'SUBJECT');
+              if (subjectId) nextQuery = nextQuery.eq('subject_id', subjectId);
+            } else {
+              nextQuery = nextQuery.or('type.eq.DAILY,type.is.null');
+            }
+
+            const { data: nextPage, error: nextErr } = await nextQuery.range(page * 1000, (page + 1) * 1000 - 1);
+            if (nextErr || !nextPage || nextPage.length === 0) break;
+            attRecords = attRecords.concat(nextPage);
+            if (nextPage.length < 1000) break;
+            page++;
+          }
+        }
       }
 
       // Map subject name jika ada
@@ -1003,8 +1057,9 @@ export default async function handler(req: any, res: any) {
           className: targetClass.name.toLowerCase().startsWith('kelas') ? targetClass.name : `Kelas ${targetClass.name}`,
           grade: targetClass.grade,
           fase: `Fase ${resolvedFase}`,
-          semester: sp?.semester || extJson.semester || 'Ganjil',
-          tahunPelajaran: targetClass.academic_year || sp?.tahun_pelajaran || extJson.tahunPelajaran || '2026/2027',
+          semester: semester || sp?.semester || extJson.semester || 'Ganjil',
+          academicYear,
+          tahunPelajaran: targetClass.academic_year || academicYear || sp?.tahun_pelajaran || extJson.tahunPelajaran || `${startYear}/${endYear}`,
           date: reportDate,
           month: resolvedMonthName,
           year: String(cleanYearNum),

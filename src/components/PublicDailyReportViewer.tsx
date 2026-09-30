@@ -108,7 +108,9 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
       const w = p.get('w') || p.get('week') || '';
       const m = p.get('mo') || p.get('month') || '';
       const y = p.get('y') || p.get('year') || '';
-      const key = `kawacanaan_report_${r}_${periodCode}_${w}_${m}_${y}`;
+      const sem = p.get('sem') || p.get('semester') || '';
+      const ay = p.get('ay') || p.get('academicYear') || '';
+      const key = `kawacanaan_report_${r}_${periodCode}_${w}_${m}_${y}_${sem}_${ay}`;
       const cached = localStorage.getItem(key);
       if (cached) {
         const parsed = JSON.parse(cached);
@@ -178,7 +180,9 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
 
   const mNum = getMonthNumber(rawMonthProp);
   const effectiveYear = Number(year || externalReportData?.year) || new Date().getFullYear();
-  const rawAcademicYear = String(propAcademicYear || externalReportData?.tahunPelajaran || ctxSchoolProfile?.tahunPelajaran || `${effectiveYear}/${effectiveYear + 1}`).trim();
+  const rawSemesterProp = String(semester || externalReportData?.semester || 'Ganjil').trim();
+  const activeSemester: 'Ganjil' | 'Genap' = (rawSemesterProp.toLowerCase() === 'genap' || rawSemesterProp === '2') ? 'Genap' : 'Ganjil';
+  const rawAcademicYear = String(propAcademicYear || externalReportData?.academicYear || externalReportData?.tahunPelajaran || ctxSchoolProfile?.tahunPelajaran || `${effectiveYear}/${effectiveYear + 1}`).trim();
   const academicYear = rawAcademicYear || `${effectiveYear}/${effectiveYear + 1}`;
 
   const yearParts = academicYear.split('/');
@@ -249,7 +253,7 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
 
   // Semester months list
   const semesterMonthList = useMemo(() => {
-    if (semester === 'Genap') {
+    if (activeSemester === 'Genap') {
       return [
         { name: 'Januari', num: 1, year: endYear },
         { name: 'Februari', num: 2, year: endYear },
@@ -267,7 +271,7 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
       { name: 'November', num: 11, year: startYear },
       { name: 'Desember', num: 12, year: startYear },
     ];
-  }, [semester, startYear, endYear]);
+  }, [activeSemester, startYear, endYear]);
 
   const semesterTotalEffectiveDays = useMemo(() => {
     return semesterMonthList.reduce((acc, m) => acc + getEffectiveDaysForMonth(m.year, m.num), 0);
@@ -602,7 +606,7 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
         r.studentId === s.id && monthPrefixes.some((p) => String(r.date || '').startsWith(p))
       );
 
-      const hadir = recordsForSemester.filter((r) => r.status === 'Hadir').length;
+      const hadir = recordsForSemester.filter((r) => r.status === 'Hadir' || r.status === 'Terlambat').length;
       const sakit = recordsForSemester.filter((r) => r.status === 'Sakit').length;
       const izin = recordsForSemester.filter((r) => r.status === 'Izin').length;
       const alfa = recordsForSemester.filter((r) => r.status === 'Alfa').length;
@@ -784,7 +788,7 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
             week: activeWeek,
             month: rawMonthProp,
             year: String(effectiveYear),
-            semester,
+            semester: activeSemester,
             academicYear,
           }),
         });
@@ -799,6 +803,8 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
                 ? `monthly_${monthKey}`
                 : reportType === 'Laporan Mingguan'
                 ? `weekly_${monthKey}_w${weekNum}`
+                : reportType === 'Laporan Semester'
+                ? `semester_${activeSemester}_${startYear}_${endYear}`
                 : selectedDate;
               const rKey = `kawacanaan_report_${propClassId || ''}_${periodTag}`;
               localStorage.setItem(rKey, JSON.stringify(json.report));
@@ -811,6 +817,8 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
                 ? `monthly_${monthKey}`
                 : reportType === 'Laporan Mingguan'
                 ? `weekly_${monthKey}_w${weekNum}`
+                : reportType === 'Laporan Semester'
+                ? `semester_${activeSemester}_${startYear}_${endYear}`
                 : selectedDate;
               const rKey = `kawacanaan_report_${propClassId || ''}_${periodTag}`;
               const cached = localStorage.getItem(rKey);
@@ -1186,9 +1194,9 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
     selectedWeek: activeWeek,
     month: rawMonthProp,
     year: String(effectiveYear),
-    semester,
+    semester: activeSemester,
     academicYear,
-  }), [resolvedClass, propClassId, propClassName, externalReportData, activeClassName, propSchoolId, currentUser, activeWorkspace, selectedDate, attendanceType, subjectId, reportType, activeWeek, rawMonthProp, effectiveYear, semester, academicYear]);
+  }), [resolvedClass, propClassId, propClassName, externalReportData, activeClassName, propSchoolId, currentUser, activeWorkspace, selectedDate, attendanceType, subjectId, reportType, activeWeek, rawMonthProp, effectiveYear, activeSemester, academicYear]);
 
   const canonicalShareUrl = useMemo(() => {
     return buildCanonicalReportUrl(canonicalParams);
@@ -1225,6 +1233,8 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
           week: activeWeek,
           month: rawMonthProp,
           year: String(effectiveYear),
+          semester: activeSemester,
+          academicYear,
           students: targetStudents.map((s, idx) => {
             const rec = targetRecords.find((r) => r.studentId === s.id && String(r.date || '') === selectedDate);
             return {
@@ -1245,6 +1255,8 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
           ? `monthly_${monthKey}`
           : reportType === 'Laporan Mingguan'
           ? `weekly_${monthKey}_w${weekNum}`
+          : reportType === 'Laporan Semester'
+          ? `semester_${activeSemester}_${startYear}_${endYear}`
           : selectedDate;
         const rKey = `kawacanaan_report_${resolvedClass?.id || propClassId || ''}_${periodTag}`;
         localStorage.setItem(rKey, JSON.stringify(snap));

@@ -486,24 +486,36 @@ export default async function handler(req: any, res: any) {
       const attType = String(body.attendanceType || 'DAILY').toUpperCase() === 'SUBJECT' ? 'SUBJECT' : 'DAILY';
       const subjectId = body.subjectId || null;
       const period = String(body.period || body.p || body.reportType || 'Laporan Harian').toLowerCase().trim();
-      const month = String(body.month || body.mo || 'Juli').trim();
-      const year = String(body.year || body.y || new Date().getFullYear()).trim();
-      const semester = String(body.semester || body.sem || 'Ganjil').trim();
+      const cleanMonthRaw = String(body.month || body.mo || '').trim();
+      let mNum = new Date().getMonth() + 1;
+      if (/^\d+$/.test(cleanMonthRaw)) {
+        mNum = Math.min(12, Math.max(1, parseInt(cleanMonthRaw, 10)));
+      } else if (cleanMonthRaw) {
+        const mLower = cleanMonthRaw.toLowerCase();
+        const map: Record<string, number> = {
+          januari: 1, january: 1, jan: 1,
+          februari: 2, february: 2, feb: 2,
+          maret: 3, march: 3, mar: 3,
+          april: 4, apr: 4,
+          mei: 5, may: 5,
+          juni: 6, june: 6, jun: 6,
+          juli: 7, july: 7, jul: 7,
+          agustus: 8, august: 8, aug: 8,
+          september: 9, sep: 9, sept: 9,
+          oktober: 10, october: 10, okt: 10, oct: 10,
+          november: 11, nov: 11,
+          desember: 12, december: 12, des: 12, dec: 12,
+        };
+        mNum = map[mLower] || mNum;
+      }
 
-      const monthNumberMap: Record<string, number> = {
-        Januari: 1,
-        Februari: 2,
-        Maret: 3,
-        April: 4,
-        Mei: 5,
-        Juni: 6,
-        Juli: 7,
-        Agustus: 8,
-        September: 9,
-        Oktober: 10,
-        November: 11,
-        Desember: 12,
-      };
+      const indonesianMonthNames = [
+        'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+        'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+      ];
+      const resolvedMonthName = indonesianMonthNames[mNum - 1] || 'September';
+      const cleanYearNum = parseInt(String(body.year || body.y || new Date().getFullYear()).replace(/\D/g, ''), 10) || new Date().getFullYear();
+      const semester = String(body.semester || body.sem || 'Ganjil').trim();
 
       // 1. Cari kelas secara aman dengan isolasi tenant sekolah (Aman dari cross-tenant leak)
       let targetClass: any = null;
@@ -696,14 +708,16 @@ export default async function handler(req: any, res: any) {
           .in('student_id', studentIds);
 
         if (period.includes('bulanan') || period === 'monthly' || period === 'kepsek' || period === 'kepsek_monthly') {
-          const mNum = monthNumberMap[month] || 7;
-          const monthPrefix = `${year}-${String(mNum).padStart(2, '0')}`;
-          attQuery = attQuery.gte('date', `${monthPrefix}-01`).lte('date', `${monthPrefix}-31`);
+          const lastDayOfMonth = new Date(cleanYearNum, mNum, 0).getDate();
+          const monthPrefix = `${cleanYearNum}-${String(mNum).padStart(2, '0')}`;
+          const startDate = `${monthPrefix}-01`;
+          const endDate = `${monthPrefix}-${String(lastDayOfMonth).padStart(2, '0')}`;
+          attQuery = attQuery.gte('date', startDate).lte('date', endDate).limit(10000);
         } else if (period.includes('semester') || period === 'kepsek_semester') {
           if (semester === 'Genap') {
-            attQuery = attQuery.gte('date', `${year}-01-01`).lte('date', `${year}-06-30`);
+            attQuery = attQuery.gte('date', `${cleanYearNum}-01-01`).lte('date', `${cleanYearNum}-06-30`).limit(10000);
           } else {
-            attQuery = attQuery.gte('date', `${year}-07-01`).lte('date', `${year}-12-31`);
+            attQuery = attQuery.gte('date', `${cleanYearNum}-07-01`).lte('date', `${cleanYearNum}-12-31`).limit(10000);
           }
         } else if (period.includes('mingguan') || period === 'weekly') {
           try {
@@ -712,7 +726,7 @@ export default async function handler(req: any, res: any) {
             minD.setDate(refD.getDate() - 14);
             const maxD = new Date(refD);
             maxD.setDate(refD.getDate() + 14);
-            attQuery = attQuery.gte('date', minD.toISOString().slice(0, 10)).lte('date', maxD.toISOString().slice(0, 10));
+            attQuery = attQuery.gte('date', minD.toISOString().slice(0, 10)).lte('date', maxD.toISOString().slice(0, 10)).limit(5000);
           } catch (_) {
             attQuery = attQuery.eq('date', reportDate);
           }
@@ -868,10 +882,10 @@ export default async function handler(req: any, res: any) {
           .order('grade', { ascending: true })
           .order('name', { ascending: true });
 
-        const daysInMonth = new Date(Number(year) || 2026, monthNumberMap[month] || 7, 0).getDate();
+        const daysInMonth = new Date(cleanYearNum, mNum, 0).getDate();
         let effDaysCount = 0;
         for (let d = 1; d <= daysInMonth; d++) {
-          const dow = new Date(Number(year) || 2026, (monthNumberMap[month] || 7) - 1, d).getDay();
+          const dow = new Date(cleanYearNum, mNum - 1, d).getDay();
           if (dow >= 1 && dow <= 5) effDaysCount++;
         }
         if (effDaysCount === 0) effDaysCount = 20;
@@ -963,6 +977,9 @@ export default async function handler(req: any, res: any) {
           semester: sp?.semester || extJson.semester || 'Ganjil',
           tahunPelajaran: targetClass.academic_year || sp?.tahun_pelajaran || extJson.tahunPelajaran || '2026/2027',
           date: reportDate,
+          month: resolvedMonthName,
+          year: String(cleanYearNum),
+          period,
           attendanceType: attType,
           subjectName,
           teacherName,

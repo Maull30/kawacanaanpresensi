@@ -153,6 +153,8 @@ export function parseCanonicalReportParams(searchParams: URLSearchParams): Canon
   const resolvedReportType = periodCodeToReportType(periodParam);
   const now = new Date();
   const defaultYear = String(now.getFullYear());
+  const indoMonths = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+  const defaultMonth = indoMonths[now.getMonth()] || 'September';
   const rawClassName = searchParams.get('cn') || searchParams.get('className') || '';
   const className = (rawClassName === 'null' || rawClassName === 'undefined') ? '' : rawClassName;
 
@@ -165,7 +167,7 @@ export function parseCanonicalReportParams(searchParams: URLSearchParams): Canon
     subjectId,
     reportType: resolvedReportType,
     selectedWeek: searchParams.get('w') || searchParams.get('week') || 'Minggu Ke-1',
-    month: searchParams.get('mo') || searchParams.get('month') || 'Juli',
+    month: searchParams.get('mo') || searchParams.get('month') || defaultMonth,
     year: searchParams.get('y') || searchParams.get('year') || defaultYear,
     semester: (searchParams.get('sem') === 'Genap' || searchParams.get('semester') === 'Genap') ? 'Genap' : 'Ganjil',
     academicYear: searchParams.get('ay') || searchParams.get('academicYear') || `${defaultYear}/${Number(defaultYear) + 1}`,

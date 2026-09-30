@@ -104,9 +104,11 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
     try {
       const p = new URLSearchParams(window.location.search);
       const r = p.get('r') || p.get('class') || p.get('classId') || '';
-      const d = p.get('d') || p.get('date') || '';
-      const key = `kawacanaan_report_${r}_${d}`;
-      const cached = localStorage.getItem(key) || localStorage.getItem('kawacanaan_last_report');
+      const periodCode = p.get('p') || p.get('period') || 'daily';
+      const m = p.get('mo') || p.get('month') || '';
+      const y = p.get('y') || p.get('year') || '';
+      const key = `kawacanaan_report_${r}_${periodCode}_${m}_${y}`;
+      const cached = localStorage.getItem(key);
       if (cached) {
         const parsed = JSON.parse(cached);
         if (parsed && (parsed.students?.length > 0 || parsed.schoolName)) {
@@ -148,14 +150,33 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
   const selectedDate = propDate || new Date().toISOString().split('T')[0];
   const isKepsekReport = reportType.startsWith('Laporan Kepala Sekolah');
 
-  const monthNumberMap: { [key: string]: number } = {
-    'Januari': 1, 'Februari': 2, 'Maret': 3, 'April': 4,
-    'Mei': 5, 'Juni': 6, 'Juli': 7, 'Agustus': 8,
-    'September': 9, 'Oktober': 10, 'November': 11, 'Desember': 12
+  const indoMonthsList = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+  const defaultMonthName = indoMonthsList[new Date().getMonth()] || 'September';
+  const rawMonthProp = String(month || externalReportData?.month || defaultMonthName).trim();
+
+  const getMonthNumber = (m: string): number => {
+    if (!m) return new Date().getMonth() + 1;
+    if (/^\d+$/.test(m)) return Math.min(12, Math.max(1, parseInt(m, 10)));
+    const clean = m.toLowerCase();
+    const map: Record<string, number> = {
+      januari: 1, january: 1, jan: 1,
+      februari: 2, february: 2, feb: 2,
+      maret: 3, march: 3, mar: 3,
+      april: 4, apr: 4,
+      mei: 5, may: 5,
+      juni: 6, june: 6, jun: 6,
+      juli: 7, july: 7, jul: 7,
+      agustus: 8, august: 8, aug: 8,
+      september: 9, sep: 9, sept: 9,
+      oktober: 10, october: 10, okt: 10, oct: 10,
+      november: 11, nov: 11,
+      desember: 12, december: 12, des: 12, dec: 12,
+    };
+    return map[clean] || (new Date().getMonth() + 1);
   };
 
-  const mNum = monthNumberMap[month] || 7;
-  const effectiveYear = Number(year) || 2026;
+  const mNum = getMonthNumber(rawMonthProp);
+  const effectiveYear = Number(year || externalReportData?.year) || new Date().getFullYear();
   const rawAcademicYear = String(propAcademicYear || externalReportData?.tahunPelajaran || ctxSchoolProfile?.tahunPelajaran || `${effectiveYear}/${effectiveYear + 1}`).trim();
   const academicYear = rawAcademicYear || `${effectiveYear}/${effectiveYear + 1}`;
 
@@ -540,7 +561,7 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
         (r) => r.studentId === s.id && String(r.date || '').startsWith(monthKey)
       );
 
-      const hadir = recordsForMonth.filter((r) => r.status === 'Hadir').length;
+      const hadir = recordsForMonth.filter((r) => r.status === 'Hadir' || r.status === 'Terlambat').length;
       const sakit = recordsForMonth.filter((r) => r.status === 'Sakit').length;
       const izin = recordsForMonth.filter((r) => r.status === 'Izin').length;
       const alfa = recordsForMonth.filter((r) => r.status === 'Alfa').length;
@@ -759,8 +780,8 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
             subjectId,
             period: reportType,
             week: selectedWeek,
-            month,
-            year,
+            month: rawMonthProp,
+            year: String(effectiveYear),
             semester,
             academicYear,
           }),
@@ -772,16 +793,17 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
             setExternalReportData(json.report);
             setError(null);
             try {
-              const rKey = `kawacanaan_report_${propClassId || ''}_${selectedDate}`;
+              const periodTag = reportType === 'Laporan Bulanan' ? `monthly_${monthKey}` : selectedDate;
+              const rKey = `kawacanaan_report_${propClassId || ''}_${periodTag}`;
               localStorage.setItem(rKey, JSON.stringify(json.report));
-              localStorage.setItem('kawacanaan_last_report', JSON.stringify(json.report));
             } catch (_) {}
           } else {
             // Cek apakah ada cache lokal sebelum menampilkan error
             let foundInCache = false;
             try {
-              const rKey = `kawacanaan_report_${propClassId || ''}_${selectedDate}`;
-              const cached = localStorage.getItem(rKey) || localStorage.getItem('kawacanaan_last_report');
+              const periodTag = reportType === 'Laporan Bulanan' ? `monthly_${monthKey}` : selectedDate;
+              const rKey = `kawacanaan_report_${propClassId || ''}_${periodTag}`;
+              const cached = localStorage.getItem(rKey);
               if (cached) {
                 const parsed = JSON.parse(cached);
                 if (parsed && (parsed.students?.length > 0 || parsed.schoolName)) {
@@ -1152,11 +1174,11 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
     subjectId,
     reportType,
     selectedWeek,
-    month,
-    year,
+    month: rawMonthProp,
+    year: String(effectiveYear),
     semester,
     academicYear,
-  }), [resolvedClass, propClassId, propClassName, externalReportData, activeClassName, propSchoolId, currentUser, activeWorkspace, selectedDate, attendanceType, subjectId, reportType, selectedWeek, month, year, semester, academicYear]);
+  }), [resolvedClass, propClassId, propClassName, externalReportData, activeClassName, propSchoolId, currentUser, activeWorkspace, selectedDate, attendanceType, subjectId, reportType, selectedWeek, rawMonthProp, effectiveYear, semester, academicYear]);
 
   const canonicalShareUrl = useMemo(() => {
     return buildCanonicalReportUrl(canonicalParams);
@@ -1189,6 +1211,9 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
           principalNip,
           reportPlace: ctxSystemConfig?.reportPlace || 'Jakarta',
           reportDateOfficial: ctxSystemConfig?.reportDate?.trim() || selectedDate,
+          reportType,
+          month: rawMonthProp,
+          year: String(effectiveYear),
           students: targetStudents.map((s, idx) => {
             const rec = targetRecords.find((r) => r.studentId === s.id && String(r.date || '') === selectedDate);
             return {
@@ -1205,12 +1230,12 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
           }),
           records: targetRecords,
         };
-        const rKey = `kawacanaan_report_${resolvedClass?.id || propClassId || ''}_${selectedDate}`;
+        const periodTag = reportType === 'Laporan Bulanan' ? `monthly_${monthKey}` : selectedDate;
+        const rKey = `kawacanaan_report_${resolvedClass?.id || propClassId || ''}_${periodTag}`;
         localStorage.setItem(rKey, JSON.stringify(snap));
-        localStorage.setItem('kawacanaan_last_report', JSON.stringify(snap));
       } catch (_) {}
     }
-  }, [isInternalUser, targetStudents, targetRecords, schoolName, principalName, teacherName, selectedDate, resolvedClass, propClassId, activeClassName, ctxSystemConfig, ctxSchoolProfile, attendanceType, resolvedSubject]);
+  }, [isInternalUser, targetStudents, targetRecords, schoolName, principalName, teacherName, selectedDate, resolvedClass, propClassId, activeClassName, ctxSystemConfig, ctxSchoolProfile, attendanceType, resolvedSubject, reportType, rawMonthProp, effectiveYear, monthKey]);
 
   // Sinkronkan address bar secara halus agar saat URL disalin manual tetap berupa Smart Link dokumen
   useEffect(() => {

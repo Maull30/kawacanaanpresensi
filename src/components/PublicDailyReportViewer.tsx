@@ -1,11 +1,11 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react';
-import { Printer, Share2, CheckCircle2, ArrowLeft, FileText, Loader2, AlertCircle, Download, Smartphone } from 'lucide-react';
+import { Printer, Share2, CheckCircle2, ArrowLeft, FileText, Loader2, AlertCircle, Smartphone } from 'lucide-react';
 import { SchoolLogo } from './SchoolLogo';
 import { useApp } from '../context/AppContext';
 import { getFaseByClassName } from '../utils/faseKurikulum';
 import { getUserRoleScope } from '../utils/userScope';
 import { normalizeClassToken } from '../utils/documentParser';
-import { buildCanonicalReportUrl, exportReportToPdf, CanonicalReportParams } from '../utils/smartReport';
+import { buildCanonicalReportUrl, CanonicalReportParams } from '../utils/smartReport';
 
 function cleanDisplayAddress(raw: string | undefined | null): string {
   if (!raw) return '';
@@ -117,7 +117,6 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
     return null;
   });
   const [copiedLink, setCopiedLink] = useState(false);
-  const [isExportingPdf, setIsExportingPdf] = useState(false);
 
   // Sync loading state immediately when internal data is ready
   useEffect(() => {
@@ -1242,43 +1241,6 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
     }
   };
 
-  const handleDownloadPdf = async (e?: React.MouseEvent) => {
-    if (e) {
-      e.preventDefault();
-      e.stopPropagation();
-    }
-    const el = reportRef.current || document.getElementById('printable-report');
-    if (!el) {
-      console.warn('Report element not found for PDF export');
-      return;
-    }
-    setIsExportingPdf(true);
-    try {
-      const cleanCls = isKepsekReport
-        ? 'Supervisi_Kepala_Sekolah'
-        : (activeClassClean || 'Kelas').replace(/[^a-zA-Z0-9_-]/g, '_');
-      const cleanType = (reportType || 'Laporan').replace(/[^a-zA-Z0-9_-]/g, '_');
-      let periodSuffix = '';
-      if (reportType === 'Laporan Harian') {
-        periodSuffix = selectedDate;
-      } else if (reportType === 'Laporan Mingguan') {
-        periodSuffix = `${(selectedWeek || 'Minggu').replace(/\s+/g, '_')}_${month}_${year}`;
-      } else if (reportType === 'Laporan Bulanan') {
-        periodSuffix = `${month}_${year}`;
-      } else if (reportType === 'Laporan Semester' || isKepsekSemester) {
-        periodSuffix = `Semester_${semester}_${(academicYear || '').replace(/[^a-zA-Z0-9_-]/g, '_')}`;
-      } else {
-        periodSuffix = `${month}_${year}`;
-      }
-      const filename = `${cleanType}_${cleanCls}_${periodSuffix}.pdf`;
-      await exportReportToPdf(el, filename);
-    } catch (err) {
-      console.error('PDF export failed:', err);
-    } finally {
-      setIsExportingPdf(false);
-    }
-  };
-
   // Determine current active metrics for the summary cards
   const activeMetrics = useMemo(() => {
     if (!isInternalUser && externalReportData) {
@@ -1532,24 +1494,7 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
               <span className="hidden sm:inline">{copiedLink ? 'Link Tersalin!' : 'Bagikan'}</span>
             </button>
 
-            {/* 2. Tombol Unduh PDF Langsung */}
-            <button
-              type="button"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                void handleDownloadPdf(e);
-              }}
-              disabled={isExportingPdf}
-              id="btn-unduh-pdf-smart-report"
-              className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-900 active:scale-95 text-white text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-              title="Unduh langsung sebagai berkas file PDF"
-            >
-              {isExportingPdf ? <Loader2 size={15} className="animate-spin text-white" /> : <Download size={15} />}
-              <span className="inline text-xs">{isExportingPdf ? 'Menyimpan...' : 'Unduh PDF'}</span>
-            </button>
-
-            {/* 3. Tombol Cetak Browser */}
+            {/* 2. Tombol Cetak Browser */}
             <button
               type="button"
               onClick={handlePrint}

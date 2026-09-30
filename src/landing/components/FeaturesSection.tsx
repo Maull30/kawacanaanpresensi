@@ -1,9 +1,9 @@
 import React from 'react';
 import { 
   Clock, 
-  Users, 
-  CalendarDays, 
-  BarChart3, 
+  Sparkles, 
+  QrCode, 
+  MessageCircle, 
   FileSpreadsheet, 
   ShieldCheck, 
   ArrowRight
@@ -28,21 +28,21 @@ export const FeaturesSection: React.FC<FeaturesSectionProps> = ({ lang, onOpenRe
   };
 
   const card2 = isId ? {
-    title: 'Database Rombel 1–6',
-    desc: 'Pengelolaan data siswa, NISN, kontak wali murid, dan riwayat kenaikan kelas rapi.',
-    tag: 'Kelas 1–6',
+    title: 'Asisten AI Cerdas "Presiden Konoha"',
+    desc: 'Bantu rekap dan catat absensi lewat perintah percakapan cerdas tanpa ribet klik manual.',
+    tag: 'Asisten Cerdas',
   } : {
-    title: 'Grade 1–6 Cohorts',
-    desc: 'Organized database for student profiles, national IDs, and progression records.',
-    tag: 'Grade 1–6',
+    title: 'Smart AI Assistant "President Konoha"',
+    desc: 'Automate attendance logs and recaps through smart natural voice and text commands.',
+    tag: 'Smart AI Assistant',
   };
 
   const bottomCards = isId ? [
     {
-      icon: CalendarDays,
-      title: 'Hari Efektif Otomatis',
-      desc: 'Kalkulasi otomatis hari belajar efektif, libur dinas, dan kalender semester.',
-      tag: 'Kalender Dinas',
+      icon: QrCode,
+      title: 'Absensi QR Code',
+      desc: 'Scan QR dinamis via kamera HP siswa atau kelas dengan validasi instan tanpa antrean.',
+      tag: 'Cepat & Akurat',
       theme: {
         iconBg: 'bg-indigo-600',
         tagBg: 'bg-indigo-50 text-indigo-700 border-indigo-100',
@@ -51,10 +51,10 @@ export const FeaturesSection: React.FC<FeaturesSectionProps> = ({ lang, onOpenRe
       }
     },
     {
-      icon: BarChart3,
-      title: 'Rekapitulasi Otomatis',
-      desc: 'Akumulasi kehadiran bulanan dan semester tanpa risiko rumus manual spreadsheet.',
-      tag: '100% Akurat',
+      icon: MessageCircle,
+      title: 'Notifikasi WhatsApp',
+      desc: 'Kirim rekap kehadiran dan status siswa langsung ke WhatsApp orang tua secara real-time.',
+      tag: 'Real-time WA',
       theme: {
         iconBg: 'bg-amber-500',
         tagBg: 'bg-amber-50 text-amber-700 border-amber-100',
@@ -76,7 +76,7 @@ export const FeaturesSection: React.FC<FeaturesSectionProps> = ({ lang, onOpenRe
     },
     {
       icon: ShieldCheck,
-      title: 'Portal Siswa & Wali',
+      title: 'Portal Siswa & Orang Tua/Wali Murid',
       desc: 'Akses transparan bagi orang tua untuk pantau kehadiran harian dan kirim surat izin.',
       tag: 'Akses Mandiri',
       theme: {
@@ -88,10 +88,10 @@ export const FeaturesSection: React.FC<FeaturesSectionProps> = ({ lang, onOpenRe
     },
   ] : [
     {
-      icon: CalendarDays,
-      title: 'Auto Effective Days',
-      desc: 'Automated learning day counts, official breaks, and academic term schedules.',
-      tag: 'Official Calendar',
+      icon: QrCode,
+      title: 'QR Code Attendance',
+      desc: 'Dynamic QR scanning via classroom camera with instant verification and no queues.',
+      tag: 'Fast & Accurate',
       theme: {
         iconBg: 'bg-indigo-600',
         tagBg: 'bg-indigo-50 text-indigo-700 border-indigo-100',
@@ -100,10 +100,10 @@ export const FeaturesSection: React.FC<FeaturesSectionProps> = ({ lang, onOpenRe
       }
     },
     {
-      icon: BarChart3,
-      title: 'Instant Recapitulation',
-      desc: 'Automated monthly and term attendance totals without manual spreadsheet formulas.',
-      tag: '100% Accurate',
+      icon: MessageCircle,
+      title: 'WhatsApp Notifications',
+      desc: 'Send real-time attendance recaps and student status alerts directly to parents WhatsApp.',
+      tag: 'Real-time WA',
       theme: {
         iconBg: 'bg-amber-500',
         tagBg: 'bg-amber-50 text-amber-700 border-amber-100',
@@ -125,7 +125,7 @@ export const FeaturesSection: React.FC<FeaturesSectionProps> = ({ lang, onOpenRe
     },
     {
       icon: ShieldCheck,
-      title: 'Student & Parent Portal',
+      title: 'Student & Parent/Guardian Portal',
       desc: 'Direct portal for parents to verify daily attendance and submit official leaves.',
       tag: 'Direct Access',
       theme: {
@@ -288,7 +288,7 @@ export const FeaturesSection: React.FC<FeaturesSectionProps> = ({ lang, onOpenRe
             </div>
           </div>
 
-          {/* KARTU 2 (Kanan): Database Rombel 1–6 */}
+          {/* KARTU 2 (Kanan): Asisten AI Cerdas "Presiden Konoha" */}
           <div className="lg:col-span-4 bg-white/95 rounded-3xl p-5 sm:p-6 lg:p-4 xl:p-5 shadow-[0_12px_30px_-10px_rgba(16,185,129,0.12)] border border-emerald-100/80 hover:border-emerald-300 hover:shadow-lg hover:shadow-emerald-500/10 transition-all duration-300 flex flex-col justify-between relative overflow-hidden group min-h-[190px] lg:min-h-[160px] xl:min-h-[185px]">
             {/* Bottom-right organic pastel decorative corner shape */}
             <div className="absolute -bottom-8 -right-8 w-28 h-28 bg-emerald-100/60 rounded-tl-full pointer-events-none transition-transform group-hover:scale-110" />
@@ -297,7 +297,7 @@ export const FeaturesSection: React.FC<FeaturesSectionProps> = ({ lang, onOpenRe
               {/* Header Icon + Tag */}
               <div className="flex items-center justify-between gap-3 mb-2.5 lg:mb-2 xl:mb-3">
                 <div className="w-10 h-10 lg:w-9 lg:h-9 xl:w-11 xl:h-11 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shadow-md shadow-emerald-600/30 shrink-0">
-                  <Users className="w-5 h-5 lg:w-4.5 lg:h-4.5 xl:w-5.5 xl:h-5.5" />
+                  <Sparkles className="w-5 h-5 lg:w-4.5 lg:h-4.5 xl:w-5.5 xl:h-5.5" />
                 </div>
                 <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100">
                   {card2.tag}

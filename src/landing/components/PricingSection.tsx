@@ -172,7 +172,7 @@ export const PricingSection: React.FC<PricingSectionProps> = ({ onOpenRegister, 
   return (
     <section 
       id="harga" 
-      className="scroll-mt-16 sm:scroll-mt-20 pt-16 sm:pt-20 pb-16 sm:pb-24 lg:py-0 lg:min-h-screen lg:h-screen lg:max-h-screen lg:flex lg:flex-col lg:justify-center bg-gradient-to-b from-[#F3F8FF] via-[#E9F3FE] to-[#DCEBFE] text-slate-900 relative antialiased overflow-hidden"
+      className="scroll-mt-16 sm:scroll-mt-20 pt-16 sm:pt-20 pb-16 sm:pb-24 lg:py-0 lg:min-h-screen lg:h-screen lg:max-h-screen lg:flex lg:flex-col lg:justify-center lg:items-center bg-gradient-to-b from-[#F3F8FF] via-[#E9F3FE] to-[#DCEBFE] text-slate-900 relative antialiased overflow-hidden"
     >
       {/* Background Soft Glows & Ambient Orbs */}
       <div className="absolute top-10 left-10 w-96 h-96 bg-blue-200/35 rounded-full blur-3xl pointer-events-none" />
@@ -194,17 +194,17 @@ export const PricingSection: React.FC<PricingSectionProps> = ({ onOpenRegister, 
         </div>
       </div>
 
-      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
+      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full my-auto flex flex-col justify-center items-center">
         
         {/* ========================================================================= */}
         {/* SECTION HEADER: Main Title, Subtitle & 3D School & Doodle                */}
         {/* ========================================================================= */}
-        <div className="relative text-center mb-6 sm:mb-8 lg:mb-2 xl:mb-4">
+        <div className="relative text-center mb-6 sm:mb-8 lg:mb-1.5 xl:mb-3">
           
           {/* Top-Left Playful Handwritten Annotation with Rays */}
           <div className="hidden lg:block absolute -top-4 left-4 xl:left-8 pointer-events-none select-none text-left">
             <div className="inline-block -rotate-[7deg] bg-white/50 backdrop-blur-xs px-3.5 py-2 rounded-2xl border border-blue-200/50 shadow-2xs">
-              <div className="relative font-bold text-blue-600 leading-tight tracking-tight text-sm xl:text-base">
+              <div className="relative font-bold text-blue-600 leading-tight tracking-tight text-xs lg:text-xs xl:text-sm">
                 <div className="text-blue-600 font-medium">`Solusi Lengkap</div>
                 <div className="text-blue-700 font-extrabold">untuk Manajemen`</div>
                 <div className="text-blue-800 font-black">Sekolah Anda.</div>
@@ -218,7 +218,7 @@ export const PricingSection: React.FC<PricingSectionProps> = ({ onOpenRegister, 
           </div>
 
           {/* Top-Right 3D Illustration of Indonesian School with 'SCHOOL' Sign */}
-          <div className="hidden xl:block absolute -top-8 right-2 xl:right-6 pointer-events-none select-none w-32 xl:w-40 opacity-80">
+          <div className="hidden xl:block absolute -top-8 right-2 xl:right-6 pointer-events-none select-none w-28 xl:w-36 opacity-80">
             <img 
               src="/images/pricing_school_3d.jpg" 
               alt="School 3D Illustration" 
@@ -228,25 +228,25 @@ export const PricingSection: React.FC<PricingSectionProps> = ({ onOpenRegister, 
           </div>
 
           {/* High-Contrast Main Title */}
-          <h2 className="text-2xl sm:text-3xl lg:text-3xl xl:text-4xl font-black text-slate-900 tracking-tight leading-tight uppercase max-w-2xl mx-auto">
+          <h2 className="text-2xl sm:text-3xl lg:text-xl xl:text-2xl 2xl:text-3xl font-black text-slate-900 tracking-tight leading-tight uppercase max-w-2xl mx-auto">
             <span>{isId ? 'Pilih Paket Sesuai' : 'Choose Plan For'}</span>
             <span className="block text-blue-600 mt-0.5">{isId ? 'Ruang Kerja Anda' : 'Your Workspace'}</span>
           </h2>
 
           {/* Subtitle Description */}
-          <p className="mt-1.5 lg:mt-1 text-slate-600 text-xs sm:text-sm lg:text-xs xl:text-sm leading-relaxed max-w-xl mx-auto font-normal">
+          <p className="mt-1.5 lg:mt-0.5 text-slate-600 text-xs sm:text-sm lg:text-[11.5px] xl:text-xs leading-relaxed max-w-lg mx-auto font-normal">
             {isId
               ? 'Paket ditentukan berdasarkan ruang kerja: mulai dari Ruang Kerja Individu hingga Ruang Kerja Sekolah terpadu.'
               : 'Plans are organized by workspace: from standalone personal workspaces for individual teachers to fully integrated institutional school deployment.'}
           </p>
 
           {/* Toggle Switch Periode Waktu: Bulanan vs Tahunan (Rounded Pill Style) */}
-          <div className="pt-3 lg:pt-2 xl:pt-3 flex items-center justify-center">
-            <div className="inline-flex items-center p-1 bg-white border border-slate-200/90 rounded-full shadow-xs">
+          <div className="pt-2.5 lg:pt-1 xl:pt-1.5 flex items-center justify-center">
+            <div className="inline-flex items-center p-0.5 lg:p-0.5 bg-white border border-slate-200/90 rounded-full shadow-xs">
               <button
                 type="button"
                 onClick={() => setBillingCycle('monthly')}
-                className={`px-4 sm:px-5 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+                className={`px-4 sm:px-5 lg:px-3 xl:px-4 py-1.5 sm:py-2 lg:py-1 xl:py-1.5 rounded-full text-xs sm:text-sm lg:text-[11px] xl:text-xs font-bold transition-all cursor-pointer ${
                   billingCycle === 'monthly'
                     ? 'bg-blue-600 text-white shadow-xs'
                     : 'text-slate-600 hover:text-slate-900'
@@ -258,14 +258,14 @@ export const PricingSection: React.FC<PricingSectionProps> = ({ onOpenRegister, 
               <button
                 type="button"
                 onClick={() => setBillingCycle('yearly')}
-                className={`px-4 sm:px-5 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                className={`px-4 sm:px-5 lg:px-3 xl:px-4 py-1.5 sm:py-2 lg:py-1 xl:py-1.5 rounded-full text-xs sm:text-sm lg:text-[11px] xl:text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
                   billingCycle === 'yearly'
                     ? 'bg-blue-600 text-white shadow-xs'
                     : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
                 <span>{isId ? 'Tahunan' : 'Yearly'}</span>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-500 text-white">
+                <span className="px-1.5 py-0.5 rounded-full text-[9px] lg:text-[8.5px] xl:text-[9.5px] font-black bg-emerald-500 text-white">
                   {isId ? 'Hemat 2 Bulan' : 'Save 2 Mos'}
                 </span>
               </button>
@@ -296,59 +296,59 @@ export const PricingSection: React.FC<PricingSectionProps> = ({ onOpenRegister, 
         {/* ========================================================================= */}
         {/* 3 PRICING CARDS: White Card, Blue-Bordered Card, Dark Blue Institution Card */}
         {/* ========================================================================= */}
-        <div className="flex md:grid md:grid-cols-3 overflow-x-auto md:overflow-x-visible snap-x snap-mandatory gap-6 items-stretch pb-4 md:pb-0 -mx-3 px-3 sm:mx-0 sm:px-0 max-w-6xl mx-auto">
+        <div className="w-full flex md:grid md:grid-cols-3 overflow-x-auto md:overflow-x-visible snap-x snap-mandatory gap-5 lg:gap-3 xl:gap-4.5 items-stretch pt-4 sm:pt-4 lg:pt-3.5 pb-2 md:pb-0 -mx-3 px-3 sm:mx-0 sm:px-0 max-w-6xl lg:max-w-4xl xl:max-w-5xl 2xl:max-w-6xl mx-auto">
           
           {/* CARD 1: PAKET GRATIS (Ruang Kerja Individu) */}
           <div 
             id="pricing-card-free"
-            className="w-[85vw] sm:w-[350px] md:w-auto shrink-0 md:shrink snap-center bg-white rounded-3xl p-6 sm:p-7 flex flex-col justify-between border border-blue-100/80 shadow-[0_8px_24px_-8px_rgba(37,99,235,0.08)] hover:shadow-xl hover:shadow-blue-500/10 transition-all duration-300 relative"
+            className="w-[85vw] sm:w-[350px] md:w-auto shrink-0 md:shrink snap-center bg-white rounded-3xl lg:rounded-2xl p-6 sm:p-7 lg:p-3 xl:p-4 flex flex-col justify-between border border-blue-100/80 shadow-[0_8px_24px_-8px_rgba(37,99,235,0.08)] hover:shadow-xl hover:shadow-blue-500/10 transition-all duration-300 relative overflow-visible"
           >
             <div>
               {/* Workspace Badge */}
-              <div className="flex items-center gap-2 mb-4">
-                <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center text-blue-600">
-                  <User className="w-4 h-4" />
+              <div className="flex items-center gap-1.5 mb-2.5 lg:mb-1 xl:mb-1.5">
+                <div className="w-7 h-7 lg:w-5.5 lg:h-5.5 xl:w-6 xl:h-6 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 shrink-0">
+                  <User className="w-3.5 h-3.5 lg:w-3 lg:h-3" />
                 </div>
-                <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-blue-50 text-blue-700">
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs lg:text-[10px] xl:text-[11px] font-bold bg-blue-50 text-blue-700">
                   {plans[0].workspaceType}
                 </span>
               </div>
 
               {/* Title & Tagline */}
-              <h3 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight mb-2">
+              <h3 className="text-lg sm:text-xl lg:text-sm xl:text-base font-black text-slate-900 tracking-tight mb-1 lg:mb-0.5">
                 {plans[0].name}
               </h3>
-              <p className="text-xs sm:text-[13px] text-slate-500 leading-relaxed min-h-[38px] mb-4">
+              <p className="text-xs sm:text-[13px] lg:text-[10.5px] xl:text-[11.5px] text-slate-500 leading-snug min-h-[36px] lg:min-h-[26px] xl:min-h-[28px] mb-2.5 lg:mb-1.5 xl:mb-2">
                 {plans[0].tagline}
               </p>
 
               {/* Price Block */}
-              <div className="mb-4 pb-4 border-b border-slate-100">
+              <div className="mb-2.5 pb-2.5 lg:mb-1.5 lg:pb-1.5 xl:mb-2 xl:pb-2 border-b border-slate-100">
                 <div className="flex items-baseline gap-1">
-                  <span className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight">
+                  <span className="text-2xl sm:text-3xl lg:text-xl xl:text-2xl font-black text-slate-900 tracking-tight">
                     {plans[0].price}
                   </span>
-                  <span className="text-xs font-bold text-slate-500">
+                  <span className="text-xs lg:text-[10px] xl:text-[11px] font-bold text-slate-500">
                     {plans[0].period}
                   </span>
                 </div>
-                <div className="mt-2 text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                  <CreditCard className="w-3.5 h-3.5 text-slate-400" />
+                <div className="mt-1.5 lg:mt-0.5 text-[10.5px] lg:text-[9px] xl:text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                  <CreditCard className="w-3.5 h-3.5 lg:w-3 lg:h-3 text-slate-400" />
                   <span>{plans[0].paymentNote}</span>
                 </div>
               </div>
 
               {/* Features List */}
-              <div className="space-y-2 mb-6">
-                <div className="text-[11px] font-black uppercase tracking-wider text-slate-400">
+              <div className="space-y-1.5 lg:space-y-0.5 xl:space-y-1 mb-4 lg:mb-2 xl:mb-3">
+                <div className="text-[10.5px] lg:text-[9px] xl:text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1 lg:mb-0.5">
                   {isId ? 'FITUR UTAMA:' : 'KEY FEATURES:'}
                 </div>
                 {plans[0].features.map((feat, i) => (
-                  <div key={i} className="flex items-start gap-2.5 text-slate-600">
-                    <div className="w-4 h-4 rounded-full bg-blue-100 flex items-center justify-center shrink-0 mt-0.5 text-blue-600">
-                      <Check className="w-2.5 h-2.5 stroke-[3]" />
+                  <div key={i} className="flex items-start gap-2 text-slate-600">
+                    <div className="w-3.5 h-3.5 lg:w-3 lg:h-3 rounded-full bg-blue-100 flex items-center justify-center shrink-0 mt-0.5 text-blue-600">
+                      <Check className="w-2 h-2 stroke-[3]" />
                     </div>
-                    <span className="text-xs sm:text-[13px] leading-snug">{feat}</span>
+                    <span className="text-xs sm:text-[13px] lg:text-[10.5px] xl:text-[11px] leading-tight">{feat}</span>
                   </div>
                 ))}
               </div>
@@ -358,70 +358,70 @@ export const PricingSection: React.FC<PricingSectionProps> = ({ onOpenRegister, 
             <button
               type="button"
               onClick={() => handleCtaClick('free')}
-              className="w-full py-3 px-4 text-xs sm:text-sm font-bold text-blue-600 bg-white border-2 border-blue-500 hover:bg-blue-50 rounded-2xl flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xs active:scale-98"
+              className="w-full py-2.5 px-3 lg:py-1.5 lg:px-2.5 xl:py-2 xl:px-3 text-xs lg:text-[11px] xl:text-xs font-bold text-blue-600 bg-white border-2 border-blue-500 hover:bg-blue-50 rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-xs active:scale-98"
             >
               <span>{plans[0].ctaText}</span>
-              <ArrowRight className="w-4 h-4" />
+              <ArrowRight className="w-3.5 h-3.5 lg:w-3 lg:h-3" />
             </button>
           </div>
 
           {/* CARD 2: PAKET GURU (Ruang Kerja Individu Pro) - Paling Populer */}
           <div 
             id="pricing-card-teacher"
-            className="w-[85vw] sm:w-[350px] md:w-auto shrink-0 md:shrink snap-center bg-white rounded-3xl p-6 sm:p-7 flex flex-col justify-between border-2 border-blue-500 shadow-[0_12px_32px_-8px_rgba(37,99,235,0.18)] hover:shadow-2xl transition-all duration-300 relative"
+            className="w-[85vw] sm:w-[350px] md:w-auto shrink-0 md:shrink snap-center bg-white rounded-3xl lg:rounded-2xl p-6 sm:p-7 lg:p-3 xl:p-4 flex flex-col justify-between border-2 border-blue-500 shadow-[0_12px_32px_-8px_rgba(37,99,235,0.18)] hover:shadow-2xl transition-all duration-300 relative overflow-visible"
           >
             {/* Top Pill Badge - Paling Populer */}
-            <div className="absolute -top-3 left-6 px-3.5 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-blue-600 text-white shadow-md flex items-center gap-1.5">
-              <Star className="w-3 h-3 fill-white" />
+            <div className="absolute -top-3 lg:-top-2.5 left-4 px-3 py-1 lg:px-2.5 lg:py-0.5 rounded-full text-[10.5px] lg:text-[9px] xl:text-[10px] font-black uppercase tracking-wider bg-blue-600 text-white shadow-md flex items-center gap-1 z-20 whitespace-nowrap">
+              <Star className="w-3 h-3 lg:w-2.5 lg:h-2.5 fill-white shrink-0" />
               <span>{plans[1].badge}</span>
             </div>
 
             <div>
               {/* Workspace Badge */}
-              <div className="flex items-center gap-2 mb-4 mt-1">
-                <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center text-blue-600">
-                  <Users className="w-4 h-4" />
+              <div className="flex items-center gap-1.5 mb-2.5 lg:mb-1 xl:mb-1.5 mt-0.5 lg:mt-0">
+                <div className="w-7 h-7 lg:w-5.5 lg:h-5.5 xl:w-6 xl:h-6 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 shrink-0">
+                  <Users className="w-3.5 h-3.5 lg:w-3 lg:h-3" />
                 </div>
-                <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-blue-50 text-blue-700">
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs lg:text-[10px] xl:text-[11px] font-bold bg-blue-50 text-blue-700">
                   {plans[1].workspaceType}
                 </span>
               </div>
 
               {/* Title & Tagline */}
-              <h3 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight mb-2">
+              <h3 className="text-lg sm:text-xl lg:text-sm xl:text-base font-black text-slate-900 tracking-tight mb-1 lg:mb-0.5">
                 {plans[1].name}
               </h3>
-              <p className="text-xs sm:text-[13px] text-slate-500 leading-relaxed min-h-[38px] mb-4">
+              <p className="text-xs sm:text-[13px] lg:text-[10.5px] xl:text-[11.5px] text-slate-500 leading-snug min-h-[36px] lg:min-h-[26px] xl:min-h-[28px] mb-2.5 lg:mb-1.5 xl:mb-2">
                 {plans[1].tagline}
               </p>
 
               {/* Price Block */}
-              <div className="mb-4 pb-4 border-b border-slate-100">
+              <div className="mb-2.5 pb-2.5 lg:mb-1.5 lg:pb-1.5 xl:mb-2 xl:pb-2 border-b border-slate-100">
                 <div className="flex items-baseline gap-1">
-                  <span className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight">
+                  <span className="text-2xl sm:text-3xl lg:text-xl xl:text-2xl font-black text-slate-900 tracking-tight">
                     {plans[1].price}
                   </span>
-                  <span className="text-xs font-bold text-slate-500">
+                  <span className="text-xs lg:text-[10px] xl:text-[11px] font-bold text-slate-500">
                     {plans[1].period}
                   </span>
                 </div>
-                <div className="mt-2 text-[11px] font-bold text-blue-600 uppercase tracking-wider flex items-center gap-1.5">
-                  <QrCode className="w-3.5 h-3.5 text-blue-600" />
+                <div className="mt-1.5 lg:mt-0.5 text-[10.5px] lg:text-[9px] xl:text-[10px] font-bold text-blue-600 uppercase tracking-wider flex items-center gap-1">
+                  <QrCode className="w-3.5 h-3.5 lg:w-3 lg:h-3 text-blue-600" />
                   <span>{plans[1].paymentNote}</span>
                 </div>
               </div>
 
               {/* Features List */}
-              <div className="space-y-2 mb-6">
-                <div className="text-[11px] font-black uppercase tracking-wider text-slate-400">
+              <div className="space-y-1.5 lg:space-y-0.5 xl:space-y-1 mb-4 lg:mb-2 xl:mb-3">
+                <div className="text-[10.5px] lg:text-[9px] xl:text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1 lg:mb-0.5">
                   {isId ? 'FITUR UTAMA:' : 'KEY FEATURES:'}
                 </div>
                 {plans[1].features.map((feat, i) => (
-                  <div key={i} className="flex items-start gap-2.5 text-slate-600">
-                    <div className="w-4 h-4 rounded-full bg-blue-100 flex items-center justify-center shrink-0 mt-0.5 text-blue-600">
-                      <Check className="w-2.5 h-2.5 stroke-[3]" />
+                  <div key={i} className="flex items-start gap-2 text-slate-600">
+                    <div className="w-3.5 h-3.5 lg:w-3 lg:h-3 rounded-full bg-blue-100 flex items-center justify-center shrink-0 mt-0.5 text-blue-600">
+                      <Check className="w-2 h-2 stroke-[3]" />
                     </div>
-                    <span className="text-xs sm:text-[13px] leading-snug">{feat}</span>
+                    <span className="text-xs sm:text-[13px] lg:text-[10.5px] xl:text-[11px] leading-tight">{feat}</span>
                   </div>
                 ))}
               </div>
@@ -431,80 +431,80 @@ export const PricingSection: React.FC<PricingSectionProps> = ({ onOpenRegister, 
             <button
               type="button"
               onClick={() => handleCtaClick('teacher')}
-              className="w-full py-3.5 px-4 text-xs sm:text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-2xl flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md shadow-blue-500/25 active:scale-98"
+              className="w-full py-2.5 px-3 lg:py-1.5 lg:px-2.5 xl:py-2 xl:px-3 text-xs lg:text-[11px] xl:text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-md shadow-blue-500/25 active:scale-98"
             >
               <span>{plans[1].ctaText}</span>
-              <ArrowRight className="w-4 h-4" />
+              <ArrowRight className="w-3.5 h-3.5 lg:w-3 lg:h-3" />
             </button>
           </div>
 
           {/* CARD 3: PAKET SEKOLAH (Ruang Kerja Sekolah / Institusi) - Dark Blue Theme */}
           <div 
             id="pricing-card-school"
-            className="w-[85vw] sm:w-[350px] md:w-auto shrink-0 md:shrink snap-center bg-[#0C2D64] text-white rounded-3xl p-6 sm:p-7 flex flex-col justify-between shadow-2xl relative overflow-hidden"
+            className="w-[85vw] sm:w-[350px] md:w-auto shrink-0 md:shrink snap-center bg-[#0C2D64] text-white rounded-3xl lg:rounded-2xl p-6 sm:p-7 lg:p-3 xl:p-4 flex flex-col justify-between shadow-2xl relative overflow-visible"
           >
             {/* Top Pill Badge - Rekomendasi Utama Sekolah */}
-            <div className="absolute -top-3 left-6 px-3.5 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-amber-400 text-slate-950 shadow-md flex items-center gap-1.5">
-              <Star className="w-3 h-3 fill-slate-950" />
+            <div className="absolute -top-3 lg:-top-2.5 left-4 px-3 py-1 lg:px-2.5 lg:py-0.5 rounded-full text-[10.5px] lg:text-[9px] xl:text-[10px] font-black uppercase tracking-wider bg-amber-400 text-slate-950 shadow-md flex items-center gap-1 z-20 whitespace-nowrap">
+              <Star className="w-3 h-3 lg:w-2.5 lg:h-2.5 fill-slate-950 shrink-0" />
               <span>{plans[2].badge}</span>
             </div>
 
             <div>
               {/* Workspace Badge */}
-              <div className="flex items-center gap-2 mb-4 mt-1">
-                <div className="w-8 h-8 rounded-full bg-blue-800/70 flex items-center justify-center text-blue-300">
-                  <Building2 className="w-4 h-4" />
+              <div className="flex items-center gap-1.5 mb-2.5 lg:mb-1 xl:mb-1.5 mt-0.5 lg:mt-0">
+                <div className="w-7 h-7 lg:w-5.5 lg:h-5.5 xl:w-6 xl:h-6 rounded-full bg-blue-800/70 flex items-center justify-center text-blue-300 shrink-0">
+                  <Building2 className="w-3.5 h-3.5 lg:w-3 lg:h-3" />
                 </div>
-                <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-blue-800/60 text-blue-200">
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs lg:text-[10px] xl:text-[11px] font-bold bg-blue-800/60 text-blue-200">
                   {plans[2].workspaceType}
                 </span>
               </div>
 
               {/* Title & Tagline */}
-              <h3 className="text-xl sm:text-2xl font-black text-white tracking-tight mb-2">
+              <h3 className="text-lg sm:text-xl lg:text-sm xl:text-base font-black text-white tracking-tight mb-1 lg:mb-0.5">
                 {plans[2].name}
               </h3>
-              <p className="text-xs sm:text-[13px] text-blue-200/90 leading-relaxed min-h-[38px] mb-4">
+              <p className="text-xs sm:text-[13px] lg:text-[10.5px] xl:text-[11.5px] text-blue-200/90 leading-snug min-h-[36px] lg:min-h-[26px] xl:min-h-[28px] mb-2.5 lg:mb-1.5 xl:mb-2">
                 {plans[2].tagline}
               </p>
 
               {/* Price Block */}
-              <div className="mb-4 pb-4 border-b border-blue-800/80">
+              <div className="mb-2.5 pb-2.5 lg:mb-1.5 lg:pb-1.5 xl:mb-2 xl:pb-2 border-b border-blue-800/80">
                 {plans[2].originalPrice && (
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-xs line-through text-blue-300 font-bold">
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <span className="text-xs lg:text-[10px] line-through text-blue-300 font-bold">
                       {plans[2].originalPrice}
                     </span>
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-500 text-white">
+                    <span className="px-1.5 py-0.5 rounded-full text-[9px] lg:text-[8.5px] xl:text-[9.5px] font-black bg-emerald-500 text-white">
                       {plans[2].savingsBadge}
                     </span>
                   </div>
                 )}
                 <div className="flex items-baseline gap-1">
-                  <span className="text-3xl sm:text-4xl font-black text-white tracking-tight">
+                  <span className="text-2xl sm:text-3xl lg:text-xl xl:text-2xl font-black text-white tracking-tight">
                     {plans[2].price}
                   </span>
-                  <span className="text-xs font-bold text-blue-200">
+                  <span className="text-xs lg:text-[10px] xl:text-[11px] font-bold text-blue-200">
                     {plans[2].period}
                   </span>
                 </div>
-                <div className="mt-2 text-[11px] font-bold text-blue-300 uppercase tracking-wider flex items-center gap-1.5">
-                  <QrCode className="w-3.5 h-3.5 text-blue-300" />
+                <div className="mt-1.5 lg:mt-0.5 text-[10.5px] lg:text-[9px] xl:text-[10px] font-bold text-blue-300 uppercase tracking-wider flex items-center gap-1">
+                  <QrCode className="w-3.5 h-3.5 lg:w-3 lg:h-3 text-blue-300" />
                   <span>{plans[2].paymentNote}</span>
                 </div>
               </div>
 
               {/* Features List */}
-              <div className="space-y-2 mb-6">
-                <div className="text-[11px] font-black uppercase tracking-wider text-blue-300">
+              <div className="space-y-1.5 lg:space-y-0.5 xl:space-y-1 mb-4 lg:mb-2 xl:mb-3">
+                <div className="text-[10.5px] lg:text-[9px] xl:text-[10px] font-black uppercase tracking-wider text-blue-300 mb-1 lg:mb-0.5">
                   {isId ? 'FITUR UTAMA:' : 'KEY FEATURES:'}
                 </div>
                 {plans[2].features.map((feat, i) => (
-                  <div key={i} className="flex items-start gap-2.5 text-blue-50">
-                    <div className="w-4 h-4 rounded-full bg-blue-500 flex items-center justify-center shrink-0 mt-0.5 text-white">
-                      <Check className="w-2.5 h-2.5 stroke-[3]" />
+                  <div key={i} className="flex items-start gap-2 text-blue-50">
+                    <div className="w-3.5 h-3.5 lg:w-3 lg:h-3 rounded-full bg-blue-500 flex items-center justify-center shrink-0 mt-0.5 text-white">
+                      <Check className="w-2 h-2 stroke-[3]" />
                     </div>
-                    <span className="text-xs sm:text-[13px] leading-snug">{feat}</span>
+                    <span className="text-xs sm:text-[13px] lg:text-[10.5px] xl:text-[11px] leading-tight">{feat}</span>
                   </div>
                 ))}
               </div>
@@ -514,10 +514,10 @@ export const PricingSection: React.FC<PricingSectionProps> = ({ onOpenRegister, 
             <button
               type="button"
               onClick={() => handleCtaClick('school')}
-              className="w-full py-3.5 px-4 text-xs sm:text-sm font-black text-slate-950 bg-gradient-to-r from-amber-400 to-amber-300 hover:from-amber-300 hover:to-amber-200 rounded-2xl flex items-center justify-center gap-2 transition-all cursor-pointer shadow-lg shadow-amber-400/20 active:scale-98"
+              className="w-full py-2.5 px-3 lg:py-1.5 lg:px-2.5 xl:py-2 xl:px-3 text-xs lg:text-[11px] xl:text-xs font-black text-slate-950 bg-gradient-to-r from-amber-400 to-amber-300 hover:from-amber-300 hover:to-amber-200 rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-lg shadow-amber-400/20 active:scale-98"
             >
               <span>{plans[2].ctaText}</span>
-              <ArrowRight className="w-4 h-4" />
+              <ArrowRight className="w-3.5 h-3.5 lg:w-3 lg:h-3" />
             </button>
           </div>
 
@@ -526,64 +526,64 @@ export const PricingSection: React.FC<PricingSectionProps> = ({ onOpenRegister, 
         {/* ========================================================================= */}
         {/* BOTTOM GUARANTEE & TRUST BAR: 4 Columns (Matching Bottom Row of Image)    */}
         {/* ========================================================================= */}
-        <div className="mt-12 sm:mt-16 bg-white/90 backdrop-blur-xs rounded-3xl p-6 sm:p-7 border border-blue-100/80 shadow-[0_8px_24px_-8px_rgba(37,99,235,0.08)] max-w-6xl mx-auto">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8">
+        <div className="mt-6 sm:mt-8 lg:mt-2 xl:mt-3 bg-white/90 backdrop-blur-xs rounded-2xl lg:rounded-xl p-4 sm:p-5 lg:py-1.5 lg:px-3 xl:py-2 xl:px-4 border border-blue-100/80 shadow-[0_6px_20px_-8px_rgba(37,99,235,0.06)] max-w-6xl lg:max-w-4xl xl:max-w-5xl 2xl:max-w-6xl mx-auto">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-2.5 xl:gap-3">
             
             {/* 1. Aman & Terpercaya */}
-            <div className="flex items-start gap-3.5">
-              <div className="w-10 h-10 rounded-2xl bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600 shrink-0">
-                <ShieldCheck className="w-5 h-5" />
+            <div className="flex items-center gap-2.5 lg:gap-2">
+              <div className="w-8 h-8 lg:w-6 lg:h-6 xl:w-7 xl:h-7 rounded-xl lg:rounded-lg bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600 shrink-0">
+                <ShieldCheck className="w-4 h-4 lg:w-3 lg:h-3 xl:w-3.5 xl:h-3.5" />
               </div>
               <div>
-                <h4 className="text-sm font-black text-slate-900 mb-0.5">
+                <h4 className="text-xs lg:text-[11px] xl:text-xs font-black text-slate-900 mb-0.5 lg:mb-0 leading-tight">
                   {isId ? 'Aman & Terpercaya' : 'Secure & Trusted'}
                 </h4>
-                <p className="text-xs text-slate-500 leading-relaxed">
+                <p className="text-[11px] lg:text-[9.5px] xl:text-[10px] text-slate-500 leading-tight">
                   {isId ? 'Data sekolah Anda terlindungi dengan sistem keamanan modern.' : 'Your school data is protected with modern security systems.'}
                 </p>
               </div>
             </div>
 
             {/* 2. Akses Fleksibel */}
-            <div className="flex items-start gap-3.5">
-              <div className="w-10 h-10 rounded-2xl bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600 shrink-0">
-                <Globe className="w-5 h-5" />
+            <div className="flex items-center gap-2.5 lg:gap-2">
+              <div className="w-8 h-8 lg:w-6 lg:h-6 xl:w-7 xl:h-7 rounded-xl lg:rounded-lg bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600 shrink-0">
+                <Globe className="w-4 h-4 lg:w-3 lg:h-3 xl:w-3.5 xl:h-3.5" />
               </div>
               <div>
-                <h4 className="text-sm font-black text-slate-900 mb-0.5">
+                <h4 className="text-xs lg:text-[11px] xl:text-xs font-black text-slate-900 mb-0.5 lg:mb-0 leading-tight">
                   {isId ? 'Akses Fleksibel' : 'Flexible Access'}
                 </h4>
-                <p className="text-xs text-slate-500 leading-relaxed">
+                <p className="text-[11px] lg:text-[9.5px] xl:text-[10px] text-slate-500 leading-tight">
                   {isId ? 'Bisa diakses dari mana saja, kapan saja, di semua perangkat.' : 'Accessible from anywhere, anytime, across all devices.'}
                 </p>
               </div>
             </div>
 
             {/* 3. Dukungan Penuh */}
-            <div className="flex items-start gap-3.5">
-              <div className="w-10 h-10 rounded-2xl bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600 shrink-0">
-                <Headphones className="w-5 h-5" />
+            <div className="flex items-center gap-2.5 lg:gap-2">
+              <div className="w-8 h-8 lg:w-6 lg:h-6 xl:w-7 xl:h-7 rounded-xl lg:rounded-lg bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600 shrink-0">
+                <Headphones className="w-4 h-4 lg:w-3 lg:h-3 xl:w-3.5 xl:h-3.5" />
               </div>
               <div>
-                <h4 className="text-sm font-black text-slate-900 mb-0.5">
+                <h4 className="text-xs lg:text-[11px] xl:text-xs font-black text-slate-900 mb-0.5 lg:mb-0 leading-tight">
                   {isId ? 'Dukungan Penuh' : 'Full Support'}
                 </h4>
-                <p className="text-xs text-slate-500 leading-relaxed">
+                <p className="text-[11px] lg:text-[9.5px] xl:text-[10px] text-slate-500 leading-tight">
                   {isId ? 'Tim support siap membantu kapanpun Anda butuh.' : 'Our support team is ready to assist whenever you need.'}
                 </p>
               </div>
             </div>
 
             {/* 4. Update Berkala */}
-            <div className="flex items-start gap-3.5">
-              <div className="w-10 h-10 rounded-2xl bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600 shrink-0">
-                <RefreshCw className="w-5 h-5" />
+            <div className="flex items-center gap-2.5 lg:gap-2">
+              <div className="w-8 h-8 lg:w-6 lg:h-6 xl:w-7 xl:h-7 rounded-xl lg:rounded-lg bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600 shrink-0">
+                <RefreshCw className="w-4 h-4 lg:w-3 lg:h-3 xl:w-3.5 xl:h-3.5" />
               </div>
               <div>
-                <h4 className="text-sm font-black text-slate-900 mb-0.5">
+                <h4 className="text-xs lg:text-[11px] xl:text-xs font-black text-slate-900 mb-0.5 lg:mb-0 leading-tight">
                   {isId ? 'Update Berkala' : 'Regular Updates'}
                 </h4>
-                <p className="text-xs text-slate-500 leading-relaxed">
+                <p className="text-[11px] lg:text-[9.5px] xl:text-[10px] text-slate-500 leading-tight">
                   {isId ? 'Fitur selalu berkembang sesuai kebutuhan sekolah.' : 'Features constantly evolve with modern school requirements.'}
                 </p>
               </div>

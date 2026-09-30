@@ -520,9 +520,19 @@ export default async function handler(req: any, res: any) {
         }
         const { data: clsRows } = await clsQuery.limit(1);
         targetClass = clsRows?.[0] || null;
+
+        // Fallback jika tidak ditemukan dengan scopedSchoolId: cari via UUID saja
+        if (!targetClass && scopedSchoolId) {
+          const { data: globalClsRows } = await db
+            .from('classes')
+            .select('id, name, grade, academic_year, school_id, wali_kelas_teacher_id')
+            .eq('id', classIdOrName)
+            .limit(1);
+          targetClass = globalClsRows?.[0] || null;
+        }
       }
 
-      // 1.b. Pencarian berdasarkan nama kelas atau explicitClassName (terkunci per sekolah jika schoolId ada)
+      // 1.b. Pencarian berdasarkan nama kelas atau explicitClassName
       if (!targetClass) {
         const candidateNames = [explicitClassName, classIdOrName].filter(
           (n) => n && n !== 'default' && n !== 'all' && n !== 'null' && n !== 'undefined'
@@ -546,9 +556,25 @@ export default async function handler(req: any, res: any) {
             break;
           }
         }
+
+        // Jika dengan scopedSchoolId belum ketemu, cari secara global berdasarkan nama kelas
+        if (!targetClass) {
+          for (const rawName of candidateNames) {
+            const cleanName = rawName.replace(/^cls[-_]?/i, '').replace(/^kelas\s*/i, '').trim();
+            const { data: foundGlobal } = await db
+              .from('classes')
+              .select('id, name, grade, academic_year, school_id, wali_kelas_teacher_id')
+              .or(`name.ilike.%${cleanName}%,name.ilike.%${rawName}%`)
+              .limit(1);
+            if (foundGlobal && foundGlobal.length > 0) {
+              targetClass = foundGlobal[0];
+              break;
+            }
+          }
+        }
       }
 
-      // 1.c. Jika masih belum ditemukan namun scopedSchoolId ada (misal pada laporan supervisi kepala sekolah atau kelas default)
+      // 1.c. Jika masih belum ditemukan namun scopedSchoolId ada
       if (!targetClass && scopedSchoolId) {
         const { data: fallbackClasses } = await db
           .from('classes')
@@ -557,6 +583,16 @@ export default async function handler(req: any, res: any) {
           .order('grade', { ascending: true })
           .limit(1);
         targetClass = fallbackClasses?.[0] || null;
+      }
+
+      // 1.d. Fallback terakhir: ambil kelas pertama di tabel classes
+      if (!targetClass) {
+        const { data: anyClass } = await db
+          .from('classes')
+          .select('id, name, grade, academic_year, school_id, wali_kelas_teacher_id')
+          .order('grade', { ascending: true })
+          .limit(1);
+        targetClass = anyClass?.[0] || null;
       }
 
       // Validasi ketat: Jika kelas tidak ditemukan, kembalikan 404
@@ -620,13 +656,33 @@ export default async function handler(req: any, res: any) {
           .order('nama', { ascending: true });
         students = allStus || [];
       } else {
-        const { data: studentRows } = await db
+        // Query siswa pada class_id tersebut tanpa mereferensikan kolom non-existent (class_name)
+        const { data: studentRows, error: stuErr } = await db
           .from('students')
           .select('id, nisn, nama, gender, class_id')
-          .or(`class_id.eq.${targetClass.id},class_name.ilike.%${targetClass.name}%`)
-          .eq('school_id', schoolId)
+          .eq('class_id', targetClass.id)
           .order('nama', { ascending: true });
-        students = studentRows || [];
+
+        if (stuErr) {
+          console.warn('[get_public_daily_report] studentRows query error:', stuErr.message);
+        }
+
+        let resolvedStudents = studentRows || [];
+
+        // Fallback jika belum ada siswa pada class_id tersebut, ambil siswa dari sekolah yang sama
+        if (resolvedStudents.length === 0 && schoolId) {
+          const { data: schoolStudents } = await db
+            .from('students')
+            .select('id, nisn, nama, gender, class_id')
+            .eq('school_id', schoolId)
+            .order('nama', { ascending: true });
+
+          if (schoolStudents && schoolStudents.length > 0) {
+            resolvedStudents = schoolStudents;
+          }
+        }
+
+        students = resolvedStudents;
       }
 
       const studentIds = students.map((s: any) => s.id);
@@ -671,8 +727,8 @@ export default async function handler(req: any, res: any) {
             attQuery = attQuery.eq('subject_id', subjectId);
           }
         } else {
-          // Seluruh absensi harian umum
-          attQuery = attQuery.neq('type', 'SUBJECT');
+          // Seluruh absensi harian umum (bisa bertipe DAILY atau NULL)
+          attQuery = attQuery.or('type.eq.DAILY,type.is.null');
         }
 
         const { data: recordsData, error: recordsErr } = await attQuery;

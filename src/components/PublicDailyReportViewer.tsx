@@ -99,7 +99,23 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
   // External fetch state (for public visitors via smart link without active session)
   const [loading, setLoading] = useState(!isInternalUser);
   const [error, setError] = useState<string | null>(null);
-  const [externalReportData, setExternalReportData] = useState<any | null>(null);
+  const [externalReportData, setExternalReportData] = useState<any | null>(() => {
+    if (typeof window === 'undefined') return null;
+    try {
+      const p = new URLSearchParams(window.location.search);
+      const r = p.get('r') || p.get('class') || p.get('classId') || '';
+      const d = p.get('d') || p.get('date') || '';
+      const key = `kawacanaan_report_${r}_${d}`;
+      const cached = localStorage.getItem(key) || localStorage.getItem('kawacanaan_last_report');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed && (parsed.students?.length > 0 || parsed.schoolName)) {
+          return parsed;
+        }
+      }
+    } catch (_) {}
+    return null;
+  });
   const [copiedLink, setCopiedLink] = useState(false);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
 
@@ -377,8 +393,19 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
           nisn: s.nisn || '-',
           gender: s.gender === 'Perempuan' || s.gender === 'P' ? 'P' : 'L',
           classId: propClassId || '',
-          className: externalReportData?.className || '',
+          className: externalReportData?.className || propClassName || '',
         }));
+      }
+      // Fallback jika ada data siswa di context internal (pengguna sedang login atau ada cache memori)
+      if (ctxStudents && ctxStudents.length > 0) {
+        const clsId = propClassId || resolvedClass?.id;
+        const filtered = ctxStudents.filter(
+          (s) => !clsId || s.classId === clsId || (propClassName && s.className && normalizeClassToken(s.className) === normalizeClassToken(propClassName))
+        );
+        if (filtered.length > 0) {
+          return filtered.sort((a, b) => a.nama.localeCompare(b.nama, 'id'));
+        }
+        return ctxStudents.sort((a, b) => a.nama.localeCompare(b.nama, 'id'));
       }
       return [];
     }
@@ -391,12 +418,12 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
         return false;
       })
       .sort((a, b) => a.nama.localeCompare(b.nama, 'id'));
-  }, [isInternalUser, externalReportData, isKepsekReport, resolvedClass, ctxStudents, propClassId]);
+  }, [isInternalUser, externalReportData, isKepsekReport, resolvedClass, ctxStudents, propClassId, propClassName]);
 
   // Target records
   const targetRecords = useMemo(() => {
     if (!isInternalUser) {
-      if (externalReportData?.records && Array.isArray(externalReportData.records)) {
+      if (externalReportData?.records && Array.isArray(externalReportData.records) && externalReportData.records.length > 0) {
         return externalReportData.records;
       }
       if (externalReportData?.students && Array.isArray(externalReportData.students)) {
@@ -412,6 +439,10 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
           type: attendanceType,
           subjectId: subjectId || null,
         }));
+      }
+      if (ctxAttendanceRecords && ctxAttendanceRecords.length > 0) {
+        const studentIds = new Set(targetStudents.map((s) => s.id));
+        return ctxAttendanceRecords.filter((r) => studentIds.has(r.studentId));
       }
       return [];
     }
@@ -741,15 +772,53 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
           if (res.ok && json.ok && json.report) {
             setExternalReportData(json.report);
             setError(null);
+            try {
+              const rKey = `kawacanaan_report_${propClassId || ''}_${selectedDate}`;
+              localStorage.setItem(rKey, JSON.stringify(json.report));
+              localStorage.setItem('kawacanaan_last_report', JSON.stringify(json.report));
+            } catch (_) {}
           } else {
-            setError(json.error || 'Data rekap kehadiran untuk rombel dan periode ini belum tersedia di sistem.');
-            setExternalReportData(null);
+            // Cek apakah ada cache lokal sebelum menampilkan error
+            let foundInCache = false;
+            try {
+              const rKey = `kawacanaan_report_${propClassId || ''}_${selectedDate}`;
+              const cached = localStorage.getItem(rKey) || localStorage.getItem('kawacanaan_last_report');
+              if (cached) {
+                const parsed = JSON.parse(cached);
+                if (parsed && (parsed.students?.length > 0 || parsed.schoolName)) {
+                  setExternalReportData(parsed);
+                  setError(null);
+                  foundInCache = true;
+                }
+              }
+            } catch (_) {}
+
+            if (!foundInCache) {
+              setError(json.error || 'Data rekap kehadiran untuk rombel dan periode ini belum tersedia di sistem.');
+              setExternalReportData(null);
+            }
           }
         }
       } catch (err: any) {
         if (isMounted && err?.name !== 'AbortError') {
-          setError('Gagal memuat dokumen rekap kehadiran. Silakan periksa jaringan internet Anda atau muat ulang halaman.');
-          setExternalReportData(null);
+          let foundInCache = false;
+          try {
+            const rKey = `kawacanaan_report_${propClassId || ''}_${selectedDate}`;
+            const cached = localStorage.getItem(rKey) || localStorage.getItem('kawacanaan_last_report');
+            if (cached) {
+              const parsed = JSON.parse(cached);
+              if (parsed && (parsed.students?.length > 0 || parsed.schoolName)) {
+                setExternalReportData(parsed);
+                setError(null);
+                foundInCache = true;
+              }
+            }
+          } catch (_) {}
+
+          if (!foundInCache) {
+            setError('Gagal memuat dokumen rekap kehadiran. Silakan periksa jaringan internet Anda atau muat ulang halaman.');
+            setExternalReportData(null);
+          }
         }
       } finally {
         if (isMounted) {
@@ -1093,6 +1162,56 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
   const canonicalShareUrl = useMemo(() => {
     return buildCanonicalReportUrl(canonicalParams);
   }, [canonicalParams]);
+
+  // Simpan snapshot laporan ke localStorage saat pengguna internal membukanya
+  // agar saat tautan dibagikan atau dibuka di tab baru, data langsung siap tanpa delay
+  useEffect(() => {
+    if (isInternalUser && targetStudents.length > 0 && typeof window !== 'undefined') {
+      try {
+        const snap = {
+          schoolId: propSchoolId || currentUser?.schoolId || null,
+          classId: resolvedClass?.id || propClassId || '',
+          className: activeClassName,
+          schoolName,
+          pemerintahDaerah: ctxSystemConfig?.pemerintahDaerah || '',
+          dinasPendidikan: ctxSystemConfig?.dinasPendidikan || 'DINAS PENDIDIKAN',
+          npsn: ctxSchoolProfile?.npsn || '',
+          alamat: ctxSchoolProfile?.alamat || '',
+          logoUrl: ctxSystemConfig?.schoolLogoUrl || null,
+          letterheadType: ctxSystemConfig?.letterheadType || 'standard_text',
+          letterheadImageUrl: ctxSystemConfig?.letterheadImageUrl || null,
+          showLetterhead: ctxSystemConfig?.showLetterhead ?? true,
+          date: selectedDate,
+          attendanceType,
+          subjectName: resolvedSubject?.name || null,
+          teacherName,
+          teacherNip,
+          principalName,
+          principalNip,
+          reportPlace: ctxSystemConfig?.reportPlace || 'Jakarta',
+          reportDateOfficial: ctxSystemConfig?.reportDate?.trim() || selectedDate,
+          students: targetStudents.map((s, idx) => {
+            const rec = targetRecords.find((r) => r.studentId === s.id && String(r.date || '') === selectedDate);
+            return {
+              id: s.id,
+              no: idx + 1,
+              nisn: s.nisn || '',
+              nama: s.nama,
+              gender: s.gender === 'P' || s.gender === 'Perempuan' ? 'P' : 'L',
+              status: rec?.status || 'Hadir',
+              checkInTime: rec?.checkInTime || '',
+              checkOutTime: rec?.checkOutTime || '',
+              notes: rec?.notes || '',
+            };
+          }),
+          records: targetRecords,
+        };
+        const rKey = `kawacanaan_report_${resolvedClass?.id || propClassId || ''}_${selectedDate}`;
+        localStorage.setItem(rKey, JSON.stringify(snap));
+        localStorage.setItem('kawacanaan_last_report', JSON.stringify(snap));
+      } catch (_) {}
+    }
+  }, [isInternalUser, targetStudents, targetRecords, schoolName, principalName, teacherName, selectedDate, resolvedClass, propClassId, activeClassName, ctxSystemConfig, ctxSchoolProfile, attendanceType, resolvedSubject]);
 
   // Sinkronkan address bar secara halus agar saat URL disalin manual tetap berupa Smart Link dokumen
   useEffect(() => {

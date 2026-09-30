@@ -211,64 +211,106 @@ export function triggerPdfDownload(blob: Blob, name: string): void {
 }
 
 /**
-  * Ekspor dokumen presensi resmi langsung ke berkas PDF A4 beresolusi tinggi.
-  * Menghasilkan berkas PDF yang langsung diunduh ke folder Downloads pengguna
-  * tanpa beralih ke print dialog browser.
-  */
+ * Ekspor dokumen presensi resmi langsung ke berkas PDF A4 beresolusi tinggi.
+ * Menghasilkan berkas PDF yang terintegrasi dan sama persis dengan tampilan laporan di aplikasi
+ * tanpa terpotong atau terpengaruh oleh scaling tampilan mobile.
+ */
 export async function exportReportToPdf(element: HTMLElement, filename = 'Laporan_Presensi.pdf'): Promise<boolean> {
   const safeFilename = filename.endsWith('.pdf') ? filename : `${filename}.pdf`;
 
+  // 1. Simpan konfigurasi gaya elemen live DOM sebelum proses rendering
+  const originalTransform = element.style.transform;
+  const originalTransformOrigin = element.style.transformOrigin;
+  const originalWidth = element.style.width;
+  const originalMinWidth = element.style.minWidth;
+  const originalMaxWidth = element.style.maxWidth;
+
+  const parent = element.parentElement;
+  const originalParentWidth = parent?.style.width || '';
+  const originalParentHeight = parent?.style.height || '';
+  const originalParentOverflow = parent?.style.overflow || '';
+
+  const inlinedImages: { img: HTMLImageElement; originalSrc: string }[] = [];
+
   try {
-    // 1. Pre-fetch dan convert gambar (logo, kop surat) ke base64 dataURL agar terhindar dari pemblokiran CORS
+    // 2. Pre-inline semua tag <img> di dalam dokumen ke base64 data-URL
+    // Menghindari kegagalan CORS pada gambar logo / kop surat
     const imgs = Array.from(element.querySelectorAll('img'));
     await Promise.all(
       imgs.map(async (img) => {
-        if (img.src && !img.src.startsWith('data:')) {
-          try {
-            const resp = await fetch(img.src, { mode: 'cors' });
-            if (resp.ok) {
-              const b = await resp.blob();
-              const reader = new FileReader();
-              await new Promise((res) => {
-                reader.onloadend = () => {
-                  if (reader.result) {
-                    img.src = reader.result as string;
-                  }
-                  res(null);
-                };
-                reader.readAsDataURL(b);
-              });
-            }
-          } catch (_) {}
-        }
+        if (!img.src || img.src.startsWith('data:')) return;
+        try {
+          if (img.complete && img.naturalWidth > 0) {
+            try {
+              const c = document.createElement('canvas');
+              c.width = img.naturalWidth;
+              c.height = img.naturalHeight;
+              const ctx = c.getContext('2d');
+              if (ctx) {
+                ctx.drawImage(img, 0, 0);
+                const dataUrl = c.toDataURL('image/png');
+                inlinedImages.push({ img, originalSrc: img.src });
+                img.src = dataUrl;
+                return;
+              }
+            } catch (_) {}
+          }
+          const resp = await fetch(img.src, { mode: 'cors' });
+          if (resp.ok) {
+            const b = await resp.blob();
+            const reader = new FileReader();
+            await new Promise((res) => {
+              reader.onloadend = () => {
+                if (reader.result) {
+                  inlinedImages.push({ img, originalSrc: img.src });
+                  img.src = reader.result as string;
+                }
+                res(null);
+              };
+              reader.readAsDataURL(b);
+            });
+          }
+        } catch (_) {}
       })
     );
 
-    // 2. Render canvas menggunakan html2canvas dengan hook onclone
-    // onclone memungkinkan manipulasi layout dokumen klon internal tanpa memodifikasi DOM asli
+    // 3. Normalkan live DOM sejenak ke ukuran A4 standar (794px lebar)
+    // agar html2canvas mengukur dimensi bounding client asli tanpa dipangkas oleh overflow/scaling HP
+    element.style.transform = 'none';
+    element.style.transformOrigin = 'top left';
+    element.style.width = '794px';
+    element.style.minWidth = '794px';
+    element.style.maxWidth = '794px';
+    if (parent) {
+      parent.style.width = 'auto';
+      parent.style.height = 'auto';
+      parent.style.overflow = 'visible';
+    }
+
+    // Jeda singkat agar browser menyelesaikan kalkulasi layout
+    await new Promise((resolve) => setTimeout(resolve, 80));
+
+    // 4. Render canvas menggunakan html2canvas dengan resolusi tinggi (scale: 2)
     const canvas = await html2canvas(element, {
       scale: 2,
       useCORS: true,
-      allowTaint: false, // JANGAN PERNAH allowTaint: true agar tidak melempar SecurityError saat toDataURL
+      allowTaint: false,
       logging: false,
       backgroundColor: '#ffffff',
-      imageTimeout: 12000,
+      windowWidth: 1200, // Mengaktifkan breakpoint desktop Tailwind (sm:, md:)
+      imageTimeout: 15000,
       onclone: (_clonedDoc, clonedEl) => {
-        // Reset skala dan margin pada elemen klon agar layout A4 794px tampak sempurna
         clonedEl.style.transform = 'none';
-        clonedEl.style.transformOrigin = 'top left';
         clonedEl.style.width = '794px';
         clonedEl.style.minWidth = '794px';
         clonedEl.style.maxWidth = '794px';
         clonedEl.style.margin = '0 auto';
         clonedEl.style.boxSizing = 'border-box';
-        clonedEl.style.padding = '32px';
+        clonedEl.style.padding = '32px 36px';
         clonedEl.style.backgroundColor = '#ffffff';
 
-        // Bersihkan border dan bayangan web
         clonedEl.classList.remove('shadow-xl', 'shadow-sm', 'border', 'border-slate-300');
 
-        // Pastikan parent container klon tidak memotong dokumen
         if (clonedEl.parentElement) {
           clonedEl.parentElement.style.width = 'auto';
           clonedEl.parentElement.style.height = 'auto';
@@ -276,7 +318,6 @@ export async function exportReportToPdf(element: HTMLElement, filename = 'Lapora
           clonedEl.parentElement.style.transform = 'none';
         }
 
-        // Pastikan tabel memenuhi lebar kertas A4
         clonedEl.querySelectorAll('.overflow-x-auto').forEach((el) => {
           (el as HTMLElement).style.overflow = 'visible';
           (el as HTMLElement).style.width = '100%';
@@ -288,7 +329,7 @@ export async function exportReportToPdf(element: HTMLElement, filename = 'Lapora
       },
     });
 
-    const imgData = canvas.toDataURL('image/jpeg', 0.96);
+    // 5. Susun halaman PDF A4
     const pdf = new jsPDF({
       orientation: 'portrait',
       unit: 'mm',
@@ -303,23 +344,43 @@ export async function exportReportToPdf(element: HTMLElement, filename = 'Lapora
     const printableWidth = pdfPageWidth - marginX * 2; // 194 mm
     const printableHeight = pdfPageHeight - marginY * 2; // 281 mm
 
-    const renderHeight = (canvas.height * printableWidth) / canvas.width;
+    const totalHeightMm = (canvas.height * printableWidth) / canvas.width;
 
-    if (renderHeight <= printableHeight + 15) {
-      const finalHeight = Math.min(renderHeight, printableHeight);
+    if (totalHeightMm <= printableHeight + 12) {
+      // Muat dalam 1 lembar A4 penuh
+      const finalHeight = Math.min(totalHeightMm, printableHeight);
+      const imgData = canvas.toDataURL('image/jpeg', 0.98);
       pdf.addImage(imgData, 'JPEG', marginX, marginY, printableWidth, finalHeight);
     } else {
-      let heightLeft = renderHeight;
-      let positionY = marginY;
+      // Pembagian halaman bertingkat yang rapi tanpa tumpang tindih
+      const pxPerPage = Math.floor(canvas.width * (printableHeight / printableWidth));
+      let currentY = 0;
+      let pageIdx = 0;
 
-      pdf.addImage(imgData, 'JPEG', marginX, positionY, printableWidth, renderHeight);
-      heightLeft -= printableHeight;
+      while (currentY < canvas.height) {
+        const slicePx = Math.min(pxPerPage, canvas.height - currentY);
+        const pageCanvas = document.createElement('canvas');
+        pageCanvas.width = canvas.width;
+        pageCanvas.height = slicePx;
+        const pageCtx = pageCanvas.getContext('2d');
+        if (pageCtx) {
+          pageCtx.fillStyle = '#ffffff';
+          pageCtx.fillRect(0, 0, pageCanvas.width, pageCanvas.height);
+          pageCtx.drawImage(
+            canvas,
+            0, currentY, canvas.width, slicePx,
+            0, 0, canvas.width, slicePx
+          );
+          const sliceImgData = pageCanvas.toDataURL('image/jpeg', 0.98);
+          const sliceHeightMm = (slicePx * printableWidth) / canvas.width;
 
-      while (heightLeft > 0) {
-        positionY -= printableHeight;
-        pdf.addPage();
-        pdf.addImage(imgData, 'JPEG', marginX, positionY, printableWidth, renderHeight);
-        heightLeft -= printableHeight;
+          if (pageIdx > 0) {
+            pdf.addPage();
+          }
+          pdf.addImage(sliceImgData, 'JPEG', marginX, marginY, printableWidth, sliceHeightMm);
+        }
+        currentY += pxPerPage;
+        pageIdx++;
       }
     }
 
@@ -327,7 +388,7 @@ export async function exportReportToPdf(element: HTMLElement, filename = 'Lapora
     triggerPdfDownload(blob, safeFilename);
     return true;
   } catch (err) {
-    console.warn('[html2canvas PDF Export Error, trying programmatic jsPDF fallback]', err);
+    console.warn('[html2canvas PDF Export Error, trying comprehensive programmatic PDF fallback]', err);
     try {
       const fallbackPdf = generateReportPdfProgrammatic(element);
       const blob = fallbackPdf.output('blob');
@@ -337,12 +398,27 @@ export async function exportReportToPdf(element: HTMLElement, filename = 'Lapora
       console.error('[Fatal PDF Generation Error]', fallbackErr);
       return false;
     }
+  } finally {
+    // 6. Kembalikan kondisi asli elemen di tampilan web
+    element.style.transform = originalTransform;
+    element.style.transformOrigin = originalTransformOrigin;
+    element.style.width = originalWidth;
+    element.style.minWidth = originalMinWidth;
+    element.style.maxWidth = originalMaxWidth;
+    if (parent) {
+      parent.style.width = originalParentWidth;
+      parent.style.height = originalParentHeight;
+      parent.style.overflow = originalParentOverflow;
+    }
+    inlinedImages.forEach(({ img, originalSrc }) => {
+      img.src = originalSrc;
+    });
   }
 }
 
 /**
- * Fallback generator PDF programatik murni menggunakan jsPDF + jspdf-autotable.
- * Menjamin file PDF resmi tetap terunduh secara instan meskipun canvas browser diblokir.
+ * Fallback generator PDF resmi lengkap menggunakan jsPDF + jspdf-autotable.
+ * Memuat seluruh struktur identik aplikasi: Kop Surat, Judul Periode, Matriks Atribut, Tabel Presensi, dan Pengesahan Tanda Tangan.
  */
 function generateReportPdfProgrammatic(element: HTMLElement): jsPDF {
   const pdf = new jsPDF({
@@ -351,38 +427,139 @@ function generateReportPdfProgrammatic(element: HTMLElement): jsPDF {
     format: 'a4',
   });
 
-  const titleEl = element.querySelector('h1, h2, .font-serif, .font-bold');
-  const docTitle = titleEl?.textContent?.trim() || 'LAPORAN REKAPITULASI PRESENSI RESMI';
+  const pageWidth = 210;
+  const marginX = 12;
+
+  // 1. Ekstraksi Data Kop Surat
+  const pemda = element.querySelector('h4:nth-of-type(1)')?.textContent?.trim() || 'PEMERINTAH DAERAH';
+  const dinas = element.querySelector('h4:nth-of-type(2)')?.textContent?.trim() || 'DINAS PENDIDIKAN';
+  const schoolName = element.querySelector('h2')?.textContent?.trim() || 'SEKOLAH';
+  const addressParagraphs = element.querySelectorAll('.flex-1 p');
+  const address = addressParagraphs[0]?.textContent?.trim() || '';
+  const metaLine = addressParagraphs[1]?.textContent?.trim() || '';
+
+  let currentY = 12;
 
   pdf.setFont('helvetica', 'bold');
-  pdf.setFontSize(14);
-  pdf.text(docTitle, 105, 18, { align: 'center' });
+  pdf.setFontSize(8.5);
+  pdf.text(pemda.toUpperCase(), pageWidth / 2, currentY, { align: 'center' });
+  currentY += 4;
+  pdf.text(dinas.toUpperCase(), pageWidth / 2, currentY, { align: 'center' });
+  currentY += 5;
 
+  pdf.setFontSize(13);
+  pdf.text(schoolName.toUpperCase(), pageWidth / 2, currentY, { align: 'center' });
+  currentY += 4.5;
+
+  pdf.setFont('helvetica', 'normal');
+  pdf.setFontSize(8);
+  if (address) {
+    pdf.text(address, pageWidth / 2, currentY, { align: 'center' });
+    currentY += 3.8;
+  }
+  if (metaLine) {
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(7.5);
+    pdf.text(metaLine, pageWidth / 2, currentY, { align: 'center' });
+    currentY += 4.5;
+  }
+
+  // Garis ganda pembatas kop surat
+  pdf.setLineWidth(0.7);
+  pdf.line(marginX, currentY, pageWidth - marginX, currentY);
+  currentY += 0.8;
+  pdf.setLineWidth(0.2);
+  pdf.line(marginX, currentY, pageWidth - marginX, currentY);
+  currentY += 6;
+
+  // 2. Judul Laporan & Periode
+  const reportTitle = element.querySelector('h3')?.textContent?.trim() || 'LAPORAN REKAPITULASI PRESENSI RESMI';
+  const reportSubtitle = element.querySelector('h3 + p')?.textContent?.trim() || '';
+
+  pdf.setFont('helvetica', 'bold');
+  pdf.setFontSize(11);
+  pdf.text(reportTitle.toUpperCase(), pageWidth / 2, currentY, { align: 'center' });
+  currentY += 4;
+
+  if (reportSubtitle) {
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(7.5);
+    pdf.setTextColor(71, 85, 105);
+    pdf.text(reportSubtitle, pageWidth / 2, currentY, { align: 'center' });
+    pdf.setTextColor(0, 0, 0);
+    currentY += 5.5;
+  }
+
+  // 3. Tabel Kehadiran
   const tableEl = element.querySelector('table');
   if (tableEl) {
     autoTable(pdf, {
       html: tableEl,
-      startY: 28,
+      startY: currentY,
       theme: 'grid',
       styles: {
-        fontSize: 8,
-        cellPadding: 2,
+        fontSize: 7.5,
+        cellPadding: 1.5,
         valign: 'middle',
       },
       headStyles: {
-        fillColor: [30, 41, 59],
-        textColor: 255,
+        fillColor: [241, 245, 249],
+        textColor: [15, 23, 42],
         fontStyle: 'bold',
         halign: 'center',
+        lineWidth: 0.2,
+        lineColor: [148, 163, 184],
       },
-      margin: { left: 10, right: 10 },
+      alternateRowStyles: {
+        fillColor: [255, 255, 255],
+      },
+      tableLineColor: [148, 163, 184],
+      tableLineWidth: 0.2,
+      margin: { left: marginX, right: marginX },
     });
-  } else {
-    pdf.setFont('helvetica', 'normal');
-    pdf.setFontSize(9);
-    const lines = pdf.splitTextToSize(element.innerText || '', 180);
-    pdf.text(lines, 15, 28);
+
+    currentY = (pdf as any).lastAutoTable.finalY + 8;
   }
+
+  // 4. Lembar Pengesahan Tanda Tangan Resmi (2 Kolom Berdampingan)
+  if (currentY > 235) {
+    pdf.addPage();
+    currentY = 20;
+  }
+
+  const signColLeft = marginX + 30;
+  const signColRight = pageWidth - marginX - 30;
+
+  pdf.setFont('helvetica', 'normal');
+  pdf.setFontSize(8);
+  pdf.text('Mengetahui,', signColLeft, currentY, { align: 'center' });
+  pdf.text(`Tanggal Cetak: ${new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}`, signColRight, currentY, { align: 'center' });
+  currentY += 4;
+
+  pdf.setFont('helvetica', 'bold');
+  pdf.text(`Kepala ${schoolName}`, signColLeft, currentY, { align: 'center' });
+  pdf.text('Wali Kelas / Guru Pengajar', signColRight, currentY, { align: 'center' });
+  currentY += 18;
+
+  // Nama Pejabat & Tanda Tangan
+  const principalEl = element.querySelector('.grid-cols-2 > div:first-child p.underline');
+  const teacherEl = element.querySelector('.grid-cols-2 > div:last-child p.underline');
+  const pName = principalEl?.textContent?.trim() || 'Kepala Sekolah';
+  const tName = teacherEl?.textContent?.trim() || 'Wali Kelas / Guru';
+
+  pdf.text(pName, signColLeft, currentY, { align: 'center' });
+  pdf.text(tName, signColRight, currentY, { align: 'center' });
+  currentY += 3.8;
+
+  const principalNipEl = element.querySelector('.grid-cols-2 > div:first-child p.font-mono');
+  const teacherNipEl = element.querySelector('.grid-cols-2 > div:last-child p.font-mono');
+  const pNip = principalNipEl?.textContent?.trim() || 'NIP. -';
+  const tNip = teacherNipEl?.textContent?.trim() || 'NIP. -';
+
+  pdf.setFont('helvetica', 'normal');
+  pdf.setFontSize(7.5);
+  pdf.text(pNip, signColLeft, currentY, { align: 'center' });
+  pdf.text(tNip, signColRight, currentY, { align: 'center' });
 
   return pdf;
 }

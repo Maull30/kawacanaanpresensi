@@ -121,8 +121,8 @@ export const PublicSmartInvoiceViewer: React.FC<PublicSmartInvoiceViewerProps> =
     setIsExporting(true);
     try {
       await exportInvoiceToPdf(invoiceContainerRef.current, `Invoice_${invoiceNumber}.pdf`);
-    } catch (_) {
-      window.print();
+    } catch (err) {
+      console.error('Invoice PDF export failed:', err);
     } finally {
       setIsExporting(false);
     }

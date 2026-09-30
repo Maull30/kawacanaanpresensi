@@ -71,8 +71,8 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
       if (onShowToast) {
         onShowToast('Invoice PDF berhasil diunduh.', 'success');
       }
-    } catch (_) {
-      window.print();
+    } catch (err) {
+      console.error('Invoice PDF export failed:', err);
     } finally {
       setIsExporting(false);
     }

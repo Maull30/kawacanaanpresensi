@@ -1254,16 +1254,26 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
     }
     setIsExportingPdf(true);
     try {
-      const cleanCls = (activeClassName || 'Kelas').replace(/[^a-zA-Z0-9_-]/g, '_');
-      const cleanPeriod = (reportType || 'Laporan').replace(/[^a-zA-Z0-9_-]/g, '_');
-      const filename = `${cleanPeriod}_${cleanCls}_${selectedDate}.pdf`;
-      const ok = await exportReportToPdf(el, filename);
-      if (!ok) {
-        window.print();
+      const cleanCls = isKepsekReport
+        ? 'Supervisi_Kepala_Sekolah'
+        : (activeClassClean || 'Kelas').replace(/[^a-zA-Z0-9_-]/g, '_');
+      const cleanType = (reportType || 'Laporan').replace(/[^a-zA-Z0-9_-]/g, '_');
+      let periodSuffix = '';
+      if (reportType === 'Laporan Harian') {
+        periodSuffix = selectedDate;
+      } else if (reportType === 'Laporan Mingguan') {
+        periodSuffix = `${(selectedWeek || 'Minggu').replace(/\s+/g, '_')}_${month}_${year}`;
+      } else if (reportType === 'Laporan Bulanan') {
+        periodSuffix = `${month}_${year}`;
+      } else if (reportType === 'Laporan Semester' || isKepsekSemester) {
+        periodSuffix = `Semester_${semester}_${(academicYear || '').replace(/[^a-zA-Z0-9_-]/g, '_')}`;
+      } else {
+        periodSuffix = `${month}_${year}`;
       }
+      const filename = `${cleanType}_${cleanCls}_${periodSuffix}.pdf`;
+      await exportReportToPdf(el, filename);
     } catch (err) {
-      console.warn('PDF export failed, falling back to print:', err);
-      window.print();
+      console.error('PDF export failed:', err);
     } finally {
       setIsExportingPdf(false);
     }

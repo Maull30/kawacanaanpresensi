@@ -1,5 +1,6 @@
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 export interface CanonicalReportParams {
   classId?: string;
@@ -210,82 +211,81 @@ export function triggerPdfDownload(blob: Blob, name: string): void {
 }
 
 /**
- * Ekspor dokumen presensi resmi langsung ke berkas PDF A4 beresolusi tinggi.
- * Menghasilkan tata letak A4 resmi yang rapi, tajam, dan sama persis dengan tampilan aplikasi desktop
- * meskipun tombol unduh ditekan dari ponsel/HP.
- */
+  * Ekspor dokumen presensi resmi langsung ke berkas PDF A4 beresolusi tinggi.
+  * Menghasilkan berkas PDF yang langsung diunduh ke folder Downloads pengguna
+  * tanpa beralih ke print dialog browser.
+  */
 export async function exportReportToPdf(element: HTMLElement, filename = 'Laporan_Presensi.pdf'): Promise<boolean> {
   const safeFilename = filename.endsWith('.pdf') ? filename : `${filename}.pdf`;
 
-  // Buat wadah klon A4 standar (794px = 210mm @96dpi)
-  // Diposisikan fixed pada (0,0) dengan opacity:0 & pointer-events:none
-  // agar html2canvas dapat menghitung koordinat elemen secara presisi tanpa pemotongan negatif
-  const sandbox = document.createElement('div');
-  sandbox.id = 'smart-report-pdf-sandbox';
-  sandbox.style.position = 'fixed';
-  sandbox.style.left = '0';
-  sandbox.style.top = '0';
-  sandbox.style.width = '794px';
-  sandbox.style.minWidth = '794px';
-  sandbox.style.maxWidth = '794px';
-  sandbox.style.zIndex = '-99999';
-  sandbox.style.opacity = '0';
-  sandbox.style.pointerEvents = 'none';
-  sandbox.style.backgroundColor = '#ffffff';
-
-  const clone = element.cloneNode(true) as HTMLElement;
-  clone.id = 'report-pdf-clone';
-  clone.style.width = '794px';
-  clone.style.minWidth = '794px';
-  clone.style.maxWidth = '794px';
-  clone.style.transform = 'none';
-  clone.style.transformOrigin = 'top left';
-  clone.style.margin = '0';
-  clone.style.backgroundColor = '#ffffff';
-  clone.style.boxSizing = 'border-box';
-  clone.style.padding = '24px 32px';
-  clone.style.display = 'block';
-  clone.style.visibility = 'visible';
-
-  // Bersihkan bayangan & border kartu web agar menjadi kertas cetak resmi
-  clone.classList.remove('shadow-xl', 'shadow-sm', 'shadow-xs', 'border', 'border-slate-300', 'rounded-xl');
-  clone.classList.add('p-8');
-
-  // Pastikan tabel memenuhi lebar halaman tanpa scrollbar
-  clone.querySelectorAll('.overflow-x-auto').forEach((el) => {
-    (el as HTMLElement).style.overflow = 'visible';
-    (el as HTMLElement).style.width = '100%';
-  });
-  clone.querySelectorAll('table').forEach((tbl) => {
-    (tbl as HTMLElement).style.width = '100%';
-    (tbl as HTMLElement).style.minWidth = '100%';
-  });
-
-  // Izinkan cross-origin untuk gambar logo / kop
-  clone.querySelectorAll('img').forEach((img) => {
-    img.crossOrigin = 'anonymous';
-  });
-
-  sandbox.appendChild(clone);
-  document.body.appendChild(sandbox);
-
   try {
-    // Beri waktu sejenak agar gambar dan font siap
-    await new Promise((resolve) => setTimeout(resolve, 200));
+    // 1. Pre-fetch dan convert gambar (logo, kop surat) ke base64 dataURL agar terhindar dari pemblokiran CORS
+    const imgs = Array.from(element.querySelectorAll('img'));
+    await Promise.all(
+      imgs.map(async (img) => {
+        if (img.src && !img.src.startsWith('data:')) {
+          try {
+            const resp = await fetch(img.src, { mode: 'cors' });
+            if (resp.ok) {
+              const b = await resp.blob();
+              const reader = new FileReader();
+              await new Promise((res) => {
+                reader.onloadend = () => {
+                  if (reader.result) {
+                    img.src = reader.result as string;
+                  }
+                  res(null);
+                };
+                reader.readAsDataURL(b);
+              });
+            }
+          } catch (_) {}
+        }
+      })
+    );
 
-    const canvas = await html2canvas(clone, {
+    // 2. Render canvas menggunakan html2canvas dengan hook onclone
+    // onclone memungkinkan manipulasi layout dokumen klon internal tanpa memodifikasi DOM asli
+    const canvas = await html2canvas(element, {
       scale: 2,
       useCORS: true,
-      allowTaint: true,
+      allowTaint: false, // JANGAN PERNAH allowTaint: true agar tidak melempar SecurityError saat toDataURL
       logging: false,
       backgroundColor: '#ffffff',
-      width: 794,
-      windowWidth: 794,
-      x: 0,
-      y: 0,
-      scrollX: 0,
-      scrollY: 0,
       imageTimeout: 12000,
+      onclone: (_clonedDoc, clonedEl) => {
+        // Reset skala dan margin pada elemen klon agar layout A4 794px tampak sempurna
+        clonedEl.style.transform = 'none';
+        clonedEl.style.transformOrigin = 'top left';
+        clonedEl.style.width = '794px';
+        clonedEl.style.minWidth = '794px';
+        clonedEl.style.maxWidth = '794px';
+        clonedEl.style.margin = '0 auto';
+        clonedEl.style.boxSizing = 'border-box';
+        clonedEl.style.padding = '32px';
+        clonedEl.style.backgroundColor = '#ffffff';
+
+        // Bersihkan border dan bayangan web
+        clonedEl.classList.remove('shadow-xl', 'shadow-sm', 'border', 'border-slate-300');
+
+        // Pastikan parent container klon tidak memotong dokumen
+        if (clonedEl.parentElement) {
+          clonedEl.parentElement.style.width = 'auto';
+          clonedEl.parentElement.style.height = 'auto';
+          clonedEl.parentElement.style.overflow = 'visible';
+          clonedEl.parentElement.style.transform = 'none';
+        }
+
+        // Pastikan tabel memenuhi lebar kertas A4
+        clonedEl.querySelectorAll('.overflow-x-auto').forEach((el) => {
+          (el as HTMLElement).style.overflow = 'visible';
+          (el as HTMLElement).style.width = '100%';
+        });
+        clonedEl.querySelectorAll('table').forEach((tbl) => {
+          (tbl as HTMLElement).style.width = '100%';
+          (tbl as HTMLElement).style.minWidth = '100%';
+        });
+      },
     });
 
     const imgData = canvas.toDataURL('image/jpeg', 0.96);
@@ -300,17 +300,15 @@ export async function exportReportToPdf(element: HTMLElement, filename = 'Lapora
     const pdfPageHeight = 297;
     const marginX = 8;
     const marginY = 8;
-    const printableWidth = pdfPageWidth - (marginX * 2); // 194 mm
-    const printableHeight = pdfPageHeight - (marginY * 2); // 281 mm
+    const printableWidth = pdfPageWidth - marginX * 2; // 194 mm
+    const printableHeight = pdfPageHeight - marginY * 2; // 281 mm
 
     const renderHeight = (canvas.height * printableWidth) / canvas.width;
 
-    // Jika pas 1 halaman atau hanya lebih sedikit (<= 300mm), sesuaikan rasio agar menjadi 1 halaman penuh
     if (renderHeight <= printableHeight + 15) {
       const finalHeight = Math.min(renderHeight, printableHeight);
       pdf.addImage(imgData, 'JPEG', marginX, marginY, printableWidth, finalHeight);
     } else {
-      // Pembagian halaman multi-halaman rapi
       let heightLeft = renderHeight;
       let positionY = marginY;
 
@@ -325,43 +323,66 @@ export async function exportReportToPdf(element: HTMLElement, filename = 'Lapora
       }
     }
 
-    try {
-      pdf.save(safeFilename);
-    } catch (_) {
-      const blob = pdf.output('blob');
-      triggerPdfDownload(blob, safeFilename);
-    }
+    const blob = pdf.output('blob');
+    triggerPdfDownload(blob, safeFilename);
     return true;
   } catch (err) {
-    console.warn('[Export Report PDF Error - Using Standard Direct Render]', err);
+    console.warn('[html2canvas PDF Export Error, trying programmatic jsPDF fallback]', err);
     try {
-      // Fallback cadangan langsung
-      const canvasFallback = await html2canvas(element, {
-        scale: 2,
-        useCORS: true,
-        allowTaint: true,
-        logging: false,
-        backgroundColor: '#ffffff',
-      });
-      const imgData = canvasFallback.toDataURL('image/jpeg', 0.95);
-      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-      const printableWidth = 194;
-      const renderHeight = (canvasFallback.height * printableWidth) / canvasFallback.width;
-      pdf.addImage(imgData, 'JPEG', 8, 8, printableWidth, Math.min(renderHeight, 281));
-      try {
-        pdf.save(safeFilename);
-      } catch (_) {
-        const blob = pdf.output('blob');
-        triggerPdfDownload(blob, safeFilename);
-      }
+      const fallbackPdf = generateReportPdfProgrammatic(element);
+      const blob = fallbackPdf.output('blob');
+      triggerPdfDownload(blob, safeFilename);
       return true;
-    } catch (finalErr) {
-      console.error('[PDF Export Fatal]', finalErr);
+    } catch (fallbackErr) {
+      console.error('[Fatal PDF Generation Error]', fallbackErr);
       return false;
     }
-  } finally {
-    if (sandbox.parentNode) {
-      sandbox.parentNode.removeChild(sandbox);
-    }
   }
+}
+
+/**
+ * Fallback generator PDF programatik murni menggunakan jsPDF + jspdf-autotable.
+ * Menjamin file PDF resmi tetap terunduh secara instan meskipun canvas browser diblokir.
+ */
+function generateReportPdfProgrammatic(element: HTMLElement): jsPDF {
+  const pdf = new jsPDF({
+    orientation: 'portrait',
+    unit: 'mm',
+    format: 'a4',
+  });
+
+  const titleEl = element.querySelector('h1, h2, .font-serif, .font-bold');
+  const docTitle = titleEl?.textContent?.trim() || 'LAPORAN REKAPITULASI PRESENSI RESMI';
+
+  pdf.setFont('helvetica', 'bold');
+  pdf.setFontSize(14);
+  pdf.text(docTitle, 105, 18, { align: 'center' });
+
+  const tableEl = element.querySelector('table');
+  if (tableEl) {
+    autoTable(pdf, {
+      html: tableEl,
+      startY: 28,
+      theme: 'grid',
+      styles: {
+        fontSize: 8,
+        cellPadding: 2,
+        valign: 'middle',
+      },
+      headStyles: {
+        fillColor: [30, 41, 59],
+        textColor: 255,
+        fontStyle: 'bold',
+        halign: 'center',
+      },
+      margin: { left: 10, right: 10 },
+    });
+  } else {
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(9);
+    const lines = pdf.splitTextToSize(element.innerText || '', 180);
+    pdf.text(lines, 15, 28);
+  }
+
+  return pdf;
 }

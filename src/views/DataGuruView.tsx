@@ -912,16 +912,11 @@ export const DataGuruView: React.FC = () => {
                   : (isMe && currentUser?.nip && currentUser.nip !== '-' ? currentUser.nip : (isMe && userNip ? userNip : '—'));
 
                 return (
-                  <tr key={t.id} className={`hover:bg-slate-50 transition-colors ${isMe ? 'bg-blue-50/30' : ''}`}>
+                  <tr key={t.id} className="hover:bg-slate-50 transition-colors">
                     <td className="py-3.5 px-4 font-semibold text-slate-400">{idx + 1}</td>
                     <td className="py-3.5 px-4">
                       <div className="flex items-center gap-2">
                         <span className="font-bold text-slate-900">{t.nama}</span>
-                        {isMe && (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-200">
-                            Akun Anda
-                          </span>
-                        )}
                       </div>
                     </td>
                     <td className="py-3.5 px-4 font-mono font-medium text-slate-600">{displayNip}</td>

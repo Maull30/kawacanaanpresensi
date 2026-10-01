@@ -702,39 +702,10 @@ export const LaporanView: React.FC = () => {
 
   const handlePrintSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (isFreePlan) {
-      openUpgradeModal({
-        featureId: 'cetak_pdf',
-        customTitle: `Cetak ${reportType}`,
-        customMessage:
-          'Fitur Cetak Dokumen Laporan Kehadiran resmi siap cetak memerlukan dukungan pengembangan aplikasi. Silakan berikan dukungan untuk mengaktifkan fitur cetak laporan.',
-        targetPackage: 'guru_pro',
-      });
-      return;
-    }
-    if (
-      !requestFeatureAccess(
-        'cetak_pdf',
-        `Cetak ${reportType}`,
-        'Fitur Cetak Dokumen Laporan Kehadiran resmi memerlukan dukungan pengembangan aplikasi.'
-      )
-    ) {
-      return;
-    }
     setIsPrintModalOpen(true);
   };
 
   const handleKepsekPrint = () => {
-    if (isFreePlan) {
-      openUpgradeModal({
-        featureId: 'cetak_pdf',
-        customTitle: 'Cetak Laporan Kepala Sekolah',
-        customMessage:
-          'Fitur Cetak Dokumen Laporan Supervisi Kepala Sekolah memerlukan dukungan pengembangan aplikasi. Silakan berikan dukungan untuk mengaktifkan fitur cetak laporan.',
-        targetPackage: 'guru_pro',
-      });
-      return;
-    }
     if (
       !requestFeatureAccess(
         'laporan_kepsek',

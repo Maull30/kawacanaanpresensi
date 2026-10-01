@@ -566,8 +566,8 @@ export const LoginView: React.FC<LoginViewProps> = ({ onBackToLanding, onEnterDa
       </div>
 
       {/* Bottom Footer Links */}
-      <footer className="w-full max-w-[400px] sm:max-w-[430px] md:max-w-[450px] lg:max-w-[460px] mx-auto flex flex-col sm:flex-row items-center justify-between gap-2 text-center text-[11px] sm:text-xs text-slate-400 pt-3 pb-2 z-10">
-        <div className="flex items-center gap-3 font-medium text-slate-500">
+      <footer className="w-full max-w-[400px] sm:max-w-[430px] md:max-w-[450px] lg:max-w-[460px] mx-auto flex items-center justify-center text-center text-[11px] sm:text-xs text-slate-400 pt-3 pb-2 z-10">
+        <div className="flex items-center justify-center gap-3 font-medium text-slate-500">
           <button
             type="button"
             id="btn-login-terms"

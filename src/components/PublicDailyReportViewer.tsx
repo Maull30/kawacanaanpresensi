@@ -80,6 +80,9 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
     attendanceRecords: ctxAttendanceRecords,
     teachers: ctxTeachers,
     subjects: ctxSubjects,
+    openUpgradeModal,
+    isTeacherPro,
+    isSchoolPro,
   } = useApp();
 
   const userScope = useMemo(
@@ -1179,6 +1182,34 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
   }, [activeClassClean, isKepsekReport, displayPeriodText]);
 
   const handlePrint = () => {
+    if (!isPublicView && isInternalUser) {
+      const isPersonal =
+        activeWorkspace?.workspaceType === 'personal' ||
+        activeWorkspace?.workspaceType === 'individu' ||
+        currentUser?.subscriptionPlan === 'guru_uji_coba' ||
+        currentUser?.subscriptionPlan === 'teacher' ||
+        currentUser?.subscriptionPlan === 'guru_pro' ||
+        currentUser?.subscriptionPlan === 'mulai' ||
+        currentUser?.subscriptionPlan === 'guru_gratis' ||
+        (!currentUser?.schoolId && currentUser?.role !== 'SUPER_ADMIN');
+
+      const isFree =
+        (isPersonal || !currentUser?.schoolId || currentUser?.subscriptionPlan === 'guru_gratis' || currentUser?.subscriptionPlan === 'mulai') &&
+        !isTeacherPro &&
+        !isSchoolPro &&
+        currentUser?.role !== 'SUPER_ADMIN';
+
+      if (isFree) {
+        openUpgradeModal({
+          featureId: 'cetak_pdf',
+          customTitle: `Cetak ${reportType}`,
+          customMessage:
+            'Fitur Cetak Dokumen Laporan Kehadiran resmi siap cetak memerlukan dukungan pengembangan aplikasi. Silakan berikan dukungan untuk mengaktifkan fitur cetak laporan.',
+          targetPackage: 'guru_pro',
+        });
+        return;
+      }
+    }
     window.print();
   };
 

@@ -457,6 +457,7 @@ export const DataPenggunaView: React.FC = () => {
 
   // Open Add User Modal with default values
   const openAddUser = () => {
+    if (isPersonalWorkspace) return;
     setAddName('');
     setAddEmail('');
     setAddUsername('');
@@ -939,17 +940,19 @@ export const DataPenggunaView: React.FC = () => {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          {/* Add User Manual Button */}
-          <button
-            type="button"
-            onClick={openAddUser}
-            id="btn-add-user"
-            className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-extrabold text-xs rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer min-h-[36px]"
-            title="Tambah akun pengguna baru secara manual"
-          >
-            <Plus size={15} />
-            <span>Tambah Pengguna</span>
-          </button>
+          {/* Add User Manual Button - Hanya muncul di Ruang Kerja Sekolah, dihilangkan di Ruang Kerja Individu */}
+          {!isPersonalWorkspace && (
+            <button
+              type="button"
+              onClick={openAddUser}
+              id="btn-add-user"
+              className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-extrabold text-xs rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer min-h-[36px]"
+              title="Tambah akun pengguna baru secara manual"
+            >
+              <Plus size={15} />
+              <span>Tambah Pengguna</span>
+            </button>
+          )}
 
           {/* Export Dropdown (PDF & CSV) */}
           <div className="relative">
@@ -1484,7 +1487,7 @@ export const DataPenggunaView: React.FC = () => {
       </div>
 
       {/* Add User Modal */}
-      {isAddModalOpen && (
+      {!isPersonalWorkspace && isAddModalOpen && (
         <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95 text-slate-800 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">

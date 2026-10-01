@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   X,
   Printer,
@@ -16,12 +16,15 @@ import {
   Building2,
   UserCheck,
   Clock,
-  ExternalLink
+  ExternalLink,
+  Lock,
+  AlertTriangle
 } from 'lucide-react';
 import { SchoolClass, SchoolProfile, SystemConfig } from '../types';
 import { generateClassQrDataUrl, generateClassQrPayload } from '../utils/classQr';
 import { getFaseByGrade } from '../utils/faseKurikulum';
 import { useApp } from '../context/AppContext';
+import { getUserRoleScope } from '../utils/userScope';
 
 export interface ClassQrModalProps {
   isOpen: boolean;
@@ -48,33 +51,117 @@ export const ClassQrModal: React.FC<ClassQrModalProps> = ({
     schoolProfile: contextSchoolProfile,
     systemConfig: contextSystemConfig,
     classes: contextClasses,
+    teachers: contextTeachers,
+    subjects: contextSubjects,
     currentUser,
     activeWorkspace,
   } = useApp();
 
-  const allAvailableClasses = propClassList || contextClasses || [];
-  const initialClass = classItem || schoolClass || allAvailableClasses[0] || null;
-  
-  const [selectedClassId, setSelectedClassId] = useState<string>(initialClass?.id || '');
+  const isPersonalWorkspace =
+    activeWorkspace?.type === 'personal' ||
+    (activeWorkspace as any)?.workspaceType === 'personal' ||
+    (activeWorkspace as any)?.workspaceType === 'individu' ||
+    (!currentUser?.schoolId && !contextSchoolProfile?.namaSekolah);
+
+  // 1. Otorisasi Kelas: Tentukan secara ketat daftar kelas yang sah menjadi hak milik/kewenangan pengguna
+  const authorizedClasses = useMemo<SchoolClass[]>(() => {
+    const rawClasses = propClassList && propClassList.length > 0 ? propClassList : contextClasses || [];
+    
+    // Administrator & Super Admin memiliki akses institusi penuh
+    const isAdmin = currentUser?.role === 'ADMIN' || currentUser?.role === 'SUPER_ADMIN';
+    if (isAdmin) {
+      return rawClasses;
+    }
+
+    // Pada Ruang Kerja Individu, pengguna adalah pemilik ruang kerja dan mengelola kelasnya sendiri
+    if (isPersonalWorkspace) {
+      return rawClasses;
+    }
+
+    // Pada Ruang Kerja Sekolah, batasi secara ketat hanya pada kelas masing-masing
+    const userScope = getUserRoleScope(
+      currentUser,
+      contextClasses || [],
+      contextSubjects || [],
+      contextTeachers || []
+    );
+
+    if (userScope.isWaliKelas) {
+      // Wali Kelas hanya memiliki hak akses tepat 1 kelas binaannya sendiri
+      if (userScope.assignedWaliClass) {
+        return [userScope.assignedWaliClass];
+      }
+      if (userScope.assignedWaliClassId) {
+        const found = (contextClasses || []).find((c) => c.id === userScope.assignedWaliClassId);
+        if (found) return [found];
+      }
+      // Fallback mencocokkan kelas yang waliKelasName atau waliKelasTeacherId sama dengan guru
+      const matched = (contextClasses || []).filter((c) => {
+        if (currentUser?.teacherId && c.waliKelasTeacherId === currentUser.teacherId) return true;
+        if (currentUser?.assignedClassIds?.includes(c.id)) return true;
+        if (currentUser?.classIds?.includes(c.id)) return true;
+        return false;
+      });
+      return matched;
+    }
+
+    if (userScope.isGuruMapel) {
+      // Guru Mapel hanya dapat melihat rombel yang diajar (sesuai mapping subjek/penugasan)
+      return userScope.accessibleClasses;
+    }
+
+    if (userScope.isSiswa) {
+      // Siswa hanya berhak pada kelasnya sendiri
+      return userScope.accessibleClasses;
+    }
+
+    // Fallback: periksa ID kelas yang terikat pada akun
+    const boundClassIds = new Set<string>();
+    if (currentUser?.classId) boundClassIds.add(currentUser.classId);
+    if (currentUser?.assignedClassIds) currentUser.assignedClassIds.forEach((id) => boundClassIds.add(id));
+    if (currentUser?.classIds) currentUser.classIds.forEach((id) => boundClassIds.add(id));
+    if (activeWorkspace?.classId) boundClassIds.add(activeWorkspace.classId);
+
+    if (boundClassIds.size > 0) {
+      return (contextClasses || []).filter((c) => boundClassIds.has(c.id));
+    }
+
+    return [];
+  }, [
+    currentUser,
+    contextClasses,
+    contextSubjects,
+    contextTeachers,
+    isPersonalWorkspace,
+    propClassList,
+    activeWorkspace,
+  ]);
+
+  const targetClass = classItem || schoolClass || authorizedClasses[0] || null;
+  const [selectedClassId, setSelectedClassId] = useState<string>(targetClass?.id || '');
 
   // Keep selectedClassId synced when initialClass changes
   useEffect(() => {
-    if (initialClass?.id) {
-      setSelectedClassId(initialClass.id);
+    if (targetClass?.id) {
+      setSelectedClassId(targetClass.id);
     }
-  }, [initialClass?.id]);
+  }, [targetClass?.id]);
 
   const activeClass =
-    allAvailableClasses.find((c) => c.id === selectedClassId) ||
-    initialClass;
+    authorizedClasses.find((c) => c.id === selectedClassId) ||
+    targetClass;
+
+  // Cek apakah pengguna diizinkan melihat QR Barcode kelas ini
+  const isAuthorized = useMemo(() => {
+    if (!activeClass) return false;
+    const isAdmin = currentUser?.role === 'ADMIN' || currentUser?.role === 'SUPER_ADMIN';
+    if (isAdmin || isPersonalWorkspace) return true;
+    return authorizedClasses.some((c) => c.id === activeClass.id);
+  }, [activeClass, authorizedClasses, currentUser?.role, isPersonalWorkspace]);
 
   const schoolProfile = propSchoolProfile || contextSchoolProfile;
   const systemConfig = propSystemConfig || contextSystemConfig;
   const schoolId = propSchoolId ?? currentUser?.schoolId;
-
-  const isPersonalWorkspace =
-    activeWorkspace?.type === 'personal' ||
-    (!currentUser?.schoolId && !schoolProfile?.namaSekolah);
 
   const workspaceDisplayName =
     activeWorkspace?.name ||
@@ -85,25 +172,28 @@ export const ClassQrModal: React.FC<ClassQrModalProps> = ({
   const [copied, setCopied] = useState<boolean>(false);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
 
-  // Generate high-resolution QR data URL (800px) for crisp display on all screens & projectors
+  // Generate high-resolution QR data URL (800px) HANYA jika terotorisasi
   useEffect(() => {
-    if (isOpen && activeClass) {
+    if (isOpen && activeClass && isAuthorized) {
       generateClassQrDataUrl(activeClass, schoolId, 800)
         .then(setQrDataUrl)
         .catch((err) => console.error('Error generating QR:', err));
+    } else {
+      setQrDataUrl('');
     }
-  }, [isOpen, activeClass, schoolId]);
+  }, [isOpen, activeClass, schoolId, isAuthorized]);
 
   if (!isOpen || !activeClass) return null;
 
   const fase = getFaseByGrade(activeClass.grade);
 
   const handlePrint = () => {
+    if (!isAuthorized) return;
     window.print();
   };
 
   const handleDownload = () => {
-    if (!qrDataUrl) return;
+    if (!qrDataUrl || !isAuthorized) return;
     const a = document.createElement('a');
     a.href = qrDataUrl;
     a.download = `QR-Presensi-${activeClass.name.replace(/\s+/g, '_')}.png`;
@@ -111,6 +201,7 @@ export const ClassQrModal: React.FC<ClassQrModalProps> = ({
   };
 
   const handleCopyPayload = () => {
+    if (!isAuthorized) return;
     const payload = generateClassQrPayload(activeClass, schoolId);
     navigator.clipboard.writeText(payload);
     setCopied(true);
@@ -138,22 +229,27 @@ export const ClassQrModal: React.FC<ClassQrModalProps> = ({
                 <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-blue-500/20 text-[9.5px] sm:text-[10.5px] font-bold text-blue-300 uppercase tracking-wider">
                   <Sparkles className="w-3 h-3 text-amber-400 shrink-0" />
                   <span className="truncate">
-                    {isFullscreen ? 'Mode Proyektor / Layar Sentuh Pintar' : 'QR Barcode Tetap Rombel'}
+                    {isAuthorized
+                      ? isFullscreen
+                        ? 'Mode Proyektor / Layar Sentuh Pintar'
+                        : 'QR Barcode Tetap Rombel'
+                      : 'Akses Rombel Dibatasi'}
                   </span>
                 </div>
                 <div className="flex items-center gap-2 mt-0.5">
                   <h3 className="font-black text-white text-sm sm:text-base md:text-lg tracking-tight truncate">
                     Presensi {activeClass.name}
                   </h3>
-                  {allAvailableClasses.length > 1 && (
+                  {/* Selector hanya muncul untuk kelas yang SAH menjadi kewenangan pengguna */}
+                  {isAuthorized && authorizedClasses.length > 1 && (
                     <div className="relative inline-block shrink-0">
                       <select
                         value={selectedClassId}
                         onChange={(e) => setSelectedClassId(e.target.value)}
                         className="bg-white/10 hover:bg-white/20 border border-white/20 text-white font-bold text-[11px] sm:text-xs rounded-lg px-2 py-0.5 sm:py-1 pr-5 appearance-none outline-none cursor-pointer transition max-w-[130px] sm:max-w-[170px] truncate"
-                        title="Pilih Kelas Lain"
+                        title="Pilih Kelas yang Anda Kelola"
                       >
-                        {allAvailableClasses.map((c) => (
+                        {authorizedClasses.map((c) => (
                           <option key={c.id} value={c.id} className="bg-slate-900 text-white">
                             {c.name}
                           </option>
@@ -168,28 +264,30 @@ export const ClassQrModal: React.FC<ClassQrModalProps> = ({
 
             {/* Top Actions: Fullscreen & Close */}
             <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
-              <button
-                type="button"
-                onClick={() => setIsFullscreen(!isFullscreen)}
-                className={`p-1.5 sm:p-2 rounded-xl transition cursor-pointer flex items-center gap-1.5 text-xs font-semibold ${
-                  isFullscreen
-                    ? 'bg-blue-600 text-white hover:bg-blue-500'
-                    : 'bg-white/10 text-slate-300 hover:text-white hover:bg-white/20'
-                }`}
-                title={isFullscreen ? 'Kembali ke Tampilan Standar' : 'Tampilan Mode Proyektor / Papan Pintar (IFP)'}
-              >
-                {isFullscreen ? (
-                  <>
-                    <Minimize2 className="w-4 h-4" />
-                    <span className="hidden md:inline text-[11px]">Kecilkan</span>
-                  </>
-                ) : (
-                  <>
-                    <Monitor className="w-4 h-4" />
-                    <span className="hidden md:inline text-[11px]">Mode Layar Lebar</span>
-                  </>
-                )}
-              </button>
+              {isAuthorized && (
+                <button
+                  type="button"
+                  onClick={() => setIsFullscreen(!isFullscreen)}
+                  className={`p-1.5 sm:p-2 rounded-xl transition cursor-pointer flex items-center gap-1.5 text-xs font-semibold ${
+                    isFullscreen
+                      ? 'bg-blue-600 text-white hover:bg-blue-500'
+                      : 'bg-white/10 text-slate-300 hover:text-white hover:bg-white/20'
+                  }`}
+                  title={isFullscreen ? 'Kembali ke Tampilan Standar' : 'Tampilan Mode Proyektor / Papan Pintar (IFP)'}
+                >
+                  {isFullscreen ? (
+                    <>
+                      <Minimize2 className="w-4 h-4" />
+                      <span className="hidden md:inline text-[11px]">Kecilkan</span>
+                    </>
+                  ) : (
+                    <>
+                      <Monitor className="w-4 h-4" />
+                      <span className="hidden md:inline text-[11px]">Mode Layar Lebar</span>
+                    </>
+                  )}
+                </button>
+              )}
               <button
                 type="button"
                 onClick={onClose}
@@ -202,10 +300,43 @@ export const ClassQrModal: React.FC<ClassQrModalProps> = ({
           </div>
 
           {/* ========================================================= */}
-          {/* BODY: ADAPTIF RESPONSIF UNTUK PONSEL, TABLET & MONITOR DESKTOP */}
+          {/* BODY: CEK OTORISASI - HANYA UNTUK KELAS MASING-MASING */}
           {/* ========================================================= */}
           <div className="p-3.5 sm:p-5 md:p-6 overflow-y-auto flex-1 space-y-4">
-            {isFullscreen ? (
+            {!isAuthorized ? (
+              /* TAMPILAN JIKA TIDAK MEMILIKI HAK AKSES KE KELAS INI */
+              <div className="py-8 sm:py-12 px-4 text-center space-y-4 max-w-md mx-auto my-auto animate-in zoom-in-95">
+                <div className="w-16 h-16 rounded-3xl bg-rose-50 border-2 border-rose-200 text-rose-600 flex items-center justify-center mx-auto shadow-xs">
+                  <Lock className="w-8 h-8" />
+                </div>
+
+                <div className="space-y-1.5">
+                  <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-rose-100 text-rose-800 text-[11px] font-bold">
+                    <AlertTriangle className="w-3.5 h-3.5 text-rose-600" />
+                    <span>Akses Barcode Dibatasi</span>
+                  </div>
+                  <h3 className="text-lg sm:text-xl font-black text-slate-900">
+                    Bukan Rombel Binaan Anda
+                  </h3>
+                  <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+                    QR Barcode presensi <strong>{activeClass.name}</strong> hanya dapat ditampilkan untuk guru yang berwenang di kelas ini. Anda tidak dapat melihat atau mencetak barcode rombel lain demi menjaga integritas presensi.
+                  </p>
+                </div>
+
+                {authorizedClasses.length > 0 && (
+                  <div className="pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedClassId(authorizedClasses[0].id)}
+                      className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition shadow-md shadow-blue-600/20 cursor-pointer inline-flex items-center gap-2"
+                    >
+                      <QrCode size={15} />
+                      <span>Buka QR Rombel Saya ({authorizedClasses[0].name})</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : isFullscreen ? (
               /* ===================================================== */
               /* MODE PROYEKTOR / PAPAN PINTAR (IFP) & MONITOR BESAR */
               /* ===================================================== */
@@ -399,112 +530,128 @@ export const ClassQrModal: React.FC<ClassQrModalProps> = ({
           {/* FOOTER ACTIONS: BERSIH & RESPONSIF DI SEMUA RESOLUSI */}
           {/* ========================================================= */}
           <div className="p-3 sm:p-4 md:p-5 bg-slate-50 border-t border-slate-100 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 shrink-0">
-            <div className="flex items-center justify-between sm:justify-start gap-2">
-              <button
-                type="button"
-                onClick={handleCopyPayload}
-                className="flex-1 sm:flex-none px-3.5 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 text-slate-700 text-xs font-bold inline-flex items-center justify-center gap-1.5 cursor-pointer transition shadow-2xs"
-              >
-                {copied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
-                <span>{copied ? 'Tersalin!' : 'Salin Token'}</span>
-              </button>
+            {isAuthorized ? (
+              <>
+                <div className="flex items-center justify-between sm:justify-start gap-2">
+                  <button
+                    type="button"
+                    onClick={handleCopyPayload}
+                    className="flex-1 sm:flex-none px-3.5 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 text-slate-700 text-xs font-bold inline-flex items-center justify-center gap-1.5 cursor-pointer transition shadow-2xs"
+                  >
+                    {copied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                    <span>{copied ? 'Tersalin!' : 'Salin Token'}</span>
+                  </button>
 
-              <button
-                type="button"
-                onClick={handleDownload}
-                className="flex-1 sm:flex-none px-3.5 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 text-slate-700 text-xs font-bold inline-flex items-center justify-center gap-1.5 cursor-pointer transition shadow-2xs"
-              >
-                <Download className="w-3.5 h-3.5" />
-                <span>Unduh Gambar</span>
-              </button>
-            </div>
+                  <button
+                    type="button"
+                    onClick={handleDownload}
+                    className="flex-1 sm:flex-none px-3.5 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 text-slate-700 text-xs font-bold inline-flex items-center justify-center gap-1.5 cursor-pointer transition shadow-2xs"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>Unduh Gambar</span>
+                  </button>
+                </div>
 
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={handlePrint}
-                className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white text-xs sm:text-sm font-black inline-flex items-center justify-center gap-2 cursor-pointer transition shadow-md shadow-blue-600/20"
-              >
-                <Printer className="w-4 h-4" />
-                <span>Cetak Poster Rombel (A4)</span>
-              </button>
-            </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handlePrint}
+                    className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white text-xs sm:text-sm font-black inline-flex items-center justify-center gap-2 cursor-pointer transition shadow-md shadow-blue-600/20"
+                  >
+                    <Printer className="w-4 h-4" />
+                    <span>Cetak Poster Rombel (A4)</span>
+                  </button>
+                </div>
+              </>
+            ) : (
+              <div className="w-full flex items-center justify-end">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl text-xs font-bold transition cursor-pointer"
+                >
+                  Tutup
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>
 
       {/* Printable A4 Poster View (hidden on screen, only appears during window.print()) */}
-      <div className="hidden print:block fixed inset-0 bg-white p-8 font-sans text-slate-900">
-        <div className="border-4 border-slate-900 rounded-3xl p-8 max-w-2xl mx-auto text-center space-y-6">
-          
-          {/* Header Kop */}
-          <div className="border-b-2 border-slate-900 pb-4 text-center">
-            <h2 className="text-xl font-black uppercase tracking-wider text-slate-900">
-              {workspaceDisplayName}
-            </h2>
-            <p className="text-xs text-slate-600 font-semibold mt-0.5">
-              SISTEM PRESENSI DIGITAL MANDIRI PESERTA DIDIK
-            </p>
-            <p className="text-[11px] text-slate-500 font-mono">
-              Tahun Ajaran {schoolProfile?.tahunPelajaran || '2025/2026'} • Semester {schoolProfile?.semester || '1 (Ganjil)'}
-            </p>
-          </div>
-
-          {/* Class Title Badge */}
-          <div className="py-2">
-            <span className="inline-block px-6 py-2 rounded-2xl bg-slate-900 text-white font-black text-2xl uppercase tracking-wider">
-              {activeClass.name}
-            </span>
-            <div className="mt-2 text-sm font-bold text-slate-700">
-              {fase} • Tingkat Kelas {activeClass.grade}
+      {isAuthorized && (
+        <div className="hidden print:block fixed inset-0 bg-white p-8 font-sans text-slate-900">
+          <div className="border-4 border-slate-900 rounded-3xl p-8 max-w-2xl mx-auto text-center space-y-6">
+            
+            {/* Header Kop */}
+            <div className="border-b-2 border-slate-900 pb-4 text-center">
+              <h2 className="text-xl font-black uppercase tracking-wider text-slate-900">
+                {workspaceDisplayName}
+              </h2>
+              <p className="text-xs text-slate-600 font-semibold mt-0.5">
+                SISTEM PRESENSI DIGITAL MANDIRI PESERTA DIDIK
+              </p>
+              <p className="text-[11px] text-slate-500 font-mono">
+                Tahun Ajaran {schoolProfile?.tahunPelajaran || '2025/2026'} • Semester {schoolProfile?.semester || '1 (Ganjil)'}
+              </p>
             </div>
-            <div className="text-xs text-slate-600 mt-1">
-              Wali Kelas: <strong>{activeClass.waliKelasName || '—'}</strong>
-            </div>
-          </div>
 
-          {/* Large QR Code */}
-          <div className="my-4">
-            <div className="inline-block p-4 border-4 border-slate-900 rounded-3xl bg-white shadow-none">
-              {qrDataUrl && (
-                <img
-                  src={qrDataUrl}
-                  alt={`QR Presensi ${activeClass.name}`}
-                  className="w-72 h-72 mx-auto object-contain"
-                />
-              )}
-            </div>
-          </div>
-
-          {/* Student Instructions */}
-          <div className="border-2 border-slate-300 rounded-2xl p-4 bg-slate-50 text-left space-y-2">
-            <p className="font-black text-xs uppercase tracking-wider text-slate-800 text-center border-b border-slate-200 pb-1.5">
-              PETUNJUK PRESENSI SISWA
-            </p>
-            <div className="grid grid-cols-3 gap-2 text-[11px] text-slate-700 pt-1">
-              <div>
-                <strong>1. Masuk Portal:</strong>
-                <p>Buka Portal Siswa di HP & login akun Anda.</p>
+            {/* Class Title Badge */}
+            <div className="py-2">
+              <span className="inline-block px-6 py-2 rounded-2xl bg-slate-900 text-white font-black text-2xl uppercase tracking-wider">
+                {activeClass.name}
+              </span>
+              <div className="mt-2 text-sm font-bold text-slate-700">
+                {fase} • Tingkat Kelas {activeClass.grade}
               </div>
-              <div>
-                <strong>2. Tekan Scan:</strong>
-                <p>Klik tombol hijau Scan QR Presensi.</p>
-              </div>
-              <div>
-                <strong>3. Scan Kode:</strong>
-                <p>Arahkan kamera ke QR ini. Jam masuk/pulang tercatat otomatis.</p>
+              <div className="text-xs text-slate-600 mt-1">
+                Wali Kelas: <strong>{activeClass.waliKelasName || '—'}</strong>
               </div>
             </div>
-          </div>
 
-          {/* Footer note & security warning */}
-          <div className="pt-2 text-[10px] text-slate-500 flex items-center justify-between border-t border-slate-200">
-            <span>*QR ini tetap dan berlaku untuk seluruh mata pelajaran di kelas ini.</span>
-            <span>Waktu presensi menggunakan jam server resmi sekolah.</span>
-          </div>
+            {/* Large QR Code */}
+            <div className="my-4">
+              <div className="inline-block p-4 border-4 border-slate-900 rounded-3xl bg-white shadow-none">
+                {qrDataUrl && (
+                  <img
+                    src={qrDataUrl}
+                    alt={`QR Presensi ${activeClass.name}`}
+                    className="w-72 h-72 mx-auto object-contain"
+                  />
+                )}
+              </div>
+            </div>
 
+            {/* Student Instructions */}
+            <div className="border-2 border-slate-300 rounded-2xl p-4 bg-slate-50 text-left space-y-2">
+              <p className="font-black text-xs uppercase tracking-wider text-slate-800 text-center border-b border-slate-200 pb-1.5">
+                PETUNJUK PRESENSI SISWA
+              </p>
+              <div className="grid grid-cols-3 gap-2 text-[11px] text-slate-700 pt-1">
+                <div>
+                  <strong>1. Masuk Portal:</strong>
+                  <p>Buka Portal Siswa di HP & login akun Anda.</p>
+                </div>
+                <div>
+                  <strong>2. Tekan Scan:</strong>
+                  <p>Klik tombol hijau Scan QR Presensi.</p>
+                </div>
+                <div>
+                  <strong>3. Scan Kode:</strong>
+                  <p>Arahkan kamera ke QR ini. Jam masuk/pulang tercatat otomatis.</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer note & security warning */}
+            <div className="pt-2 text-[10px] text-slate-500 flex items-center justify-between border-t border-slate-200">
+              <span>*QR ini tetap dan berlaku untuk seluruh mata pelajaran di kelas ini.</span>
+              <span>Waktu presensi menggunakan jam server resmi sekolah.</span>
+            </div>
+
+          </div>
         </div>
-      </div>
+      )}
     </>
   );
 };

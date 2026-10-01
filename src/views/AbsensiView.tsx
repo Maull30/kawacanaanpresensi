@@ -1563,7 +1563,7 @@ export const AbsensiView: React.FC = () => {
           classItem={activeTargetClass}
           schoolProfile={schoolProfile}
           systemConfig={systemConfig}
-          classList={availableClasses.length > 0 ? availableClasses : classes}
+          classList={availableClasses}
         />
       )}
     </div>

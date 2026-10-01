@@ -27,7 +27,8 @@ import {
   Layers,
   BookmarkCheck,
   Sparkles,
-  QrCode
+  QrCode,
+  Lock
 } from 'lucide-react';
 import { ClassQrModal } from '../components/ClassQrModal';
 import { validateTeacherRoleAssignment } from '../utils/packageSystem';
@@ -990,18 +991,22 @@ export const DataKelasView: React.FC = () => {
               </button>
             )}
 
-            {classes.length > 0 && (
-              <button
-                type="button"
-                id="btn-qr-presensi-rombel-header"
-                onClick={() => setQrModalClass(classes[0])}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold rounded-xl border border-indigo-200 transition-all cursor-pointer shadow-xs"
-                title="Tampilkan / Cetak QR Code Presensi Rombel"
-              >
-                <QrCode size={15} />
-                <span>QR Code Rombel</span>
-              </button>
-            )}
+            {(() => {
+              const defaultQrClass = myAssignedClasses.length > 0 ? myAssignedClasses[0] : (isAdmin || isPersonalWorkspace ? classes[0] : null);
+              if (!defaultQrClass) return null;
+              return (
+                <button
+                  type="button"
+                  id="btn-qr-presensi-rombel-header"
+                  onClick={() => setQrModalClass(defaultQrClass)}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold rounded-xl border border-indigo-200 transition-all cursor-pointer shadow-xs"
+                  title={`Tampilkan / Cetak QR Code Presensi ${defaultQrClass.name}`}
+                >
+                  <QrCode size={15} />
+                  <span>QR Code {isWaliKelas && defaultQrClass ? defaultQrClass.name : 'Rombel'}</span>
+                </button>
+              );
+            })()}
 
             {canAddClass && (
               <button
@@ -1214,15 +1219,30 @@ export const DataKelasView: React.FC = () => {
                           </td>
                           <td className="py-3.5 px-4 text-center">
                             <div className="flex items-center justify-center gap-1.5">
-                              <button
-                                type="button"
-                                id={`btn-qr-class-${c.id}`}
-                                onClick={() => setQrModalClass(resolvedClass)}
-                                className="p-1.5 text-indigo-700 bg-indigo-50/80 hover:bg-indigo-100 rounded-lg transition-colors cursor-pointer border border-indigo-200/60 shadow-2xs"
-                                title={`QR Code Presensi ${effectiveClassName} (Cetak / Tampilkan)`}
-                              >
-                                <QrCode size={15} />
-                              </button>
+                              {(() => {
+                                const isMyClass = isAdmin || isPersonalWorkspace || accessibleClassIds.has(c.id);
+                                if (isMyClass) {
+                                  return (
+                                    <button
+                                      type="button"
+                                      id={`btn-qr-class-${c.id}`}
+                                      onClick={() => setQrModalClass(resolvedClass)}
+                                      className="p-1.5 text-indigo-700 bg-indigo-50/80 hover:bg-indigo-100 rounded-lg transition-colors cursor-pointer border border-indigo-200/60 shadow-2xs"
+                                      title={`QR Code Presensi ${effectiveClassName} (Cetak / Tampilkan)`}
+                                    >
+                                      <QrCode size={15} />
+                                    </button>
+                                  );
+                                }
+                                return (
+                                  <span
+                                    className="p-1.5 text-slate-300 rounded-lg inline-flex items-center justify-center cursor-not-allowed"
+                                    title="QR Barcode hanya dapat diakses oleh Wali Kelas / Guru rombel ini"
+                                  >
+                                    <Lock size={14} />
+                                  </span>
+                                );
+                              })()}
                               {canEditClass && (
                                 <button
                                   type="button"
@@ -2124,7 +2144,7 @@ export const DataKelasView: React.FC = () => {
           classItem={qrModalClass}
           schoolProfile={schoolProfile}
           systemConfig={systemConfig}
-          classList={classes}
+          classList={myAssignedClasses}
         />
       )}
     </div>

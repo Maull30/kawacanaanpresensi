@@ -909,10 +909,12 @@ export const DataPenggunaView: React.FC = () => {
           <span>Dashboard</span>
         </button>
 
-        <div className="text-xs font-bold text-slate-500 flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-xl border border-slate-200 shadow-xs">
-          <School size={13} className="text-blue-600" />
-          <span>{schoolProfile?.namaSekolah || 'Sistem Sekolah'}</span>
-        </div>
+        {!isPersonalWorkspace && (
+          <div className="text-xs font-bold text-slate-500 flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-xl border border-slate-200 shadow-xs">
+            <School size={13} className="text-blue-600" />
+            <span>{schoolProfile?.namaSekolah || 'Sistem Sekolah'}</span>
+          </div>
+        )}
       </div>
 
       {/* Header & Main Actions */}
@@ -924,12 +926,9 @@ export const DataPenggunaView: React.FC = () => {
           <div>
             <div className="flex items-center gap-2 flex-wrap">
               <h1 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight">Data Pengguna & Hak Akses</h1>
-              <span className="px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 text-xs font-extrabold border border-blue-200/60">
-                {stats.total} Akun
-              </span>
-              {isPersonalWorkspace && (
-                <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[11px] font-semibold border border-slate-200/60">
-                  Ruang Kerja Individu
+              {!isPersonalWorkspace && (
+                <span className="px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 text-xs font-extrabold border border-blue-200/60">
+                  {stats.total} Akun
                 </span>
               )}
             </div>

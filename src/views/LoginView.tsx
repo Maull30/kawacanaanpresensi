@@ -592,9 +592,6 @@ export const LoginView: React.FC<LoginViewProps> = ({ onBackToLanding, onEnterDa
             Kebijakan Privasi
           </button>
         </div>
-        <div className="font-medium text-slate-400 text-[10.5px]">
-          &copy; {new Date().getFullYear()} Kawacanaan by Maulana Yusuf. All Rights Reserved
-        </div>
       </footer>
 
       {/* Modal Syarat & Ketentuan & Kebijakan Privasi (Sama dengan footer Landing Page) */}

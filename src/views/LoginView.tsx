@@ -593,7 +593,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onBackToLanding, onEnterDa
           </button>
         </div>
         <div className="font-medium text-slate-400 text-[10.5px]">
-          &copy; {new Date().getFullYear()} KawaCanaan Presensi
+          &copy; {new Date().getFullYear()} Kawacanaan by Maulana Yusuf. All Rights Reserved
         </div>
       </footer>
 

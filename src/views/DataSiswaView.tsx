@@ -612,26 +612,11 @@ export const DataSiswaView: React.FC = () => {
   return (
     <div className="w-full space-y-6 animate-in fade-in duration-200">
       {/* Title */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div className="flex items-center gap-2 text-slate-900 font-black text-lg">
-          <div className="w-8 h-8 rounded-lg bg-blue-50 border border-blue-200 text-blue-600 flex items-center justify-center shadow-xs">
-            <Users size={18} />
-          </div>
-          <span>Data Siswa</span>
+      <div className="flex items-center gap-2 text-slate-900 font-black text-lg">
+        <div className="w-8 h-8 rounded-lg bg-blue-50 border border-blue-200 text-blue-600 flex items-center justify-center shadow-xs">
+          <Users size={18} />
         </div>
-
-        {/* Workspace / Quota Plan Badge */}
-        {isPersonalWorkspace && (
-          <div className="flex items-center gap-2 flex-wrap">
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-blue-50 border border-blue-200/80 text-blue-800 text-xs font-bold w-fit">
-              <span>Ruang Kerja Individu</span>
-              <span className="text-blue-300">•</span>
-              <span>{isWaliKelas ? 'Wali Kelas' : 'Guru Mapel'}</span>
-              <span className="text-blue-300">•</span>
-              <span>Kapasitas: Maks. 50 Siswa/Kelas</span>
-            </div>
-          </div>
-        )}
+        <span>Data Siswa</span>
       </div>
 
       {/* Main Container Card */}

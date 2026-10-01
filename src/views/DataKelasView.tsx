@@ -961,12 +961,10 @@ export const DataKelasView: React.FC = () => {
                   </div>
                 )
               ) : (
-                !isAdmin && (isWaliKelas || isGuru) ? (
+                !isAdmin && isGuru ? (
                   <div className="flex flex-wrap items-center gap-2 mt-2">
                     <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 border border-slate-200 text-[11px] font-bold">
-                      {isWaliKelas
-                        ? `Binaan: ${accessibleClasses.map((c) => c.name).join(', ') || 'Belum ditugaskan'}`
-                        : `Diajar: ${accessibleClasses.map((c) => c.name).join(', ') || 'Belum ditugaskan'}`}
+                      {`Diajar: ${accessibleClasses.map((c) => c.name).join(', ') || 'Belum ditugaskan'}`}
                     </span>
                   </div>
                 ) : null
@@ -1194,11 +1192,9 @@ export const DataKelasView: React.FC = () => {
                               >
                                 {fase}
                               </span>
-                              {!isAdmin && !isPersonalWorkspace && accessibleClassIds.has(c.id) && (
-                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${
-                                  isWaliKelas ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' : 'bg-blue-100 text-blue-800 border border-blue-200'
-                                }`}>
-                                  {isWaliKelas ? 'Kelas Binaan Anda' : 'Kelas Diajar'}
+                              {!isAdmin && !isPersonalWorkspace && !isWaliKelas && accessibleClassIds.has(c.id) && (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-blue-100 text-blue-800 border border-blue-200">
+                                  Kelas Diajar
                                 </span>
                               )}
                             </div>

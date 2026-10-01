@@ -843,14 +843,12 @@ export const DataSiswaView: React.FC = () => {
                             {getFaseByClassName(s.className)}
                           </span>
                         )}
-                        {!isAdmin && !isPersonalWorkspace && (
+                        {!isAdmin && !isPersonalWorkspace && !isWaliKelas && (
                           (s.classId && accessibleClassIds.has(s.classId)) ||
                           (s.className && accessibleClassNames.has(s.className.trim().toLowerCase()))
                         ) && (
-                          <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full ${
-                            isWaliKelas ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' : 'bg-blue-100 text-blue-800 border border-blue-200'
-                          }`}>
-                            {isWaliKelas ? 'Siswa Binaan' : 'Siswa Diajar'}
+                          <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 border border-blue-200">
+                            Siswa Diajar
                           </span>
                         )}
                       </div>

@@ -1058,11 +1058,6 @@ export const DataPenggunaView: React.FC = () => {
           >
             <Sparkles size={14} />
             <span>Generate Akun & Password</span>
-            {isPersonalWorkspace && !isTeacherPro && (
-              <span className="px-1.5 py-0.5 rounded bg-amber-700/80 text-[9px] font-black uppercase tracking-wider">
-                PRO
-              </span>
-            )}
           </button>
         </div>
       </div>
@@ -1098,11 +1093,6 @@ export const DataPenggunaView: React.FC = () => {
           >
             <Sparkles size={13} />
             <span>Generate Tersisa</span>
-            {isPersonalWorkspace && !isTeacherPro && (
-              <span className="px-1 py-0.2 rounded bg-amber-800 text-[9px] font-black">
-                PRO
-              </span>
-            )}
           </button>
         </div>
       ) : (teachers.length > 0 || students.length > 0) ? (
@@ -1340,11 +1330,6 @@ export const DataPenggunaView: React.FC = () => {
                       <td className="py-2.5 px-3 sm:px-3.5">
                         <div className="font-bold text-slate-900 flex items-center gap-1.5">
                           <span>{u.name}</span>
-                          {currentUser && currentUser.id === u.id && (
-                            <span className="px-1.5 py-0.2 rounded text-[9px] font-black bg-blue-100 text-blue-800">
-                              SAYA
-                            </span>
-                          )}
                         </div>
                         {u.email && (
                           <div className="text-[11px] text-slate-400 font-normal">{u.email}</div>

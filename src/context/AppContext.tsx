@@ -43,6 +43,7 @@ interface AppContextType {
   currentUser: UserAccount | null;
   setCurrentUser: (u: UserAccount | null) => void;
   logout: () => Promise<void>;
+  isLoggingOut: boolean;
   registrationRequired: boolean;
   setRegistrationRequired: (v: boolean) => void;
   activeView: ActiveView;
@@ -1025,6 +1026,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
   const loadRequestRef = React.useRef(0);
   const navigationIntentRef = React.useRef(0);
   const isLoggingOutRef = React.useRef(false);
+  const [isLoggingOut, setIsLoggingOut] = useState<boolean>(false);
   const passwordChangedRecentlyRef = React.useRef(false);
   const setActiveView = (view: ActiveView) => {
     navigationIntentRef.current += 1;
@@ -1202,6 +1204,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const logout = async () => {
     isLoggingOutRef.current = true;
+    setIsLoggingOut(true);
     // Invalidate any in-flight data loading requests immediately
     loadRequestRef.current++;
 
@@ -1229,6 +1232,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     setAcademicEvents([]);
     setIsSwitchingWorkspace(false);
     passwordChangedRecentlyRef.current = false;
+    inFlightLoadPromiseRef.current = null;
+    inFlightLoadUserIdRef.current = "";
 
     // 3. Bersihkan seluruh penyimpanan lokal sesi dan cache
     try {
@@ -1239,6 +1244,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       localStorage.removeItem("kawacanaan_last_workspace_id");
       localStorage.removeItem("kawacanaan_cached_school_ws");
       localStorage.removeItem("kawacanaan_user_has_logged_in");
+      localStorage.removeItem("kawacanaan_hide_landing");
+      localStorage.removeItem("kawacanaan_oauth_pending");
+      localStorage.removeItem("kawacanaan_oauth_time");
+      sessionStorage.removeItem("kawacanaan_oauth_pending");
+      sessionStorage.removeItem("kawacanaan_oauth_time");
+      sessionStorage.removeItem("kawacanaan_hide_landing");
+
       try {
         for (let i = sessionStorage.length - 1; i >= 0; i--) {
           const sKey = sessionStorage.key(i);
@@ -1246,7 +1258,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
             sKey &&
             (sKey.startsWith("pwd_changed_") ||
               sKey.startsWith("kawacanaan_") ||
-              sKey.startsWith("sb-"))
+              sKey.startsWith("sb-") ||
+              sKey.startsWith("supabase."))
           ) {
             sessionStorage.removeItem(sKey);
           }
@@ -1263,7 +1276,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
             key.startsWith("kawacanaan_summary_cache_") ||
             key.startsWith("sb-") ||
             key.startsWith("supabase.auth.") ||
-            key.includes("supabase.auth.token"))
+            key.includes("supabase.auth.token") ||
+            key.includes("-auth-token"))
         ) {
           localStorage.removeItem(key);
         }
@@ -1276,19 +1290,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
         const url = new URL(window.location.href);
         url.searchParams.set("page", "login");
         url.searchParams.delete("view");
+        url.searchParams.delete("code");
         window.history.replaceState(null, "", url.pathname + url.search);
       } catch (_) {}
     }
 
-    // 5. Eksekusi Supabase Auth signOut() secara non-blocking dengan timeout cepat
+    // 5. Eksekusi Supabase Auth signOut() scope local terlebih dahulu agar sesi memori langsung musnah
     try {
-      await Promise.race([
-        supabase.auth.signOut().catch(() => {}),
-        new Promise((resolve) => setTimeout(resolve, 250)),
-      ]);
-    } catch (err) {
-      console.warn("[logout] supabase.auth.signOut error:", err);
-    }
+      await supabase.auth.signOut({ scope: "local" }).catch(() => {});
+    } catch (_) {}
+    try {
+      supabase.auth.signOut({ scope: "global" }).catch(() => {});
+    } catch (_) {}
+
+    setTimeout(() => {
+      isLoggingOutRef.current = false;
+      setIsLoggingOut(false);
+    }, 600);
   };
 
   const loginWithCredentials = async (
@@ -2301,13 +2319,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
   };
 
   const loadData = async (userId: string) => {
-    if (userId) {
-      // Pemanggilan eksplisit dengan userId menandakan proses login/sinkronisasi aktif yang sah
-      isLoggingOutRef.current = false;
-    }
     if (isLoggingOutRef.current) return;
     if (!userId) {
+      if (isLoggingOutRef.current) return;
       const { data: sessionData } = await supabase.auth.getSession();
+      if (isLoggingOutRef.current) return;
       userId = sessionData.session?.user?.id || "";
     }
     if (isLoggingOutRef.current) return;
@@ -2764,12 +2780,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     setIsAuthChecking(false);
     setIsLoginPreparing(false);
       } catch (err) {
+        if (isLoggingOutRef.current) return;
         console.error("[loadData] error:", err);
         const wasOAuth =
           localStorage.getItem("kawacanaan_oauth_pending") === "true" ||
           sessionStorage.getItem("kawacanaan_oauth_pending") === "true";
         const cached = getCachedUserSession();
-        if (cached && (!currentUser || currentUser.id === cached.id)) {
+        if (cached && (!currentUser || currentUser.id === cached.id) && !isLoggingOutRef.current) {
           setCurrentUser(cached);
           const saved = wasOAuth ? null : getSavedActiveView();
           const targetView = wasOAuth
@@ -2803,7 +2820,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     const handleAuthEvent = (event: string, session: any) => {
       if (!mounted) return;
 
-      if (event === "SIGNED_OUT") {
+      if (event === "SIGNED_OUT" || isLoggingOutRef.current) {
         setPasswordRecovery(false);
         setCurrentUser(null);
         setRegistrationRequired(false);
@@ -3011,8 +3028,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
 
     const handleUserActivity = () => {
       const currentNow = Date.now();
-      // Throttle update localStorage setiap 5 detik agar tetap ringan
-      if (currentNow - lastThrottledUpdate > 5000) {
+      // Throttle update localStorage setiap 2.5 detik agar tetap responsif dan ringan
+      if (currentNow - lastThrottledUpdate > 2500) {
         lastThrottledUpdate = currentNow;
         try {
           localStorage.setItem(SESSION_LAST_ACTIVE_KEY, String(currentNow));
@@ -3027,18 +3044,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       "touchstart",
       "scroll",
       "click",
+      "wheel",
     ];
     activityEvents.forEach((evt) => {
       window.addEventListener(evt, handleUserActivity, { passive: true });
     });
 
     const checkTimeout = () => {
+      if (isLoggingOutRef.current) return;
       const timeoutStatus = checkSessionTimeouts();
       if (timeoutStatus.expired) {
         void logout();
         if (timeoutStatus.reason === "idle") {
           showToast(
-            "Sesi Anda berakhir otomatis karena tidak ada aktivitas selama 10 menit. Silakan login kembali.",
+            "Sesi Anda berakhir otomatis karena tidak aktif selama 10 menit. Silakan login kembali.",
             "info",
           );
         } else if (timeoutStatus.reason === "absolute") {
@@ -3050,8 +3069,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       }
     };
 
-    // Periksa setiap 10 detik
-    const timerInterval = window.setInterval(checkTimeout, 10000);
+    // Periksa setiap 5 detik agar timeout 10 menit terdeteksi tepat waktu
+    const timerInterval = window.setInterval(checkTimeout, 5000);
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible") {
@@ -8132,6 +8151,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
         loginRoleDetails,
         loginWithCredentials,
         logout,
+        isLoggingOut,
         classes,
         addClass,
         updateClass,

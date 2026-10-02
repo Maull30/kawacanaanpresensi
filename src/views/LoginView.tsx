@@ -41,6 +41,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onBackToLanding, onEnterDa
     currentUser,
     setActiveView,
     isLoginPreparing,
+    isLoggingOut,
     loginProgressMessage,
     loginStep,
   } = useApp();
@@ -134,6 +135,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onBackToLanding, onEnterDa
   }, [registrationRequired, openOnboarding]);
 
   useEffect(() => {
+    if (isLoggingOut) return;
     if (currentUser) {
       if (onEnterDashboard) {
         onEnterDashboard();
@@ -146,7 +148,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onBackToLanding, onEnterDa
         } catch (_) {}
       }
     }
-  }, [currentUser, onEnterDashboard, setActiveView]);
+  }, [currentUser, isLoggingOut, onEnterDashboard, setActiveView]);
 
   // Handle standard login through Supabase Auth.
   const handleLogin = async (e: React.FormEvent) => {

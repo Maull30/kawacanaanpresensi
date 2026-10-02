@@ -87,16 +87,7 @@ export const PortalSiswaView: React.FC = () => {
   const [scanStatusType, setScanStatusType] = useState<'idle' | 'processing' | 'success' | 'rejected'>('idle');
   const isProcessingRef = useRef<boolean>(false);
 
-  // Mode simulasi khusus untuk pengujian oleh Admin / Kepala Sekolah / Guru
-  const [selectedSimulatedStudentId, setSelectedSimulatedStudentId] = useState<string>('');
-
-  useEffect(() => {
-    if (currentUser?.role !== 'SISWA' && students.length > 0 && !selectedSimulatedStudentId) {
-      setSelectedSimulatedStudentId(students[0].id);
-    }
-  }, [currentUser?.role, students, selectedSimulatedStudentId]);
-
-  // Resolusi akun siswa yang definitif
+  // Resolusi akun siswa yang definitif (Sistem Produksi Nyata)
   const activeStudent: Student = useMemo(() => {
     if (currentUser?.role === 'SISWA') {
       if (currentUser.studentId) {
@@ -141,14 +132,9 @@ export const PortalSiswaView: React.FC = () => {
       };
     }
 
-    if (selectedSimulatedStudentId) {
-      const selected = students.find((s) => s.id === selectedSimulatedStudentId);
-      if (selected) return selected;
-    }
-
     return (
       students[0] || {
-        id: 'simulasi-default',
+        id: 'siswa-utama',
         nisn: '3149271621',
         nama: 'Ayesha Khansa Zahira',
         gender: 'P',
@@ -156,7 +142,7 @@ export const PortalSiswaView: React.FC = () => {
         className: '6A',
       }
     );
-  }, [currentUser, students, classes, selectedSimulatedStudentId]);
+  }, [currentUser, students, classes]);
 
   // Resolusi kelas siswa
   const studentClass = useMemo(() => {
@@ -495,39 +481,6 @@ export const PortalSiswaView: React.FC = () => {
     );
   }, [activeStudent, selectedDetailDate, attendanceRecords]);
 
-  // Quick simulation function for seamless testing on all devices
-  const handleSimulateScanSuccess = async () => {
-    if (isProcessingRef.current) return;
-    isProcessingRef.current = true;
-    setScanStatusType('processing');
-    setScanStatusMessage('Mencatat presensi...');
-    playChimeSuccess();
-    const now = getServerNow();
-    const timeStr = formatServerTimeString(now);
-    const notes = scannerAction === 'masuk' ? 'Hadir via Scan QR' : undefined;
-    const res = await submitStudentAttendance(activeStudent.id, scannerAction, notes, currentAttendanceDate, timeStr);
-    if (res.success) {
-      setScanStatusType('success');
-      setScanStatusMessage(
-        scannerAction === 'masuk'
-          ? `Presensi Masuk berhasil dicatat pukul ${timeStr} WIB!`
-          : `Presensi Pulang berhasil dicatat pukul ${timeStr} WIB!`
-      );
-      setTimeout(() => {
-        stopCameraScanner();
-        setSelectedDetailDate(currentAttendanceDate);
-        setCurrentScreen('detail');
-        isProcessingRef.current = false;
-      }, 900);
-    } else {
-      setScanStatusType('rejected');
-      setScanStatusMessage(res.message || 'Presensi gagal.');
-      setTimeout(() => {
-        isProcessingRef.current = false;
-      }, 2000);
-    }
-  };
-
   // =========================================================================
   // RENDER SECTIONS
   // =========================================================================
@@ -535,38 +488,10 @@ export const PortalSiswaView: React.FC = () => {
   return (
     <div className="min-h-screen bg-slate-100/90 flex justify-center items-start sm:py-6 px-0 sm:px-4 font-sans antialiased text-slate-800 select-none">
       {/* Mobile Smartphone Frame Container (Designed specifically for Mobile Screen) */}
-      <div className="w-full max-w-md bg-white sm:rounded-[36px] sm:shadow-2xl sm:border sm:border-slate-200/90 flex flex-col relative min-h-screen sm:min-h-[844px] pb-24">
+      <div className="w-full max-w-md bg-white sm:rounded-[36px] sm:shadow-2xl sm:border sm:border-slate-200/90 flex flex-col relative min-h-screen sm:min-h-[844px] pb-24 overflow-hidden">
         
         {/* Hidden temp div for file upload scanner */}
         <div id="file-scanner-temp" className="hidden" />
-
-        {/* Simulation Banner for Admin / Guru */}
-        {currentUser?.role !== 'SISWA' && (
-          <div className="bg-amber-500 text-white px-4 py-2 text-[11px] font-bold flex items-center justify-between shrink-0 z-30 shadow-xs sm:rounded-t-[36px]">
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setActiveView('dashboard')}
-                className="inline-flex items-center gap-1 bg-amber-600 hover:bg-amber-700 active:scale-95 text-white px-2 py-0.5 rounded text-[10px] font-black cursor-pointer transition-all"
-                title="Kembali ke Dashboard Utama"
-              >
-                <ArrowLeft size={11} />
-                <span>Dashboard</span>
-              </button>
-              <span>Simulasi Siswa:</span>
-            </div>
-            <select
-              value={activeStudent.id}
-              onChange={(e) => setSelectedSimulatedStudentId(e.target.value)}
-              className="bg-amber-600 text-white text-[11px] font-bold rounded px-1.5 py-0.5 outline-none cursor-pointer max-w-[150px] truncate"
-            >
-              {students.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.nama} ({s.nisn})
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
 
         {/* 2. DYNAMIC CONTENT SCROLL AREA */}
         <div className="flex-1 relative bg-white">
@@ -814,9 +739,6 @@ export const PortalSiswaView: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Animated Green Scanning Laser Line */}
-                <div className="absolute left-8 right-8 h-0.5 bg-gradient-to-r from-transparent via-emerald-400 to-transparent shadow-[0_0_12px_#34d399] pointer-events-none animate-pulse z-10" />
-
                 {/* Camera Error Message Fallback */}
                 {cameraError && (
                   <div className="absolute inset-0 bg-slate-950/90 text-white p-5 flex flex-col items-center justify-center text-center z-20 space-y-3">
@@ -867,16 +789,6 @@ export const PortalSiswaView: React.FC = () => {
                   <li>• Jaga jarak 10–20 cm dari QR code.</li>
                 </ul>
               </div>
-
-              {/* Quick Simulation Button for Rapid & Stable Testing */}
-              <button
-                type="button"
-                onClick={handleSimulateScanSuccess}
-                className="w-full py-2.5 px-4 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 active:scale-98 text-white font-black text-xs flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer"
-              >
-                <Sparkles size={16} />
-                <span>Simulasi Scan Berhasil ({scannerAction === 'masuk' ? 'Masuk' : 'Pulang'})</span>
-              </button>
 
               {/* Upload QR Image Fallback Button */}
               <div className="pt-1 flex justify-center">
@@ -1391,8 +1303,8 @@ export const PortalSiswaView: React.FC = () => {
                 <Smile size={20} className="text-blue-600 shrink-0" />
               </div>
 
-              {/* Logout Option for Student Account */}
-              {currentUser?.role === 'SISWA' && (
+              {/* Profile Bottom Actions */}
+              {currentUser?.role === 'SISWA' ? (
                 <div className="pt-2">
                   <button
                     onClick={logout}
@@ -1400,6 +1312,16 @@ export const PortalSiswaView: React.FC = () => {
                   >
                     <LogOut size={16} />
                     <span>Keluar dari Akun Siswa</span>
+                  </button>
+                </div>
+              ) : (
+                <div className="pt-2">
+                  <button
+                    onClick={() => setActiveView('dashboard')}
+                    className="w-full py-2.5 rounded-2xl bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 font-black text-xs flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-98"
+                  >
+                    <ArrowLeft size={16} />
+                    <span>Kembali ke Dashboard Utama</span>
                   </button>
                 </div>
               )}

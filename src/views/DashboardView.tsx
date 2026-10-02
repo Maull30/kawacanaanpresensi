@@ -607,6 +607,14 @@ export const DashboardView: React.FC = () => {
       bg: 'bg-blue-50 border border-blue-100',
     },
     {
+      id: 'portal-siswa',
+      title: 'Portal Siswa & Wali Murid',
+      desc: 'Simulasi Mandiri & Pantau Orang Tua',
+      icon: Users,
+      color: 'text-blue-600',
+      bg: 'bg-blue-50 border border-blue-100',
+    },
+    {
       id: 'rekapitulasi',
       title: 'Rekapitulasi',
       desc: 'Statistik & Matriks Bulanan',
@@ -660,6 +668,7 @@ export const DashboardView: React.FC = () => {
           'data-referensi',
           'kalender-akademik',
           'absensi',
+          'portal-siswa',
           'rekapitulasi',
           'laporan',
         ].includes(item.id);
@@ -671,12 +680,13 @@ export const DashboardView: React.FC = () => {
           'data-referensi',
           'kalender-akademik',
           'absensi',
+          'portal-siswa',
           'rekapitulasi',
           'laporan',
         ].includes(item.id);
       }
       if (currentUser.role === 'KEPALA SEKOLAH') {
-        return ['data-referensi', 'kalender-akademik', 'rekapitulasi', 'laporan', 'pengaturan'].includes(
+        return ['data-referensi', 'kalender-akademik', 'portal-siswa', 'rekapitulasi', 'laporan', 'pengaturan'].includes(
           item.id
         );
       }

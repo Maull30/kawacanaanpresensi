@@ -86,7 +86,14 @@ export const TeacherLeaveApprovalModal: React.FC<TeacherLeaveApprovalModalProps>
     const text = encodeURIComponent(
       `Halo Bapak/Ibu Wali dari ${studentName}, kami dari pihak sekolah terkait surat permohonan izin/sakit yang diajukan...`
     );
-    window.open(`https://api.whatsapp.com/send?phone=${formattedPhone}&text=${text}`, '_blank');
+    const url = `https://api.whatsapp.com/send?phone=${formattedPhone}&text=${text}`;
+    const link = document.createElement('a');
+    link.href = url;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   return (

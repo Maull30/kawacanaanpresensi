@@ -46,7 +46,7 @@ const VIEW_ACCESS: Record<ActiveView, UserRole[] | 'all'> = {
   rekapitulasi: ['ADMIN', 'KEPALA SEKOLAH', 'WALI KELAS', 'GURU MAPEL'],
   laporan: ['ADMIN', 'KEPALA SEKOLAH', 'WALI KELAS', 'GURU MAPEL'],
   pengaturan: ['ADMIN', 'KEPALA SEKOLAH', 'WALI KELAS', 'GURU MAPEL'],
-  'portal-siswa': ['SISWA'],
+  'portal-siswa': ['SISWA', 'ADMIN', 'KEPALA SEKOLAH', 'WALI KELAS', 'GURU MAPEL'],
 };
 
 const defaultViewForRole = (role: UserRole): ActiveView => role === 'SUPER_ADMIN' ? 'superadmin' : (role === 'SISWA' ? 'portal-siswa' : 'dashboard');
@@ -427,7 +427,10 @@ const MainAppContent: React.FC = () => {
     const fallback = defaultViewForRole(currentUser.role);
     // Jangan setState saat render; jadwalkan redirect lalu tampilkan layar kosong sesaat.
     setTimeout(() => {
-      showToast('Menu Pengaturan Sistem hanya dapat diakses oleh Administrator dan Kepala Sekolah di ruang kerja sekolah.', 'error');
+      const errMsg = activeView === 'pengaturan'
+        ? 'Menu Pengaturan Sistem hanya dapat diakses oleh Administrator dan Kepala Sekolah di ruang kerja sekolah.'
+        : 'Anda tidak memiliki hak akses untuk membuka halaman tersebut.';
+      showToast(errMsg, 'error');
       setActiveView(fallback);
     }, 0);
     return (

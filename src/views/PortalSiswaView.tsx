@@ -213,6 +213,7 @@ export const PortalSiswaView: React.FC = () => {
   const hasCheckedIn = !!(todayRecord && todayRecord.checkInTime && todayRecord.checkInTime !== '-' && todayRecord.status === 'Hadir');
   const hasCheckedOut = !!(todayRecord && todayRecord.checkOutTime && todayRecord.checkOutTime !== '-');
   const isExcused = todayRecord && (todayRecord.status === 'Sakit' || todayRecord.status === 'Izin');
+  const isSimulationMode = currentUser?.role !== 'SISWA';
 
   // Time window checks
   const currentTotalMinutes = Number(hours) * 60 + Number(mins);
@@ -220,7 +221,7 @@ export const PortalSiswaView: React.FC = () => {
   // Check-in start time
   const [startH, startM] = (systemConfig.checkInStartTime || '06:00').split(':').map(Number);
   const startMinutes = (startH || 0) * 60 + (startM || 0);
-  const isBeforeCheckInOpen = currentTotalMinutes < startMinutes;
+  const isBeforeCheckInOpen = !isSimulationMode && currentTotalMinutes < startMinutes;
 
   // Check-in deadline (Late check)
   const [dlH, dlM] = (systemConfig.checkInDeadlineTime || '07:00').split(':').map(Number);
@@ -230,11 +231,12 @@ export const PortalSiswaView: React.FC = () => {
   // Check-out start time
   const [outH, outM] = (systemConfig.checkOutStartTime || '12:30').split(':').map(Number);
   const outMinutes = (outH || 12) * 60 + (outM || 30);
-  const isBeforeCheckOutOpen = currentTotalMinutes < outMinutes;
+  const isBeforeCheckOutOpen = !isSimulationMode && currentTotalMinutes < outMinutes;
 
   // Handlers
   const handleCheckIn = () => {
-    if (!activeStudent || isLockedForHoliday) return;
+    if (!activeStudent) return;
+    if (isLockedForHoliday && !isSimulationMode) return;
     if (isBeforeCheckInOpen) {
       showToast(`Presensi masuk belum dibuka. Jam buka presensi: ${systemConfig.checkInStartTime || '06:00'} WIB.`, 'error');
       return;
@@ -244,8 +246,9 @@ export const PortalSiswaView: React.FC = () => {
   };
 
   const handleCheckOut = () => {
-    if (!activeStudent || isLockedForHoliday) return;
-    if (!hasCheckedIn) {
+    if (!activeStudent) return;
+    if (isLockedForHoliday && !isSimulationMode) return;
+    if (!hasCheckedIn && !isSimulationMode) {
       showToast('Harap lakukan Scan Presensi Masuk terlebih dahulu.', 'error');
       return;
     }
@@ -771,18 +774,18 @@ export const PortalSiswaView: React.FC = () => {
               id="btn-presensi-masuk"
               onClick={handleCheckIn}
               disabled={
-                isLockedForHoliday ||
+                (!isSimulationMode && isLockedForHoliday) ||
                 hasCheckedIn ||
                 isExcused ||
-                !systemConfig.studentSelfAttendanceEnabled ||
+                (!isSimulationMode && !systemConfig.studentSelfAttendanceEnabled) ||
                 isBeforeCheckInOpen
               }
               className={`relative p-5 rounded-3xl flex flex-col items-center justify-center gap-2 text-center transition-all cursor-pointer shadow-md min-h-[140px] group ${
-                isLockedForHoliday
+                !isSimulationMode && isLockedForHoliday
                   ? 'bg-slate-100 border border-slate-300 text-slate-400 cursor-not-allowed opacity-80'
                   : hasCheckedIn
                   ? 'bg-emerald-50 border-2 border-emerald-300 text-emerald-900 cursor-not-allowed opacity-90'
-                  : !systemConfig.studentSelfAttendanceEnabled
+                  : !isSimulationMode && !systemConfig.studentSelfAttendanceEnabled
                   ? 'bg-slate-100 border border-slate-200 text-slate-400 cursor-not-allowed'
                   : isBeforeCheckInOpen
                   ? 'bg-slate-100 border border-slate-200 text-slate-400 cursor-not-allowed'
@@ -791,7 +794,7 @@ export const PortalSiswaView: React.FC = () => {
             >
               <div
                 className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-inner ${
-                  isLockedForHoliday
+                  !isSimulationMode && isLockedForHoliday
                     ? 'bg-slate-200 text-slate-500'
                     : hasCheckedIn
                     ? 'bg-emerald-200 text-emerald-800'
@@ -800,7 +803,7 @@ export const PortalSiswaView: React.FC = () => {
                     : 'bg-white/20 text-white'
                 }`}
               >
-                {isLockedForHoliday ? (
+                {!isSimulationMode && isLockedForHoliday ? (
                   <Lock size={28} />
                 ) : hasCheckedIn ? (
                   <CheckCircle2 size={30} />
@@ -812,7 +815,7 @@ export const PortalSiswaView: React.FC = () => {
               </div>
               <div>
                 <span className="text-base font-black tracking-tight block">
-                  {isLockedForHoliday
+                  {!isSimulationMode && isLockedForHoliday
                     ? 'LIBUR (DIKUNCI)'
                     : hasCheckedIn
                     ? 'SUDAH MASUK'
@@ -821,7 +824,7 @@ export const PortalSiswaView: React.FC = () => {
                     : 'SCAN PRESENSI MASUK'}
                 </span>
                 <span className="text-[11px] font-medium opacity-90 block mt-0.5">
-                  {isLockedForHoliday
+                  {!isSimulationMode && isLockedForHoliday
                     ? 'Bukan hari belajar'
                     : hasCheckedIn
                     ? `Tercatat pukul ${todayRecord?.checkInTime} WIB`
@@ -839,18 +842,18 @@ export const PortalSiswaView: React.FC = () => {
               id="btn-presensi-pulang"
               onClick={handleCheckOut}
               disabled={
-                isLockedForHoliday ||
+                (!isSimulationMode && isLockedForHoliday) ||
                 hasCheckedOut ||
-                !hasCheckedIn ||
-                !systemConfig.studentSelfAttendanceEnabled ||
+                (!isSimulationMode && !hasCheckedIn) ||
+                (!isSimulationMode && !systemConfig.studentSelfAttendanceEnabled) ||
                 isBeforeCheckOutOpen
               }
               className={`relative p-5 rounded-3xl flex flex-col items-center justify-center gap-2 text-center transition-all cursor-pointer shadow-md min-h-[140px] group ${
-                isLockedForHoliday
+                !isSimulationMode && isLockedForHoliday
                   ? 'bg-slate-100 border border-slate-300 text-slate-400 cursor-not-allowed opacity-80'
                   : hasCheckedOut
                   ? 'bg-blue-50 border-2 border-blue-300 text-blue-900 cursor-not-allowed opacity-90'
-                  : !hasCheckedIn
+                  : !hasCheckedIn && !isSimulationMode
                   ? 'bg-slate-50 border border-slate-200 text-slate-400 cursor-not-allowed'
                   : isBeforeCheckOutOpen
                   ? 'bg-slate-100 border border-slate-200 text-slate-400 cursor-not-allowed'
@@ -859,7 +862,7 @@ export const PortalSiswaView: React.FC = () => {
             >
               <div
                 className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-inner ${
-                  isLockedForHoliday
+                  !isSimulationMode && isLockedForHoliday
                     ? 'bg-slate-200 text-slate-500'
                     : hasCheckedOut
                     ? 'bg-blue-200 text-blue-800'
@@ -868,7 +871,7 @@ export const PortalSiswaView: React.FC = () => {
                     : 'bg-white/20 text-white'
                 }`}
               >
-                {isLockedForHoliday ? (
+                {!isSimulationMode && isLockedForHoliday ? (
                   <Lock size={28} />
                 ) : hasCheckedOut ? (
                   <CheckCircle2 size={30} />
@@ -880,7 +883,7 @@ export const PortalSiswaView: React.FC = () => {
               </div>
               <div>
                 <span className="text-base font-black tracking-tight block">
-                  {isLockedForHoliday
+                  {!isSimulationMode && isLockedForHoliday
                     ? 'LIBUR (DIKUNCI)'
                     : hasCheckedOut
                     ? 'SUDAH PULANG'
@@ -889,11 +892,11 @@ export const PortalSiswaView: React.FC = () => {
                     : 'SCAN PRESENSI PULANG'}
                 </span>
                 <span className="text-[11px] font-medium opacity-90 block mt-0.5">
-                  {isLockedForHoliday
+                  {!isSimulationMode && isLockedForHoliday
                     ? 'Bukan hari belajar'
                     : hasCheckedOut
                     ? `Tercatat pukul ${todayRecord?.checkOutTime} WIB`
-                    : !hasCheckedIn
+                    : !hasCheckedIn && !isSimulationMode
                     ? 'Harus scan presensi masuk dulu'
                     : isBeforeCheckOutOpen
                     ? `Dibuka pukul ${systemConfig.checkOutStartTime || '12:30'} WIB`
@@ -1395,6 +1398,7 @@ export const PortalSiswaView: React.FC = () => {
           onSubmitAttendance={submitStudentAttendance}
           targetDate={targetDate}
           targetAction={scannerAction}
+          isSimulation={isSimulationMode}
         />
       )}
 

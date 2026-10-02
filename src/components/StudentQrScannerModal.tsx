@@ -34,6 +34,7 @@ interface StudentQrScannerModalProps {
   ) => Promise<{ success: boolean; message?: string }>;
   targetDate: string;
   targetAction?: 'masuk' | 'pulang';
+  isSimulation?: boolean;
 }
 
 export type ScanStatusType =
@@ -55,6 +56,7 @@ export const StudentQrScannerModal: React.FC<StudentQrScannerModalProps> = ({
   onSubmitAttendance,
   targetDate,
   targetAction,
+  isSimulation,
 }) => {
   const [scanStatus, setScanStatus] = useState<ScanStatusType>('idle');
   const [statusMessage, setStatusMessage] = useState<string>('');
@@ -188,11 +190,20 @@ export const StudentQrScannerModal: React.FC<StudentQrScannerModalProps> = ({
     const scannedClassId = parsed.classId;
     const scannedClassName = parsed.className || 'Rombel Lain';
 
-    // Verify if student matches class
+    const cleanStudentClassName = (activeStudent.className || studentClass?.name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const cleanScannedClassName = (parsed.className || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+    // Verify if student matches class (with simulation bypass and loose name matching)
     const isClassMatch =
+      Boolean(isSimulation) ||
+      !activeStudent.classId ||
       (activeStudent.classId && activeStudent.classId === scannedClassId) ||
       (studentClass && studentClass.id === scannedClassId) ||
-      (studentClass && parsed.className && studentClass.name.toLowerCase() === parsed.className.toLowerCase());
+      (cleanStudentClassName && cleanScannedClassName && (
+        cleanStudentClassName === cleanScannedClassName ||
+        cleanStudentClassName.includes(cleanScannedClassName) ||
+        cleanScannedClassName.includes(cleanStudentClassName)
+      ));
 
     if (!isClassMatch) {
       playChimeWarning();
@@ -205,14 +216,13 @@ export const StudentQrScannerModal: React.FC<StudentQrScannerModalProps> = ({
       return;
     }
 
-    // 3. Time Window Checks (Opsi A: Jendela Waktu Ketat)
+    // 3. Time Window Checks
     const [startH, startM] = (systemConfig.checkInStartTime || '06:00').split(':').map(Number);
     const startMinutes = (startH || 6) * 60 + (startM || 0);
 
     const [dlH, dlM] = (systemConfig.checkInDeadlineTime || '07:00').split(':').map(Number);
     const deadlineMinutes = (dlH || 7) * 60 + (dlM || 0);
-    // Batas akhir scan mandiri masuk (misal 30 menit setelah deadline atau jam 07:30)
-    const cutoffMinutes = deadlineMinutes + 45;
+    const cutoffMinutes = deadlineMinutes + 60; // 60 menit toleransi setelah deadline
 
     const [outH, outM] = (systemConfig.checkOutStartTime || '12:30').split(':').map(Number);
     const outMinutes = (outH || 12) * 60 + (outM || 30);
@@ -243,7 +253,7 @@ export const StudentQrScannerModal: React.FC<StudentQrScannerModalProps> = ({
     }
 
     // Specific validation if student clicked "Scan Presensi Pulang" but has not checked in yet
-    if (targetAction === 'pulang' && !hasCheckedIn) {
+    if (targetAction === 'pulang' && !hasCheckedIn && !isSimulation) {
       playChimeWarning();
       setScanStatus('rejected');
       setStatusMessage(
@@ -258,7 +268,7 @@ export const StudentQrScannerModal: React.FC<StudentQrScannerModalProps> = ({
     // CASE B: Has Checked In, attempting scan for pulang
     if (isCheckOutScan) {
       // Check if checkout time is NOT yet reached
-      if (currentTotalMinutes < outMinutes) {
+      if (!isSimulation && currentTotalMinutes < outMinutes) {
         playChimeWarning();
         setScanStatus('debounced');
         setStatusMessage(
@@ -269,11 +279,11 @@ export const StudentQrScannerModal: React.FC<StudentQrScannerModalProps> = ({
         return;
       }
 
-      // Check for rapid accidental double-scan right after check-in (less than 3 mins)
-      if (todayRecord?.checkInTime) {
+      // Check for rapid accidental double-scan right after check-in (less than 2 mins)
+      if (!isSimulation && todayRecord?.checkInTime) {
         const [inH, inM] = todayRecord.checkInTime.split(':').map(Number);
         const inMinutes = inH * 60 + inM;
-        if (Math.abs(currentTotalMinutes - inMinutes) < 3) {
+        if (Math.abs(currentTotalMinutes - inMinutes) < 2) {
           playChimeWarning();
           setScanStatus('debounced');
           setStatusMessage(
@@ -313,7 +323,7 @@ export const StudentQrScannerModal: React.FC<StudentQrScannerModalProps> = ({
     // CASE C: Scan -> MASUK (Check-in)
     if (!hasCheckedIn) {
       // Check if too early
-      if (currentTotalMinutes < startMinutes) {
+      if (!isSimulation && currentTotalMinutes < startMinutes) {
         playChimeWarning();
         setScanStatus('rejected');
         setStatusMessage(
@@ -323,8 +333,8 @@ export const StudentQrScannerModal: React.FC<StudentQrScannerModalProps> = ({
         return;
       }
 
-      // Check if after cutoff window (Opsi A - Jendela Ketat)
-      if (currentTotalMinutes > cutoffMinutes) {
+      // Check if after cutoff window (only enforce if autoMarkLate is disabled)
+      if (!isSimulation && systemConfig.autoMarkLate === false && currentTotalMinutes > cutoffMinutes) {
         playChimeWarning();
         setScanStatus('rejected');
         setStatusMessage(

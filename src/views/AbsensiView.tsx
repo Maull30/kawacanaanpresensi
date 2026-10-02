@@ -32,6 +32,7 @@ import {
   X,
 } from 'lucide-react';
 import { ClassQrModal } from '../components/ClassQrModal';
+import { TeacherLeaveApprovalModal } from '../components/TeacherLeaveApprovalModal';
 
 export const AbsensiView: React.FC = () => {
   const {
@@ -52,6 +53,8 @@ export const AbsensiView: React.FC = () => {
     showToast,
     attendanceRecords,
     requestFeatureAccess,
+    leaveRequests,
+    updateLeaveRequestStatus,
   } = useApp();
 
   const userScope = useMemo(
@@ -96,6 +99,7 @@ export const AbsensiView: React.FC = () => {
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [isClassQrOpen, setIsClassQrOpen] = useState<boolean>(false);
+  const [isLeaveApprovalOpen, setIsLeaveApprovalOpen] = useState<boolean>(false);
   const [isDirty, setIsDirty] = useState<boolean>(false);
   const isDirtyRef = React.useRef<boolean>(false);
   const prevContextKeyRef = React.useRef<string>('');
@@ -213,6 +217,15 @@ export const AbsensiView: React.FC = () => {
       null
     );
   }, [classes, availableClasses, selectedClassId]);
+
+  const pendingClassLeaveRequestsCount = useMemo(() => {
+    return (leaveRequests || []).filter((r) => {
+      if (r.status !== 'PENDING') return false;
+      if (activeTargetClass?.id && r.classId) return r.classId === activeTargetClass.id;
+      if (activeTargetClass?.name && r.className) return r.className.toLowerCase() === activeTargetClass.name.toLowerCase();
+      return true;
+    }).length;
+  }, [leaveRequests, activeTargetClass]);
 
   const currentDayName = useMemo(() => {
     try {
@@ -1055,6 +1068,22 @@ export const AbsensiView: React.FC = () => {
 
         <button
           type="button"
+          onClick={() => setIsLeaveApprovalOpen(true)}
+          id="btn-verifikasi-surat-izin"
+          className="relative py-2 px-3 rounded-xl border border-amber-300 bg-amber-50 hover:bg-amber-100 active:scale-95 text-amber-900 font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-2xs min-h-[40px] cursor-pointer"
+          title="Verifikasi Surat Izin / Sakit dari Orang Tua Siswa"
+        >
+          <FileText size={14} className="text-amber-700 shrink-0" />
+          <span>Surat Izin Wali</span>
+          {pendingClassLeaveRequestsCount > 0 && (
+            <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-rose-600 text-white text-[10px] font-black flex items-center justify-center shadow-xs animate-pulse">
+              {pendingClassLeaveRequestsCount}
+            </span>
+          )}
+        </button>
+
+        <button
+          type="button"
           onClick={handleReset}
           disabled={isDateLocked || isSaving}
           id="btn-reset-absensi"
@@ -1564,6 +1593,17 @@ export const AbsensiView: React.FC = () => {
           schoolProfile={schoolProfile}
           systemConfig={systemConfig}
           classList={availableClasses}
+        />
+      )}
+
+      {/* Teacher Leave Approval Modal */}
+      {isLeaveApprovalOpen && (
+        <TeacherLeaveApprovalModal
+          isOpen={isLeaveApprovalOpen}
+          onClose={() => setIsLeaveApprovalOpen(false)}
+          leaveRequests={leaveRequests || []}
+          onUpdateStatus={updateLeaveRequestStatus}
+          selectedClassName={activeTargetClass?.name}
         />
       )}
     </div>

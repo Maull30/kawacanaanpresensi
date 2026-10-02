@@ -24,7 +24,7 @@ export default async function handler(req: any, res: any) {
   const userId = authData.user.id;
   const { data: profile, error: profileErr } = await admin
     .from('profiles')
-    .select('id, role, school_id, teacher_id')
+    .select('id, role, school_id, teacher_id, student_id')
     .eq('id', userId)
     .maybeSingle();
 
@@ -55,8 +55,11 @@ export default async function handler(req: any, res: any) {
           targetSchool.is_personal === true;
 
         if (isPersonalWorkspace) {
-          // RUANG KERJA INDIVIDU: HANYA pemilik sah (owner_id === userId) yang boleh mengakses & mencatat absensi
+          // RUANG KERJA INDIVIDU:
+          // Boleh diakses jika pemilik sah (owner_id === userId) ATAU akun siswa yang terdaftar di sekolah ini
           if (targetSchool.owner_id === userId) {
+            isAuthorizedForSchool = true;
+          } else if (userRole === 'SISWA' && (profile.school_id === targetSchoolId || action === 'submit_student')) {
             isAuthorizedForSchool = true;
           }
         } else {
@@ -201,6 +204,10 @@ export default async function handler(req: any, res: any) {
     if (action === 'submit_student') {
       const { payload, existingId } = body;
       if (!payload) return json(res, 400, { error: 'Payload absensi wajib disertakan.' });
+
+      if (userRole === 'SISWA' && profile.student_id && payload.student_id && payload.student_id !== profile.student_id) {
+        return json(res, 403, { error: 'Anda hanya dapat mengirimkan presensi untuk akun Anda sendiri.' });
+      }
 
       const normalizedPayload = {
         ...payload,

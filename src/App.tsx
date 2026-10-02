@@ -144,7 +144,6 @@ const MainAppContent: React.FC = () => {
     loadUserDataAfterOnboarding,
     isAuthChecking,
     isLoginPreparing,
-    isLoggingOut,
     isSwitchingWorkspace,
     switchingWorkspaceProgress,
     switchingWorkspaceTitle,
@@ -241,9 +240,7 @@ const MainAppContent: React.FC = () => {
   }, [currentUser, isAuthChecking, isLoginPreparing]);
 
   React.useEffect(() => {
-    if (isLoggingOut) return;
-    const isLoginPageRequested = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('page') === 'login';
-    if (currentUser && !isLoginPageRequested) {
+    if (currentUser) {
       if (activeView === 'login') {
         const targetView = defaultViewForRole(currentUser.role);
         setActiveView(targetView);
@@ -257,7 +254,7 @@ const MainAppContent: React.FC = () => {
         }
       } catch (_) {}
     }
-  }, [currentUser, activeView, setActiveView, isLoggingOut]);
+  }, [currentUser, activeView, setActiveView]);
 
   const handleEnterSystem = () => {
     setShowLanding(false);
@@ -374,10 +371,8 @@ const MainAppContent: React.FC = () => {
     );
   }
 
-  const isLoginPageRequested = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('page') === 'login';
-
-  // Tampilan landing page sebagai layar awal SAAT pengguna memang belum login sama sekali dan bukan sedang membuka halaman login
-  if (showLanding && !currentUser && !isLoggingOut && activeView !== 'login' && !isLoginPageRequested) {
+  // Tampilan landing page sebagai layar awal SAAT pengguna memang belum login sama sekali
+  if (showLanding && !currentUser) {
     return (
       <>
         <LandingPageView onEnterSystem={handleEnterSystem} onEnterDashboard={handleEnterDashboard} />
@@ -386,9 +381,7 @@ const MainAppContent: React.FC = () => {
     );
   }
 
-  // Jika sedang logout, tidak ada user, activeView === 'login', atau sedang membuka halaman login:
-  // Selalu tampilkan layar Login secara mutlak
-  if (isLoggingOut || !currentUser || activeView === 'login' || isLoginPageRequested) {
+  if (!currentUser || activeView === 'login') {
     return (
       <>
         <LoginView onBackToLanding={handleBackToLanding} onEnterDashboard={handleEnterDashboard} />

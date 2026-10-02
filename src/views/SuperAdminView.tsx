@@ -467,11 +467,12 @@ export const SuperAdminView: React.FC = () => {
 
             <button
               onClick={() => {
-                void logout();
+                if (window.confirm('Keluar dari sesi Super Administrator?')) {
+                  void logout();
+                }
               }}
               title="Keluar dari sistem"
               className="p-2 rounded-xl text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition cursor-pointer shrink-0"
-              id="btn-superadmin-logout-sidebar"
             >
               <LogOut size={16} />
             </button>
@@ -594,10 +595,11 @@ export const SuperAdminView: React.FC = () => {
                     <button
                       onClick={() => {
                         setIsProfileDropdownOpen(false);
-                        void logout();
+                        if (window.confirm('Keluar dari sesi Super Administrator?')) {
+                          void logout();
+                        }
                       }}
-                      className="w-full px-3.5 py-2 text-xs text-rose-600 hover:bg-rose-50 flex items-center gap-2 font-bold cursor-pointer"
-                      id="btn-superadmin-logout-top"
+                      className="w-full px-3.5 py-2 text-xs text-rose-600 hover:bg-rose-50 flex items-center gap-2 font-bold"
                     >
                       <LogOut size={14} />
                       <span>Keluar</span>

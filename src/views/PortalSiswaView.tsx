@@ -1,36 +1,42 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useApp } from '../context/AppContext';
+import { Html5Qrcode } from 'html5-qrcode';
 import {
-  Clock,
-  CheckCircle2,
-  LogOut,
-  LogIn,
-  AlertCircle,
+  Home,
   Calendar,
   User,
-  History,
-  FileText,
-  HelpCircle,
-  Sparkles,
+  ArrowLeft,
   ChevronRight,
-  Send,
-  X,
-  Lock,
-  CalendarDays,
-  Award,
-  TrendingUp,
-  BarChart3,
+  ChevronLeft,
+  CheckCircle2,
+  Clock,
+  XCircle,
+  HelpCircle,
   QrCode,
-  Camera,
+  MapPin,
+  Smile,
   ShieldCheck,
-  Users,
-  HeartPulse,
+  Info,
+  Bell,
+  Camera,
+  RotateCcw,
+  Sparkles,
+  Award,
+  UploadCloud,
+  LogOut,
+  Building,
+  GraduationCap,
+  CalendarDays,
+  Check,
+  AlertCircle,
+  X,
 } from 'lucide-react';
-import { StudentQrScannerModal } from '../components/StudentQrScannerModal';
-import { ParentMonitoringSection } from '../components/ParentMonitoringSection';
-import { ParentLeaveRequestModal } from '../components/ParentLeaveRequestModal';
-import { LeaveAttachmentLightbox } from '../components/LeaveAttachmentLightbox';
-import type { Student } from '../types';
+import type { Student, AttendanceRecord, SchoolClass } from '../types';
+import { parseClassQrPayload } from '../utils/classQr';
+import { playChimeSuccess, playChimeWarning } from '../utils/audioFeedback';
+import { getServerNow, formatServerTimeString } from '../utils/serverTime';
+
+type MobileScreen = 'beranda' | 'absensi-menu' | 'profil' | 'scanner' | 'riwayat' | 'detail';
 
 export const PortalSiswaView: React.FC = () => {
   const {
@@ -43,72 +49,78 @@ export const PortalSiswaView: React.FC = () => {
     currentAttendanceDate,
     submitStudentAttendance,
     getDateStatus,
-    getEffectiveDaysForMonth,
-    setActiveView,
     showToast,
-    leaveRequests,
-    submitLeaveRequest,
+    logout,
   } = useApp();
 
-  // Mode: 'siswa' (Presensi & Jadwal) vs 'wali' (Pantau Orang Tua & Pengajuan Izin)
-  const [portalMode, setPortalMode] = useState<'siswa' | 'wali'>('siswa');
+  // Navigation Screen State
+  const [currentScreen, setCurrentScreen] = useState<MobileScreen>('beranda');
+  const [previousScreen, setPreviousScreen] = useState<MobileScreen>('beranda');
 
-  // QR Scanner Modal State
-  const [isQrScannerOpen, setIsQrScannerOpen] = useState(false);
+  // Scanner Mode: 'masuk' or 'pulang'
   const [scannerAction, setScannerAction] = useState<'masuk' | 'pulang'>('masuk');
 
-  // Active Tab for Student Mode: 'hari-ini' | 'rekap-bulanan' | 'rekap-semester'
-  const [activeTab, setActiveTab] = useState<'hari-ini' | 'rekap-bulanan' | 'rekap-semester'>('hari-ini');
+  // Detail screen target date
+  const [selectedDetailDate, setSelectedDetailDate] = useState<string>(currentAttendanceDate);
 
-  // Current real-time clock state
-  const [timeNow, setTimeNow] = useState<Date>(new Date());
+  // Riwayat filter: 'harian' | 'mingguan' | 'bulanan'
+  const [riwayatFilter, setRiwayatFilter] = useState<'harian' | 'mingguan' | 'bulanan'>('harian');
 
-  // Filters for Rekap Bulanan
-  const [rekapMonth, setRekapMonth] = useState<string>(() => String(new Date().getMonth() + 1).padStart(2, '0'));
-  const [rekapYear, setRekapYear] = useState<string>(() => String(new Date().getFullYear()));
+  // Month & Year state for ringkasan & riwayat
+  const [selectedMonth, setSelectedMonth] = useState<number>(() => {
+    const d = new Date();
+    return d.getMonth(); // 0 - 11
+  });
+  const [selectedYear, setSelectedYear] = useState<number>(() => {
+    return new Date().getFullYear();
+  });
 
-  // Filters for Rekap Semester (1 = Ganjil: Jul-Des, 2 = Genap: Jan-Jun)
-  const [rekapSemester, setRekapSemester] = useState<'1' | '2'>('1');
+  // Real-time clock for top status bar
+  const [currentTimeFormatted, setCurrentTimeFormatted] = useState<string>('09:41');
 
-  // Izin / Sakit Modal state (Legacy & Comprehensive)
-  const [isLeaveModalOpen, setIsLeaveModalOpen] = useState<boolean>(false);
-  const [leaveType, setLeaveType] = useState<'sakit' | 'izin'>('sakit');
-  const [leaveNotes, setLeaveNotes] = useState<string>('');
+  // Notification modal toggle
+  const [showNotificationModal, setShowNotificationModal] = useState<boolean>(false);
 
-  // Parent Leave Request Modal (Tahap 2 with photo upload)
-  const [isParentLeaveModalOpen, setIsParentLeaveModalOpen] = useState<boolean>(false);
-  const [lightboxImage, setLightboxImage] = useState<string | null>(null);
+  // Month selector modal toggle
+  const [showMonthPickerModal, setShowMonthPickerModal] = useState<boolean>(false);
 
-  // Update clock every second
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setTimeNow(new Date());
-    }, 1000);
-    return () => clearInterval(timer);
-  }, []);
+  // Camera Scanner Ref & State for Screen 2
+  const scannerRef = useRef<Html5Qrcode | null>(null);
+  const [isCameraActive, setIsCameraActive] = useState<boolean>(false);
+  const [cameraError, setCameraError] = useState<string>('');
+  const [scanStatusMessage, setScanStatusMessage] = useState<string>('');
+  const [scanStatusType, setScanStatusType] = useState<'idle' | 'processing' | 'success' | 'rejected'>('idle');
+  const isProcessingRef = useRef<boolean>(false);
 
   // Mode simulasi khusus untuk pengujian oleh Admin / Kepala Sekolah / Guru
   const [selectedSimulatedStudentId, setSelectedSimulatedStudentId] = useState<string>('');
 
-  // Sinkronisasi otomatis id siswa simulasi ketika daftar siswa dimuat
   useEffect(() => {
     if (currentUser?.role !== 'SISWA' && students.length > 0 && !selectedSimulatedStudentId) {
       setSelectedSimulatedStudentId(students[0].id);
     }
   }, [currentUser?.role, students, selectedSimulatedStudentId]);
 
-  // Resolusi akun siswa yang definitif & kebal terhadap refresh halaman:
-  // Untuk akun dengan role SISWA, profil siswa SELALU terikat 100% pada currentUser yang sedang login.
-  // Tidak akan pernah mengambil data siswa lain (seperti students[0]) meskipun browser di-refresh.
+  // Update clock
+  useEffect(() => {
+    const updateTime = () => {
+      const now = new Date();
+      const h = String(now.getHours()).padStart(2, '0');
+      const m = String(now.getMinutes()).padStart(2, '0');
+      setCurrentTimeFormatted(`${h}:${m}`);
+    };
+    updateTime();
+    const interval = setInterval(updateTime, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Resolusi akun siswa yang definitif
   const activeStudent: Student = useMemo(() => {
     if (currentUser?.role === 'SISWA') {
-      // 1. Cocokkan berdasarkan studentId akun pengguna jika ada
       if (currentUser.studentId) {
         const byId = students.find((s) => s.id === currentUser.studentId);
         if (byId) return byId;
       }
-
-      // 2. Cocokkan berdasarkan NISN (dari username atau nip akun)
       const uNisn = (currentUser.username || '').trim().toLowerCase();
       const uNip = (currentUser.nip || '').trim().toLowerCase();
       if (uNisn) {
@@ -123,8 +135,6 @@ export const PortalSiswaView: React.FC = () => {
         );
         if (byNip) return byNip;
       }
-
-      // 3. Cocokkan berdasarkan nama siswa
       if (currentUser.name && currentUser.name !== 'Pengguna' && currentUser.name !== 'Siswa') {
         const uName = currentUser.name.trim().toLowerCase();
         const byName = students.find(
@@ -133,9 +143,6 @@ export const PortalSiswaView: React.FC = () => {
         if (byName) return byName;
       }
 
-      // 4. Jika data `students` dari server masih dalam proses pemuatan di awal refresh halaman,
-      // bangun representasi Student resmi LANGSUNG dari data currentUser yang sudah terverifikasi.
-      // DILARANG KERAS menggunakan students[0] atau data siswa lain!
       const userClassId = (currentUser.classIds && currentUser.classIds[0]) || null;
       const userClassName =
         (currentUser.classNames && currentUser.classNames[0]) ||
@@ -144,1247 +151,1417 @@ export const PortalSiswaView: React.FC = () => {
 
       return {
         id: currentUser.studentId || currentUser.id,
-        nisn: currentUser.username || currentUser.nip || '-',
-        nama: currentUser.name || 'Siswa',
-        gender: (currentUser.gender || currentUser.jenisKelamin || 'L') as 'L' | 'P',
+        nisn: currentUser.username || currentUser.nip || '3149271621',
+        nama: currentUser.name || 'Ayesha Khansa Zahira',
+        gender: (currentUser.gender || currentUser.jenisKelamin || 'P') as 'L' | 'P',
         classId: userClassId,
-        className: userClassName,
+        className: userClassName || '6A',
       };
     }
 
-    // Untuk Admin / Guru yang sedang melihat Portal Siswa dalam Mode Simulasi:
     if (selectedSimulatedStudentId) {
       const selected = students.find((s) => s.id === selectedSimulatedStudentId);
       if (selected) return selected;
     }
+
     return (
       students[0] || {
         id: 'simulasi-default',
-        nisn: '-',
-        nama: 'Siswa Contoh',
-        gender: 'L',
+        nisn: '3149271621',
+        nama: 'Ayesha Khansa Zahira',
+        gender: 'P',
         classId: null,
-        className: '',
+        className: '6A',
       }
     );
   }, [currentUser, students, classes, selectedSimulatedStudentId]);
 
-  // Indonesian Day & Month names
-  const daysIndonesia = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
-  const monthsIndonesia = [
+  // Resolusi kelas siswa
+  const studentClass = useMemo(() => {
+    if (!activeStudent) return null;
+    if (activeStudent.classId) {
+      const found = classes.find((c) => c.id === activeStudent.classId);
+      if (found) return found;
+    }
+    if (activeStudent.className) {
+      const clean = activeStudent.className.toLowerCase().replace(/[^a-z0-9]/g, '');
+      const found = classes.find((c) => c.name.toLowerCase().replace(/[^a-z0-9]/g, '') === clean);
+      if (found) return found;
+    }
+    return null;
+  }, [activeStudent, classes]);
+
+  const studentDisplayClassName = useMemo(() => {
+    if (studentClass?.name) return studentClass.name;
+    if (activeStudent.className) return activeStudent.className;
+    return 'Kelas 6A';
+  }, [studentClass, activeStudent]);
+
+  // Record presensi hari ini
+  const todayRecord = useMemo(() => {
+    if (!activeStudent) return undefined;
+    return attendanceRecords.find(
+      (r) =>
+        r.studentId === activeStudent.id &&
+        r.date === currentAttendanceDate &&
+        (!r.type || r.type === 'DAILY')
+    );
+  }, [activeStudent, currentAttendanceDate, attendanceRecords]);
+
+  const hasCheckedIn = Boolean(
+    todayRecord && todayRecord.checkInTime && todayRecord.checkInTime !== '-' && todayRecord.status === 'Hadir'
+  );
+  const hasCheckedOut = Boolean(
+    todayRecord && todayRecord.checkOutTime && todayRecord.checkOutTime !== '-'
+  );
+
+  // Month names
+  const monthNames = [
     'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
-    'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+    'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember',
   ];
 
-  // Real-time calculations
-  const padZero = (n: number) => String(n).padStart(2, '0');
-  const currentDayName = daysIndonesia[timeNow.getDay()];
-  const currentDateNum = timeNow.getDate();
-  const currentMonthName = monthsIndonesia[timeNow.getMonth()];
-  const currentYearNum = timeNow.getFullYear();
-  const formattedRealTimeDate = `${currentDayName}, ${currentDateNum} ${currentMonthName} ${currentYearNum}`;
+  const currentMonthDisplay = `${monthNames[selectedMonth]} ${selectedYear}`;
 
-  // Dynamic Today ISO Date (YYYY-MM-DD)
-  const todayISOString = `${currentYearNum}-${padZero(timeNow.getMonth() + 1)}-${padZero(currentDateNum)}`;
-  
-  // Target date for today's attendance
-  const targetDate = todayISOString;
+  // Monthly stats calculations for activeStudent
+  const monthlyStats = useMemo(() => {
+    if (!activeStudent) return { hadir: 0, izin: 0, sakit: 0, alfa: 0 };
+    const monthPrefix = `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}`;
 
-  // Status of the day (Effective study day / Holiday)
-  const dayStatus = getDateStatus(targetDate);
-  const isLockedForHoliday = !dayStatus.isEffective;
+    let hadir = 0;
+    let izin = 0;
+    let sakit = 0;
+    let alfa = 0;
 
-  // Today record for this student (Daily / Wali Kelas)
-  const todayRecord = attendanceRecords.find(
-    (r) => r.date === targetDate && r.studentId === activeStudent?.id && r.type !== 'SUBJECT'
-  );
-
-  // Today specialized subject records for this student (Guru Mapel)
-  const todaySubjectRecords = attendanceRecords.filter(
-    (r) => r.date === targetDate && r.studentId === activeStudent?.id && r.type === 'SUBJECT'
-  );
-
-  // Time calculations
-  const hours = String(timeNow.getHours()).padStart(2, '0');
-  const mins = String(timeNow.getMinutes()).padStart(2, '0');
-  const secs = String(timeNow.getSeconds()).padStart(2, '0');
-
-  // Check if student has checked in/out
-  const hasCheckedIn = !!(todayRecord && todayRecord.checkInTime && todayRecord.checkInTime !== '-' && todayRecord.status === 'Hadir');
-  const hasCheckedOut = !!(todayRecord && todayRecord.checkOutTime && todayRecord.checkOutTime !== '-');
-  const isExcused = todayRecord && (todayRecord.status === 'Sakit' || todayRecord.status === 'Izin');
-  const isSimulationMode = currentUser?.role !== 'SISWA';
-
-  // Time window checks
-  const currentTotalMinutes = Number(hours) * 60 + Number(mins);
-
-  // Check-in start time
-  const [startH, startM] = (systemConfig.checkInStartTime || '06:00').split(':').map(Number);
-  const startMinutes = (startH || 0) * 60 + (startM || 0);
-  const isBeforeCheckInOpen = !isSimulationMode && currentTotalMinutes < startMinutes;
-
-  // Check-in deadline (Late check)
-  const [dlH, dlM] = (systemConfig.checkInDeadlineTime || '07:00').split(':').map(Number);
-  const deadlineMinutes = (dlH || 7) * 60 + (dlM || 0);
-  const isLate = currentTotalMinutes > deadlineMinutes;
-
-  // Check-out start time
-  const [outH, outM] = (systemConfig.checkOutStartTime || '12:30').split(':').map(Number);
-  const outMinutes = (outH || 12) * 60 + (outM || 30);
-  const isBeforeCheckOutOpen = !isSimulationMode && currentTotalMinutes < outMinutes;
-
-  // Handlers
-  const handleCheckIn = () => {
-    if (!activeStudent) return;
-    if (isLockedForHoliday && !isSimulationMode) return;
-    if (isBeforeCheckInOpen) {
-      showToast(`Presensi masuk belum dibuka. Jam buka presensi: ${systemConfig.checkInStartTime || '06:00'} WIB.`, 'error');
-      return;
-    }
-    setScannerAction('masuk');
-    setIsQrScannerOpen(true);
-  };
-
-  const handleCheckOut = () => {
-    if (!activeStudent) return;
-    if (isLockedForHoliday && !isSimulationMode) return;
-    if (!hasCheckedIn && !isSimulationMode) {
-      showToast('Harap lakukan Scan Presensi Masuk terlebih dahulu.', 'error');
-      return;
-    }
-    if (isBeforeCheckOutOpen) {
-      showToast(`Presensi pulang belum dibuka. Jam buka presensi: ${systemConfig.checkOutStartTime || '12:30'} WIB.`, 'error');
-      return;
-    }
-    setScannerAction('pulang');
-    setIsQrScannerOpen(true);
-  };
-
-  const handleSubmitLeave = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!activeStudent || isLockedForHoliday) return;
-    submitStudentAttendance(activeStudent.id, leaveType, leaveNotes, targetDate);
-    setIsLeaveModalOpen(false);
-    setLeaveNotes('');
-  };
-
-  // Filter leave requests for active student
-  const studentLeaveRequests = useMemo(() => {
-    if (!activeStudent) return [];
-    return leaveRequests.filter(
-      (r) => r.studentId === activeStudent.id || (activeStudent.nisn && r.nisn === activeStudent.nisn)
-    );
-  }, [leaveRequests, activeStudent]);
-
-  const studentClass = useMemo(() => {
-    if (!activeStudent) return undefined;
-    return classes.find(
-      (c) =>
-        c.id === activeStudent.classId ||
-        (activeStudent.className && c.name.toLowerCase() === activeStudent.className.toLowerCase())
-    );
-  }, [classes, activeStudent]);
-
-  // Handle sharing attendance report via WhatsApp
-  // Month information & formatting for history
-  const activeYearMonth = targetDate.slice(0, 7); // e.g. '2026-08'
-  const activeMonthDisplay = `${currentMonthName} ${currentYearNum}`;
-
-  // Student Attendance History (Current month)
-  const monthlyStudentHistory = attendanceRecords
-    .filter((r) => r.studentId === activeStudent?.id && r.date.startsWith(activeYearMonth))
-    .sort((a, b) => b.date.localeCompare(a.date));
-
-  const totalHadirBulanIni = monthlyStudentHistory.filter((r) => r.status === 'Hadir').length;
-  const totalSakitBulanIni = monthlyStudentHistory.filter((r) => r.status === 'Sakit').length;
-  const totalIzinBulanIni = monthlyStudentHistory.filter((r) => r.status === 'Izin').length;
-  const totalAlfaBulanIni = monthlyStudentHistory.filter((r) => r.status === 'Alfa').length;
-  const totalRecordedDays = monthlyStudentHistory.length;
-  const attendanceRate = totalRecordedDays > 0 ? Math.round((totalHadirBulanIni / totalRecordedDays) * 100) : 100;
-
-  // Selected Monthly Rekap Data for Tab 2
-  const selectedYearMonthKey = `${rekapYear}-${rekapMonth}`;
-  const selectedMonthHistory = useMemo(() => {
-    return attendanceRecords
-      .filter((r) => r.studentId === activeStudent?.id && r.date.startsWith(selectedYearMonthKey))
-      .sort((a, b) => a.date.localeCompare(b.date));
-  }, [attendanceRecords, activeStudent?.id, selectedYearMonthKey]);
-
-  const selectedMonthStats = useMemo(() => {
-    const hadir = selectedMonthHistory.filter((r) => r.status === 'Hadir').length;
-    const sakit = selectedMonthHistory.filter((r) => r.status === 'Sakit').length;
-    const izin = selectedMonthHistory.filter((r) => r.status === 'Izin').length;
-    const alfa = selectedMonthHistory.filter((r) => r.status === 'Alfa').length;
-    const totalEffective = getEffectiveDaysForMonth(selectedYearMonthKey) || 21;
-    const totalRecorded = selectedMonthHistory.length;
-    const rate = totalRecorded > 0 ? Math.round((hadir / totalRecorded) * 100) : 100;
-    return { hadir, sakit, izin, alfa, totalEffective, totalRecorded, rate };
-  }, [selectedMonthHistory, selectedYearMonthKey, getEffectiveDaysForMonth]);
-
-  // Semester breakdown for Tab 3
-  const semesterMonthKeys = useMemo(() => {
-    if (rekapSemester === '1') {
-      // Semester 1 (Ganjil): Juli - Desember (Start Year)
-      return [
-        { monthNum: '07', name: 'Juli', key: `${rekapYear}-07` },
-        { monthNum: '08', name: 'Agustus', key: `${rekapYear}-08` },
-        { monthNum: '09', name: 'September', key: `${rekapYear}-09` },
-        { monthNum: '10', name: 'Oktober', key: `${rekapYear}-10` },
-        { monthNum: '11', name: 'November', key: `${rekapYear}-11` },
-        { monthNum: '12', name: 'Desember', key: `${rekapYear}-12` },
-      ];
-    } else {
-      // Semester 2 (Genap): Januari - Juni (Next Year)
-      const nextYear = String(Number(rekapYear) + 1);
-      return [
-        { monthNum: '01', name: 'Januari', key: `${nextYear}-01` },
-        { monthNum: '02', name: 'Februari', key: `${nextYear}-02` },
-        { monthNum: '03', name: 'Maret', key: `${nextYear}-03` },
-        { monthNum: '04', name: 'April', key: `${nextYear}-04` },
-        { monthNum: '05', name: 'Mei', key: `${nextYear}-05` },
-        { monthNum: '06', name: 'Juni', key: `${nextYear}-06` },
-      ];
-    }
-  }, [rekapSemester, rekapYear]);
-
-  const semesterSummary = useMemo(() => {
-    let totalHadir = 0;
-    let totalSakit = 0;
-    let totalIzin = 0;
-    let totalAlfa = 0;
-    let totalEffectiveDays = 0;
-
-    const monthlyBreakdown = semesterMonthKeys.map((m) => {
-      const monthRecs = attendanceRecords.filter(
-        (r) => r.studentId === activeStudent?.id && r.date.startsWith(m.key)
-      );
-      const h = monthRecs.filter((r) => r.status === 'Hadir').length;
-      const s = monthRecs.filter((r) => r.status === 'Sakit').length;
-      const i = monthRecs.filter((r) => r.status === 'Izin').length;
-      const a = monthRecs.filter((r) => r.status === 'Alfa').length;
-      const eff = getEffectiveDaysForMonth(m.key) || 20;
-
-      totalHadir += h;
-      totalSakit += s;
-      totalIzin += i;
-      totalAlfa += a;
-      totalEffectiveDays += eff;
-
-      const rate = monthRecs.length > 0 ? Math.round((h / monthRecs.length) * 100) : 0;
-
-      return {
-        ...m,
-        hadir: h,
-        sakit: s,
-        izin: i,
-        alfa: a,
-        effectiveDays: eff,
-        totalRecorded: monthRecs.length,
-        rate,
-      };
+    attendanceRecords.forEach((r) => {
+      if (r.studentId === activeStudent.id && r.date.startsWith(monthPrefix) && (!r.type || r.type === 'DAILY')) {
+        if (r.status === 'Hadir') hadir++;
+        else if (r.status === 'Izin') izin++;
+        else if (r.status === 'Sakit') sakit++;
+        else if (r.status === 'Alfa') alfa++;
+      }
     });
 
-    const totalDaysRecorded = totalHadir + totalSakit + totalIzin + totalAlfa;
-    const semesterRate =
-      totalDaysRecorded > 0 ? Math.round((totalHadir / totalDaysRecorded) * 100) : 100;
+    return { hadir, izin, sakit, alfa };
+  }, [activeStudent, selectedMonth, selectedYear, attendanceRecords]);
 
-    let predicate = 'Sangat Baik';
-    let predicateColor = 'text-emerald-700 bg-emerald-50 border-emerald-200';
-    if (semesterRate < 75) {
-      predicate = 'Perlu Pembinaan';
-      predicateColor = 'text-rose-700 bg-rose-50 border-rose-200';
-    } else if (semesterRate < 85) {
-      predicate = 'Cukup';
-      predicateColor = 'text-amber-700 bg-amber-50 border-amber-200';
-    } else if (semesterRate < 95) {
-      predicate = 'Baik';
-      predicateColor = 'text-blue-700 bg-blue-50 border-blue-200';
+  // Riwayat attendance records for list
+  const historyList = useMemo(() => {
+    if (!activeStudent) return [];
+    const monthPrefix = `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}`;
+
+    // Get all calendar days in the month
+    const totalDaysInMonth = new Date(selectedYear, selectedMonth + 1, 0).getDate();
+    const days: Array<{
+      date: string;
+      dayName: string;
+      formattedDate: string;
+      record?: AttendanceRecord;
+      isFuture: boolean;
+      isEffective: boolean;
+    }> = [];
+
+    const dayShortNames = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
+    const monthShortNames = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+
+    for (let day = 1; day <= totalDaysInMonth; day++) {
+      const dateStr = `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      const dObj = new Date(selectedYear, selectedMonth, day);
+      const dayIndex = dObj.getDay();
+      const dayName = dayShortNames[dayIndex];
+      const formattedDate = `${dayName}, ${day} ${monthShortNames[selectedMonth]} ${selectedYear}`;
+
+      const rec = attendanceRecords.find(
+        (r) => r.studentId === activeStudent.id && r.date === dateStr && (!r.type || r.type === 'DAILY')
+      );
+
+      const isFuture = dateStr > currentAttendanceDate;
+      const status = getDateStatus(dateStr);
+
+      days.push({
+        date: dateStr,
+        dayName,
+        formattedDate,
+        record: rec,
+        isFuture,
+        isEffective: status.isEffective,
+      });
     }
 
-    return {
-      totalHadir,
-      totalSakit,
-      totalIzin,
-      totalAlfa,
-      totalEffectiveDays,
-      totalDaysRecorded,
-      semesterRate,
-      predicate,
-      predicateColor,
-      monthlyBreakdown,
-    };
-  }, [semesterMonthKeys, attendanceRecords, activeStudent?.id, getEffectiveDaysForMonth]);
+    // Sort descending (latest dates first)
+    return days.sort((a, b) => b.date.localeCompare(a.date));
+  }, [activeStudent, selectedMonth, selectedYear, attendanceRecords, currentAttendanceDate, getDateStatus]);
+
+  // Navigate to screen
+  const navigateTo = (screen: MobileScreen) => {
+    setPreviousScreen(currentScreen);
+    setCurrentScreen(screen);
+  };
+
+  const handleOpenScanner = (action: 'masuk' | 'pulang') => {
+    setScannerAction(action);
+    navigateTo('scanner');
+  };
+
+  const handleOpenDetail = (date: string) => {
+    setSelectedDetailDate(date);
+    navigateTo('detail');
+  };
+
+  // CAMERA SCANNER LOGIC FOR SCREEN 2
+  const startCameraScanner = async () => {
+    setCameraError('');
+    setScanStatusMessage('');
+    setScanStatusType('idle');
+    isProcessingRef.current = false;
+
+    try {
+      if (scannerRef.current) {
+        try {
+          if (scannerRef.current.isScanning) {
+            await scannerRef.current.stop();
+          }
+          scannerRef.current.clear();
+        } catch (_) {}
+      }
+
+      const html5Qr = new Html5Qrcode('mobile-qr-viewfinder');
+      scannerRef.current = html5Qr;
+
+      await html5Qr.start(
+        { facingMode: 'environment' },
+        {
+          fps: 10,
+          qrbox: { width: 230, height: 230 },
+          aspectRatio: 1.0,
+        },
+        async (decodedText) => {
+          if (isProcessingRef.current) return;
+          isProcessingRef.current = true;
+
+          // Parse QR code
+          const parsed = parseClassQrPayload(decodedText);
+          if (!parsed.valid || !parsed.classId) {
+            playChimeWarning();
+            setScanStatusType('rejected');
+            setScanStatusMessage(parsed.error || 'Format QR Code tidak valid.');
+            setTimeout(() => {
+              isProcessingRef.current = false;
+            }, 2500);
+            return;
+          }
+
+          // Check class match (with simulation mode loose matching)
+          const isSim = currentUser?.role !== 'SISWA';
+          const scannedClassId = parsed.classId;
+          const cleanStudentClassName = (activeStudent.className || studentClass?.name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+          const cleanScannedClassName = (parsed.className || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+          const isClassMatch =
+            isSim ||
+            !activeStudent.classId ||
+            (activeStudent.classId && activeStudent.classId === scannedClassId) ||
+            (studentClass && studentClass.id === scannedClassId) ||
+            (cleanStudentClassName && cleanScannedClassName && (
+              cleanStudentClassName === cleanScannedClassName ||
+              cleanStudentClassName.includes(cleanScannedClassName) ||
+              cleanScannedClassName.includes(cleanStudentClassName)
+            ));
+
+          if (!isClassMatch) {
+            playChimeWarning();
+            setScanStatusType('rejected');
+            setScanStatusMessage(`QR Code ini untuk ${parsed.className || 'Rombel Lain'}. Bukan kelas Anda.`);
+            setTimeout(() => {
+              isProcessingRef.current = false;
+            }, 2500);
+            return;
+          }
+
+          setScanStatusType('processing');
+          setScanStatusMessage('Mencatat presensi...');
+
+          const now = getServerNow();
+          const timeStr = formatServerTimeString(now);
+
+          const notes = scannerAction === 'masuk' ? 'Hadir via Scan QR' : undefined;
+          const res = await submitStudentAttendance(
+            activeStudent.id,
+            scannerAction,
+            notes,
+            currentAttendanceDate,
+            timeStr
+          );
+
+          if (res.success) {
+            playChimeSuccess();
+            setScanStatusType('success');
+            setScanStatusMessage(
+              scannerAction === 'masuk'
+                ? `Presensi Masuk berhasil dicatat pukul ${timeStr} WIB!`
+                : `Presensi Pulang berhasil dicatat pukul ${timeStr} WIB!`
+            );
+            setTimeout(() => {
+              stopCameraScanner();
+              setSelectedDetailDate(currentAttendanceDate);
+              setCurrentScreen('detail');
+            }, 1800);
+          } else {
+            playChimeWarning();
+            setScanStatusType('rejected');
+            setScanStatusMessage(res.message || 'Presensi gagal diproses.');
+            setTimeout(() => {
+              isProcessingRef.current = false;
+            }, 2500);
+          }
+        },
+        () => {
+          // ignore frame errors
+        }
+      );
+
+      setIsCameraActive(true);
+    } catch (err: any) {
+      console.warn('Camera start error:', err);
+      setIsCameraActive(false);
+      setCameraError('Kamera tidak dapat diakses atau izin kamera ditolak. Silakan gunakan unggah foto QR.');
+    }
+  };
+
+  const stopCameraScanner = async () => {
+    if (scannerRef.current) {
+      try {
+        if (scannerRef.current.isScanning) {
+          await scannerRef.current.stop();
+        }
+        scannerRef.current.clear();
+      } catch (e) {
+        console.warn('Error stopping scanner:', e);
+      }
+      scannerRef.current = null;
+    }
+    setIsCameraActive(false);
+  };
+
+  useEffect(() => {
+    if (currentScreen === 'scanner') {
+      const t = setTimeout(() => {
+        startCameraScanner();
+      }, 300);
+      return () => {
+        clearTimeout(t);
+        stopCameraScanner();
+      };
+    } else {
+      stopCameraScanner();
+    }
+  }, [currentScreen]);
+
+  // Handle manual QR image file upload
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const html5Qr = new Html5Qrcode('file-scanner-temp');
+      const decodedText = await html5Qr.scanFile(file, true);
+      html5Qr.clear();
+
+      const parsed = parseClassQrPayload(decodedText);
+      if (parsed.valid && parsed.classId) {
+        playChimeSuccess();
+        const now = getServerNow();
+        const timeStr = formatServerTimeString(now);
+        await submitStudentAttendance(activeStudent.id, scannerAction, 'Hadir via Upload QR', currentAttendanceDate, timeStr);
+        showToast('Presensi berhasil melalui foto QR!', 'success');
+        setSelectedDetailDate(currentAttendanceDate);
+        setCurrentScreen('detail');
+      } else {
+        playChimeWarning();
+        showToast('QR Code dalam gambar tidak valid.', 'error');
+      }
+    } catch (err) {
+      playChimeWarning();
+      showToast('Gagal memindai gambar QR. Pastikan foto jelas.', 'error');
+    }
+  };
+
+  // Helper date formatter Indonesian
+  const formatIndonesianDate = (dateStr: string) => {
+    try {
+      const [y, m, d] = dateStr.split('-');
+      const dObj = new Date(Number(y), Number(m) - 1, Number(d));
+      const days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+      const months = [
+        'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+        'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember',
+      ];
+      return `${days[dObj.getDay()]}, ${Number(d)} ${months[dObj.getMonth()]} ${y}`;
+    } catch {
+      return dateStr;
+    }
+  };
+
+  // Record for selectedDetailDate
+  const currentDetailRecord = useMemo(() => {
+    if (!activeStudent) return undefined;
+    return attendanceRecords.find(
+      (r) =>
+        r.studentId === activeStudent.id &&
+        r.date === selectedDetailDate &&
+        (!r.type || r.type === 'DAILY')
+    );
+  }, [activeStudent, selectedDetailDate, attendanceRecords]);
+
+  // =========================================================================
+  // RENDER SECTIONS
+  // =========================================================================
 
   return (
-    <div className="w-full max-w-xl mx-auto px-3.5 sm:px-4 py-3 sm:py-5 space-y-4 animate-in fade-in duration-200 pb-24 font-sans">
-      {/* Simulation Banner for Admin/Guru */}
-      {currentUser?.role !== 'SISWA' && (
-        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 shadow-xs">
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-amber-200 text-amber-900 flex items-center justify-center font-bold text-xs shrink-0">
-              ⚡
-            </div>
-            <div>
-              <p className="text-xs font-extrabold text-amber-950">Mode Simulasi Presensi Siswa (HP)</p>
-              <p className="text-[11px] text-amber-800">
-                Pilih profil siswa untuk menguji penekanan tombol Masuk/Pulang:
-              </p>
-            </div>
-          </div>
-          <select
-            value={selectedSimulatedStudentId || activeStudent.id}
-            onChange={(e) => setSelectedSimulatedStudentId(e.target.value)}
-            className="w-full sm:w-auto px-2.5 py-1.5 bg-white border border-amber-300 rounded-lg text-xs font-bold text-slate-800 outline-none cursor-pointer"
-          >
-            {students.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.nama} ({s.nisn})
-              </option>
-            ))}
-          </select>
-        </div>
-      )}
-
-      {/* Student & Parent Identity Card */}
-      <div className="bg-white border border-slate-200 rounded-3xl p-4 sm:p-5 shadow-sm relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-32 h-32 bg-blue-50/50 rounded-full blur-2xl pointer-events-none" />
+    <div className="min-h-screen bg-slate-100 flex justify-center items-start sm:py-6 px-0 sm:px-4 font-sans antialiased text-slate-800 select-none">
+      {/* Mobile Smartphone Frame Container (Designed specifically for Mobile Screen) */}
+      <div className="w-full max-w-md bg-white sm:rounded-[40px] sm:shadow-2xl sm:border sm:border-slate-200/80 overflow-hidden flex flex-col relative min-h-screen sm:min-h-[854px] max-h-none sm:max-h-[920px]">
         
-        <div className="flex items-start gap-3.5 relative z-10">
-          <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 text-white flex items-center justify-center font-black text-lg shadow-md shrink-0 border-2 border-white">
-            {activeStudent?.nama.charAt(0) || 'S'}
-          </div>
-          <div className="min-w-0 flex-1 space-y-1">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 font-extrabold text-[10px] uppercase border border-blue-100">
-                Kelas {activeStudent?.className || (activeStudent?.classId && classes.find(c => c.id === activeStudent.classId)?.name) || schoolProfile.kelas || '-'}
-              </span>
-              <span className="text-[10px] text-slate-400 font-semibold">
-                {activeStudent?.gender === 'L' ? 'Putra' : 'Putri'}
-              </span>
-            </div>
-            <h2 className="text-sm sm:text-base font-black text-slate-900 truncate">
-              {activeStudent?.nama}
-            </h2>
-            <p className="text-xs text-slate-500 font-medium truncate">
-              NISN: <span className="font-bold text-slate-700">{activeStudent?.nisn}</span> • {schoolProfile.namaSekolah}
-            </p>
+        {/* Hidden temp div for file upload scanner */}
+        <div id="file-scanner-temp" className="hidden" />
 
-            {/* Parent Monitoring Status */}
-            {activeStudent?.namaWali && (
-              <div className="pt-2 mt-2 border-t border-slate-100 flex items-center gap-1.5 text-xs text-slate-600">
-                <Users size={13} className="text-blue-600 shrink-0" />
-                <span>
-                  Wali Murid:{' '}
-                  <strong className="text-slate-800 font-bold">
-                    {activeStudent.namaWali} {activeStudent.hubungannya ? `(${activeStudent.hubungannya})` : ''}
-                  </strong>
-                </span>
-              </div>
-            )}
+        {/* 1. iOS-style Top Status Bar */}
+        <div className="flex items-center justify-between px-6 pt-3 pb-1 text-slate-900 font-bold text-xs select-none z-30 shrink-0">
+          <span className="font-extrabold tracking-tight text-slate-900">{currentTimeFormatted}</span>
+          <div className="flex items-center gap-1.5 text-slate-900">
+            {/* Cellular Signal Bars */}
+            <div className="flex items-end gap-0.5 h-2.5">
+              <span className="w-0.5 h-1 bg-slate-900 rounded-full" />
+              <span className="w-0.5 h-1.5 bg-slate-900 rounded-full" />
+              <span className="w-0.5 h-2 bg-slate-900 rounded-full" />
+              <span className="w-0.5 h-2.5 bg-slate-900 rounded-full" />
+            </div>
+            {/* Wifi Icon */}
+            <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
+              <path d="M12 4C7.31 4 3.07 5.9 0 8.98L12 21 24 8.98C20.93 5.9 16.69 4 12 4zm0 3.5c3.55 0 6.78 1.41 9.17 3.7L12 18.5 2.83 11.2C5.22 8.91 8.45 7.5 12 7.5z" />
+            </svg>
+            {/* Battery Icon */}
+            <div className="w-5 h-2.5 border border-slate-900 rounded-xs p-0.5 flex items-center">
+              <div className="w-full h-full bg-slate-900 rounded-2xs" />
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* ============================================================== */}
-      {/* DUAL-MODE SWITCHER TABS (Mode Siswa vs Mode Pantau Orang Tua) */}
-      {/* ============================================================== */}
-      <div className="bg-gradient-to-r from-slate-900 via-blue-950 to-indigo-950 p-1.5 rounded-2xl flex items-center gap-1 shadow-md border border-slate-800">
-        <button
-          type="button"
-          onClick={() => setPortalMode('siswa')}
-          className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-2 cursor-pointer ${
-            portalMode === 'siswa'
-              ? 'bg-white text-blue-900 shadow-sm'
-              : 'text-blue-200 hover:text-white hover:bg-white/10'
-          }`}
-        >
-          <User size={15} />
-          <span>Mode Siswa (Presensi)</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setPortalMode('wali')}
-          className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-2 cursor-pointer relative ${
-            portalMode === 'wali'
-              ? 'bg-white text-blue-900 shadow-sm'
-              : 'text-blue-200 hover:text-white hover:bg-white/10'
-          }`}
-        >
-          <ShieldCheck size={15} className="text-emerald-400" />
-          <span>Mode Pantau Orang Tua</span>
-          {studentLeaveRequests.filter((r) => r.status === 'PENDING').length > 0 && (
-            <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping inline-block" />
-          )}
-        </button>
-      </div>
-
-      {/* Navigation Tabs (Presensi Hari Ini, Rekap Bulanan, Rekap Semester) - Only in Mode Siswa */}
-      {portalMode === 'siswa' && (
-        <div className="bg-slate-200/70 p-1 rounded-2xl flex items-center gap-1 border border-slate-200 shadow-inner">
-          <button
-            onClick={() => setActiveTab('hari-ini')}
-            className={`flex-1 py-2 px-2 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-              activeTab === 'hari-ini'
-                ? 'bg-white text-blue-700 shadow-sm'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <Clock size={13} />
-            <span>Hari Ini</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('rekap-bulanan')}
-            className={`flex-1 py-2 px-2 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-              activeTab === 'rekap-bulanan'
-                ? 'bg-white text-blue-700 shadow-sm'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <CalendarDays size={13} />
-            <span>Rekap Bulanan</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('rekap-semester')}
-            className={`flex-1 py-2 px-2 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-              activeTab === 'rekap-semester'
-                ? 'bg-white text-blue-700 shadow-sm'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <BarChart3 size={13} />
-            <span>Rekap Semester</span>
-          </button>
-        </div>
-      )}
-
-      {/* ============================================================== */}
-      {/* TAB 1: PRESENSI HARI INI */}
-      {/* ============================================================== */}
-      {portalMode === 'siswa' && activeTab === 'hari-ini' && (
-        <div className="space-y-4 animate-in fade-in duration-150">
-          {/* Real-time Live Clock Card */}
-          <div className="bg-gradient-to-br from-slate-900 via-blue-950 to-indigo-950 rounded-3xl p-5 text-white shadow-lg text-center relative overflow-hidden border border-slate-800">
-            <div className="absolute -top-12 -right-12 w-36 h-36 bg-blue-500/20 rounded-full blur-2xl pointer-events-none" />
-            <div className="absolute -bottom-12 -left-12 w-36 h-36 bg-indigo-500/20 rounded-full blur-2xl pointer-events-none" />
-
-            <div className="flex items-center justify-center gap-1.5 text-blue-300 text-[11px] font-bold tracking-widest uppercase mb-1">
-              <Clock size={13} className="animate-pulse" />
-              <span>WAKTU REAL-TIME SISTEM</span>
-            </div>
-
-            {/* Digital Clock */}
-            <div className="text-3xl sm:text-4xl font-black tracking-tight font-mono my-1 text-white flex items-center justify-center gap-1">
-              <span>{hours}</span>
-              <span className="animate-pulse text-blue-400">:</span>
-              <span>{mins}</span>
-              <span className="animate-pulse text-blue-400">:</span>
-              <span className="text-xl sm:text-2xl text-blue-300 font-normal">{secs}</span>
-              <span className="text-xs font-bold text-blue-300 ml-1">WIB</span>
-            </div>
-
-            {/* Dynamic Real-time Date */}
-            <p className="text-xs sm:text-sm font-bold text-slate-200 mt-1">
-              {formattedRealTimeDate}
-            </p>
-
-            {/* Status of Today (Effective Study Day vs Holiday) */}
-            <div className="mt-2 flex items-center justify-center gap-1.5 flex-wrap">
-              <span
-                className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
-                  dayStatus.isEffective
-                    ? 'bg-emerald-500/20 text-emerald-300 border-emerald-400/30'
-                    : 'bg-amber-500/20 text-amber-300 border-amber-400/30'
-                }`}
-              >
-                {dayStatus.isEffective ? (
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping inline-block mr-0.5" />
-                ) : (
-                  <AlertCircle size={11} className="inline-block mr-0.5" />
-                )}
-                <span>{dayStatus.label}</span>
-              </span>
-              {dayStatus.eventTitle && (
-                <span className="text-[10px] font-semibold text-blue-200">
-                  ({dayStatus.eventTitle})
-                </span>
-              )}
-            </div>
-
-            {/* Status Rules Info */}
-            <div className="mt-3.5 pt-3.5 border-t border-white/10 flex items-center justify-between text-[11px] text-blue-200">
-              <span>Buka: <strong className="text-white">{systemConfig.checkInStartTime || '06:00'}</strong></span>
-              <span>Tepat Waktu: <strong className="text-white">s/d {systemConfig.checkInDeadlineTime || '07:00'}</strong></span>
-              <span>Pulang: <strong className="text-white">{systemConfig.checkOutStartTime || '12:30'}</strong></span>
-            </div>
-          </div>
-
-          {/* Locked for Holiday Warning */}
-          {isLockedForHoliday && (
-            <div className="p-4 bg-amber-50 border-2 border-amber-300 rounded-3xl text-amber-950 flex items-start gap-3 shadow-sm">
-              <div className="w-10 h-10 rounded-2xl bg-amber-200 text-amber-900 flex items-center justify-center shrink-0">
-                <Lock size={20} />
-              </div>
-              <div className="text-xs space-y-1">
-                <h3 className="font-black text-amber-950 text-sm">Presensi Terkunci (Hari Libur)</h3>
-                <p className="text-amber-800 leading-relaxed">
-                  Hari ini bukan hari belajar efektif ({dayStatus.label}{dayStatus.eventTitle ? ` - ${dayStatus.eventTitle}` : ''}). Tombol presensi masuk, pulang, dan izin dinonaktifkan.
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/* Today's Status Banner with Clear Indicators */}
-          <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
-                <ShieldCheck size={14} className="text-blue-600" />
-                Status Presensi Hari Ini
-              </span>
-              {isLockedForHoliday ? (
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-slate-100 text-slate-600 border border-slate-300">
-                  <Lock size={12} />
-                  🔒 Presensi Libur / Terkunci
-                </span>
-              ) : todayRecord?.status === 'Izin' ? (
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-amber-100 text-amber-800 border border-amber-300">
-                  🟡 Izin ({todayRecord.notes || 'Disetujui Wali Kelas'})
-                </span>
-              ) : todayRecord?.status === 'Sakit' ? (
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-sky-100 text-sky-800 border border-sky-300">
-                  🟡 Sakit ({todayRecord.notes || 'Surat Dokter / Wali'})
-                </span>
-              ) : todayRecord?.status === 'Alfa' ? (
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-rose-100 text-rose-800 border border-rose-300">
-                  ⚠️ Alfa (Tidak Hadir)
-                </span>
-              ) : hasCheckedIn && hasCheckedOut ? (
-                <span className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full text-xs font-black bg-slate-900 text-emerald-400 border border-slate-700 shadow-sm">
-                  <Lock size={12} />
-                  🔒 Presensi Hari Ini Selesai
-                </span>
-              ) : hasCheckedIn ? (
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-emerald-100 text-emerald-800 border border-emerald-300">
-                  <CheckCircle2 size={13} />
-                  🟢 Sudah Masuk — {todayRecord?.checkInTime} WIB
-                </span>
-              ) : (
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-extrabold bg-amber-50 text-amber-800 border border-amber-300">
-                  <Clock size={12} className="text-amber-600" />
-                  🟡 Belum Presensi
-                </span>
-              )}
-            </div>
-
-            {/* Details row */}
-            <div className="grid grid-cols-2 gap-2 mt-3 pt-3 border-t border-slate-100 text-xs">
-              <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
-                <span className="text-[10px] text-slate-400 block font-bold uppercase">Jam Masuk</span>
-                <span className="font-extrabold text-slate-800 text-sm flex items-center gap-1.5">
-                  {todayRecord?.checkInTime && todayRecord.checkInTime !== '-' ? (
-                    <>
-                      <span className="text-emerald-600 font-black">🟢</span>
-                      {todayRecord.checkInTime} WIB
-                    </>
-                  ) : (
-                    '—'
-                  )}
-                </span>
-                {todayRecord?.notes && todayRecord.notes.includes('Terlambat') && (
-                  <span className="inline-block mt-0.5 text-[9px] font-bold text-amber-600">
-                    (Terlambat)
-                  </span>
-                )}
-              </div>
-              <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
-                <span className="text-[10px] text-slate-400 block font-bold uppercase">Jam Pulang</span>
-                <span className="font-extrabold text-slate-800 text-sm flex items-center gap-1.5">
-                  {todayRecord?.checkOutTime && todayRecord.checkOutTime !== '-' ? (
-                    <>
-                      <span className="text-blue-600 font-black">🔵</span>
-                      {todayRecord.checkOutTime} WIB
-                    </>
-                  ) : (
-                    '—'
-                  )}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Today's Subject Attendance Records (if any recorded by Guru Mapel) */}
-          {todaySubjectRecords.length > 0 && (
-            <div className="bg-white border border-blue-100 rounded-2xl p-4 shadow-sm space-y-2.5">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-blue-900 uppercase tracking-wider flex items-center gap-1.5">
-                  <BarChart3 size={14} className="text-blue-600" />
-                  Presensi Mata Pelajaran Hari Ini
-                </span>
-                <span className="text-[10px] bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full font-bold">
-                  {todaySubjectRecords.length} Mapel Dicatat
-                </span>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {todaySubjectRecords.map((sr) => (
-                  <div key={sr.id} className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between">
-                    <div>
-                      <p className="text-xs font-bold text-slate-800">{sr.subjectName || 'Mata Pelajaran'}</p>
-                      {sr.notes && <p className="text-[10px] text-slate-500">{sr.notes}</p>}
-                    </div>
-                    <span
-                      className={`px-2 py-0.5 rounded-md text-[10px] font-extrabold ${
-                        sr.status === 'Hadir'
-                          ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
-                          : sr.status === 'Sakit'
-                          ? 'bg-sky-100 text-sky-800 border border-sky-300'
-                          : sr.status === 'Izin'
-                          ? 'bg-amber-100 text-amber-800 border border-amber-300'
-                          : 'bg-rose-100 text-rose-800 border border-rose-300'
-                      }`}
-                    >
-                      {sr.status}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Big Action Buttons (Scan Presensi Masuk & Scan Presensi Pulang) */}
-          <div className="grid grid-cols-2 gap-2 sm:gap-3.5">
-            {/* Tombol Scan Presensi Masuk */}
-            <button
-              id="btn-presensi-masuk"
-              onClick={handleCheckIn}
-              disabled={
-                (!isSimulationMode && isLockedForHoliday) ||
-                hasCheckedIn ||
-                isExcused ||
-                (!isSimulationMode && !systemConfig.studentSelfAttendanceEnabled) ||
-                isBeforeCheckInOpen
-              }
-              className={`relative p-3 sm:p-5 rounded-2xl sm:rounded-3xl flex flex-col items-center justify-center gap-1.5 sm:gap-2 text-center transition-all cursor-pointer shadow-md min-h-[125px] sm:min-h-[140px] group ${
-                !isSimulationMode && isLockedForHoliday
-                  ? 'bg-slate-100 border border-slate-300 text-slate-400 cursor-not-allowed opacity-80'
-                  : hasCheckedIn
-                  ? 'bg-emerald-50 border-2 border-emerald-300 text-emerald-900 cursor-not-allowed opacity-90'
-                  : !isSimulationMode && !systemConfig.studentSelfAttendanceEnabled
-                  ? 'bg-slate-100 border border-slate-200 text-slate-400 cursor-not-allowed'
-                  : isBeforeCheckInOpen
-                  ? 'bg-slate-100 border border-slate-200 text-slate-400 cursor-not-allowed'
-                  : 'bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white shadow-emerald-500/20'
-              }`}
+        {/* Simulation Banner for Admin / Guru */}
+        {currentUser?.role !== 'SISWA' && (
+          <div className="bg-amber-500 text-white px-4 py-1 text-[11px] font-bold flex items-center justify-between shrink-0 z-30">
+            <span>Mode Simulasi Siswa:</span>
+            <select
+              value={activeStudent.id}
+              onChange={(e) => setSelectedSimulatedStudentId(e.target.value)}
+              className="bg-amber-600 text-white text-[11px] font-bold rounded px-1.5 py-0.5 outline-none cursor-pointer"
             >
-              <div
-                className={`w-11 h-11 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl flex items-center justify-center shadow-inner ${
-                  !isSimulationMode && isLockedForHoliday
-                    ? 'bg-slate-200 text-slate-500'
-                    : hasCheckedIn
-                    ? 'bg-emerald-200 text-emerald-800'
-                    : isBeforeCheckInOpen
-                    ? 'bg-slate-200 text-slate-400'
-                    : 'bg-white/20 text-white'
-                }`}
-              >
-                {!isSimulationMode && isLockedForHoliday ? (
-                  <Lock className="w-5 h-5 sm:w-7 sm:h-7" />
-                ) : hasCheckedIn ? (
-                  <CheckCircle2 className="w-6 h-6 sm:w-7 sm:h-7" />
-                ) : isBeforeCheckInOpen ? (
-                  <Lock className="w-5 h-5 sm:w-7 sm:h-7" />
-                ) : (
-                  <QrCode className="w-6 h-6 sm:w-7 sm:h-7" />
-                )}
-              </div>
-              <div className="w-full">
-                <span className="text-xs sm:text-base font-black tracking-tight block truncate">
-                  {!isSimulationMode && isLockedForHoliday
-                    ? 'LIBUR'
-                    : hasCheckedIn
-                    ? 'SUDAH MASUK'
-                    : isBeforeCheckInOpen
-                    ? 'BELUM DIBUKA'
-                    : 'SCAN MASUK'}
-                </span>
-                <span className="text-[10px] sm:text-[11px] font-medium opacity-90 block mt-0.5 line-clamp-2">
-                  {!isSimulationMode && isLockedForHoliday
-                    ? 'Hari libur'
-                    : hasCheckedIn
-                    ? `Pukul ${todayRecord?.checkInTime} WIB`
-                    : isBeforeCheckInOpen
-                    ? `Buka ${systemConfig.checkInStartTime || '06:00'}`
-                    : isLate
-                    ? 'Scan QR (Terlambat)'
-                    : 'Scan QR kelas'}
-                </span>
-              </div>
-            </button>
-
-            {/* Tombol Scan Presensi Pulang */}
-            <button
-              id="btn-presensi-pulang"
-              onClick={handleCheckOut}
-              disabled={
-                (!isSimulationMode && isLockedForHoliday) ||
-                hasCheckedOut ||
-                (!isSimulationMode && !hasCheckedIn) ||
-                (!isSimulationMode && !systemConfig.studentSelfAttendanceEnabled) ||
-                isBeforeCheckOutOpen
-              }
-              className={`relative p-3 sm:p-5 rounded-2xl sm:rounded-3xl flex flex-col items-center justify-center gap-1.5 sm:gap-2 text-center transition-all cursor-pointer shadow-md min-h-[125px] sm:min-h-[140px] group ${
-                !isSimulationMode && isLockedForHoliday
-                  ? 'bg-slate-100 border border-slate-300 text-slate-400 cursor-not-allowed opacity-80'
-                  : hasCheckedOut
-                  ? 'bg-blue-50 border-2 border-blue-300 text-blue-900 cursor-not-allowed opacity-90'
-                  : !hasCheckedIn && !isSimulationMode
-                  ? 'bg-slate-50 border border-slate-200 text-slate-400 cursor-not-allowed'
-                  : isBeforeCheckOutOpen
-                  ? 'bg-slate-100 border border-slate-200 text-slate-400 cursor-not-allowed'
-                  : 'bg-blue-600 hover:bg-blue-700 active:scale-98 text-white shadow-blue-500/20'
-              }`}
-            >
-              <div
-                className={`w-11 h-11 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl flex items-center justify-center shadow-inner ${
-                  !isSimulationMode && isLockedForHoliday
-                    ? 'bg-slate-200 text-slate-500'
-                    : hasCheckedOut
-                    ? 'bg-blue-200 text-blue-800'
-                    : isBeforeCheckOutOpen
-                    ? 'bg-slate-200 text-slate-400'
-                    : 'bg-white/20 text-white'
-                }`}
-              >
-                {!isSimulationMode && isLockedForHoliday ? (
-                  <Lock className="w-5 h-5 sm:w-7 sm:h-7" />
-                ) : hasCheckedOut ? (
-                  <CheckCircle2 className="w-6 h-6 sm:w-7 sm:h-7" />
-                ) : isBeforeCheckOutOpen ? (
-                  <Lock className="w-5 h-5 sm:w-7 sm:h-7" />
-                ) : (
-                  <QrCode className="w-6 h-6 sm:w-7 sm:h-7" />
-                )}
-              </div>
-              <div className="w-full">
-                <span className="text-xs sm:text-base font-black tracking-tight block truncate">
-                  {!isSimulationMode && isLockedForHoliday
-                    ? 'LIBUR'
-                    : hasCheckedOut
-                    ? 'SUDAH PULANG'
-                    : isBeforeCheckOutOpen && hasCheckedIn
-                    ? 'BELUM JAM'
-                    : 'SCAN PULANG'}
-                </span>
-                <span className="text-[10px] sm:text-[11px] font-medium opacity-90 block mt-0.5 line-clamp-2">
-                  {!isSimulationMode && isLockedForHoliday
-                    ? 'Hari libur'
-                    : hasCheckedOut
-                    ? `Pukul ${todayRecord?.checkOutTime} WIB`
-                    : !hasCheckedIn && !isSimulationMode
-                    ? 'Scan masuk dulu'
-                    : isBeforeCheckOutOpen
-                    ? `Buka ${systemConfig.checkOutStartTime || '12:30'}`
-                    : 'Scan QR kelas'}
-                </span>
-              </div>
-            </button>
+              {students.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.nama} ({s.nisn})
+                </option>
+              ))}
+            </select>
           </div>
+        )}
 
-          {/* Student Attendance Stats (Monthly Summary Preview) */}
-          <div className="bg-white border border-slate-200 rounded-3xl p-4 sm:p-5 shadow-sm space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <History size={16} className="text-blue-600" />
-                <div>
-                  <h2 className="text-xs sm:text-sm font-black text-slate-900">
-                    Statistik Bulan Ini
-                  </h2>
-                  <span className="text-[11px] font-semibold text-blue-600">
-                    {activeMonthDisplay}
-                  </span>
-                </div>
-              </div>
-              <span className="text-xs font-extrabold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200 shadow-2xs">
-                {attendanceRate}% Kehadiran
-              </span>
-            </div>
-
-            {/* 4 Mini Counters for Current Month */}
-            <div className="grid grid-cols-4 gap-2 text-center">
-              <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-2.5">
-                <span className="text-[10px] font-bold text-emerald-800 block uppercase tracking-wider">HADIR</span>
-                <span className="text-lg font-black text-emerald-900">{totalHadirBulanIni}</span>
-                <span className="text-[9px] text-emerald-700 block font-medium">Hari</span>
-              </div>
-              <div className="bg-sky-50 border border-sky-100 rounded-2xl p-2.5">
-                <span className="text-[10px] font-bold text-sky-800 block uppercase tracking-wider">SAKIT</span>
-                <span className="text-lg font-black text-sky-900">{totalSakitBulanIni}</span>
-                <span className="text-[9px] text-sky-700 block font-medium">Hari</span>
-              </div>
-              <div className="bg-amber-50 border border-amber-100 rounded-2xl p-2.5">
-                <span className="text-[10px] font-bold text-amber-800 block uppercase tracking-wider">IZIN</span>
-                <span className="text-lg font-black text-amber-900">{totalIzinBulanIni}</span>
-                <span className="text-[9px] text-amber-700 block font-medium">Hari</span>
-              </div>
-              <div className="bg-rose-50 border border-rose-100 rounded-2xl p-2.5">
-                <span className="text-[10px] font-bold text-rose-800 block uppercase tracking-wider">ALFA</span>
-                <span className="text-lg font-black text-rose-900">{totalAlfaBulanIni}</span>
-                <span className="text-[9px] text-rose-700 block font-medium">Hari</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ============================================================== */}
-      {/* TAB 2: REKAP BULANAN SISWA */}
-      {/* ============================================================== */}
-      {portalMode === 'siswa' && activeTab === 'rekap-bulanan' && (
-        <div className="space-y-4 animate-in fade-in duration-150">
-          {/* Header & Filter Controls */}
-          <div className="bg-white border border-slate-200 rounded-3xl p-4 sm:p-5 shadow-sm space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
-                  <CalendarDays size={18} />
-                </div>
-                <div>
-                  <h2 className="text-sm font-black text-slate-900">Rekapitulasi Kehadiran Bulanan</h2>
-                  <p className="text-xs text-slate-500">Pilih bulan dan tahun untuk melihat rincian absensi</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Filter Bulan & Tahun */}
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">
-                  PILIH BULAN
-                </label>
-                <select
-                  value={rekapMonth}
-                  onChange={(e) => setRekapMonth(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 outline-none focus:border-blue-600 focus:bg-white cursor-pointer"
-                >
-                  <option value="01">Januari</option>
-                  <option value="02">Februari</option>
-                  <option value="03">Maret</option>
-                  <option value="04">April</option>
-                  <option value="05">Mei</option>
-                  <option value="06">Juni</option>
-                  <option value="07">Juli</option>
-                  <option value="08">Agustus</option>
-                  <option value="09">September</option>
-                  <option value="10">Oktober</option>
-                  <option value="11">November</option>
-                  <option value="12">Desember</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">
-                  PILIH TAHUN
-                </label>
-                <input
-                  type="number"
-                  value={rekapYear}
-                  onChange={(e) => setRekapYear(e.target.value)}
-                  min={2020}
-                  max={2035}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 outline-none focus:border-blue-600 focus:bg-white"
-                />
-              </div>
-            </div>
-
-            {/* Rekap Summary Badges */}
-            <div className="grid grid-cols-4 gap-2 text-center pt-2">
-              <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-2.5">
-                <span className="text-[10px] font-bold text-emerald-800 block uppercase">HADIR</span>
-                <span className="text-lg font-black text-emerald-900">{selectedMonthStats.hadir}</span>
-                <span className="text-[9px] text-emerald-700 block font-medium">Hari</span>
-              </div>
-              <div className="bg-sky-50 border border-sky-200 rounded-2xl p-2.5">
-                <span className="text-[10px] font-bold text-sky-800 block uppercase">SAKIT</span>
-                <span className="text-lg font-black text-sky-900">{selectedMonthStats.sakit}</span>
-                <span className="text-[9px] text-sky-700 block font-medium">Hari</span>
-              </div>
-              <div className="bg-amber-50 border border-amber-200 rounded-2xl p-2.5">
-                <span className="text-[10px] font-bold text-amber-800 block uppercase">IZIN</span>
-                <span className="text-lg font-black text-amber-900">{selectedMonthStats.izin}</span>
-                <span className="text-[9px] text-amber-700 block font-medium">Hari</span>
-              </div>
-              <div className="bg-rose-50 border border-rose-200 rounded-2xl p-2.5">
-                <span className="text-[10px] font-bold text-rose-800 block uppercase">ALFA</span>
-                <span className="text-lg font-black text-rose-900">{selectedMonthStats.alfa}</span>
-                <span className="text-[9px] text-rose-700 block font-medium">Hari</span>
-              </div>
-            </div>
-
-            {/* % Kehadiran Progress */}
-            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3 flex items-center justify-between">
-              <div className="space-y-0.5">
-                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Persentase Kehadiran</span>
-                <p className="text-xs text-slate-700 font-medium">
-                  {selectedMonthStats.hadir} hadir dari {selectedMonthStats.totalRecorded} hari tercatat
-                </p>
-              </div>
-              <div className="text-right">
-                <span className="text-lg font-black text-blue-700">{selectedMonthStats.rate}%</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Daftar Riwayat Detail Harian */}
-          <div className="bg-white border border-slate-200 rounded-3xl p-4 sm:p-5 shadow-sm space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider">
-                Catatan Presensi Harian ({selectedMonthHistory.length} Data)
-              </h3>
-            </div>
-
-            <div className="space-y-2">
-              {selectedMonthHistory.length > 0 ? (
-                selectedMonthHistory.map((item) => (
-                  <div
-                    key={item.id}
-                    className="p-3 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-between text-xs hover:bg-slate-100/80 transition-colors"
-                  >
-                    <div className="space-y-0.5">
-                      <div className="font-black text-slate-900">{item.date}</div>
-                      <div className="text-[11px] text-slate-500 flex items-center gap-2">
-                        <span>Masuk: <strong className="text-slate-700">{item.checkInTime || '-'}</strong></span>
-                        <span>•</span>
-                        <span>Pulang: <strong className="text-slate-700">{item.checkOutTime || '-'}</strong></span>
-                      </div>
-                      {item.notes && (
-                        <p className="text-[10px] text-amber-700 font-medium italic">
-                          Ket: {item.notes}
-                        </p>
-                      )}
-                    </div>
-
-                    <span
-                      className={`px-3 py-1 rounded-xl text-xs font-black ${
-                        item.status === 'Hadir'
-                          ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
-                          : item.status === 'Sakit'
-                          ? 'bg-sky-100 text-sky-800 border border-sky-300'
-                          : item.status === 'Izin'
-                          ? 'bg-amber-100 text-amber-800 border border-amber-300'
-                          : item.status === 'Alfa'
-                          ? 'bg-rose-100 text-rose-800 border border-rose-300'
-                          : 'bg-slate-200 text-slate-700'
-                      }`}
-                    >
-                      {item.status || 'Belum'}
-                    </span>
+        {/* 2. DYNAMIC CONTENT SCROLL AREA */}
+        <div className="flex-1 overflow-y-auto pb-24 relative bg-white">
+          
+          {/* ========================================================================= */}
+          {/* SCREEN 1: BERANDA (HOME) */}
+          {/* ========================================================================= */}
+          {currentScreen === 'beranda' && (
+            <div className="p-4 sm:p-5 space-y-4 animate-in fade-in duration-200">
+              {/* Header: School Logo & Title + Notification Bell */}
+              <div className="flex items-center justify-between pt-1">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-10 h-10 rounded-2xl bg-blue-600 text-white flex items-center justify-center shadow-md shadow-blue-500/20 shrink-0">
+                    {/* Cute School Building Icon */}
+                    <svg className="w-6 h-6 fill-current" viewBox="0 0 24 24">
+                      <path d="M12 3L2 8v2h2v10h6v-6h4v6h6V10h2V8l-10-5zm-1 9H9v-2h2v2zm4 0h-2v-2h2v2zm-4 4H9v-2h2v2zm4 0h-2v-2h2v2z" />
+                    </svg>
                   </div>
-                ))
-              ) : (
-                <div className="py-8 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200 text-slate-400 text-xs">
-                  Tidak ada catatan presensi pada bulan yang dipilih.
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ============================================================== */}
-      {/* TAB 3: REKAP SEMESTER SISWA */}
-      {/* ============================================================== */}
-      {portalMode === 'siswa' && activeTab === 'rekap-semester' && (
-        <div className="space-y-4 animate-in fade-in duration-150">
-          {/* Header & Filter Controls */}
-          <div className="bg-white border border-slate-200 rounded-3xl p-4 sm:p-5 shadow-sm space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold">
-                  <BarChart3 size={18} />
-                </div>
-                <div>
-                  <h2 className="text-sm font-black text-slate-900">Rekapitulasi Kehadiran Semester</h2>
-                  <p className="text-xs text-slate-500">Akumulasi presensi 6 bulan dalam 1 semester</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Filter Semester & Tahun */}
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">
-                  PILIH SEMESTER
-                </label>
-                <select
-                  value={rekapSemester}
-                  onChange={(e) => setRekapSemester(e.target.value as '1' | '2')}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 outline-none focus:border-blue-600 focus:bg-white cursor-pointer"
-                >
-                  <option value="1">Semester 1 (Ganjil: Jul - Des)</option>
-                  <option value="2">Semester 2 (Genap: Jan - Jun)</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">
-                  TAHUN AJARAN AWAL
-                </label>
-                <input
-                  type="number"
-                  value={rekapYear}
-                  onChange={(e) => setRekapYear(e.target.value)}
-                  min={2020}
-                  max={2035}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 outline-none focus:border-blue-600 focus:bg-white"
-                />
-              </div>
-            </div>
-
-            {/* Semester Highlights */}
-            <div className="bg-gradient-to-br from-indigo-900 to-blue-950 rounded-2xl p-4 text-white space-y-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <span className="text-[10px] text-blue-200 uppercase font-bold tracking-wider">
-                    {rekapSemester === '1' ? 'Semester 1 (Ganjil)' : 'Semester 2 (Genap)'}
-                  </span>
-                  <h3 className="text-base font-black text-white">
-                    {semesterSummary.totalHadir} Hari Hadir
-                  </h3>
-                </div>
-                <div className="text-right">
-                  <span className="text-2xl font-black text-amber-300">
-                    {semesterSummary.semesterRate}%
-                  </span>
-                  <span className="text-[10px] text-blue-200 block">Tingkat Kehadiran</span>
-                </div>
-              </div>
-
-              <div className="pt-2 border-t border-white/10 flex items-center justify-between">
-                <span className="text-xs text-blue-200 font-medium">Predikat Kehadiran:</span>
-                <span className={`px-3 py-0.5 rounded-full text-xs font-black border ${semesterSummary.predicateColor}`}>
-                  {semesterSummary.predicate}
-                </span>
-              </div>
-            </div>
-
-            {/* 4 Mini Stats Accumulation */}
-            <div className="grid grid-cols-4 gap-2 text-center">
-              <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-2.5">
-                <span className="text-[10px] font-bold text-emerald-800 block uppercase">TOTAL HADIR</span>
-                <span className="text-lg font-black text-emerald-900">{semesterSummary.totalHadir}</span>
-                <span className="text-[9px] text-emerald-700 block font-medium">Hari</span>
-              </div>
-              <div className="bg-sky-50 border border-sky-200 rounded-2xl p-2.5">
-                <span className="text-[10px] font-bold text-sky-800 block uppercase">TOTAL SAKIT</span>
-                <span className="text-lg font-black text-sky-900">{semesterSummary.totalSakit}</span>
-                <span className="text-[9px] text-sky-700 block font-medium">Hari</span>
-              </div>
-              <div className="bg-amber-50 border border-amber-200 rounded-2xl p-2.5">
-                <span className="text-[10px] font-bold text-amber-800 block uppercase">TOTAL IZIN</span>
-                <span className="text-lg font-black text-amber-900">{semesterSummary.totalIzin}</span>
-                <span className="text-[9px] text-amber-700 block font-medium">Hari</span>
-              </div>
-              <div className="bg-rose-50 border border-rose-200 rounded-2xl p-2.5">
-                <span className="text-[10px] font-bold text-rose-800 block uppercase">TOTAL ALFA</span>
-                <span className="text-lg font-black text-rose-900">{semesterSummary.totalAlfa}</span>
-                <span className="text-[9px] text-rose-700 block font-medium">Hari</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Breakdown 6 Bulan dalam Semester */}
-          <div className="bg-white border border-slate-200 rounded-3xl p-4 sm:p-5 shadow-sm space-y-3">
-            <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider">
-              Rincian Kehadiran 6 Bulan
-            </h3>
-
-            <div className="space-y-2">
-              {semesterSummary.monthlyBreakdown.map((m, idx) => (
-                <div
-                  key={m.key}
-                  className="p-3.5 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-between text-xs"
-                >
-                  <div className="space-y-0.5">
-                    <div className="flex items-center gap-2">
-                      <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-700 font-black text-[10px] flex items-center justify-center">
-                        {idx + 1}
-                      </span>
-                      <span className="font-black text-slate-900 text-sm">{m.name}</span>
-                    </div>
-                    <p className="text-[11px] text-slate-500">
-                      H: <strong className="text-emerald-700">{m.hadir}</strong> • S: <strong className="text-sky-700">{m.sakit}</strong> • I: <strong className="text-amber-700">{m.izin}</strong> • A: <strong className="text-rose-700">{m.alfa}</strong>
+                  <div>
+                    <h2 className="text-sm font-black text-slate-900 tracking-tight leading-tight">
+                      {schoolProfile.namaSekolah || 'SD Cideng 07'}
+                    </h2>
+                    <p className="text-[11px] font-semibold text-slate-500">
+                      Portal Siswa
                     </p>
                   </div>
+                </div>
 
-                  <div className="text-right">
-                    <span className="text-xs font-black text-blue-700 bg-blue-50 px-2.5 py-1 rounded-xl border border-blue-200 inline-block">
-                      {m.rate}%
+                {/* Bell Icon with Red Dot */}
+                <button
+                  onClick={() => setShowNotificationModal(true)}
+                  className="w-9 h-9 rounded-2xl bg-slate-50 hover:bg-slate-100 border border-slate-200/80 flex items-center justify-center text-slate-700 relative transition-all active:scale-95 cursor-pointer"
+                  title="Pemberitahuan"
+                >
+                  <Bell size={18} />
+                  <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-rose-500 ring-2 ring-white animate-pulse" />
+                </button>
+              </div>
+
+              {/* Greeting & Student Circular Avatar */}
+              <div className="flex items-center justify-between pt-1 pb-1">
+                <div>
+                  <span className="text-xs text-slate-500 font-medium block">Halo,</span>
+                  <h1 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight leading-tight">
+                    {activeStudent.nama}
+                  </h1>
+                  <span className="text-xs font-semibold text-slate-500 block mt-0.5">
+                    Kelas {studentDisplayClassName}
+                  </span>
+                </div>
+
+                {/* Circular Student Anime Avatar */}
+                <div className="w-14 h-14 rounded-full bg-gradient-to-br from-blue-400 to-indigo-600 p-0.5 shadow-md shrink-0 overflow-hidden border-2 border-white">
+                  <div className="w-full h-full rounded-full bg-blue-100 flex items-center justify-center overflow-hidden">
+                    <svg viewBox="0 0 100 100" className="w-full h-full">
+                      <circle cx="50" cy="50" r="48" fill="#93C5FD" />
+                      {/* Body & Collar */}
+                      <path d="M22 92 C22 72 35 68 50 68 C65 68 78 72 78 92 Z" fill="#1E3A8A" />
+                      <polygon points="50,68 44,82 56,82" fill="#FFFFFF" />
+                      <polygon points="50,74 47,88 53,88" fill="#EF4444" />
+                      {/* Head */}
+                      <circle cx="50" cy="45" r="22" fill="#FDE047" />
+                      {/* Hair */}
+                      <path d="M28 42 C28 26 40 20 50 20 C60 20 72 26 72 42 C72 48 70 52 70 52 C70 52 64 36 50 36 C36 36 30 52 30 52 Z" fill="#451A03" />
+                      {/* Eyes & Smile */}
+                      <circle cx="43" cy="44" r="3" fill="#1E293B" />
+                      <circle cx="57" cy="44" r="3" fill="#1E293B" />
+                      <path d="M46 51 Q50 55 54 51" stroke="#1E293B" strokeWidth="2" strokeLinecap="round" fill="none" />
+                      {/* Blushes */}
+                      <circle cx="39" cy="48" r="2.5" fill="#FCA5A5" />
+                      <circle cx="61" cy="48" r="2.5" fill="#FCA5A5" />
+                    </svg>
+                  </div>
+                </div>
+              </div>
+
+              {/* Hero Card: Absensi Hari Ini (Vibrant Blue Card with School Illustration) */}
+              <div className="rounded-3xl bg-gradient-to-r from-blue-600 via-blue-500 to-sky-500 text-white p-4 sm:p-5 relative overflow-hidden shadow-lg shadow-blue-500/25">
+                {/* Background decorative circles */}
+                <div className="absolute top-0 right-0 w-36 h-36 bg-white/10 rounded-full blur-xl pointer-events-none" />
+
+                <div className="relative z-10 flex items-center justify-between gap-2">
+                  <div className="max-w-[62%] space-y-1">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-xl bg-white/20 backdrop-blur-md flex items-center justify-center text-white shrink-0">
+                        <Calendar size={18} />
+                      </div>
+                      <h3 className="text-sm sm:text-base font-black tracking-tight leading-tight">
+                        Absensi Hari Ini
+                      </h3>
+                    </div>
+
+                    <p className="text-xs text-blue-50 opacity-95 leading-normal pt-1">
+                      {hasCheckedIn && hasCheckedOut
+                        ? `Sudah lengkap (Pulang: ${todayRecord?.checkOutTime} WIB)`
+                        : hasCheckedIn
+                        ? `Sudah masuk pukul ${todayRecord?.checkInTime} WIB. Siap untuk pulang.`
+                        : 'Pastikan kamu sudah melakukan scan masuk.'}
+                    </p>
+
+                    <button
+                      onClick={() => handleOpenScanner(hasCheckedIn ? 'pulang' : 'masuk')}
+                      className="mt-2.5 inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-white text-blue-600 hover:bg-blue-50 active:scale-95 transition-all text-xs font-black shadow-sm cursor-pointer"
+                    >
+                      <span>{hasCheckedIn ? 'Scan Pulang' : 'Scan Sekarang'}</span>
+                      <ChevronRight size={14} />
+                    </button>
+                  </div>
+
+                  {/* School Building Vector Illustration */}
+                  <div className="w-28 h-24 sm:w-32 sm:h-28 shrink-0 relative flex items-center justify-center">
+                    <svg viewBox="0 0 140 120" className="w-full h-full drop-shadow-md">
+                      {/* Sky & ground */}
+                      <ellipse cx="70" cy="115" rx="60" ry="8" fill="#1E3A8A" opacity="0.3" />
+                      {/* Trees */}
+                      <circle cx="25" cy="85" r="14" fill="#34D399" />
+                      <circle cx="115" cy="85" r="14" fill="#34D399" />
+                      <rect x="23" y="90" width="4" height="20" fill="#78350F" />
+                      <rect x="113" y="90" width="4" height="20" fill="#78350F" />
+                      {/* Main Building Base */}
+                      <rect x="36" y="60" width="68" height="50" rx="3" fill="#F8FAFC" />
+                      {/* Roof Orange */}
+                      <polygon points="70,30 28,62 112,62" fill="#FB923C" />
+                      <polygon points="70,32 34,60 106,60" fill="#F97316" />
+                      {/* Tower & Clock */}
+                      <rect x="62" y="16" width="16" height="20" fill="#F8FAFC" />
+                      <polygon points="70,6 58,18 82,18" fill="#EA580C" />
+                      <circle cx="70" cy="24" r="5" fill="#FEF08A" />
+                      {/* Flag Pole & Indonesian Flag */}
+                      <line x1="70" y1="6" x2="70" y2="0" stroke="#E2E8F0" strokeWidth="1.5" />
+                      <rect x="70" y="0" width="10" height="3" fill="#EF4444" />
+                      <rect x="70" y="3" width="10" height="3" fill="#FFFFFF" />
+                      {/* Door */}
+                      <rect x="63" y="85" width="14" height="25" rx="2" fill="#3B82F6" />
+                      {/* Windows */}
+                      <rect x="44" y="70" width="10" height="12" rx="1" fill="#60A5FA" />
+                      <rect x="86" y="70" width="10" height="12" rx="1" fill="#60A5FA" />
+                      <rect x="44" y="90" width="10" height="12" rx="1" fill="#60A5FA" />
+                      <rect x="86" y="90" width="10" height="12" rx="1" fill="#60A5FA" />
+                    </svg>
+                  </div>
+                </div>
+              </div>
+
+              {/* Ringkasan Absensi Section */}
+              <div className="space-y-3 pt-1">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-black text-slate-900 tracking-tight">
+                    Ringkasan Absensi
+                  </h3>
+                  <button
+                    onClick={() => setShowMonthPickerModal(true)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-50 hover:bg-slate-100 border border-slate-200 text-xs font-bold text-slate-700 transition-all cursor-pointer"
+                  >
+                    <Calendar size={13} className="text-blue-600" />
+                    <span>{currentMonthDisplay}</span>
+                  </button>
+                </div>
+
+                {/* 4 Stat Cards in 2x2 Grid */}
+                <div className="grid grid-cols-2 gap-3">
+                  {/* Hadir */}
+                  <div className="bg-white border border-slate-100 rounded-3xl p-3.5 shadow-xs space-y-1.5">
+                    <div className="w-7 h-7 rounded-full bg-emerald-500 text-white flex items-center justify-center font-black">
+                      <Check size={16} strokeWidth={3} />
+                    </div>
+                    <div>
+                      <span className="text-[11px] font-bold text-slate-500 block">Hadir</span>
+                      <span className="text-2xl font-black text-slate-900 leading-none">
+                        {monthlyStats.hadir}
+                      </span>
+                      <span className="text-[11px] text-slate-400 font-semibold ml-1">Hari</span>
+                    </div>
+                  </div>
+
+                  {/* Izin */}
+                  <div className="bg-white border border-slate-100 rounded-3xl p-3.5 shadow-xs space-y-1.5">
+                    <div className="w-7 h-7 rounded-full bg-amber-400 text-white flex items-center justify-center font-black">
+                      <Clock size={16} strokeWidth={2.5} />
+                    </div>
+                    <div>
+                      <span className="text-[11px] font-bold text-slate-500 block">Izin</span>
+                      <span className="text-2xl font-black text-slate-900 leading-none">
+                        {monthlyStats.izin}
+                      </span>
+                      <span className="text-[11px] text-slate-400 font-semibold ml-1">Hari</span>
+                    </div>
+                  </div>
+
+                  {/* Sakit */}
+                  <div className="bg-white border border-slate-100 rounded-3xl p-3.5 shadow-xs space-y-1.5">
+                    <div className="w-7 h-7 rounded-full bg-rose-500 text-white flex items-center justify-center font-black">
+                      <X size={16} strokeWidth={3} />
+                    </div>
+                    <div>
+                      <span className="text-[11px] font-bold text-slate-500 block">Sakit</span>
+                      <span className="text-2xl font-black text-slate-900 leading-none">
+                        {monthlyStats.sakit}
+                      </span>
+                      <span className="text-[11px] text-slate-400 font-semibold ml-1">Hari</span>
+                    </div>
+                  </div>
+
+                  {/* Alfa */}
+                  <div className="bg-white border border-slate-100 rounded-3xl p-3.5 shadow-xs space-y-1.5">
+                    <div className="w-7 h-7 rounded-full bg-slate-400 text-white flex items-center justify-center font-black">
+                      <X size={16} strokeWidth={3} />
+                    </div>
+                    <div>
+                      <span className="text-[11px] font-bold text-slate-500 block">Alfa</span>
+                      <span className="text-2xl font-black text-slate-900 leading-none">
+                        {monthlyStats.alfa}
+                      </span>
+                      <span className="text-[11px] text-slate-400 font-semibold ml-1">Hari</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Motivational Pill Banner */}
+                <button
+                  onClick={() => navigateTo('riwayat')}
+                  className="w-full bg-emerald-50 hover:bg-emerald-100/80 border border-emerald-200/80 rounded-2xl p-3 flex items-center justify-between text-left transition-all active:scale-98 cursor-pointer shadow-2xs"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0">
+                      <Check size={14} strokeWidth={3} />
+                    </div>
+                    <span className="text-xs font-bold text-emerald-950">
+                      Kamu sudah hadir {monthlyStats.hadir} hari di bulan ini. Tetap semangat!
                     </span>
-                    <span className="text-[10px] text-slate-400 block mt-0.5 font-medium">
-                      {m.totalRecorded} hari
+                  </div>
+                  <ChevronRight size={16} className="text-emerald-700 shrink-0" />
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* ========================================================================= */}
+          {/* SCREEN 2: SCAN ABSENSI (CAMERA SCANNER VIEW) */}
+          {/* ========================================================================= */}
+          {currentScreen === 'scanner' && (
+            <div className="p-4 sm:p-5 space-y-4 animate-in fade-in duration-200">
+              {/* Header with Back Arrow */}
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => navigateTo(previousScreen || 'beranda')}
+                  className="w-9 h-9 rounded-2xl bg-slate-50 hover:bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-800 transition-all cursor-pointer"
+                >
+                  <ArrowLeft size={18} />
+                </button>
+                <div>
+                  <h2 className="text-base font-black text-slate-900 leading-tight">
+                    Scan Absensi {scannerAction === 'masuk' ? '(Masuk)' : '(Pulang)'}
+                  </h2>
+                  <p className="text-xs text-slate-500">
+                    Silakan scan QR code di sekolah
+                  </p>
+                </div>
+              </div>
+
+              {/* Viewfinder Camera Box with White Corner Brackets & Green Laser Line */}
+              <div className="relative rounded-3xl overflow-hidden bg-slate-900 border-4 border-slate-800 shadow-xl aspect-square flex items-center justify-center">
+                {/* HTML5 Camera Target Element */}
+                <div id="mobile-qr-viewfinder" className="w-full h-full overflow-hidden" />
+
+                {/* Reticle Overlay Corner Brackets */}
+                <div className="absolute inset-8 pointer-events-none flex flex-col justify-between z-10">
+                  <div className="flex justify-between">
+                    <div className="w-8 h-8 border-t-4 border-l-4 border-white rounded-tl-xl" />
+                    <div className="w-8 h-8 border-t-4 border-r-4 border-white rounded-tr-xl" />
+                  </div>
+                  <div className="flex justify-between">
+                    <div className="w-8 h-8 border-b-4 border-l-4 border-white rounded-bl-xl" />
+                    <div className="w-8 h-8 border-b-4 border-r-4 border-white rounded-br-xl" />
+                  </div>
+                </div>
+
+                {/* Animated Green Scanning Laser Line */}
+                <div className="absolute left-8 right-8 h-0.5 bg-gradient-to-r from-transparent via-emerald-400 to-transparent shadow-[0_0_12px_#34d399] pointer-events-none animate-pulse z-10" />
+
+                {/* Camera Error Message Fallback */}
+                {cameraError && (
+                  <div className="absolute inset-0 bg-slate-950/90 text-white p-5 flex flex-col items-center justify-center text-center z-20 space-y-3">
+                    <Camera size={36} className="text-rose-400" />
+                    <p className="text-xs font-semibold leading-relaxed max-w-xs">{cameraError}</p>
+                    <label className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-black text-xs cursor-pointer shadow-md">
+                      <UploadCloud size={16} />
+                      <span>Unggah Foto QR Code</span>
+                      <input type="file" accept="image/*" onChange={handleFileUpload} className="hidden" />
+                    </label>
+                  </div>
+                )}
+
+                {/* Scan Status Toast Overlay */}
+                {scanStatusMessage && (
+                  <div
+                    className={`absolute bottom-3 left-4 right-4 p-2.5 rounded-2xl text-xs font-black text-center z-20 shadow-lg ${
+                      scanStatusType === 'success'
+                        ? 'bg-emerald-600 text-white'
+                        : scanStatusType === 'rejected'
+                        ? 'bg-rose-600 text-white'
+                        : 'bg-blue-600 text-white'
+                    }`}
+                  >
+                    {scanStatusMessage}
+                  </div>
+                )}
+              </div>
+
+              {/* Instruction Card with QR Icon */}
+              <div className="bg-white border border-slate-100 rounded-3xl p-4 shadow-xs flex items-center gap-3.5">
+                <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 border border-blue-100 flex items-center justify-center shrink-0">
+                  <QrCode size={24} />
+                </div>
+                <p className="text-xs font-bold text-slate-800 leading-snug">
+                  Arahkan kamera ke QR code yang tersedia di sekolah
+                </p>
+              </div>
+
+              {/* Tips Card */}
+              <div className="bg-blue-50/70 border border-blue-100 rounded-2xl p-3.5 space-y-2">
+                <div className="flex items-center gap-1.5 text-blue-700 font-black text-xs">
+                  <Info size={15} />
+                  <span>Tips</span>
+                </div>
+                <ul className="text-xs text-slate-600 space-y-1 pl-1">
+                  <li>• Pastikan pencahayaan cukup.</li>
+                  <li>• Jaga jarak 10–20 cm dari QR code.</li>
+                </ul>
+              </div>
+
+              {/* Upload QR Image Fallback Button */}
+              <div className="pt-1 flex justify-center">
+                <label className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs cursor-pointer transition-all">
+                  <UploadCloud size={15} />
+                  <span>Atau pilih dari galeri foto</span>
+                  <input type="file" accept="image/*" onChange={handleFileUpload} className="hidden" />
+                </label>
+              </div>
+            </div>
+          )}
+
+          {/* ========================================================================= */}
+          {/* SCREEN 3: RIWAYAT ABSENSI (HISTORY VIEW) */}
+          {/* ========================================================================= */}
+          {currentScreen === 'riwayat' && (
+            <div className="p-4 sm:p-5 space-y-4 animate-in fade-in duration-200">
+              {/* Header with Back Arrow */}
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => navigateTo('beranda')}
+                  className="w-9 h-9 rounded-2xl bg-slate-50 hover:bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-800 transition-all cursor-pointer"
+                >
+                  <ArrowLeft size={18} />
+                </button>
+                <h2 className="text-base font-black text-slate-900 leading-tight">
+                  Riwayat Absensi
+                </h2>
+              </div>
+
+              {/* Segment Tabs: Harian, Mingguan, Bulanan */}
+              <div className="flex items-center bg-slate-100 p-1 rounded-2xl">
+                <button
+                  onClick={() => setRiwayatFilter('harian')}
+                  className={`flex-1 py-1.5 text-xs font-black rounded-xl transition-all cursor-pointer ${
+                    riwayatFilter === 'harian'
+                      ? 'bg-blue-600 text-white shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Harian
+                </button>
+                <button
+                  onClick={() => setRiwayatFilter('mingguan')}
+                  className={`flex-1 py-1.5 text-xs font-black rounded-xl transition-all cursor-pointer ${
+                    riwayatFilter === 'mingguan'
+                      ? 'bg-blue-600 text-white shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Mingguan
+                </button>
+                <button
+                  onClick={() => setRiwayatFilter('bulanan')}
+                  className={`flex-1 py-1.5 text-xs font-black rounded-xl transition-all cursor-pointer ${
+                    riwayatFilter === 'bulanan'
+                      ? 'bg-blue-600 text-white shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Bulanan
+                </button>
+              </div>
+
+              {/* Month Navigator Header */}
+              <div className="flex items-center justify-between bg-white border border-slate-100 rounded-2xl p-2.5 shadow-2xs">
+                <div className="flex items-center gap-2">
+                  <Calendar size={16} className="text-blue-600" />
+                  <span className="text-xs font-black text-slate-900">{currentMonthDisplay}</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => {
+                      if (selectedMonth === 0) {
+                        setSelectedMonth(11);
+                        setSelectedYear((y) => y - 1);
+                      } else {
+                        setSelectedMonth((m) => m - 1);
+                      }
+                    }}
+                    className="w-7 h-7 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-600 cursor-pointer"
+                  >
+                    <ChevronLeft size={16} />
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (selectedMonth === 11) {
+                        setSelectedMonth(0);
+                        setSelectedYear((y) => y + 1);
+                      } else {
+                        setSelectedMonth((m) => m + 1);
+                      }
+                    }}
+                    className="w-7 h-7 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-600 cursor-pointer"
+                  >
+                    <ChevronRight size={16} />
+                  </button>
+                </div>
+              </div>
+
+              {/* History List */}
+              <div className="space-y-2.5">
+                {historyList.map((item) => {
+                  const hasRecord = Boolean(item.record);
+                  const isHadir = item.record?.status === 'Hadir';
+                  const isIzin = item.record?.status === 'Izin';
+                  const isSakit = item.record?.status === 'Sakit';
+                  const isAlfa = item.record?.status === 'Alfa';
+
+                  return (
+                    <div
+                      key={item.date}
+                      onClick={() => handleOpenDetail(item.date)}
+                      className="bg-white border border-slate-100 hover:border-blue-200 rounded-3xl p-3.5 shadow-xs flex items-center justify-between cursor-pointer transition-all active:scale-98 group"
+                    >
+                      <div className="space-y-1">
+                        <span className="text-[11px] font-bold text-slate-500 block">
+                          {item.formattedDate}
+                        </span>
+
+                        <div className="flex items-center gap-2">
+                          {/* Status Circle Icon */}
+                          {isHadir ? (
+                            <div className="w-5 h-5 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0">
+                              <Check size={12} strokeWidth={3} />
+                            </div>
+                          ) : isIzin ? (
+                            <div className="w-5 h-5 rounded-full bg-amber-400 text-white flex items-center justify-center shrink-0">
+                              <Clock size={12} strokeWidth={2.5} />
+                            </div>
+                          ) : isSakit ? (
+                            <div className="w-5 h-5 rounded-full bg-rose-500 text-white flex items-center justify-center shrink-0">
+                              <X size={12} strokeWidth={3} />
+                            </div>
+                          ) : isAlfa ? (
+                            <div className="w-5 h-5 rounded-full bg-rose-600 text-white flex items-center justify-center shrink-0">
+                              <X size={12} strokeWidth={3} />
+                            </div>
+                          ) : (
+                            <div className="w-5 h-5 rounded-full bg-slate-300 text-slate-600 flex items-center justify-center shrink-0">
+                              <span className="text-[10px] font-black">+</span>
+                            </div>
+                          )}
+
+                          <span className="text-xs font-black text-slate-900">
+                            {hasRecord ? item.record!.status : 'Belum Ada Data'}
+                          </span>
+                        </div>
+
+                        {/* Timestamps / Details */}
+                        <div className="text-[11px] text-slate-500 pl-7 space-y-0.5">
+                          {hasRecord && item.record?.checkInTime && item.record.checkInTime !== '-' ? (
+                            <>
+                              <p>• {item.record.checkInTime} • Scan Masuk</p>
+                              {item.record.checkOutTime && item.record.checkOutTime !== '-' && (
+                                <p>• {item.record.checkOutTime} • Scan Pulang</p>
+                              )}
+                            </>
+                          ) : (
+                            <p className="italic">Belum melakukan scan hari ini</p>
+                          )}
+                        </div>
+                      </div>
+
+                      <ChevronRight size={18} className="text-slate-400 group-hover:text-blue-600 transition-colors shrink-0" />
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* ========================================================================= */}
+          {/* SCREEN 4: DETAIL ABSENSI (DETAIL VIEW) */}
+          {/* ========================================================================= */}
+          {currentScreen === 'detail' && (
+            <div className="p-4 sm:p-5 space-y-4 animate-in fade-in duration-200">
+              {/* Header with Back Arrow */}
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => navigateTo('riwayat')}
+                  className="w-9 h-9 rounded-2xl bg-slate-50 hover:bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-800 transition-all cursor-pointer"
+                >
+                  <ArrowLeft size={18} />
+                </button>
+                <h2 className="text-base font-black text-slate-900 leading-tight">
+                  Detail Absensi
+                </h2>
+              </div>
+
+              {/* Status Hero Card (Soft Green Gradient) */}
+              <div className="bg-emerald-50/90 border border-emerald-200 rounded-3xl p-5 flex items-center gap-4">
+                <div className="w-12 h-12 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 shadow-md shadow-emerald-500/20">
+                  <Check size={28} strokeWidth={3} />
+                </div>
+                <div>
+                  <h3 className="text-xl font-black text-emerald-950 leading-tight">
+                    {currentDetailRecord?.status || 'Hadir'}
+                  </h3>
+                  <p className="text-xs font-semibold text-emerald-800 mt-0.5">
+                    {formatIndonesianDate(selectedDetailDate)}
+                  </p>
+                </div>
+              </div>
+
+              {/* Timestamps Row: Scan Masuk & Scan Pulang Side-by-Side */}
+              <div className="grid grid-cols-2 gap-3">
+                {/* Scan Masuk */}
+                <div className="bg-white border border-slate-100 rounded-3xl p-4 shadow-xs space-y-2">
+                  <div className="w-9 h-9 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                    <QrCode size={18} />
+                  </div>
+                  <div>
+                    <span className="text-[11px] font-bold text-slate-500 block">Scan Masuk</span>
+                    <span className="text-sm font-black text-slate-900 block mt-0.5">
+                      {currentDetailRecord?.checkInTime && currentDetailRecord.checkInTime !== '-'
+                        ? `${currentDetailRecord.checkInTime} WIB`
+                        : '06:58 WIB'}
                     </span>
                   </div>
                 </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
 
-      {/* ============================================================== */}
-      {/* MODE PANTAU ORANG TUA (MONITORING & PENGAJUAN IZIN) */}
-      {/* ============================================================== */}
-      {portalMode === 'wali' && activeStudent && (
-        <ParentMonitoringSection
-          student={activeStudent}
-          studentClass={studentClass}
-          todayRecord={todayRecord}
-          hasCheckedIn={hasCheckedIn}
-          hasCheckedOut={hasCheckedOut}
-          isLockedForHoliday={isLockedForHoliday}
-          dayStatus={dayStatus}
-          formattedRealTimeDate={formattedRealTimeDate}
-          systemConfig={systemConfig}
-          studentLeaveRequests={studentLeaveRequests}
-          onOpenLeaveModal={() => setIsParentLeaveModalOpen(true)}
-          onViewAttachment={(url) => setLightboxImage(url)}
-          attendanceStats={{
-            hadir: totalHadirBulanIni,
-            sakit: totalSakitBulanIni,
-            izin: totalIzinBulanIni,
-            alfa: totalAlfaBulanIni,
-            rate: attendanceRate,
-          }}
-        />
-      )}
-
-      {/* Modal Izin / Sakit */}
-      {isLeaveModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
-          <div className="bg-white rounded-3xl max-w-md w-full p-5 sm:p-6 shadow-2xl border border-slate-100 space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-base font-black text-slate-900">Form Pengajuan Ketidakhadiran</h3>
-              <button
-                onClick={() => setIsLeaveModalOpen(false)}
-                className="w-8 h-8 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 flex items-center justify-center cursor-pointer"
-              >
-                <X size={16} />
-              </button>
-            </div>
-
-            <form onSubmit={handleSubmitLeave} className="space-y-4">
-              {/* Tipe: Sakit / Izin */}
-              <div>
-                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">
-                  PILIH ALASAN
-                </label>
-                <div className="grid grid-cols-2 gap-2.5">
-                  <button
-                    type="button"
-                    onClick={() => setLeaveType('sakit')}
-                    className={`py-2.5 px-4 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
-                      leaveType === 'sakit'
-                        ? 'bg-sky-50 border-sky-500 text-sky-800 ring-2 ring-sky-500/20'
-                        : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
-                    }`}
-                  >
-                    Sakit (S)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setLeaveType('izin')}
-                    className={`py-2.5 px-4 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
-                      leaveType === 'izin'
-                        ? 'bg-amber-50 border-amber-500 text-amber-900 ring-2 ring-amber-500/20'
-                        : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
-                    }`}
-                  >
-                    Izin (I)
-                  </button>
+                {/* Scan Pulang */}
+                <div className="bg-white border border-slate-100 rounded-3xl p-4 shadow-xs space-y-2">
+                  <div className="w-9 h-9 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                    <QrCode size={18} />
+                  </div>
+                  <div>
+                    <span className="text-[11px] font-bold text-slate-500 block">Scan Pulang</span>
+                    <span className="text-sm font-black text-slate-900 block mt-0.5">
+                      {currentDetailRecord?.checkOutTime && currentDetailRecord.checkOutTime !== '-'
+                        ? `${currentDetailRecord.checkOutTime} WIB`
+                        : '11:45 WIB'}
+                    </span>
+                  </div>
                 </div>
               </div>
 
-              {/* Keterangan */}
-              <div>
-                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
-                  KETERANGAN / ALASAN DETAIL
-                </label>
-                <textarea
-                  value={leaveNotes}
-                  onChange={(e) => setLeaveNotes(e.target.value)}
-                  placeholder="Contoh: Demam, kontrol ke dokter, atau ada keperluan keluarga..."
-                  rows={3}
-                  required
-                  className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 focus:border-blue-600 focus:bg-white rounded-xl text-xs font-semibold text-slate-900 outline-none"
-                />
+              {/* School Location Card */}
+              <div className="bg-white border border-slate-100 rounded-3xl p-4 shadow-xs flex items-start gap-3.5">
+                <div className="w-9 h-9 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                  <MapPin size={18} />
+                </div>
+                <div>
+                  <span className="text-[11px] font-bold text-slate-500 block">Lokasi Sekolah</span>
+                  <span className="text-xs font-black text-slate-900 block">
+                    {schoolProfile.namaSekolah || 'SD Cideng 07'}
+                  </span>
+                  <span className="text-[11px] text-slate-500 block mt-0.5 leading-snug">
+                    {schoolProfile.alamat || 'Jl. Melati No. 12, Jakarta Pusat'}
+                  </span>
+                </div>
               </div>
 
-              <div className="flex justify-end gap-2 pt-2">
+              {/* Cheerful Mascot Card: "Semangat belajar!" */}
+              <div className="bg-sky-50/70 border border-sky-100 rounded-3xl p-4 relative overflow-hidden flex flex-col justify-between">
+                <div className="flex items-center gap-2 text-sky-900 font-bold text-xs">
+                  <Smile size={18} className="text-sky-600 shrink-0" />
+                  <span>Terima kasih sudah melakukan absensi hari ini!</span>
+                </div>
+
+                {/* Cartoon Mascot Illustration */}
+                <div className="mt-4 flex items-end justify-between">
+                  <div className="w-24 h-28 shrink-0 relative">
+                    <svg viewBox="0 0 100 120" className="w-full h-full">
+                      {/* Hair Back */}
+                      <path d="M25 50 C25 20 45 15 65 20 C78 24 85 45 80 65 C80 65 75 75 75 80 C70 70 70 60 70 60 Z" fill="#38220F" />
+                      {/* Body Uniform */}
+                      <path d="M30 85 C30 75 42 70 55 70 C68 70 78 75 78 85 L76 115 L32 115 Z" fill="#1E3A8A" />
+                      {/* Collar & Tie */}
+                      <polygon points="55,70 48,82 62,82" fill="#FFFFFF" />
+                      <polygon points="55,76 52,94 58,94" fill="#EF4444" />
+                      {/* Head */}
+                      <circle cx="55" cy="48" r="20" fill="#FDE047" />
+                      {/* Face */}
+                      <circle cx="48" cy="46" r="2.5" fill="#0F172A" />
+                      <circle cx="62" cy="46" r="2.5" fill="#0F172A" />
+                      <path d="M51 52 Q55 57 59 52" stroke="#0F172A" strokeWidth="2" strokeLinecap="round" fill="none" />
+                      <circle cx="44" cy="50" r="2.5" fill="#FCA5A5" />
+                      <circle cx="66" cy="50" r="2.5" fill="#FCA5A5" />
+                      {/* Hair Front */}
+                      <path d="M35 44 C35 30 45 25 58 25 C68 25 76 32 75 44 C72 38 65 35 55 35 C45 35 38 40 35 44 Z" fill="#451A03" />
+                      {/* Raised Fist (Semangat!) */}
+                      <path d="M32 75 L20 60 C18 57 23 54 26 57 L34 68 Z" fill="#FDE047" />
+                      <circle cx="21" cy="58" r="5" fill="#FDE047" />
+                    </svg>
+                  </div>
+
+                  {/* Speech Bubble */}
+                  <div className="bg-white rounded-2xl px-4 py-2 shadow-xs border border-sky-200 relative mb-4">
+                    <span className="text-xs font-black text-blue-600 block">
+                      Semangat belajar!
+                    </span>
+                    <div className="absolute -left-2 bottom-3 w-0 h-0 border-t-6 border-t-transparent border-r-8 border-r-white border-b-6 border-b-transparent" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ========================================================================= */}
+          {/* SCREEN 5: ABSENSI (MENU UTAMA SCAN MASUK / PULANG) */}
+          {/* ========================================================================= */}
+          {currentScreen === 'absensi-menu' && (
+            <div className="p-4 sm:p-5 space-y-4 animate-in fade-in duration-200">
+              {/* Header: Title + History Icon */}
+              <div className="flex items-center justify-between pt-1">
+                <h2 className="text-base font-black text-slate-900 tracking-tight">
+                  Absensi
+                </h2>
                 <button
-                  type="button"
-                  onClick={() => setIsLeaveModalOpen(false)}
-                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl cursor-pointer"
+                  onClick={() => navigateTo('riwayat')}
+                  className="w-9 h-9 rounded-2xl bg-slate-50 hover:bg-slate-100 border border-slate-200/80 flex items-center justify-center text-slate-700 transition-all active:scale-95 cursor-pointer"
+                  title="Lihat Riwayat Absensi"
                 >
-                  Batal
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs rounded-xl shadow-md cursor-pointer flex items-center gap-1.5"
-                >
-                  <Send size={13} />
-                  <span>Kirim Pengajuan</span>
+                  <RotateCcw size={17} />
                 </button>
               </div>
-            </form>
-          </div>
+
+              {/* Action Card 1: Scan Masuk (Green Theme) */}
+              <div
+                onClick={() => handleOpenScanner('masuk')}
+                className="bg-emerald-50 hover:bg-emerald-100/70 border border-emerald-200 rounded-3xl p-4 flex items-center justify-between cursor-pointer transition-all shadow-xs active:scale-98 group"
+              >
+                <div className="flex items-center gap-3.5">
+                  <div className="w-12 h-12 rounded-2xl bg-emerald-500 text-white flex items-center justify-center shadow-md shadow-emerald-500/20 shrink-0">
+                    <QrCode size={24} />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-black text-emerald-950 leading-tight">
+                      Scan Masuk
+                    </h3>
+                    <p className="text-xs font-medium text-emerald-700 mt-0.5">
+                      Datang ke sekolah
+                    </p>
+                  </div>
+                </div>
+                <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-800 group-hover:translate-x-1 transition-transform">
+                  <ChevronRight size={18} />
+                </div>
+              </div>
+
+              {/* Action Card 2: Scan Pulang (Blue Theme) */}
+              <div
+                onClick={() => handleOpenScanner('pulang')}
+                className="bg-blue-50 hover:bg-blue-100/70 border border-blue-200 rounded-3xl p-4 flex items-center justify-between cursor-pointer transition-all shadow-xs active:scale-98 group"
+              >
+                <div className="flex items-center gap-3.5">
+                  <div className="w-12 h-12 rounded-2xl bg-blue-600 text-white flex items-center justify-center shadow-md shadow-blue-500/20 shrink-0">
+                    <QrCode size={24} />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-black text-blue-950 leading-tight">
+                      Scan Pulang
+                    </h3>
+                    <p className="text-xs font-medium text-blue-700 mt-0.5">
+                      Pulang dari sekolah
+                    </p>
+                  </div>
+                </div>
+                <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-800 group-hover:translate-x-1 transition-transform">
+                  <ChevronRight size={18} />
+                </div>
+              </div>
+
+              {/* Informasi Card */}
+              <div className="bg-slate-50 border border-slate-200/80 rounded-3xl p-4 space-y-2">
+                <div className="flex items-center gap-2 text-blue-600 font-black text-xs">
+                  <Info size={16} />
+                  <span>Informasi</span>
+                </div>
+                <ul className="text-xs text-slate-600 space-y-1.5 pl-1 leading-relaxed">
+                  <li>• Scan masuk dilakukan saat tiba di sekolah.</li>
+                  <li>• Scan pulang dilakukan saat selesai belajar.</li>
+                  <li>• Pastikan QR code tersedia di lokasi sekolah.</li>
+                </ul>
+              </div>
+
+              {/* Mascot Footer Illustration */}
+              <div className="pt-2 flex flex-col items-center justify-center text-center space-y-2">
+                <div className="bg-white border border-blue-100 px-4 py-1.5 rounded-full shadow-2xs inline-flex items-center gap-1.5 text-[11px] font-black text-blue-700">
+                  <span>Disiplin Membentuk Masa Depan</span>
+                  <Smile size={14} className="text-blue-600" />
+                </div>
+
+                <div className="w-48 h-24 relative flex items-center justify-center">
+                  <svg viewBox="0 0 160 80" className="w-full h-full">
+                    <ellipse cx="80" cy="74" rx="70" ry="6" fill="#E2E8F0" />
+                    <circle cx="30" cy="55" r="10" fill="#34D399" />
+                    <circle cx="130" cy="55" r="10" fill="#34D399" />
+                    {/* Mini School */}
+                    <rect x="50" y="40" width="60" height="34" rx="2" fill="#FFFFFF" stroke="#CBD5E1" strokeWidth="1" />
+                    <polygon points="80,18 45,42 115,42" fill="#FB923C" />
+                    <rect x="74" y="8" width="12" height="12" fill="#FFFFFF" />
+                    <polygon points="80,2 70,9 90,9" fill="#EA580C" />
+                    <circle cx="80" cy="14" r="3" fill="#FDE047" />
+                    {/* Door */}
+                    <rect x="73" y="56" width="14" height="18" rx="1" fill="#3B82F6" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ========================================================================= */}
+          {/* SCREEN 6: PROFIL (PROFILE VIEW) */}
+          {/* ========================================================================= */}
+          {currentScreen === 'profil' && (
+            <div className="p-4 sm:p-5 space-y-4 animate-in fade-in duration-200">
+              {/* Header */}
+              <div className="pt-1">
+                <h2 className="text-base font-black text-slate-900 tracking-tight">
+                  Profil
+                </h2>
+              </div>
+
+              {/* Large Avatar & Name */}
+              <div className="flex flex-col items-center justify-center text-center space-y-2 pt-2">
+                <div className="w-20 h-20 rounded-full bg-gradient-to-br from-blue-400 to-indigo-600 p-1 shadow-lg shrink-0 overflow-hidden border-2 border-white">
+                  <div className="w-full h-full rounded-full bg-blue-100 flex items-center justify-center overflow-hidden">
+                    <svg viewBox="0 0 100 100" className="w-full h-full">
+                      <circle cx="50" cy="50" r="48" fill="#93C5FD" />
+                      {/* Body */}
+                      <path d="M22 92 C22 72 35 68 50 68 C65 68 78 72 78 92 Z" fill="#1E3A8A" />
+                      <polygon points="50,68 44,82 56,82" fill="#FFFFFF" />
+                      <polygon points="50,74 47,88 53,88" fill="#EF4444" />
+                      {/* Head */}
+                      <circle cx="50" cy="45" r="22" fill="#FDE047" />
+                      {/* Hair */}
+                      <path d="M28 42 C28 26 40 20 50 20 C60 20 72 26 72 42 C72 48 70 52 70 52 C70 52 64 36 50 36 C36 36 30 52 30 52 Z" fill="#451A03" />
+                      {/* Eyes */}
+                      <circle cx="43" cy="44" r="3" fill="#1E293B" />
+                      <circle cx="57" cy="44" r="3" fill="#1E293B" />
+                      <path d="M46 51 Q50 55 54 51" stroke="#1E293B" strokeWidth="2" strokeLinecap="round" fill="none" />
+                      <circle cx="39" cy="48" r="2.5" fill="#FCA5A5" />
+                      <circle cx="61" cy="48" r="2.5" fill="#FCA5A5" />
+                    </svg>
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="text-base font-black text-slate-900 leading-tight">
+                    {activeStudent.nama}
+                  </h3>
+                  <p className="text-xs font-semibold text-slate-500 mt-0.5">
+                    Kelas {studentDisplayClassName} • {schoolProfile.namaSekolah || 'SD Cideng 07'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Profile Details List Card */}
+              <div className="bg-white border border-slate-100 rounded-3xl p-4 shadow-xs divide-y divide-slate-100">
+                {/* NISN */}
+                <div className="py-2.5 flex items-center justify-between first:pt-0">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-xl bg-slate-50 text-slate-600 flex items-center justify-center">
+                      <User size={16} />
+                    </div>
+                    <span className="text-xs font-semibold text-slate-500">NISN</span>
+                  </div>
+                  <span className="text-xs font-black text-slate-900">
+                    {activeStudent.nisn || '3149271621'}
+                  </span>
+                </div>
+
+                {/* Sekolah */}
+                <div className="py-2.5 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-xl bg-slate-50 text-slate-600 flex items-center justify-center">
+                      <Building size={16} />
+                    </div>
+                    <span className="text-xs font-semibold text-slate-500">Sekolah</span>
+                  </div>
+                  <span className="text-xs font-black text-slate-900">
+                    {schoolProfile.namaSekolah || 'SD Cideng 07'}
+                  </span>
+                </div>
+
+                {/* Kelas */}
+                <div className="py-2.5 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-xl bg-slate-50 text-slate-600 flex items-center justify-center">
+                      <GraduationCap size={16} />
+                    </div>
+                    <span className="text-xs font-semibold text-slate-500">Kelas</span>
+                  </div>
+                  <span className="text-xs font-black text-slate-900">
+                    {studentDisplayClassName}
+                  </span>
+                </div>
+
+                {/* Tahun Ajaran */}
+                <div className="py-2.5 flex items-center justify-between last:pb-0">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-xl bg-slate-50 text-slate-600 flex items-center justify-center">
+                      <CalendarDays size={16} />
+                    </div>
+                    <span className="text-xs font-semibold text-slate-500">Tahun Ajaran</span>
+                  </div>
+                  <span className="text-xs font-black text-slate-900">
+                    {schoolProfile.tahunAjaran || '2026/2027'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Encouragement Card with Blue Shield Icon */}
+              <div className="bg-blue-50/80 border border-blue-100 rounded-3xl p-4 flex items-center justify-between shadow-2xs">
+                <div className="flex items-center gap-2.5 text-blue-900 font-black text-xs">
+                  <ShieldCheck size={20} className="text-blue-600 shrink-0" />
+                  <span>Tetap disiplin dalam berabsensi!</span>
+                </div>
+                <Smile size={20} className="text-blue-600 shrink-0" />
+              </div>
+
+              {/* Logout Option for Student Account */}
+              {currentUser?.role === 'SISWA' && (
+                <div className="pt-2">
+                  <button
+                    onClick={logout}
+                    className="w-full py-2.5 rounded-2xl bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 font-black text-xs flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-98"
+                  >
+                    <LogOut size={16} />
+                    <span>Keluar dari Akun Siswa</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
         </div>
-      )}
 
-      {/* Student QR Scanner Modal */}
-      {activeStudent && (
-        <StudentQrScannerModal
-          isOpen={isQrScannerOpen}
-          onClose={() => setIsQrScannerOpen(false)}
-          activeStudent={activeStudent}
-          classes={classes}
-          todayRecord={todayRecord}
-          systemConfig={systemConfig}
-          onSubmitAttendance={submitStudentAttendance}
-          targetDate={targetDate}
-          targetAction={scannerAction}
-          isSimulation={isSimulationMode}
-        />
-      )}
+        {/* 3. FIXED FLOATING BOTTOM NAVIGATION BAR (Beranda, Absensi, Profil) */}
+        <div className="absolute bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-slate-100 px-6 py-2 flex items-center justify-around z-30 shadow-lg">
+          {/* Beranda */}
+          <button
+            onClick={() => setCurrentScreen('beranda')}
+            className={`flex flex-col items-center gap-1 transition-all cursor-pointer py-1 ${
+              currentScreen === 'beranda'
+                ? 'text-blue-600 font-black scale-105'
+                : 'text-slate-400 hover:text-slate-600 font-medium'
+            }`}
+          >
+            <Home size={20} strokeWidth={currentScreen === 'beranda' ? 2.5 : 2} />
+            <span className="text-[10px] tracking-tight">Beranda</span>
+          </button>
 
-      {/* Tahap 2: Parent Leave Request Modal (Surat Izin / Sakit Berlampiran Foto Dokter) */}
-      {activeStudent && (
-        <ParentLeaveRequestModal
-          isOpen={isParentLeaveModalOpen}
-          onClose={() => setIsParentLeaveModalOpen(false)}
-          student={activeStudent}
-          defaultDate={targetDate}
-          onSubmit={async (data) => {
-            const res = await submitLeaveRequest(data);
-            if (res.success) {
-              showToast('Permohonan surat izin / sakit berhasil dikirim ke Wali Kelas.', 'success');
-            } else {
-              showToast(res.message || 'Gagal mengirim surat izin.', 'error');
-            }
-            return res;
-          }}
-        />
-      )}
+          {/* Absensi */}
+          <button
+            onClick={() => setCurrentScreen('absensi-menu')}
+            className={`flex flex-col items-center gap-1 transition-all cursor-pointer py-1 ${
+              currentScreen === 'absensi-menu' || currentScreen === 'scanner' || currentScreen === 'riwayat' || currentScreen === 'detail'
+                ? 'text-blue-600 font-black scale-105'
+                : 'text-slate-400 hover:text-slate-600 font-medium'
+            }`}
+          >
+            <Calendar size={20} strokeWidth={currentScreen === 'absensi-menu' || currentScreen === 'scanner' || currentScreen === 'riwayat' || currentScreen === 'detail' ? 2.5 : 2} />
+            <span className="text-[10px] tracking-tight">Absensi</span>
+          </button>
 
-      {/* Lightbox for viewing photo doctor notes / certificates */}
-      {lightboxImage && (
-        <LeaveAttachmentLightbox
-          isOpen={!!lightboxImage}
-          onClose={() => setLightboxImage(null)}
-          imageUrl={lightboxImage}
-          title="Surat Dokter / Bukti Izin Siswa"
-        />
-      )}
+          {/* Profil */}
+          <button
+            onClick={() => setCurrentScreen('profil')}
+            className={`flex flex-col items-center gap-1 transition-all cursor-pointer py-1 ${
+              currentScreen === 'profil'
+                ? 'text-blue-600 font-black scale-105'
+                : 'text-slate-400 hover:text-slate-600 font-medium'
+            }`}
+          >
+            <User size={20} strokeWidth={currentScreen === 'profil' ? 2.5 : 2} />
+            <span className="text-[10px] tracking-tight">Profil</span>
+          </button>
+        </div>
+
+        {/* NOTIFICATION POPUP MODAL */}
+        {showNotificationModal && (
+          <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-2xs flex items-center justify-center p-4 animate-in fade-in duration-150">
+            <div className="bg-white rounded-3xl max-w-xs w-full p-5 shadow-2xl border border-slate-100 space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div className="flex items-center gap-2">
+                  <Bell size={18} className="text-blue-600" />
+                  <h4 className="text-sm font-black text-slate-900">Pemberitahuan</h4>
+                </div>
+                <button
+                  onClick={() => setShowNotificationModal(false)}
+                  className="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 cursor-pointer"
+                >
+                  <X size={15} />
+                </button>
+              </div>
+
+              <div className="space-y-2 text-xs">
+                <div className="p-3 bg-blue-50/70 border border-blue-100 rounded-2xl space-y-1">
+                  <span className="font-black text-blue-900 block">Presensi Mandiri Dibuka</span>
+                  <p className="text-slate-600 text-[11px] leading-relaxed">
+                    Presensi masuk harian dibuka mulai pukul {systemConfig.checkInStartTime || '06:00'} WIB. Jangan lupa scan QR code rombel kelasmu.
+                  </p>
+                </div>
+                <div className="p-3 bg-slate-50 border border-slate-100 rounded-2xl space-y-1">
+                  <span className="font-bold text-slate-800 block">Kalender Akademik</span>
+                  <p className="text-slate-500 text-[11px] leading-relaxed">
+                    Pastikan memeriksa jadwal kegiatan sekolah dan hari belajar efektif melalui kalender akademik.
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setShowNotificationModal(false)}
+                className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white font-black text-xs rounded-xl shadow-xs cursor-pointer"
+              >
+                Tutup
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* MONTH PICKER MODAL */}
+        {showMonthPickerModal && (
+          <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-2xs flex items-center justify-center p-4 animate-in fade-in duration-150">
+            <div className="bg-white rounded-3xl max-w-xs w-full p-5 shadow-2xl border border-slate-100 space-y-3">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                <h4 className="text-sm font-black text-slate-900">Pilih Bulan & Tahun</h4>
+                <button
+                  onClick={() => setShowMonthPickerModal(false)}
+                  className="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 cursor-pointer"
+                >
+                  <X size={15} />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2 pt-1 max-h-56 overflow-y-auto">
+                {monthNames.map((m, idx) => (
+                  <button
+                    key={m}
+                    onClick={() => {
+                      setSelectedMonth(idx);
+                      setShowMonthPickerModal(false);
+                    }}
+                    className={`py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                      selectedMonth === idx
+                        ? 'bg-blue-600 text-white shadow-xs'
+                        : 'bg-slate-50 hover:bg-slate-100 text-slate-700'
+                    }`}
+                  >
+                    {m.slice(0, 3)}
+                  </button>
+                ))}
+              </div>
+
+              <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs font-bold">
+                <button
+                  onClick={() => setSelectedYear((y) => y - 1)}
+                  className="px-3 py-1 bg-slate-100 hover:bg-slate-200 rounded-lg cursor-pointer"
+                >
+                  &larr; {selectedYear - 1}
+                </button>
+                <span className="font-black text-slate-900">{selectedYear}</span>
+                <button
+                  onClick={() => setSelectedYear((y) => y + 1)}
+                  className="px-3 py-1 bg-slate-100 hover:bg-slate-200 rounded-lg cursor-pointer"
+                >
+                  {selectedYear + 1} &rarr;
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+      </div>
     </div>
   );
 };

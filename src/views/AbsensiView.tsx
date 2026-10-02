@@ -1229,7 +1229,7 @@ export const AbsensiView: React.FC = () => {
           {filteredRecords.length > 0 ? (
             filteredRecords.map((r, idx) => (
               <div key={r.studentId} className="p-3.5 space-y-2.5 hover:bg-slate-50/60 transition-colors">
-                {/* Card Top: Number + Name + Subject Sync Badge */}
+                  {/* Card Top: Number + Name + Subject Sync Badge */}
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex items-center gap-2 min-w-0">
                     <span className="w-5 h-5 rounded-full bg-slate-100 text-slate-600 text-[10px] font-black flex items-center justify-center shrink-0">
@@ -1240,27 +1240,65 @@ export const AbsensiView: React.FC = () => {
                     </span>
                   </div>
 
-                  {attendanceMode === 'SUBJECT' && (() => {
-                    const dailyRec = attendanceRecords.find(
-                      (ar) => ar.studentId === r.studentId && ar.date === date && (!ar.type || ar.type === 'DAILY')
-                    );
-                    if (dailyRec?.status === 'Hadir') {
-                      return (
-                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded-md shrink-0">
-                          <span className="w-1 h-1 rounded-full bg-emerald-500" />
-                          Hadir Wali
-                        </span>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {/* Status Surat Izin / Sakit Orang Tua */}
+                    {(() => {
+                      const activeLeave = (leaveRequests || []).find(
+                        (lr) =>
+                          lr.studentId === r.studentId &&
+                          lr.startDate <= date &&
+                          (lr.endDate || lr.startDate) >= date
                       );
-                    }
-                    if (dailyRec?.status === 'Sakit' || dailyRec?.status === 'Izin') {
-                      return (
-                        <span className="inline-flex items-center text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-md shrink-0">
-                          {dailyRec.status} (Wali)
-                        </span>
+                      if (!activeLeave) return null;
+                      if (activeLeave.status === 'PENDING') {
+                        return (
+                          <button
+                            type="button"
+                            onClick={() => setIsLeaveApprovalOpen(true)}
+                            className="inline-flex items-center gap-1 text-[10px] font-black bg-amber-100 text-amber-900 border border-amber-300 px-1.5 py-0.5 rounded-full hover:bg-amber-200 transition-colors shrink-0 shadow-2xs cursor-pointer animate-pulse"
+                            title={`Ada permohonan surat izin/sakit: "${activeLeave.reason}". Klik untuk verifikasi.`}
+                          >
+                            <FileText size={10} className="text-amber-700" />
+                            <span>Surat Izin</span>
+                          </button>
+                        );
+                      }
+                      if (activeLeave.status === 'APPROVED') {
+                        return (
+                          <span
+                            className="inline-flex items-center gap-1 text-[10px] font-bold bg-sky-50 text-sky-800 border border-sky-200 px-1.5 py-0.5 rounded-full shrink-0"
+                            title={`Surat izin disetujui: ${activeLeave.subCategory || activeLeave.leaveType} (${activeLeave.reason})`}
+                          >
+                            <CheckCircle2 size={10} className="text-sky-600" />
+                            <span>{activeLeave.leaveType === 'sakit' ? 'Sakit Resmi' : 'Izin Resmi'}</span>
+                          </span>
+                        );
+                      }
+                      return null;
+                    })()}
+
+                    {attendanceMode === 'SUBJECT' && (() => {
+                      const dailyRec = attendanceRecords.find(
+                        (ar) => ar.studentId === r.studentId && ar.date === date && (!ar.type || ar.type === 'DAILY')
                       );
-                    }
-                    return null;
-                  })()}
+                      if (dailyRec?.status === 'Hadir') {
+                        return (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded-md shrink-0">
+                            <span className="w-1 h-1 rounded-full bg-emerald-500" />
+                            Hadir Wali
+                          </span>
+                        );
+                      }
+                      if (dailyRec?.status === 'Sakit' || dailyRec?.status === 'Izin') {
+                        return (
+                          <span className="inline-flex items-center text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-md shrink-0">
+                            {dailyRec.status} (Wali)
+                          </span>
+                        );
+                      }
+                      return null;
+                    })()}
+                  </div>
                 </div>
 
                 {/* Card 1-Tap Quick Attendance Buttons */}
@@ -1400,30 +1438,69 @@ export const AbsensiView: React.FC = () => {
                     <td className="py-2.5 px-3.5 font-bold text-slate-900 tracking-tight">
                       <div className="flex items-center justify-between gap-2">
                         <span className="truncate">{r.studentName}</span>
-                        {attendanceMode === 'SUBJECT' && (() => {
-                          const dailyRec = attendanceRecords.find(
-                            (ar) => ar.studentId === r.studentId && ar.date === date && (!ar.type || ar.type === 'DAILY')
-                          );
-                          if (dailyRec?.status === 'Hadir') {
-                            return (
-                              <span
-                                className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.2 rounded shrink-0"
-                                title={`Siswa hadir di sekolah (dicatat Wali Kelas)`}
-                              >
-                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                                Hadir
-                              </span>
+
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {/* Status Surat Izin / Sakit Orang Tua */}
+                          {(() => {
+                            const activeLeave = (leaveRequests || []).find(
+                              (lr) =>
+                                lr.studentId === r.studentId &&
+                                lr.startDate <= date &&
+                                (lr.endDate || lr.startDate) >= date
                             );
-                          }
-                          if (dailyRec?.status === 'Sakit' || dailyRec?.status === 'Izin') {
-                            return (
-                              <span className="inline-flex items-center text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.2 rounded shrink-0">
-                                {dailyRec.status} (Wali)
-                              </span>
+                            if (!activeLeave) return null;
+                            if (activeLeave.status === 'PENDING') {
+                              return (
+                                <button
+                                  type="button"
+                                  onClick={() => setIsLeaveApprovalOpen(true)}
+                                  className="inline-flex items-center gap-1 text-[10px] font-black bg-amber-100 text-amber-900 border border-amber-300 px-2 py-0.5 rounded-full hover:bg-amber-200 transition-colors shadow-2xs cursor-pointer animate-pulse"
+                                  title={`Ada permohonan surat izin/sakit: "${activeLeave.reason}". Klik untuk verifikasi.`}
+                                >
+                                  <FileText size={10} className="text-amber-700" />
+                                  <span>Surat Izin</span>
+                                </button>
+                              );
+                            }
+                            if (activeLeave.status === 'APPROVED') {
+                              return (
+                                <span
+                                  className="inline-flex items-center gap-1 text-[10px] font-bold bg-sky-50 text-sky-800 border border-sky-200 px-2 py-0.5 rounded-full"
+                                  title={`Surat izin disetujui: ${activeLeave.subCategory || activeLeave.leaveType} (${activeLeave.reason})`}
+                                >
+                                  <CheckCircle2 size={10} className="text-sky-600" />
+                                  <span>{activeLeave.leaveType === 'sakit' ? 'Sakit Resmi' : 'Izin Resmi'}</span>
+                                </span>
+                              );
+                            }
+                            return null;
+                          })()}
+
+                          {attendanceMode === 'SUBJECT' && (() => {
+                            const dailyRec = attendanceRecords.find(
+                              (ar) => ar.studentId === r.studentId && ar.date === date && (!ar.type || ar.type === 'DAILY')
                             );
-                          }
-                          return null;
-                        })()}
+                            if (dailyRec?.status === 'Hadir') {
+                              return (
+                                <span
+                                  className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.2 rounded shrink-0"
+                                  title={`Siswa hadir di sekolah (dicatat Wali Kelas)`}
+                                >
+                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                  Hadir
+                                </span>
+                              );
+                            }
+                            if (dailyRec?.status === 'Sakit' || dailyRec?.status === 'Izin') {
+                              return (
+                                <span className="inline-flex items-center text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.2 rounded shrink-0">
+                                  {dailyRec.status} (Wali)
+                                </span>
+                              );
+                            }
+                            return null;
+                          })()}
+                        </div>
                       </div>
                     </td>
 
@@ -1640,6 +1717,7 @@ export const AbsensiView: React.FC = () => {
           leaveRequests={leaveRequests || []}
           onUpdateStatus={updateLeaveRequestStatus}
           selectedClassName={activeTargetClass?.name}
+          selectedClassId={activeTargetClass?.id}
         />
       )}
     </div>

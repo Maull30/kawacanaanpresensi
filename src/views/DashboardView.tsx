@@ -35,6 +35,7 @@ import {
   PieChart,
 } from 'lucide-react';
 import disneySchoolBuildingBanner from '../assets/images/disney_school_building_1790204694548.jpg';
+import { TeacherLeaveApprovalModal } from '../components/TeacherLeaveApprovalModal';
 
 interface SummaryCache {
   scopedTotal: number;
@@ -73,11 +74,21 @@ export const DashboardView: React.FC = () => {
     systemConfig,
     currentAttendanceDate,
     isDataLoading,
+    leaveRequests,
+    updateLeaveRequestStatus,
+    refreshLeaveRequests,
   } = useApp();
 
   const [copiedCode, setCopiedCode] = useState(false);
   const [trendPeriod, setTrendPeriod] = useState<'7' | '14' | '30'>('7');
   const [showTrendDropdown, setShowTrendDropdown] = useState(false);
+  const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false);
+
+  useEffect(() => {
+    if (refreshLeaveRequests) {
+      refreshLeaveRequests();
+    }
+  }, [refreshLeaveRequests]);
 
   // Workspace cache key
   const cacheKey = `kawacanaan_summary_cache_${activeWorkspace?.workspaceId || currentUser?.schoolId || 'global'}`;
@@ -149,6 +160,9 @@ export const DashboardView: React.FC = () => {
   const currentMonthName = monthNames[now.getMonth()];
   const effectiveDaysThisMonth = getEffectiveDaysForMonth(currentYear, currentMonth);
 
+  const normalizeClassStr = (s?: string | null) =>
+    s ? s.toLowerCase().replace(/^(kelas|kls)\s+/i, '').replace(/[^a-z0-9]/g, '') : '';
+
   // Scoped students calculation based on role
   // Untuk Admin Sekolah & Kepala Sekolah serta Ruang Kerja Individu: mencakup seluruh siswa aktif
   const scopedStudents = useMemo(() => {
@@ -156,18 +170,21 @@ export const DashboardView: React.FC = () => {
       return students;
     }
     if (userScope.isWaliKelas) {
-      if (userScope.assignedWaliClassId) {
-        const byId = students.filter((s) => s.classId === userScope.assignedWaliClassId);
-        if (byId.length > 0) return byId;
-      }
-      if (userScope.assignedWaliClassName) {
-        const normName = userScope.assignedWaliClassName.trim().toLowerCase();
-        const byName = students.filter((s) => s.className && s.className.trim().toLowerCase() === normName);
-        if (byName.length > 0) return byName;
-      }
-      if (currentUser?.classIds && currentUser.classIds.length > 0) {
-        const byUserClassIds = students.filter((s) => currentUser.classIds?.includes(s.classId || ''));
-        if (byUserClassIds.length > 0) return byUserClassIds;
+      const targetClassId = userScope.assignedWaliClassId || userScope.accessibleClasses[0]?.id;
+      const targetClassName = userScope.assignedWaliClassName || userScope.accessibleClasses[0]?.name;
+
+      if (targetClassId || targetClassName) {
+        const cleanTargetName = normalizeClassStr(targetClassName);
+        const byClass = students.filter((s) => {
+          if (targetClassId && s.classId === targetClassId) return true;
+          if (currentUser?.classIds?.includes(s.classId || '')) return true;
+          if (cleanTargetName && s.className) {
+            const cleanSName = normalizeClassStr(s.className);
+            if (cleanSName === cleanTargetName) return true;
+          }
+          return false;
+        });
+        return byClass;
       }
       return students;
     }
@@ -183,6 +200,23 @@ export const DashboardView: React.FC = () => {
   }, [isSchoolAdminOrKS, isPersonalWorkspace, userScope, students, currentUser]);
 
   const scopedStudentIds = useMemo(() => new Set(scopedStudents.map((s) => s.id)), [scopedStudents]);
+
+  // Permohonan surat izin / sakit yang menunggu verifikasi Wali Kelas
+  const pendingWaliLeaveRequests = useMemo(() => {
+    if (!leaveRequests) return [];
+    return leaveRequests.filter((r) => {
+      if (r.status !== 'PENDING') return false;
+      if (isSchoolAdminOrKS || isPersonalWorkspace) return true;
+      if (userScope.isWaliKelas) {
+        if (userScope.assignedWaliClassId && r.classId === userScope.assignedWaliClassId) return true;
+        if (userScope.assignedWaliClassName && r.className && normalizeClassStr(r.className) === normalizeClassStr(userScope.assignedWaliClassName)) return true;
+        if (scopedStudentIds.has(r.studentId)) return true;
+        if (!r.classId && !r.className) return true;
+        return false;
+      }
+      return false;
+    });
+  }, [leaveRequests, isSchoolAdminOrKS, isPersonalWorkspace, userScope, scopedStudentIds]);
 
   // Metrics for scoped students
   const scopedTotal = (isSchoolAdminOrKS || isPersonalWorkspace ? students.length : scopedStudents.length) || cachedSummary?.scopedTotal || 0;
@@ -376,8 +410,22 @@ export const DashboardView: React.FC = () => {
         map.set(r.studentId, r.status);
       }
     }
+    // Fallback: periksa juga jika ada surat izin resmi yang telah disetujui (APPROVED) untuk hari ini
+    if (leaveRequests && leaveRequests.length > 0) {
+      for (const lr of leaveRequests) {
+        if (
+          lr.status === 'APPROVED' &&
+          lr.startDate <= todayFormatted &&
+          (lr.endDate || lr.startDate) >= todayFormatted
+        ) {
+          if (!map.has(lr.studentId)) {
+            map.set(lr.studentId, lr.leaveType === 'sakit' ? 'Sakit' : 'Izin');
+          }
+        }
+      }
+    }
     return map;
-  }, [todayRecords]);
+  }, [todayRecords, leaveRequests, todayFormatted]);
 
   const hadirCount = useMemo(() => {
     let count = 0;
@@ -773,6 +821,43 @@ export const DashboardView: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Notifikasi Permohonan Surat Izin / Sakit Menunggu Verifikasi */}
+      {pendingWaliLeaveRequests.length > 0 && (
+        <div className="bg-gradient-to-r from-amber-50 via-amber-50/90 to-orange-50/80 border border-amber-300 rounded-xl p-3 sm:p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs animate-in slide-in-from-top-2 duration-200">
+          <div className="flex items-start sm:items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-xs">
+              <FileText size={18} />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="font-black text-xs sm:text-sm text-amber-950">
+                  {pendingWaliLeaveRequests.length} Surat Izin / Sakit Menunggu Verifikasi
+                </span>
+                <span className="px-2 py-0.5 rounded-full bg-rose-600 text-white text-[10px] font-black animate-pulse">
+                  Baru
+                </span>
+              </div>
+              <p className="text-[11px] text-amber-900 font-medium">
+                {userScope.isWaliKelas
+                  ? `Orang tua siswa ${userScope.assignedWaliClassName ? `Kelas ${userScope.assignedWaliClassName}` : 'kelas binaan'} telah mengajukan surat permohonan izin/sakit.`
+                  : 'Terdapat permohonan surat izin/sakit dari orang tua siswa yang menunggu tindak lanjut sekolah.'}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => setIsLeaveModalOpen(true)}
+              className="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 active:scale-95 text-white font-extrabold text-xs rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
+            >
+              <FileText size={13} />
+              <span>Verifikasi Surat Izin</span>
+              <ArrowRight size={13} />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* 2. Four Stat Cards (Minimalist Commercial SaaS Metrics - No Redundant Text) */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-2.5">
@@ -1212,12 +1297,24 @@ export const DashboardView: React.FC = () => {
                 ? '✓ Seluruh siswa terdata'
                 : `${totalInputted} terdata • ${totalBelumInput} belum`}
             </span>
-            <button
-              onClick={() => setActiveView('absensi')}
-              className="font-bold text-blue-600 hover:text-blue-800 hover:underline shrink-0 ml-1 cursor-pointer"
-            >
-              {totalInputted > 0 && isAttendanceFullyInputted ? 'Lihat Detail' : 'Input Presensi'}
-            </button>
+            <div className="flex items-center gap-1.5 shrink-0 ml-1">
+              <button
+                type="button"
+                onClick={() => setIsLeaveModalOpen(true)}
+                className="font-bold text-amber-700 hover:text-amber-800 hover:underline flex items-center gap-0.5 cursor-pointer"
+                title="Buka permohonan surat izin / sakit siswa"
+              >
+                <FileText size={11} />
+                <span>Surat Izin{pendingWaliLeaveRequests.length > 0 ? ` (${pendingWaliLeaveRequests.length})` : ''}</span>
+              </button>
+              <span className="text-slate-300">•</span>
+              <button
+                onClick={() => setActiveView('absensi')}
+                className="font-bold text-blue-600 hover:text-blue-800 hover:underline shrink-0 cursor-pointer"
+              >
+                {totalInputted > 0 && isAttendanceFullyInputted ? 'Detail' : 'Input Presensi'}
+              </button>
+            </div>
           </div>
         </div>
 
@@ -1387,6 +1484,18 @@ export const DashboardView: React.FC = () => {
           {systemConfig.footerCopyright || '© 2026 Kawacanaan by Maulana Yusuf. All Rights Reserved.'}
         </p>
       </footer>
+
+      {/* Teacher Leave Approval Modal */}
+      {isLeaveModalOpen && (
+        <TeacherLeaveApprovalModal
+          isOpen={isLeaveModalOpen}
+          onClose={() => setIsLeaveModalOpen(false)}
+          leaveRequests={leaveRequests || []}
+          onUpdateStatus={updateLeaveRequestStatus}
+          selectedClassName={userScope.assignedWaliClassName || undefined}
+          selectedClassId={userScope.assignedWaliClassId || undefined}
+        />
+      )}
     </div>
   );
 };

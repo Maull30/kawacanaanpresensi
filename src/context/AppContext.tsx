@@ -6986,41 +6986,58 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     );
     return sortedStudents.map((s) => {
       const existing = specificRecordsMap.get(s.id);
-      if (existing) return existing;
+      if (existing && existing.status && existing.status !== '-') return existing;
+
+      // Cek apakah ada permohonan surat izin/sakit resmi yang telah disetujui (APPROVED)
+      const approvedLeave = (leaveRequests || []).find(
+        (lr) =>
+          lr.studentId === s.id &&
+          lr.status === "APPROVED" &&
+          lr.startDate <= date &&
+          (lr.endDate || lr.startDate) >= date
+      );
+
+      const leaveStatus: AttendanceStatus = approvedLeave
+        ? (approvedLeave.leaveType === "sakit" ? "Sakit" : "Izin")
+        : ("" as AttendanceStatus);
+      const leaveNote = approvedLeave
+        ? (approvedLeave.subCategory ? `[${approvedLeave.subCategory}] ${approvedLeave.reason}` : approvedLeave.reason)
+        : "";
+
       if (targetType === "SUBJECT") {
         const dailyRec = dailyRecordsMap.get(s.id);
         const isPermitOrSick =
-          dailyRec?.status === "Sakit" || dailyRec?.status === "Izin";
+          dailyRec?.status === "Sakit" || dailyRec?.status === "Izin" || Boolean(approvedLeave);
         const inheritedStatus = isPermitOrSick
-          ? dailyRec.status
+          ? (dailyRec?.status || leaveStatus)
           : ("" as AttendanceStatus);
         const inheritedNotes = isPermitOrSick
-          ? "(Sinkron Wali Kelas: " + dailyRec.status + ")"
+          ? (dailyRec?.notes || (leaveNote ? `(Surat Izin: ${leaveNote})` : `(Sinkron Wali Kelas: ${dailyRec?.status || leaveStatus})`))
           : "";
         return {
-          id:
+          id: existing?.id ||
             "att-subj-" + date + "-" + (targetSubjectId || "gen") + "-" + s.id,
           date,
           studentId: s.id,
           studentName: s.nama,
-          status: inheritedStatus,
-          checkInTime: isPermitOrSick ? dailyRec?.checkInTime || "" : "",
-          checkOutTime: isPermitOrSick ? dailyRec?.checkOutTime || "" : "",
-          notes: inheritedNotes,
+          status: existing?.status || inheritedStatus,
+          checkInTime: existing?.checkInTime || (isPermitOrSick ? dailyRec?.checkInTime || "" : ""),
+          checkOutTime: existing?.checkOutTime || (isPermitOrSick ? dailyRec?.checkOutTime || "" : ""),
+          notes: existing?.notes || inheritedNotes,
           type: "SUBJECT" as AttendanceType,
           subjectId: targetSubjectId,
           classId: targetClassId || s.classId || null,
         };
       }
       return {
-        id: "att-" + date + "-" + s.id,
+        id: existing?.id || "att-" + date + "-" + s.id,
         date,
         studentId: s.id,
         studentName: s.nama,
-        status: "" as AttendanceStatus,
-        checkInTime: "",
-        checkOutTime: "",
-        notes: "",
+        status: existing?.status || leaveStatus,
+        checkInTime: existing?.checkInTime || "",
+        checkOutTime: existing?.checkOutTime || "",
+        notes: existing?.notes || (leaveNote ? `Surat ${leaveStatus}: ${leaveNote}` : ""),
         type: "DAILY" as AttendanceType,
         classId: targetClassId || s.classId || null,
       };
@@ -7405,7 +7422,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
         showToast(msg, "error");
         return { success: false, message: msg };
       }
-      if (!systemConfig.studentSelfAttendanceEnabled) {
+      if (isStudent && !isSimulator && !systemConfig.studentSelfAttendanceEnabled) {
         const msg =
           "Presensi mandiri siswa sedang dinonaktifkan oleh pihak sekolah.";
         showToast(msg, "error");
@@ -7846,15 +7863,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       if (status === "APPROVED") {
         // Auto mark attendance for that student across the date range
         const note = targetReq.subCategory ? `[${targetReq.subCategory}] ${targetReq.reason}` : targetReq.reason;
+        const leaveStatus = targetReq.leaveType === "sakit" ? "Sakit" : "Izin";
         const datesToMark: string[] = [];
         try {
-          const start = new Date(targetReq.startDate);
-          const end = new Date(targetReq.endDate || targetReq.startDate);
-          const curr = new Date(start);
+          const [sy, sm, sd] = String(targetReq.startDate).split('-').map(Number);
+          const endStr = targetReq.endDate || targetReq.startDate;
+          const [ey, em, ed] = String(endStr).split('-').map(Number);
+          const cur = new Date(Date.UTC(sy, sm - 1, sd, 12, 0, 0));
+          const end = new Date(Date.UTC(ey, em - 1, ed, 12, 0, 0));
           let count = 0;
-          while (curr <= end && count < 30) {
-            datesToMark.push(curr.toISOString().slice(0, 10));
-            curr.setDate(curr.getDate() + 1);
+          while (cur <= end && count < 60) {
+            const y = cur.getUTCFullYear();
+            const m = String(cur.getUTCMonth() + 1).padStart(2, '0');
+            const d = String(cur.getUTCDate()).padStart(2, '0');
+            datesToMark.push(`${y}-${m}-${d}`);
+            cur.setUTCDate(cur.getUTCDate() + 1);
             count++;
           }
         } catch (_) {
@@ -7863,13 +7886,46 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
 
         if (datesToMark.length === 0) datesToMark.push(targetReq.startDate);
 
+        const studentObj = students.find((s) => s.id === targetReq.studentId);
+        const resolvedClassId = targetReq.classId || studentObj?.classId || null;
+        const newRecords: AttendanceRecord[] = [];
+
         for (const targetD of datesToMark) {
-          await submitStudentAttendance(
-            targetReq.studentId,
-            targetReq.leaveType === "sakit" ? "sakit" : "izin",
-            note,
-            targetD
-          ).catch((e) => console.warn("Auto mark attendance failed for date " + targetD + ":", e));
+          const dStat = getDateStatus(targetD);
+          // Lewati hari libur / bukan hari belajar aktif tanpa membatalkan proses
+          if (!dStat.isEffective) continue;
+
+          const existing = attendanceRecords.find(
+            (r) => r.studentId === targetReq.studentId && r.date === targetD && (!r.type || r.type === "DAILY")
+          );
+
+          newRecords.push({
+            id: existing?.id || `att_${targetD}_${targetReq.studentId}`,
+            date: targetD,
+            studentId: targetReq.studentId,
+            studentName: targetReq.studentName || studentObj?.nama || 'Siswa',
+            classId: resolvedClassId,
+            type: "DAILY",
+            status: leaveStatus,
+            checkInTime: "",
+            checkOutTime: "",
+            notes: `Surat ${leaveStatus}: ${note}`,
+            teacherId: currentUser?.teacherId || null,
+          });
+        }
+
+        if (newRecords.length > 0) {
+          setAttendanceRecords((prev) => {
+            const map = new Map<string, AttendanceRecord>();
+            prev.forEach((r) => map.set(`${r.date}_${r.studentId}_${r.type || 'DAILY'}`, r));
+            newRecords.forEach((r) => map.set(`${r.date}_${r.studentId}_${r.type || 'DAILY'}`, r));
+            const next = Array.from(map.values());
+            try {
+              const backupKey = `kawacanaan_attendance_backup_${currentUser?.schoolId || 'default'}`;
+              localStorage.setItem(backupKey, JSON.stringify(next.slice(-500)));
+            } catch (_) {}
+            return next;
+          });
         }
       }
 

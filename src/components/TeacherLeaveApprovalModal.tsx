@@ -28,7 +28,11 @@ interface TeacherLeaveApprovalModalProps {
     reviewNotes?: string
   ) => Promise<{ success: boolean; message?: string }>;
   selectedClassName?: string;
+  selectedClassId?: string;
 }
+
+const normalizeClassStr = (s?: string | null) =>
+  s ? s.toLowerCase().replace(/^(kelas|kls)\s+/i, '').replace(/[^a-z0-9]/g, '') : '';
 
 export const TeacherLeaveApprovalModal: React.FC<TeacherLeaveApprovalModalProps> = ({
   isOpen,
@@ -36,8 +40,10 @@ export const TeacherLeaveApprovalModal: React.FC<TeacherLeaveApprovalModalProps>
   leaveRequests,
   onUpdateStatus,
   selectedClassName,
+  selectedClassId,
 }) => {
   const [filterStatus, setFilterStatus] = useState<'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED'>('PENDING');
+  const [filterClassOnly, setFilterClassOnly] = useState<boolean>(Boolean(selectedClassName));
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
   const [rejectingId, setRejectingId] = useState<string | null>(null);
@@ -46,7 +52,18 @@ export const TeacherLeaveApprovalModal: React.FC<TeacherLeaveApprovalModalProps>
 
   if (!isOpen) return null;
 
-  const filteredRequests = leaveRequests.filter((req) => {
+  const isMatchingClass = (req: StudentLeaveRequest) => {
+    if (!filterClassOnly || !selectedClassName) return true;
+    if (selectedClassId && req.classId && req.classId === selectedClassId) return true;
+    if (req.className && normalizeClassStr(req.className) === normalizeClassStr(selectedClassName)) return true;
+    return false;
+  };
+
+  const visibleBase = (filterClassOnly && selectedClassName)
+    ? leaveRequests.filter(isMatchingClass)
+    : leaveRequests;
+
+  const filteredRequests = visibleBase.filter((req) => {
     if (filterStatus !== 'ALL' && req.status !== filterStatus) return false;
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
@@ -58,7 +75,7 @@ export const TeacherLeaveApprovalModal: React.FC<TeacherLeaveApprovalModalProps>
     return true;
   });
 
-  const pendingCount = leaveRequests.filter((r) => r.status === 'PENDING').length;
+  const pendingCount = visibleBase.filter((r) => r.status === 'PENDING').length;
 
   const handleApprove = async (id: string) => {
     setIsProcessing(id);
@@ -129,37 +146,68 @@ export const TeacherLeaveApprovalModal: React.FC<TeacherLeaveApprovalModalProps>
 
         {/* Filter & Search Toolbar */}
         <div className="p-3.5 bg-slate-50 border-b border-slate-100 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
-          <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-slate-200 shadow-2xs">
-            <button
-              onClick={() => setFilterStatus('PENDING')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                filterStatus === 'PENDING'
-                  ? 'bg-amber-500 text-white shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              Menunggu ({pendingCount})
-            </button>
-            <button
-              onClick={() => setFilterStatus('APPROVED')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                filterStatus === 'APPROVED'
-                  ? 'bg-emerald-600 text-white shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              Disetujui
-            </button>
-            <button
-              onClick={() => setFilterStatus('ALL')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                filterStatus === 'ALL'
-                  ? 'bg-slate-800 text-white shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              Semua ({leaveRequests.length})
-            </button>
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-slate-200 shadow-2xs">
+              <button
+                onClick={() => setFilterStatus('PENDING')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  filterStatus === 'PENDING'
+                    ? 'bg-amber-500 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                Menunggu ({pendingCount})
+              </button>
+              <button
+                onClick={() => setFilterStatus('APPROVED')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  filterStatus === 'APPROVED'
+                    ? 'bg-emerald-600 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                Disetujui
+              </button>
+              <button
+                onClick={() => setFilterStatus('ALL')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  filterStatus === 'ALL'
+                    ? 'bg-slate-800 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                Semua ({visibleBase.length})
+              </button>
+            </div>
+
+            {selectedClassName && (
+              <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-slate-200 shadow-2xs">
+                <button
+                  type="button"
+                  onClick={() => setFilterClassOnly(true)}
+                  className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    filterClassOnly
+                      ? 'bg-blue-600 text-white shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                  title={`Tampilkan hanya permohonan untuk ${selectedClassName}`}
+                >
+                  {selectedClassName}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFilterClassOnly(false)}
+                  className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    !filterClassOnly
+                      ? 'bg-blue-600 text-white shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                  title="Tampilkan permohonan dari semua rombel kelas"
+                >
+                  Semua Kelas ({leaveRequests.length})
+                </button>
+              </div>
+            )}
           </div>
 
           <div className="relative flex-1 sm:max-w-xs">

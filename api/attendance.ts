@@ -413,13 +413,18 @@ export default async function handler(req: any, res: any) {
         const attendanceStatus = updatedReq.leave_type === 'sakit' ? 'Sakit' : 'Izin';
         const dates: string[] = [];
         try {
-          const start = new Date(updatedReq.start_date);
-          const end = new Date(updatedReq.end_date || updatedReq.start_date);
-          const cur = new Date(start);
+          const [sy, sm, sd] = String(updatedReq.start_date).split('-').map(Number);
+          const endStr = updatedReq.end_date || updatedReq.start_date;
+          const [ey, em, ed] = String(endStr).split('-').map(Number);
+          const cur = new Date(Date.UTC(sy, sm - 1, sd, 12, 0, 0));
+          const end = new Date(Date.UTC(ey, em - 1, ed, 12, 0, 0));
           let count = 0;
-          while (cur <= end && count < 30) {
-            dates.push(cur.toISOString().slice(0, 10));
-            cur.setDate(cur.getDate() + 1);
+          while (cur <= end && count < 60) {
+            const y = cur.getUTCFullYear();
+            const m = String(cur.getUTCMonth() + 1).padStart(2, '0');
+            const d = String(cur.getUTCDate()).padStart(2, '0');
+            dates.push(`${y}-${m}-${d}`);
+            cur.setUTCDate(cur.getUTCDate() + 1);
             count++;
           }
         } catch (_) {
@@ -429,17 +434,37 @@ export default async function handler(req: any, res: any) {
 
         for (const d of dates) {
           try {
-            await admin.from('attendance_records').upsert({
+            const noteText = updatedReq.sub_category 
+              ? `[${updatedReq.sub_category}] ${updatedReq.reason || ''}`
+              : `Surat ${updatedReq.leave_type === 'sakit' ? 'Sakit' : 'Izin'} disetujui: ${updatedReq.reason || ''}`;
+
+            const { data: existingRec } = await admin
+              .from('attendance_records')
+              .select('id')
+              .eq('student_id', updatedReq.student_id)
+              .eq('date', d)
+              .eq('type', 'DAILY')
+              .maybeSingle();
+
+            const attData = {
               school_id: updatedReq.school_id,
               date: d,
               student_id: updatedReq.student_id,
               class_id: updatedReq.class_id,
               type: 'DAILY',
               status: attendanceStatus,
-              notes: `Surat ${updatedReq.leave_type === 'sakit' ? 'Sakit' : 'Izin'} disetujui: ${updatedReq.reason}`,
+              notes: noteText,
               updated_by: userId,
-            }, { onConflict: 'school_id,student_id,date,type,subject_id' });
-          } catch (_) {}
+            };
+
+            if (existingRec?.id) {
+              await admin.from('attendance_records').update(attData).eq('id', existingRec.id);
+            } else {
+              await admin.from('attendance_records').insert(attData);
+            }
+          } catch (attSaveErr: any) {
+            console.warn('[update_leave_request_status] Error writing attendance record:', attSaveErr?.message);
+          }
         }
       }
 

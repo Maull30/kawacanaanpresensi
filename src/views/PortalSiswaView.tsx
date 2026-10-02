@@ -445,21 +445,6 @@ export const PortalSiswaView: React.FC = () => {
         </div>
       )}
 
-      {/* Re-branding Header & Persona */}
-      <div className="flex items-center justify-between px-1">
-        <div>
-          <span className="text-[10px] font-black uppercase tracking-widest text-blue-600">
-            Sistem Presensi & Pemantauan Terpadu
-          </span>
-          <h1 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight">
-            Portal Siswa & Wali Murid
-          </h1>
-        </div>
-        <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-blue-50 text-blue-800 border border-blue-200">
-          Satu Akun Bersama
-        </span>
-      </div>
-
       {/* Student & Parent Identity Card */}
       <div className="bg-white border border-slate-200 rounded-3xl p-4 sm:p-5 shadow-sm relative overflow-hidden">
         <div className="absolute top-0 right-0 w-32 h-32 bg-blue-50/50 rounded-full blur-2xl pointer-events-none" />
@@ -768,7 +753,7 @@ export const PortalSiswaView: React.FC = () => {
           )}
 
           {/* Big Action Buttons (Scan Presensi Masuk & Scan Presensi Pulang) */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+          <div className="grid grid-cols-2 gap-2 sm:gap-3.5">
             {/* Tombol Scan Presensi Masuk */}
             <button
               id="btn-presensi-masuk"
@@ -780,7 +765,7 @@ export const PortalSiswaView: React.FC = () => {
                 (!isSimulationMode && !systemConfig.studentSelfAttendanceEnabled) ||
                 isBeforeCheckInOpen
               }
-              className={`relative p-5 rounded-3xl flex flex-col items-center justify-center gap-2 text-center transition-all cursor-pointer shadow-md min-h-[140px] group ${
+              className={`relative p-3 sm:p-5 rounded-2xl sm:rounded-3xl flex flex-col items-center justify-center gap-1.5 sm:gap-2 text-center transition-all cursor-pointer shadow-md min-h-[125px] sm:min-h-[140px] group ${
                 !isSimulationMode && isLockedForHoliday
                   ? 'bg-slate-100 border border-slate-300 text-slate-400 cursor-not-allowed opacity-80'
                   : hasCheckedIn
@@ -793,7 +778,7 @@ export const PortalSiswaView: React.FC = () => {
               }`}
             >
               <div
-                className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-inner ${
+                className={`w-11 h-11 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl flex items-center justify-center shadow-inner ${
                   !isSimulationMode && isLockedForHoliday
                     ? 'bg-slate-200 text-slate-500'
                     : hasCheckedIn
@@ -804,35 +789,35 @@ export const PortalSiswaView: React.FC = () => {
                 }`}
               >
                 {!isSimulationMode && isLockedForHoliday ? (
-                  <Lock size={28} />
+                  <Lock className="w-5 h-5 sm:w-7 sm:h-7" />
                 ) : hasCheckedIn ? (
-                  <CheckCircle2 size={30} />
+                  <CheckCircle2 className="w-6 h-6 sm:w-7 sm:h-7" />
                 ) : isBeforeCheckInOpen ? (
-                  <Lock size={28} />
+                  <Lock className="w-5 h-5 sm:w-7 sm:h-7" />
                 ) : (
-                  <QrCode size={30} />
+                  <QrCode className="w-6 h-6 sm:w-7 sm:h-7" />
                 )}
               </div>
-              <div>
-                <span className="text-base font-black tracking-tight block">
+              <div className="w-full">
+                <span className="text-xs sm:text-base font-black tracking-tight block truncate">
                   {!isSimulationMode && isLockedForHoliday
-                    ? 'LIBUR (DIKUNCI)'
+                    ? 'LIBUR'
                     : hasCheckedIn
                     ? 'SUDAH MASUK'
                     : isBeforeCheckInOpen
                     ? 'BELUM DIBUKA'
-                    : 'SCAN PRESENSI MASUK'}
+                    : 'SCAN MASUK'}
                 </span>
-                <span className="text-[11px] font-medium opacity-90 block mt-0.5">
+                <span className="text-[10px] sm:text-[11px] font-medium opacity-90 block mt-0.5 line-clamp-2">
                   {!isSimulationMode && isLockedForHoliday
-                    ? 'Bukan hari belajar'
+                    ? 'Hari libur'
                     : hasCheckedIn
-                    ? `Tercatat pukul ${todayRecord?.checkInTime} WIB`
+                    ? `Pukul ${todayRecord?.checkInTime} WIB`
                     : isBeforeCheckInOpen
-                    ? `Dibuka pukul ${systemConfig.checkInStartTime || '06:00'} WIB`
+                    ? `Buka ${systemConfig.checkInStartTime || '06:00'}`
                     : isLate
-                    ? 'Scan QR kelas (Terlambat)'
-                    : 'Scan QR Code rombel kelas'}
+                    ? 'Scan QR (Terlambat)'
+                    : 'Scan QR kelas'}
                 </span>
               </div>
             </button>
@@ -848,7 +833,7 @@ export const PortalSiswaView: React.FC = () => {
                 (!isSimulationMode && !systemConfig.studentSelfAttendanceEnabled) ||
                 isBeforeCheckOutOpen
               }
-              className={`relative p-5 rounded-3xl flex flex-col items-center justify-center gap-2 text-center transition-all cursor-pointer shadow-md min-h-[140px] group ${
+              className={`relative p-3 sm:p-5 rounded-2xl sm:rounded-3xl flex flex-col items-center justify-center gap-1.5 sm:gap-2 text-center transition-all cursor-pointer shadow-md min-h-[125px] sm:min-h-[140px] group ${
                 !isSimulationMode && isLockedForHoliday
                   ? 'bg-slate-100 border border-slate-300 text-slate-400 cursor-not-allowed opacity-80'
                   : hasCheckedOut
@@ -861,7 +846,7 @@ export const PortalSiswaView: React.FC = () => {
               }`}
             >
               <div
-                className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-inner ${
+                className={`w-11 h-11 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl flex items-center justify-center shadow-inner ${
                   !isSimulationMode && isLockedForHoliday
                     ? 'bg-slate-200 text-slate-500'
                     : hasCheckedOut
@@ -872,67 +857,37 @@ export const PortalSiswaView: React.FC = () => {
                 }`}
               >
                 {!isSimulationMode && isLockedForHoliday ? (
-                  <Lock size={28} />
+                  <Lock className="w-5 h-5 sm:w-7 sm:h-7" />
                 ) : hasCheckedOut ? (
-                  <CheckCircle2 size={30} />
+                  <CheckCircle2 className="w-6 h-6 sm:w-7 sm:h-7" />
                 ) : isBeforeCheckOutOpen ? (
-                  <Lock size={28} />
+                  <Lock className="w-5 h-5 sm:w-7 sm:h-7" />
                 ) : (
-                  <QrCode size={30} />
+                  <QrCode className="w-6 h-6 sm:w-7 sm:h-7" />
                 )}
               </div>
-              <div>
-                <span className="text-base font-black tracking-tight block">
+              <div className="w-full">
+                <span className="text-xs sm:text-base font-black tracking-tight block truncate">
                   {!isSimulationMode && isLockedForHoliday
-                    ? 'LIBUR (DIKUNCI)'
+                    ? 'LIBUR'
                     : hasCheckedOut
                     ? 'SUDAH PULANG'
                     : isBeforeCheckOutOpen && hasCheckedIn
-                    ? 'BELUM JAM PULANG'
-                    : 'SCAN PRESENSI PULANG'}
+                    ? 'BELUM JAM'
+                    : 'SCAN PULANG'}
                 </span>
-                <span className="text-[11px] font-medium opacity-90 block mt-0.5">
+                <span className="text-[10px] sm:text-[11px] font-medium opacity-90 block mt-0.5 line-clamp-2">
                   {!isSimulationMode && isLockedForHoliday
-                    ? 'Bukan hari belajar'
+                    ? 'Hari libur'
                     : hasCheckedOut
-                    ? `Tercatat pukul ${todayRecord?.checkOutTime} WIB`
+                    ? `Pukul ${todayRecord?.checkOutTime} WIB`
                     : !hasCheckedIn && !isSimulationMode
-                    ? 'Harus scan presensi masuk dulu'
+                    ? 'Scan masuk dulu'
                     : isBeforeCheckOutOpen
-                    ? `Dibuka pukul ${systemConfig.checkOutStartTime || '12:30'} WIB`
-                    : 'Scan QR Code rombel kelas'}
+                    ? `Buka ${systemConfig.checkOutStartTime || '12:30'}`
+                    : 'Scan QR kelas'}
                 </span>
               </div>
-            </button>
-          </div>
-
-          {/* Button Ajukan Izin / Sakit */}
-          <div className="bg-white border border-slate-200 rounded-2xl p-3.5 flex items-center justify-between shadow-xs">
-            <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-xl bg-amber-50 border border-amber-200 text-amber-700 flex items-center justify-center shrink-0">
-                <FileText size={18} />
-              </div>
-              <div>
-                <p className="text-xs font-bold text-slate-800">Tidak Bisa Hadir?</p>
-                <p className="text-[11px] text-slate-500">Ajukan surat izin atau surat sakit ke wali kelas</p>
-              </div>
-            </div>
-            <button
-              onClick={() => {
-                if (isLockedForHoliday) {
-                  showToast('Hari ini adalah hari libur, tidak perlu mengajukan izin', 'info');
-                  return;
-                }
-                setIsLeaveModalOpen(true);
-              }}
-              disabled={isLockedForHoliday}
-              className={`px-3 py-1.5 font-extrabold text-xs rounded-xl transition-all shadow-xs cursor-pointer ${
-                isLockedForHoliday
-                  ? 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed'
-                  : 'bg-amber-500 hover:bg-amber-600 active:scale-95 text-slate-900'
-              }`}
-            >
-              Ajukan Izin
             </button>
           </div>
 

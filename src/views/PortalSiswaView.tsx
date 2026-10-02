@@ -75,12 +75,6 @@ export const PortalSiswaView: React.FC = () => {
     return new Date().getFullYear();
   });
 
-  // Real-time clock for top status bar
-  const [currentTimeFormatted, setCurrentTimeFormatted] = useState<string>('09:41');
-
-  // Notification modal toggle
-  const [showNotificationModal, setShowNotificationModal] = useState<boolean>(false);
-
   // Month selector modal toggle
   const [showMonthPickerModal, setShowMonthPickerModal] = useState<boolean>(false);
 
@@ -100,19 +94,6 @@ export const PortalSiswaView: React.FC = () => {
       setSelectedSimulatedStudentId(students[0].id);
     }
   }, [currentUser?.role, students, selectedSimulatedStudentId]);
-
-  // Update clock
-  useEffect(() => {
-    const updateTime = () => {
-      const now = new Date();
-      const h = String(now.getHours()).padStart(2, '0');
-      const m = String(now.getMinutes()).padStart(2, '0');
-      setCurrentTimeFormatted(`${h}:${m}`);
-    };
-    updateTime();
-    const interval = setInterval(updateTime, 30000);
-    return () => clearInterval(interval);
-  }, []);
 
   // Resolusi akun siswa yang definitif
   const activeStudent: Student = useMemo(() => {
@@ -518,34 +499,12 @@ export const PortalSiswaView: React.FC = () => {
   // =========================================================================
 
   return (
-    <div className="min-h-screen bg-slate-100 flex justify-center items-start sm:py-6 px-0 sm:px-4 font-sans antialiased text-slate-800 select-none">
+    <div className="fixed inset-0 sm:relative sm:inset-auto min-h-screen bg-slate-100 flex justify-center items-start sm:py-6 px-0 sm:px-4 font-sans antialiased text-slate-800 select-none">
       {/* Mobile Smartphone Frame Container (Designed specifically for Mobile Screen) */}
-      <div className="w-full max-w-md bg-white sm:rounded-[40px] sm:shadow-2xl sm:border sm:border-slate-200/80 overflow-hidden flex flex-col relative min-h-screen sm:min-h-[854px] max-h-none sm:max-h-[920px]">
+      <div className="w-full max-w-md bg-white sm:rounded-[36px] sm:shadow-2xl sm:border sm:border-slate-200/80 overflow-hidden flex flex-col h-full sm:h-[860px] relative">
         
         {/* Hidden temp div for file upload scanner */}
         <div id="file-scanner-temp" className="hidden" />
-
-        {/* 1. iOS-style Top Status Bar */}
-        <div className="flex items-center justify-between px-6 pt-3 pb-1 text-slate-900 font-bold text-xs select-none z-30 shrink-0">
-          <span className="font-extrabold tracking-tight text-slate-900">{currentTimeFormatted}</span>
-          <div className="flex items-center gap-1.5 text-slate-900">
-            {/* Cellular Signal Bars */}
-            <div className="flex items-end gap-0.5 h-2.5">
-              <span className="w-0.5 h-1 bg-slate-900 rounded-full" />
-              <span className="w-0.5 h-1.5 bg-slate-900 rounded-full" />
-              <span className="w-0.5 h-2 bg-slate-900 rounded-full" />
-              <span className="w-0.5 h-2.5 bg-slate-900 rounded-full" />
-            </div>
-            {/* Wifi Icon */}
-            <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
-              <path d="M12 4C7.31 4 3.07 5.9 0 8.98L12 21 24 8.98C20.93 5.9 16.69 4 12 4zm0 3.5c3.55 0 6.78 1.41 9.17 3.7L12 18.5 2.83 11.2C5.22 8.91 8.45 7.5 12 7.5z" />
-            </svg>
-            {/* Battery Icon */}
-            <div className="w-5 h-2.5 border border-slate-900 rounded-xs p-0.5 flex items-center">
-              <div className="w-full h-full bg-slate-900 rounded-2xs" />
-            </div>
-          </div>
-        </div>
 
         {/* Simulation Banner for Admin / Guru */}
         {currentUser?.role !== 'SISWA' && (
@@ -566,45 +525,15 @@ export const PortalSiswaView: React.FC = () => {
         )}
 
         {/* 2. DYNAMIC CONTENT SCROLL AREA */}
-        <div className="flex-1 overflow-y-auto pb-24 relative bg-white">
+        <div className="flex-1 overflow-y-auto min-h-0 relative bg-white pb-6">
           
           {/* ========================================================================= */}
           {/* SCREEN 1: BERANDA (HOME) */}
           {/* ========================================================================= */}
           {currentScreen === 'beranda' && (
             <div className="p-4 sm:p-5 space-y-4 animate-in fade-in duration-200">
-              {/* Header: School Logo & Title + Notification Bell */}
-              <div className="flex items-center justify-between pt-1">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-10 h-10 rounded-2xl bg-blue-600 text-white flex items-center justify-center shadow-md shadow-blue-500/20 shrink-0">
-                    {/* Cute School Building Icon */}
-                    <svg className="w-6 h-6 fill-current" viewBox="0 0 24 24">
-                      <path d="M12 3L2 8v2h2v10h6v-6h4v6h6V10h2V8l-10-5zm-1 9H9v-2h2v2zm4 0h-2v-2h2v2zm-4 4H9v-2h2v2zm4 0h-2v-2h2v2z" />
-                    </svg>
-                  </div>
-                  <div>
-                    <h2 className="text-sm font-black text-slate-900 tracking-tight leading-tight">
-                      {schoolProfile.namaSekolah || 'SD Cideng 07'}
-                    </h2>
-                    <p className="text-[11px] font-semibold text-slate-500">
-                      Portal Siswa
-                    </p>
-                  </div>
-                </div>
-
-                {/* Bell Icon with Red Dot */}
-                <button
-                  onClick={() => setShowNotificationModal(true)}
-                  className="w-9 h-9 rounded-2xl bg-slate-50 hover:bg-slate-100 border border-slate-200/80 flex items-center justify-center text-slate-700 relative transition-all active:scale-95 cursor-pointer"
-                  title="Pemberitahuan"
-                >
-                  <Bell size={18} />
-                  <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-rose-500 ring-2 ring-white animate-pulse" />
-                </button>
-              </div>
-
               {/* Greeting & Student Circular Avatar */}
-              <div className="flex items-center justify-between pt-1 pb-1">
+              <div className="flex items-center justify-between pt-2 pb-1">
                 <div>
                   <span className="text-xs text-slate-500 font-medium block">Halo,</span>
                   <h1 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight leading-tight">
@@ -1425,8 +1354,8 @@ export const PortalSiswaView: React.FC = () => {
 
         </div>
 
-        {/* 3. FIXED FLOATING BOTTOM NAVIGATION BAR (Beranda, Absensi, Profil) */}
-        <div className="absolute bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-slate-100 px-6 py-2 flex items-center justify-around z-30 shadow-lg">
+        {/* 3. PERSISTENT FIXED BOTTOM NAVIGATION BAR (Beranda, Absensi, Profil) */}
+        <div className="shrink-0 w-full bg-white/95 backdrop-blur-md border-t border-slate-100 px-6 py-2.5 flex items-center justify-around z-40 shadow-lg select-none pb-[max(0.625rem,env(safe-area-inset-bottom))]">
           {/* Beranda */}
           <button
             onClick={() => setCurrentScreen('beranda')}
@@ -1444,12 +1373,12 @@ export const PortalSiswaView: React.FC = () => {
           <button
             onClick={() => setCurrentScreen('absensi-menu')}
             className={`flex flex-col items-center gap-1 transition-all cursor-pointer py-1 ${
-              currentScreen === 'absensi-menu' || currentScreen === 'scanner' || currentScreen === 'riwayat' || currentScreen === 'detail'
+              ['absensi-menu', 'scanner', 'riwayat', 'detail'].includes(currentScreen)
                 ? 'text-blue-600 font-black scale-105'
                 : 'text-slate-400 hover:text-slate-600 font-medium'
             }`}
           >
-            <Calendar size={20} strokeWidth={currentScreen === 'absensi-menu' || currentScreen === 'scanner' || currentScreen === 'riwayat' || currentScreen === 'detail' ? 2.5 : 2} />
+            <Calendar size={20} strokeWidth={['absensi-menu', 'scanner', 'riwayat', 'detail'].includes(currentScreen) ? 2.5 : 2} />
             <span className="text-[10px] tracking-tight">Absensi</span>
           </button>
 
@@ -1466,48 +1395,6 @@ export const PortalSiswaView: React.FC = () => {
             <span className="text-[10px] tracking-tight">Profil</span>
           </button>
         </div>
-
-        {/* NOTIFICATION POPUP MODAL */}
-        {showNotificationModal && (
-          <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-2xs flex items-center justify-center p-4 animate-in fade-in duration-150">
-            <div className="bg-white rounded-3xl max-w-xs w-full p-5 shadow-2xl border border-slate-100 space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                <div className="flex items-center gap-2">
-                  <Bell size={18} className="text-blue-600" />
-                  <h4 className="text-sm font-black text-slate-900">Pemberitahuan</h4>
-                </div>
-                <button
-                  onClick={() => setShowNotificationModal(false)}
-                  className="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 cursor-pointer"
-                >
-                  <X size={15} />
-                </button>
-              </div>
-
-              <div className="space-y-2 text-xs">
-                <div className="p-3 bg-blue-50/70 border border-blue-100 rounded-2xl space-y-1">
-                  <span className="font-black text-blue-900 block">Presensi Mandiri Dibuka</span>
-                  <p className="text-slate-600 text-[11px] leading-relaxed">
-                    Presensi masuk harian dibuka mulai pukul {systemConfig.checkInStartTime || '06:00'} WIB. Jangan lupa scan QR code rombel kelasmu.
-                  </p>
-                </div>
-                <div className="p-3 bg-slate-50 border border-slate-100 rounded-2xl space-y-1">
-                  <span className="font-bold text-slate-800 block">Kalender Akademik</span>
-                  <p className="text-slate-500 text-[11px] leading-relaxed">
-                    Pastikan memeriksa jadwal kegiatan sekolah dan hari belajar efektif melalui kalender akademik.
-                  </p>
-                </div>
-              </div>
-
-              <button
-                onClick={() => setShowNotificationModal(false)}
-                className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white font-black text-xs rounded-xl shadow-xs cursor-pointer"
-              >
-                Tutup
-              </button>
-            </div>
-          </div>
-        )}
 
         {/* MONTH PICKER MODAL */}
         {showMonthPickerModal && (

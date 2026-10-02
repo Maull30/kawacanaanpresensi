@@ -9,9 +9,11 @@ export interface ClassQrData {
   grade: number;
   schoolId?: string;
   createdTime?: number;
+  timestamp?: number;
 }
 
 export function generateClassQrPayload(classItem: SchoolClass, schoolId?: string | null): string {
+  const now = Date.now();
   const payload: ClassQrData = {
     app: 'KAWACANAAN_PRESENSI',
     version: '1.0',
@@ -19,6 +21,8 @@ export function generateClassQrPayload(classItem: SchoolClass, schoolId?: string
     className: classItem.name,
     grade: classItem.grade,
     schoolId: schoolId || undefined,
+    createdTime: now,
+    timestamp: now,
   };
   return JSON.stringify(payload);
 }
@@ -28,6 +32,7 @@ export function parseClassQrPayload(raw: string): {
   classId?: string;
   className?: string;
   grade?: number;
+  timestamp?: number;
   error?: string;
 } {
   const trimmed = (raw || '').trim();
@@ -39,12 +44,17 @@ export function parseClassQrPayload(raw: string): {
   if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
     try {
       const parsed = JSON.parse(trimmed);
+      const parsedTimestamp = typeof parsed.timestamp === 'number'
+        ? parsed.timestamp
+        : (typeof parsed.createdTime === 'number' ? parsed.createdTime : undefined);
+
       if (parsed.app === 'KAWACANAAN_PRESENSI' && parsed.classId) {
         return {
           valid: true,
           classId: String(parsed.classId),
           className: parsed.className ? String(parsed.className) : undefined,
           grade: parsed.grade ? Number(parsed.grade) : undefined,
+          timestamp: parsedTimestamp,
         };
       }
       if (parsed.classId) {
@@ -52,6 +62,7 @@ export function parseClassQrPayload(raw: string): {
           valid: true,
           classId: String(parsed.classId),
           className: parsed.className ? String(parsed.className) : undefined,
+          timestamp: parsedTimestamp,
         };
       }
     } catch {

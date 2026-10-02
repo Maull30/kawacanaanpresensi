@@ -30,13 +30,19 @@ import {
   Check,
   AlertCircle,
   X,
+  FileText,
+  Lock,
+  Navigation,
+  AlertTriangle,
+  HeartPulse,
+  ShieldAlert,
 } from 'lucide-react';
 import type { Student, AttendanceRecord, SchoolClass } from '../types';
 import { parseClassQrPayload } from '../utils/classQr';
 import { playChimeSuccess, playChimeWarning } from '../utils/audioFeedback';
 import { getServerNow, formatServerTimeString } from '../utils/serverTime';
 
-type MobileScreen = 'beranda' | 'absensi-menu' | 'profil' | 'scanner' | 'riwayat' | 'detail';
+type MobileScreen = 'beranda' | 'absensi-menu' | 'profil' | 'scanner' | 'riwayat' | 'detail' | 'izin-sakit';
 
 export const PortalSiswaView: React.FC = () => {
   const {
@@ -48,6 +54,7 @@ export const PortalSiswaView: React.FC = () => {
     attendanceRecords,
     currentAttendanceDate,
     submitStudentAttendance,
+    submitLeaveRequest,
     getDateStatus,
     showToast,
     setActiveView,
@@ -86,6 +93,88 @@ export const PortalSiswaView: React.FC = () => {
   const [scanStatusMessage, setScanStatusMessage] = useState<string>('');
   const [scanStatusType, setScanStatusType] = useState<'idle' | 'processing' | 'success' | 'rejected'>('idle');
   const isProcessingRef = useRef<boolean>(false);
+
+  // Leave Request Form State (Fitur Pengajuan Izin / Sakit Mandiri)
+  const [leaveType, setLeaveType] = useState<'sakit' | 'izin'>('sakit');
+  const [leaveStartDate, setLeaveStartDate] = useState<string>(currentAttendanceDate);
+  const [leaveEndDate, setLeaveEndDate] = useState<string>(currentAttendanceDate);
+  const [leaveReason, setLeaveReason] = useState<string>('');
+  const [leaveRequesterRole, setLeaveRequesterRole] = useState<'Orang Tua' | 'Wali' | 'Siswa'>('Orang Tua');
+  const [leaveRequesterName, setLeaveRequesterName] = useState<string>('');
+  const [leaveRequesterPhone, setLeaveRequesterPhone] = useState<string>('');
+  const [leaveAttachment, setLeaveAttachment] = useState<string>('');
+  const [leaveAttachmentName, setLeaveAttachmentName] = useState<string>('');
+  const [isSubmittingLeave, setIsSubmittingLeave] = useState<boolean>(false);
+
+  // Getar Halus (Haptic Feedback) Helper
+  const triggerHaptic = (type: 'success' | 'warning' | 'error' | 'tap' = 'tap') => {
+    if (typeof window === 'undefined' || !navigator?.vibrate) return;
+    try {
+      if (type === 'success') {
+        navigator.vibrate(45);
+      } else if (type === 'warning') {
+        navigator.vibrate([40, 50, 40]);
+      } else if (type === 'error') {
+        navigator.vibrate([70, 50, 70]);
+      } else if (type === 'tap') {
+        navigator.vibrate(12);
+      }
+    } catch (_) {}
+  };
+
+  // Anti-Kecurangan: Titik Koordinat GPS Sekolah & Radius Geofencing
+  const schoolLat = schoolProfile.latitude ?? -6.175392;
+  const schoolLng = schoolProfile.longitude ?? 106.827153;
+  const maxRadiusMeters = systemConfig.radiusMeters ?? 200;
+
+  const calculateDistanceInMeters = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+    const R = 6371e3; // meter
+    const φ1 = (lat1 * Math.PI) / 180;
+    const φ2 = (lat2 * Math.PI) / 180;
+    const Δφ = ((lat2 - lat1) * Math.PI) / 180;
+    const Δλ = ((lon2 - lon1) * Math.PI) / 180;
+    const a =
+      Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+      Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  };
+
+  const checkGpsGeofence = async (): Promise<{ valid: boolean; distance?: number; message?: string }> => {
+    if (typeof window === 'undefined' || !navigator.geolocation) {
+      return { valid: true };
+    }
+
+    return new Promise((resolve) => {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const uLat = pos.coords.latitude;
+          const uLng = pos.coords.longitude;
+          const dist = calculateDistanceInMeters(uLat, uLng, schoolLat, schoolLng);
+          if (dist > maxRadiusMeters) {
+            resolve({
+              valid: false,
+              distance: Math.round(dist),
+              message: `Anti-Kecurangan: Anda terdeteksi berada di luar area sekolah (~${Math.round(dist)} meter dari gerbang). Batas maksimal radius adalah ${maxRadiusMeters} meter.`,
+            });
+          } else {
+            resolve({ valid: true, distance: Math.round(dist) });
+          }
+        },
+        () => {
+          if (systemConfig.geofenceEnabled) {
+            resolve({
+              valid: false,
+              message: 'Anti-Kecurangan: Izin lokasi (GPS) diperlukan untuk memvalidasi bahwa Anda berada di area sekolah.',
+            });
+          } else {
+            resolve({ valid: true });
+          }
+        },
+        { enableHighAccuracy: true, timeout: 5000, maximumAge: 15000 }
+      );
+    });
+  };
 
   // Resolusi akun siswa yang definitif (Sistem Produksi Nyata)
   const activeStudent: Student = useMemo(() => {
@@ -267,13 +356,120 @@ export const PortalSiswaView: React.FC = () => {
   };
 
   const handleOpenScanner = (action: 'masuk' | 'pulang') => {
+    // Penguncian scan QR kode jika sudah melakukan scan
+    if (action === 'masuk' && hasCheckedIn) {
+      showToast(`Presensi masuk sudah tercatat hari ini (${todayRecord?.checkInTime} WIB). Scan masuk dikunci.`, 'warning');
+      triggerHaptic('warning');
+      return;
+    }
+    if (action === 'pulang' && hasCheckedOut) {
+      showToast(`Presensi pulang sudah tercatat hari ini (${todayRecord?.checkOutTime} WIB). Scan pulang dikunci.`, 'warning');
+      triggerHaptic('warning');
+      return;
+    }
+    if (action === 'pulang' && !hasCheckedIn) {
+      showToast('Silakan lakukan presensi masuk terlebih dahulu sebelum scan pulang.', 'warning');
+      triggerHaptic('warning');
+      return;
+    }
+
+    triggerHaptic('tap');
     setScannerAction(action);
     navigateTo('scanner');
   };
 
   const handleOpenDetail = (date: string) => {
+    triggerHaptic('tap');
     setSelectedDetailDate(date);
     navigateTo('detail');
+  };
+
+  // Prefill requester contacts from activeStudent
+  useEffect(() => {
+    if (activeStudent) {
+      if (activeStudent.namaWali) {
+        setLeaveRequesterName(activeStudent.namaWali);
+      }
+      if (activeStudent.noHpWali) {
+        setLeaveRequesterPhone(activeStudent.noHpWali);
+      }
+    }
+  }, [activeStudent]);
+
+  // Handle upload foto surat izin / surat dokter
+  const handleLeaveFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      showToast('Ukuran foto maksimal 5MB.', 'error');
+      triggerHaptic('warning');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      setLeaveAttachment(reader.result as string);
+      setLeaveAttachmentName(file.name);
+      triggerHaptic('tap');
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Handle submit pengajuan izin / sakit mandiri
+  const handleSubmitLeave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!leaveReason.trim()) {
+      showToast('Harap jelaskan alasan izin atau sakit secara jelas.', 'error');
+      triggerHaptic('warning');
+      return;
+    }
+
+    setIsSubmittingLeave(true);
+    try {
+      // 1. Submit official leave request
+      await submitLeaveRequest({
+        studentId: activeStudent.id,
+        studentName: activeStudent.nama,
+        nisn: activeStudent.nisn,
+        classId: activeStudent.classId,
+        className: studentDisplayClassName,
+        requesterName: leaveRequesterName || activeStudent.namaWali || activeStudent.nama,
+        requesterRole: (leaveRequesterRole === 'Orang Tua' ? 'Ibu' : leaveRequesterRole === 'Wali' ? 'Wali' : 'Siswa') as any,
+        requesterPhone: leaveRequesterPhone,
+        leaveType,
+        subCategory: leaveType === 'sakit' ? 'Sakit (Istirahat / Surat Dokter)' : 'Izin Keperluan Keluarga',
+        startDate: leaveStartDate,
+        endDate: leaveEndDate,
+        reason: leaveReason,
+        attachmentUrl: leaveAttachment || undefined,
+        attachmentName: leaveAttachmentName || undefined,
+      });
+
+      // 2. Mark attendance immediately for the student
+      await submitStudentAttendance(
+        activeStudent.id,
+        leaveType,
+        `${leaveType === 'sakit' ? 'Sakit' : 'Izin'}: ${leaveReason}`,
+        leaveStartDate
+      );
+
+      playChimeSuccess();
+      triggerHaptic('success');
+      showToast(`Pengajuan ${leaveType === 'sakit' ? 'Sakit' : 'Izin'} berhasil dikirim dan dicatat ke sistem!`, 'success');
+
+      // Reset form
+      setLeaveReason('');
+      setLeaveAttachment('');
+      setLeaveAttachmentName('');
+
+      // Navigate back to Beranda
+      navigateTo('beranda');
+    } catch (err: any) {
+      playChimeWarning();
+      triggerHaptic('error');
+      showToast(err?.message || 'Gagal mengirim pengajuan izin/sakit.', 'error');
+    } finally {
+      setIsSubmittingLeave(false);
+    }
   };
 
   // CAMERA SCANNER LOGIC FOR SCREEN 2
@@ -282,6 +478,18 @@ export const PortalSiswaView: React.FC = () => {
     setScanStatusMessage('');
     setScanStatusType('idle');
     isProcessingRef.current = false;
+
+    // Penguncian: Cek apakah tindakan ini sudah pernah dicatat
+    if (scannerAction === 'masuk' && hasCheckedIn) {
+      setScanStatusType('rejected');
+      setScanStatusMessage(`Presensi masuk sudah tercatat (${todayRecord?.checkInTime} WIB). Pemindaian dikunci.`);
+      return;
+    }
+    if (scannerAction === 'pulang' && hasCheckedOut) {
+      setScanStatusType('rejected');
+      setScanStatusMessage(`Presensi pulang sudah tercatat (${todayRecord?.checkOutTime} WIB). Pemindaian dikunci.`);
+      return;
+    }
 
     try {
       if (scannerRef.current) {
@@ -307,10 +515,29 @@ export const PortalSiswaView: React.FC = () => {
           if (isProcessingRef.current) return;
           isProcessingRef.current = true;
 
-          // Parse QR code
+          // 1. Penguncian Check: Hindari scan ulang
+          if (scannerAction === 'masuk' && hasCheckedIn) {
+            playChimeWarning();
+            triggerHaptic('warning');
+            setScanStatusType('rejected');
+            setScanStatusMessage(`Presensi masuk sudah tercatat pukul ${todayRecord?.checkInTime} WIB. Pemindaian dikunci.`);
+            setTimeout(() => { isProcessingRef.current = false; }, 2500);
+            return;
+          }
+          if (scannerAction === 'pulang' && hasCheckedOut) {
+            playChimeWarning();
+            triggerHaptic('warning');
+            setScanStatusType('rejected');
+            setScanStatusMessage(`Presensi pulang sudah tercatat pukul ${todayRecord?.checkOutTime} WIB. Pemindaian dikunci.`);
+            setTimeout(() => { isProcessingRef.current = false; }, 2500);
+            return;
+          }
+
+          // 2. Parse QR code
           const parsed = parseClassQrPayload(decodedText);
           if (!parsed.valid || !parsed.classId) {
             playChimeWarning();
+            triggerHaptic('warning');
             setScanStatusType('rejected');
             setScanStatusMessage(parsed.error || 'Format QR Code tidak valid.');
             setTimeout(() => {
@@ -319,7 +546,19 @@ export const PortalSiswaView: React.FC = () => {
             return;
           }
 
-          // Check class match (with simulation mode loose matching)
+          // 3. Anti-Kecurangan: Cek usia token QR (Mencegah foto/screenshot QR code yang disebar)
+          if (parsed.timestamp && Date.now() - parsed.timestamp > 5 * 60 * 1000) {
+            playChimeWarning();
+            triggerHaptic('error');
+            setScanStatusType('rejected');
+            setScanStatusMessage('Anti-Kecurangan: QR Code telah kedaluwarsa. Dilarang menggunakan foto/screenshot QR code lama.');
+            setTimeout(() => {
+              isProcessingRef.current = false;
+            }, 2500);
+            return;
+          }
+
+          // 4. Check class match
           const isSim = currentUser?.role !== 'SISWA';
           const scannedClassId = parsed.classId;
           const cleanStudentClassName = (activeStudent.className || studentClass?.name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -338,6 +577,7 @@ export const PortalSiswaView: React.FC = () => {
 
           if (!isClassMatch) {
             playChimeWarning();
+            triggerHaptic('warning');
             setScanStatusType('rejected');
             setScanStatusMessage(`QR Code ini untuk ${parsed.className || 'Rombel Lain'}. Bukan kelas Anda.`);
             setTimeout(() => {
@@ -346,6 +586,22 @@ export const PortalSiswaView: React.FC = () => {
             return;
           }
 
+          // 5. Anti-Kecurangan: Validasi Lokasi Radius GPS Gerbang Sekolah
+          setScanStatusType('processing');
+          setScanStatusMessage('Memverifikasi radius lokasi GPS sekolah...');
+          const geoCheck = await checkGpsGeofence();
+          if (!geoCheck.valid) {
+            playChimeWarning();
+            triggerHaptic('error');
+            setScanStatusType('rejected');
+            setScanStatusMessage(geoCheck.message || 'Anti-Kecurangan: Anda berada di luar area sekolah!');
+            setTimeout(() => {
+              isProcessingRef.current = false;
+            }, 3500);
+            return;
+          }
+
+          // 6. Catat Presensi
           setScanStatusType('processing');
           setScanStatusMessage('Mencatat presensi...');
 
@@ -363,6 +619,7 @@ export const PortalSiswaView: React.FC = () => {
 
           if (res.success) {
             playChimeSuccess();
+            triggerHaptic('success');
             setScanStatusType('success');
             setScanStatusMessage(
               scannerAction === 'masuk'
@@ -376,6 +633,7 @@ export const PortalSiswaView: React.FC = () => {
             }, 1800);
           } else {
             playChimeWarning();
+            triggerHaptic('error');
             setScanStatusType('rejected');
             setScanStatusMessage(res.message || 'Presensi gagal diproses.');
             setTimeout(() => {
@@ -430,26 +688,67 @@ export const PortalSiswaView: React.FC = () => {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    // 1. Penguncian Check
+    if (scannerAction === 'masuk' && hasCheckedIn) {
+      playChimeWarning();
+      triggerHaptic('warning');
+      showToast(`Presensi masuk sudah tercatat hari ini (${todayRecord?.checkInTime} WIB). Scan masuk dikunci.`, 'warning');
+      return;
+    }
+    if (scannerAction === 'pulang' && hasCheckedOut) {
+      playChimeWarning();
+      triggerHaptic('warning');
+      showToast(`Presensi pulang sudah tercatat hari ini (${todayRecord?.checkOutTime} WIB). Scan pulang dikunci.`, 'warning');
+      return;
+    }
+    if (scannerAction === 'pulang' && !hasCheckedIn) {
+      playChimeWarning();
+      triggerHaptic('warning');
+      showToast('Silakan lakukan presensi masuk terlebih dahulu sebelum scan pulang.', 'warning');
+      return;
+    }
+
     try {
       const html5Qr = new Html5Qrcode('file-scanner-temp');
       const decodedText = await html5Qr.scanFile(file, true);
       html5Qr.clear();
 
       const parsed = parseClassQrPayload(decodedText);
-      if (parsed.valid && parsed.classId) {
-        playChimeSuccess();
-        const now = getServerNow();
-        const timeStr = formatServerTimeString(now);
-        await submitStudentAttendance(activeStudent.id, scannerAction, 'Hadir via Upload QR', currentAttendanceDate, timeStr);
-        showToast('Presensi berhasil melalui foto QR!', 'success');
-        setSelectedDetailDate(currentAttendanceDate);
-        setCurrentScreen('detail');
-      } else {
+      if (!parsed.valid || !parsed.classId) {
         playChimeWarning();
+        triggerHaptic('warning');
         showToast('QR Code dalam gambar tidak valid.', 'error');
+        return;
       }
+
+      // Anti-Kecurangan: Usia Token QR
+      if (parsed.timestamp && Date.now() - parsed.timestamp > 5 * 60 * 1000) {
+        playChimeWarning();
+        triggerHaptic('error');
+        showToast('Anti-Kecurangan: Foto QR Code telah kedaluwarsa. Gunakan QR code terbaru di kelas.', 'error');
+        return;
+      }
+
+      // Anti-Kecurangan: Lokasi GPS
+      const geoCheck = await checkGpsGeofence();
+      if (!geoCheck.valid) {
+        playChimeWarning();
+        triggerHaptic('error');
+        showToast(geoCheck.message || 'Anti-Kecurangan: Anda berada di luar area sekolah!', 'error');
+        return;
+      }
+
+      playChimeSuccess();
+      triggerHaptic('success');
+      const now = getServerNow();
+      const timeStr = formatServerTimeString(now);
+      await submitStudentAttendance(activeStudent.id, scannerAction, 'Hadir via Upload QR', currentAttendanceDate, timeStr);
+      showToast('Presensi berhasil melalui foto QR!', 'success');
+      setSelectedDetailDate(currentAttendanceDate);
+      setCurrentScreen('detail');
     } catch (err) {
       playChimeWarning();
+      triggerHaptic('error');
       showToast('Gagal memindai gambar QR. Pastikan foto jelas.', 'error');
     }
   };
@@ -556,17 +855,30 @@ export const PortalSiswaView: React.FC = () => {
 
                     <p className="text-xs text-blue-50 opacity-95 leading-normal pt-1">
                       {hasCheckedIn && hasCheckedOut
-                        ? `Sudah lengkap (Pulang: ${todayRecord?.checkOutTime} WIB)`
+                        ? `✓ Sudah lengkap (Masuk: ${todayRecord?.checkInTime} • Pulang: ${todayRecord?.checkOutTime} WIB)`
                         : hasCheckedIn
-                        ? `Sudah masuk pukul ${todayRecord?.checkInTime} WIB. Siap untuk pulang.`
-                        : 'Pastikan kamu sudah melakukan scan masuk.'}
+                        ? `✓ Sudah masuk pukul ${todayRecord?.checkInTime} WIB. Siap untuk scan pulang.`
+                        : 'Pastikan kamu sudah melakukan scan masuk di gerbang/kelas.'}
                     </p>
 
                     <button
-                      onClick={() => handleOpenScanner(hasCheckedIn ? 'pulang' : 'masuk')}
+                      onClick={() => {
+                        triggerHaptic('tap');
+                        if (hasCheckedIn && hasCheckedOut) {
+                          handleOpenDetail(currentAttendanceDate);
+                        } else {
+                          handleOpenScanner(hasCheckedIn ? 'pulang' : 'masuk');
+                        }
+                      }}
                       className="mt-2.5 inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-white text-blue-600 hover:bg-blue-50 active:scale-95 transition-all text-xs font-black shadow-sm cursor-pointer"
                     >
-                      <span>{hasCheckedIn ? 'Scan Pulang' : 'Scan Sekarang'}</span>
+                      <span>
+                        {hasCheckedIn && hasCheckedOut
+                          ? 'Lihat Bukti Presensi'
+                          : hasCheckedIn
+                          ? 'Scan Pulang'
+                          : 'Scan Sekarang'}
+                      </span>
                       <ChevronRight size={14} />
                     </button>
                   </div>
@@ -603,6 +915,33 @@ export const PortalSiswaView: React.FC = () => {
                       <rect x="86" y="90" width="10" height="12" rx="1" fill="#60A5FA" />
                     </svg>
                   </div>
+                </div>
+              </div>
+
+              {/* Quick Action: Pengajuan Izin / Sakit Mandiri */}
+              <div
+                onClick={() => {
+                  triggerHaptic('tap');
+                  navigateTo('izin-sakit');
+                }}
+                className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200/90 hover:border-amber-300 rounded-3xl p-3.5 flex items-center justify-between shadow-2xs transition-all active:scale-98 cursor-pointer"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-xs">
+                    <FileText size={20} />
+                  </div>
+                  <div className="text-left">
+                    <h4 className="text-xs font-black text-slate-900 leading-tight">
+                      Tidak Masuk Sekolah?
+                    </h4>
+                    <p className="text-[11px] font-semibold text-slate-600 mt-0.5">
+                      Ajukan surat izin atau surat sakit mandiri
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1 text-amber-800 font-bold text-xs shrink-0 bg-white/90 px-3 py-1.5 rounded-full border border-amber-200 shadow-2xs">
+                  <span>Ajukan</span>
+                  <ChevronRight size={14} />
                 </div>
               </div>
 
@@ -712,7 +1051,7 @@ export const PortalSiswaView: React.FC = () => {
                 >
                   <ArrowLeft size={18} />
                 </button>
-                <div>
+                <div className="flex-1">
                   <h2 className="text-base font-black text-slate-900 leading-tight">
                     Scan Absensi {scannerAction === 'masuk' ? '(Masuk)' : '(Pulang)'}
                   </h2>
@@ -722,7 +1061,18 @@ export const PortalSiswaView: React.FC = () => {
                 </div>
               </div>
 
-              {/* Viewfinder Camera Box with White Corner Brackets & Green Laser Line */}
+              {/* Anti-Kecurangan Info Badge */}
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl px-3.5 py-2 flex items-center justify-between text-[11px] text-slate-300 shadow-xs">
+                <div className="flex items-center gap-1.5 text-blue-400 font-black">
+                  <ShieldCheck size={14} />
+                  <span>Anti-Kecurangan Aktif</span>
+                </div>
+                <span className="text-slate-400 font-semibold text-[10px]">
+                  GPS Radius {maxRadiusMeters}m • Token Anti-Replay
+                </span>
+              </div>
+
+              {/* Viewfinder Camera Box with White Corner Brackets */}
               <div className="relative rounded-3xl overflow-hidden bg-slate-900 border-4 border-slate-800 shadow-xl aspect-square flex items-center justify-center">
                 {/* HTML5 Camera Target Element */}
                 <div id="mobile-qr-viewfinder" className="w-full h-full overflow-hidden" />
@@ -738,6 +1088,32 @@ export const PortalSiswaView: React.FC = () => {
                     <div className="w-8 h-8 border-b-4 border-r-4 border-white rounded-br-xl" />
                   </div>
                 </div>
+
+                {/* Lock Overlay when already scanned */}
+                {((scannerAction === 'masuk' && hasCheckedIn) || (scannerAction === 'pulang' && hasCheckedOut)) && (
+                  <div className="absolute inset-0 bg-slate-950/92 text-white p-5 flex flex-col items-center justify-center text-center z-25 space-y-3 animate-in fade-in">
+                    <div className="w-14 h-14 rounded-2xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center shadow-lg">
+                      <Lock size={26} />
+                    </div>
+                    <div className="space-y-1">
+                      <h3 className="text-sm font-black text-white">
+                        Presensi {scannerAction === 'masuk' ? 'Masuk' : 'Pulang'} Terkunci
+                      </h3>
+                      <p className="text-xs text-slate-300 max-w-xs leading-relaxed">
+                        Anda sudah tercatat {scannerAction === 'masuk' ? `masuk pukul ${todayRecord?.checkInTime} WIB` : `pulang pukul ${todayRecord?.checkOutTime} WIB`}. Scanner dikunci untuk mencegah duplikasi.
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => {
+                        triggerHaptic('tap');
+                        handleOpenDetail(currentAttendanceDate);
+                      }}
+                      className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-black text-xs cursor-pointer shadow-md transition-all active:scale-95"
+                    >
+                      Lihat Bukti Presensi
+                    </button>
+                  </div>
+                )}
 
                 {/* Camera Error Message Fallback */}
                 {cameraError && (
@@ -979,20 +1355,86 @@ export const PortalSiswaView: React.FC = () => {
                 </h2>
               </div>
 
-              {/* Status Hero Card (Soft Green Gradient) */}
-              <div className="bg-emerald-50/90 border border-emerald-200 rounded-3xl p-5 flex items-center gap-4">
-                <div className="w-12 h-12 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 shadow-md shadow-emerald-500/20">
-                  <Check size={28} strokeWidth={3} />
-                </div>
-                <div>
-                  <h3 className="text-xl font-black text-emerald-950 leading-tight">
-                    {currentDetailRecord?.status || 'Hadir'}
-                  </h3>
-                  <p className="text-xs font-semibold text-emerald-800 mt-0.5">
-                    {formatIndonesianDate(selectedDetailDate)}
-                  </p>
-                </div>
-              </div>
+              {/* Status Hero Card (Adapts to Hadir, Izin, Sakit, Alfa) */}
+              {(() => {
+                const status = currentDetailRecord?.status || 'Hadir';
+                if (status === 'Sakit') {
+                  return (
+                    <div className="bg-rose-50/90 border border-rose-200 rounded-3xl p-5 flex items-center gap-4">
+                      <div className="w-12 h-12 rounded-full bg-rose-500 text-white flex items-center justify-center shrink-0 shadow-md shadow-rose-500/20">
+                        <HeartPulse size={26} />
+                      </div>
+                      <div className="flex-1">
+                        <h3 className="text-xl font-black text-rose-950 leading-tight">
+                          Sakit
+                        </h3>
+                        <p className="text-xs font-semibold text-rose-800 mt-0.5">
+                          {formatIndonesianDate(selectedDetailDate)}
+                        </p>
+                        {currentDetailRecord?.notes && (
+                          <p className="text-xs text-rose-700/90 font-medium mt-1.5 bg-white/70 px-3 py-1.5 rounded-xl border border-rose-100">
+                            {currentDetailRecord.notes}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                }
+                if (status === 'Izin') {
+                  return (
+                    <div className="bg-amber-50/90 border border-amber-200 rounded-3xl p-5 flex items-center gap-4">
+                      <div className="w-12 h-12 rounded-full bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-md shadow-amber-500/20">
+                        <FileText size={26} />
+                      </div>
+                      <div className="flex-1">
+                        <h3 className="text-xl font-black text-amber-950 leading-tight">
+                          Izin
+                        </h3>
+                        <p className="text-xs font-semibold text-amber-800 mt-0.5">
+                          {formatIndonesianDate(selectedDetailDate)}
+                        </p>
+                        {currentDetailRecord?.notes && (
+                          <p className="text-xs text-amber-700/90 font-medium mt-1.5 bg-white/70 px-3 py-1.5 rounded-xl border border-amber-100">
+                            {currentDetailRecord.notes}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                }
+                if (status === 'Alfa') {
+                  return (
+                    <div className="bg-slate-100 border border-slate-300 rounded-3xl p-5 flex items-center gap-4">
+                      <div className="w-12 h-12 rounded-full bg-slate-500 text-white flex items-center justify-center shrink-0 shadow-md shadow-slate-500/20">
+                        <X size={26} strokeWidth={3} />
+                      </div>
+                      <div className="flex-1">
+                        <h3 className="text-xl font-black text-slate-900 leading-tight">
+                          Alfa (Tanpa Keterangan)
+                        </h3>
+                        <p className="text-xs font-semibold text-slate-600 mt-0.5">
+                          {formatIndonesianDate(selectedDetailDate)}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                }
+                return (
+                  <div className="bg-emerald-50/90 border border-emerald-200 rounded-3xl p-5 flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 shadow-md shadow-emerald-500/20">
+                      <Check size={28} strokeWidth={3} />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-black text-emerald-950 leading-tight">
+                        Hadir
+                      </h3>
+                      <p className="text-xs font-semibold text-emerald-800 mt-0.5">
+                        {formatIndonesianDate(selectedDetailDate)}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* Timestamps Row: Scan Masuk & Scan Pulang Side-by-Side */}
               <div className="grid grid-cols-2 gap-3">
@@ -1111,45 +1553,105 @@ export const PortalSiswaView: React.FC = () => {
               {/* Action Card 1: Scan Masuk (Green Theme) */}
               <div
                 onClick={() => handleOpenScanner('masuk')}
-                className="bg-emerald-50 hover:bg-emerald-100/70 border border-emerald-200 rounded-3xl p-4 flex items-center justify-between cursor-pointer transition-all shadow-xs active:scale-98 group"
+                className={`border rounded-3xl p-4 flex items-center justify-between transition-all shadow-xs ${
+                  hasCheckedIn
+                    ? 'bg-emerald-50/60 border-emerald-300 opacity-90 cursor-default'
+                    : 'bg-emerald-50 hover:bg-emerald-100/70 border-emerald-200 cursor-pointer active:scale-98 group'
+                }`}
               >
                 <div className="flex items-center gap-3.5">
                   <div className="w-12 h-12 rounded-2xl bg-emerald-500 text-white flex items-center justify-center shadow-md shadow-emerald-500/20 shrink-0">
-                    <QrCode size={24} />
+                    {hasCheckedIn ? <CheckCircle2 size={24} /> : <QrCode size={24} />}
                   </div>
                   <div>
-                    <h3 className="text-sm font-black text-emerald-950 leading-tight">
-                      Scan Masuk
-                    </h3>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-sm font-black text-emerald-950 leading-tight">
+                        Scan Masuk
+                      </h3>
+                      {hasCheckedIn && (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-black bg-emerald-600 text-white px-2 py-0.5 rounded-full">
+                          <Lock size={10} />
+                          <span>Tercatat</span>
+                        </span>
+                      )}
+                    </div>
                     <p className="text-xs font-medium text-emerald-700 mt-0.5">
-                      Datang ke sekolah
+                      {hasCheckedIn
+                        ? `Sudah masuk pukul ${todayRecord?.checkInTime} WIB (Terkunci)`
+                        : 'Datang ke sekolah'}
                     </p>
                   </div>
                 </div>
-                <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-800 group-hover:translate-x-1 transition-transform">
-                  <ChevronRight size={18} />
+                <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-800">
+                  {hasCheckedIn ? <Lock size={15} /> : <ChevronRight size={18} className="group-hover:translate-x-1 transition-transform" />}
                 </div>
               </div>
 
               {/* Action Card 2: Scan Pulang (Blue Theme) */}
               <div
                 onClick={() => handleOpenScanner('pulang')}
-                className="bg-blue-50 hover:bg-blue-100/70 border border-blue-200 rounded-3xl p-4 flex items-center justify-between cursor-pointer transition-all shadow-xs active:scale-98 group"
+                className={`border rounded-3xl p-4 flex items-center justify-between transition-all shadow-xs ${
+                  hasCheckedOut
+                    ? 'bg-blue-50/60 border-blue-300 opacity-90 cursor-default'
+                    : !hasCheckedIn
+                    ? 'bg-slate-50 border-slate-200 opacity-75 cursor-not-allowed'
+                    : 'bg-blue-50 hover:bg-blue-100/70 border-blue-200 cursor-pointer active:scale-98 group'
+                }`}
               >
                 <div className="flex items-center gap-3.5">
-                  <div className="w-12 h-12 rounded-2xl bg-blue-600 text-white flex items-center justify-center shadow-md shadow-blue-500/20 shrink-0">
-                    <QrCode size={24} />
+                  <div className={`w-12 h-12 rounded-2xl text-white flex items-center justify-center shadow-md shrink-0 ${
+                    hasCheckedOut ? 'bg-blue-600 shadow-blue-500/20' : !hasCheckedIn ? 'bg-slate-400 shadow-slate-400/20' : 'bg-blue-600 shadow-blue-500/20'
+                  }`}>
+                    {hasCheckedOut ? <CheckCircle2 size={24} /> : <QrCode size={24} />}
                   </div>
                   <div>
-                    <h3 className="text-sm font-black text-blue-950 leading-tight">
-                      Scan Pulang
-                    </h3>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-sm font-black text-blue-950 leading-tight">
+                        Scan Pulang
+                      </h3>
+                      {hasCheckedOut && (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-black bg-blue-600 text-white px-2 py-0.5 rounded-full">
+                          <Lock size={10} />
+                          <span>Tercatat</span>
+                        </span>
+                      )}
+                    </div>
                     <p className="text-xs font-medium text-blue-700 mt-0.5">
-                      Pulang dari sekolah
+                      {hasCheckedOut
+                        ? `Sudah pulang pukul ${todayRecord?.checkOutTime} WIB (Terkunci)`
+                        : !hasCheckedIn
+                        ? 'Perlu scan masuk terlebih dahulu'
+                        : 'Pulang dari sekolah'}
                     </p>
                   </div>
                 </div>
-                <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-800 group-hover:translate-x-1 transition-transform">
+                <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-800">
+                  {hasCheckedOut ? <Lock size={15} /> : <ChevronRight size={18} className="group-hover:translate-x-1 transition-transform" />}
+                </div>
+              </div>
+
+              {/* Action Card 3: Ajukan Izin / Sakit Mandiri (Amber Theme) */}
+              <div
+                onClick={() => {
+                  triggerHaptic('tap');
+                  navigateTo('izin-sakit');
+                }}
+                className="bg-amber-50 hover:bg-amber-100/70 border border-amber-200 rounded-3xl p-4 flex items-center justify-between cursor-pointer transition-all shadow-xs active:scale-98 group"
+              >
+                <div className="flex items-center gap-3.5">
+                  <div className="w-12 h-12 rounded-2xl bg-amber-500 text-white flex items-center justify-center shadow-md shadow-amber-500/20 shrink-0">
+                    <FileText size={24} />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-black text-amber-950 leading-tight">
+                      Pengajuan Izin / Sakit
+                    </h3>
+                    <p className="text-xs font-medium text-amber-800 mt-0.5">
+                      Kirim surat dokter atau permohonan izin
+                    </p>
+                  </div>
+                </div>
+                <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center text-amber-800 group-hover:translate-x-1 transition-transform">
                   <ChevronRight size={18} />
                 </div>
               </div>
@@ -1328,6 +1830,248 @@ export const PortalSiswaView: React.FC = () => {
             </div>
           )}
 
+          {/* ========================================================================= */}
+          {/* SCREEN 7: PENGAJUAN IZIN / SAKIT MANDIRI */}
+          {/* ========================================================================= */}
+          {currentScreen === 'izin-sakit' && (
+            <div className="p-4 sm:p-5 space-y-4 animate-in fade-in duration-200">
+              {/* Header with Back Arrow */}
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    triggerHaptic('tap');
+                    navigateTo(previousScreen || 'beranda');
+                  }}
+                  className="w-9 h-9 rounded-2xl bg-slate-50 hover:bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-800 transition-all cursor-pointer"
+                >
+                  <ArrowLeft size={18} />
+                </button>
+                <div>
+                  <h2 className="text-base font-black text-slate-900 leading-tight">
+                    Pengajuan Izin / Sakit
+                  </h2>
+                  <p className="text-xs text-slate-500">
+                    Form resmi permohonan ketidakhadiran
+                  </p>
+                </div>
+              </div>
+
+              {/* Form Body */}
+              <form onSubmit={handleSubmitLeave} className="space-y-3.5">
+                {/* 1. Pilih Kategori: Sakit vs Izin */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-black text-slate-700 block">
+                    Jenis Ketidakhadiran
+                  </label>
+                  <div className="grid grid-cols-2 gap-2.5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        triggerHaptic('tap');
+                        setLeaveType('sakit');
+                      }}
+                      className={`p-3 rounded-2xl border-2 font-black text-xs flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                        leaveType === 'sakit'
+                          ? 'bg-rose-50 border-rose-500 text-rose-700 shadow-xs'
+                          : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                      }`}
+                    >
+                      <HeartPulse size={18} className={leaveType === 'sakit' ? 'text-rose-600' : 'text-slate-400'} />
+                      <span>Sakit</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        triggerHaptic('tap');
+                        setLeaveType('izin');
+                      }}
+                      className={`p-3 rounded-2xl border-2 font-black text-xs flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                        leaveType === 'izin'
+                          ? 'bg-amber-50 border-amber-500 text-amber-700 shadow-xs'
+                          : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                      }`}
+                    >
+                      <FileText size={18} className={leaveType === 'izin' ? 'text-amber-600' : 'text-slate-400'} />
+                      <span>Izin</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* 2. Rentang Tanggal */}
+                <div className="bg-white border border-slate-200/90 rounded-3xl p-3.5 space-y-2.5 shadow-2xs">
+                  <span className="text-xs font-black text-slate-800 block">
+                    Rentang Waktu
+                  </span>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <span className="text-[11px] font-bold text-slate-500 block mb-1">Mulai Tanggal</span>
+                      <input
+                        type="date"
+                        value={leaveStartDate}
+                        onChange={(e) => setLeaveStartDate(e.target.value)}
+                        className="w-full text-xs font-bold bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-2 outline-none focus:border-blue-500 focus:bg-white transition-all cursor-pointer"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <span className="text-[11px] font-bold text-slate-500 block mb-1">Sampai Tanggal</span>
+                      <input
+                        type="date"
+                        value={leaveEndDate}
+                        onChange={(e) => setLeaveEndDate(e.target.value)}
+                        className="w-full text-xs font-bold bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-2 outline-none focus:border-blue-500 focus:bg-white transition-all cursor-pointer"
+                        required
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* 3. Alasan / Keterangan */}
+                <div className="bg-white border border-slate-200/90 rounded-3xl p-3.5 space-y-1.5 shadow-2xs">
+                  <label className="text-xs font-black text-slate-800 block">
+                    Alasan / Keterangan Lengkap
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={leaveReason}
+                    onChange={(e) => setLeaveReason(e.target.value)}
+                    placeholder={
+                      leaveType === 'sakit'
+                        ? 'Contoh: Mengalami demam tinggi sejak semalam, istirahat di rumah...'
+                        : 'Contoh: Ada keperluan keluarga di luar kota...'
+                    }
+                    className="w-full text-xs bg-slate-50 border border-slate-200 rounded-2xl p-3 outline-none focus:border-blue-500 focus:bg-white transition-all resize-none leading-relaxed"
+                    required
+                  />
+                </div>
+
+                {/* 4. Data Pengaju & Kontak */}
+                <div className="bg-white border border-slate-200/90 rounded-3xl p-3.5 space-y-2.5 shadow-2xs">
+                  <span className="text-xs font-black text-slate-800 block">
+                    Data Pengaju & Kontak
+                  </span>
+                  
+                  <div className="space-y-2">
+                    <div className="flex gap-2">
+                      {(['Orang Tua', 'Wali', 'Siswa'] as const).map((r) => (
+                        <button
+                          key={r}
+                          type="button"
+                          onClick={() => {
+                            triggerHaptic('tap');
+                            setLeaveRequesterRole(r);
+                          }}
+                          className={`flex-1 py-1.5 rounded-xl text-[11px] font-black border transition-all cursor-pointer ${
+                            leaveRequesterRole === r
+                              ? 'bg-blue-600 text-white border-blue-600 shadow-2xs'
+                              : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+                          }`}
+                        >
+                          {r}
+                        </button>
+                      ))}
+                    </div>
+
+                    <div className="space-y-1">
+                      <span className="text-[11px] font-bold text-slate-500 block">Nama Pengaju</span>
+                      <input
+                        type="text"
+                        value={leaveRequesterName}
+                        onChange={(e) => setLeaveRequesterName(e.target.value)}
+                        placeholder="Nama Orang Tua / Siswa"
+                        className="w-full text-xs font-bold bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 outline-none focus:border-blue-500 focus:bg-white transition-all"
+                        required
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <span className="text-[11px] font-bold text-slate-500 block">Nomor WhatsApp</span>
+                      <input
+                        type="tel"
+                        value={leaveRequesterPhone}
+                        onChange={(e) => setLeaveRequesterPhone(e.target.value)}
+                        placeholder="08xxxxxxxxxx"
+                        className="w-full text-xs font-bold bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 outline-none focus:border-blue-500 focus:bg-white transition-all"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* 5. Lampiran Bukti / Surat Dokter */}
+                <div className="bg-white border border-slate-200/90 rounded-3xl p-3.5 space-y-2 shadow-2xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-black text-slate-800 block">
+                      Lampiran Surat (Foto / Bukti)
+                    </span>
+                    <span className="text-[10px] text-slate-400 font-semibold">
+                      Opsional / Disarankan
+                    </span>
+                  </div>
+
+                  {leaveAttachment ? (
+                    <div className="space-y-2">
+                      <div className="relative rounded-2xl overflow-hidden border border-slate-200 max-h-48 bg-slate-50 flex items-center justify-center">
+                        <img src={leaveAttachment} alt="Lampiran Surat" className="max-h-48 object-contain" />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            triggerHaptic('tap');
+                            setLeaveAttachment('');
+                            setLeaveAttachmentName('');
+                          }}
+                          className="absolute top-2 right-2 w-7 h-7 rounded-full bg-rose-600 text-white flex items-center justify-center shadow-md cursor-pointer hover:bg-rose-700"
+                        >
+                          <X size={15} />
+                        </button>
+                      </div>
+                      <span className="text-[11px] font-semibold text-slate-600 block truncate">
+                        ✓ {leaveAttachmentName || 'Foto surat berhasil dilampirkan'}
+                      </span>
+                    </div>
+                  ) : (
+                    <label className="border-2 border-dashed border-slate-200 hover:border-blue-400 hover:bg-blue-50/40 rounded-2xl p-4 flex flex-col items-center justify-center text-center cursor-pointer transition-all space-y-1">
+                      <UploadCloud size={24} className="text-blue-600 mb-1" />
+                      <span className="text-xs font-black text-slate-800">
+                        Unggah Foto Surat Dokter / Keterangan
+                      </span>
+                      <span className="text-[10px] text-slate-400">
+                        Mendukung kamera HP / galeri (JPG, PNG maks. 5MB)
+                      </span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleLeaveFileChange}
+                        className="hidden"
+                      />
+                    </label>
+                  )}
+                </div>
+
+                {/* 6. Info Callout */}
+                <div className="bg-blue-50/70 border border-blue-100 rounded-2xl p-3 flex items-start gap-2.5">
+                  <ShieldAlert size={16} className="text-blue-600 shrink-0 mt-0.5" />
+                  <p className="text-[11px] text-slate-600 leading-relaxed">
+                    Pengajuan akan langsung tercatat sebagai <b>{leaveType === 'sakit' ? 'Sakit' : 'Izin'}</b> pada data presensi harian dan otomatis diteruskan ke wali kelas {studentDisplayClassName}.
+                  </p>
+                </div>
+
+                {/* 7. Submit Button */}
+                <button
+                  type="submit"
+                  disabled={isSubmittingLeave}
+                  className="w-full py-3.5 rounded-2xl bg-blue-600 hover:bg-blue-700 active:scale-98 text-white font-black text-xs shadow-lg shadow-blue-500/25 flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-70"
+                >
+                  <FileText size={16} />
+                  <span>
+                    {isSubmittingLeave ? 'Mengirim Pengajuan...' : `Kirim Pengajuan ${leaveType === 'sakit' ? 'Sakit' : 'Izin'}`}
+                  </span>
+                </button>
+              </form>
+            </div>
+          )}
+
         </div>
 
         {/* 3. PERSISTENT FIXED BOTTOM NAVIGATION BAR (Beranda, Absensi, Profil) */}
@@ -1335,7 +2079,10 @@ export const PortalSiswaView: React.FC = () => {
           {/* Beranda */}
           <button
             id="nav-btn-beranda"
-            onClick={() => setCurrentScreen('beranda')}
+            onClick={() => {
+              triggerHaptic('tap');
+              setCurrentScreen('beranda');
+            }}
             className={`flex flex-col items-center gap-1 transition-all cursor-pointer py-1 px-4 rounded-xl active:scale-95 ${
               currentScreen === 'beranda'
                 ? 'text-blue-600 font-black'
@@ -1349,21 +2096,27 @@ export const PortalSiswaView: React.FC = () => {
           {/* Absensi */}
           <button
             id="nav-btn-absensi"
-            onClick={() => setCurrentScreen('absensi-menu')}
+            onClick={() => {
+              triggerHaptic('tap');
+              setCurrentScreen('absensi-menu');
+            }}
             className={`flex flex-col items-center gap-1 transition-all cursor-pointer py-1 px-4 rounded-xl active:scale-95 ${
-              ['absensi-menu', 'scanner', 'riwayat', 'detail'].includes(currentScreen)
+              ['absensi-menu', 'scanner', 'riwayat', 'detail', 'izin-sakit'].includes(currentScreen)
                 ? 'text-blue-600 font-black'
                 : 'text-slate-400 hover:text-slate-600 font-medium'
             }`}
           >
-            <Calendar size={22} strokeWidth={['absensi-menu', 'scanner', 'riwayat', 'detail'].includes(currentScreen) ? 2.5 : 2} />
+            <Calendar size={22} strokeWidth={['absensi-menu', 'scanner', 'riwayat', 'detail', 'izin-sakit'].includes(currentScreen) ? 2.5 : 2} />
             <span className="text-[11px] tracking-tight font-bold">Absensi</span>
           </button>
 
           {/* Profil */}
           <button
             id="nav-btn-profil"
-            onClick={() => setCurrentScreen('profil')}
+            onClick={() => {
+              triggerHaptic('tap');
+              setCurrentScreen('profil');
+            }}
             className={`flex flex-col items-center gap-1 transition-all cursor-pointer py-1 px-4 rounded-xl active:scale-95 ${
               currentScreen === 'profil'
                 ? 'text-blue-600 font-black'

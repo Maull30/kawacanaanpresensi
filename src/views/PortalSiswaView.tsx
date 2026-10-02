@@ -55,12 +55,20 @@ export const PortalSiswaView: React.FC = () => {
     currentAttendanceDate,
     submitStudentAttendance,
     submitLeaveRequest,
+    cancelLeaveRequest,
+    refreshLeaveRequests,
     leaveRequests,
     getDateStatus,
     showToast,
     setActiveView,
     logout,
   } = useApp();
+
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    refreshLeaveRequests();
+  }, [refreshLeaveRequests]);
 
   // Navigation Screen State
   const [currentScreen, setCurrentScreen] = useState<MobileScreen>('beranda');
@@ -401,9 +409,28 @@ export const PortalSiswaView: React.FC = () => {
   const myLeaveRequests = useMemo(() => {
     if (!activeStudent || !leaveRequests) return [];
     return leaveRequests
-      .filter((r) => r.studentId === activeStudent.id || (activeStudent.nisn && r.nisn === activeStudent.nisn))
+      .filter((r) => {
+        if (r.studentId === activeStudent.id) return true;
+        if (activeStudent.nisn && r.nisn && String(activeStudent.nisn).trim() === String(r.nisn).trim()) return true;
+        if (activeStudent.nama && r.studentName && r.studentName.trim().toLowerCase() === activeStudent.nama.trim().toLowerCase()) return true;
+        return false;
+      })
       .sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime());
   }, [activeStudent, leaveRequests]);
+
+  const handleCancelLeave = async (requestId: string) => {
+    if (!window.confirm('Apakah Anda yakin ingin membatalkan pengajuan surat izin ini?')) {
+      return;
+    }
+    setCancellingId(requestId);
+    try {
+      await cancelLeaveRequest(requestId);
+      triggerHaptic('tap');
+      playChimeSuccess();
+    } finally {
+      setCancellingId(null);
+    }
+  };
 
   // Handle upload foto surat izin / surat dokter
   const handleLeaveFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -2111,30 +2138,49 @@ export const PortalSiswaView: React.FC = () => {
                             </span>
                           </div>
 
-                          {/* Approval Status Badge */}
-                          {req.status === 'PENDING' ? (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-100 text-amber-900 border border-amber-300">
-                              <Clock size={10} />
-                              <span>Menunggu Wali Kelas</span>
-                            </span>
-                          ) : req.status === 'APPROVED' ? (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-900 border border-emerald-300">
-                              <CheckCircle2 size={10} />
-                              <span>Disetujui</span>
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-rose-100 text-rose-900 border border-rose-300">
-                              <XCircle size={10} />
-                              <span>Ditolak</span>
-                            </span>
-                          )}
+                          {/* Approval Status Badge & Cancel Action */}
+                          <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                            {req.status === 'PENDING' ? (
+                              <>
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-100 text-amber-900 border border-amber-300">
+                                  <Clock size={10} />
+                                  <span>Menunggu Wali Kelas</span>
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleCancelLeave(req.id)}
+                                  disabled={cancellingId === req.id}
+                                  className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition-all cursor-pointer active:scale-95 disabled:opacity-50"
+                                  title="Batalkan surat pengajuan izin ini"
+                                >
+                                  <XCircle size={10} />
+                                  <span>{cancellingId === req.id ? 'Membatalkan...' : 'Batalkan'}</span>
+                                </button>
+                              </>
+                            ) : req.status === 'APPROVED' ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-900 border border-emerald-300">
+                                <CheckCircle2 size={10} />
+                                <span>Disetujui</span>
+                              </span>
+                            ) : req.status === 'CANCELLED' ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-slate-100 text-slate-600 border border-slate-300">
+                                <XCircle size={10} />
+                                <span>Dibatalkan</span>
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-rose-100 text-rose-900 border border-rose-300">
+                                <XCircle size={10} />
+                                <span>Ditolak</span>
+                              </span>
+                            )}
+                          </div>
                         </div>
 
                         <p className="text-xs text-slate-700 leading-relaxed font-medium bg-slate-50 rounded-xl p-2.5 border border-slate-100">
                           {req.reason}
                         </p>
 
-                        {/* Review info if approved or rejected */}
+                        {/* Review info if approved, rejected, or cancelled */}
                         {req.status === 'APPROVED' && (
                           <div className="text-[10px] text-emerald-700 font-bold flex items-center gap-1">
                             <Check size={12} strokeWidth={3} />
@@ -2145,6 +2191,12 @@ export const PortalSiswaView: React.FC = () => {
                           <div className="text-[10px] text-rose-700 font-bold flex items-center gap-1">
                             <AlertCircle size={12} />
                             <span>Catatan Wali Kelas: {req.reviewNotes || 'Pengajuan tidak disetujui.'}</span>
+                          </div>
+                        )}
+                        {req.status === 'CANCELLED' && (
+                          <div className="text-[10px] text-slate-500 font-medium flex items-center gap-1">
+                            <AlertCircle size={12} className="text-slate-400" />
+                            <span>Pengajuan telah dibatalkan oleh siswa/wali murid.</span>
                           </div>
                         )}
                       </div>

@@ -55,7 +55,12 @@ export const AbsensiView: React.FC = () => {
     requestFeatureAccess,
     leaveRequests,
     updateLeaveRequestStatus,
+    refreshLeaveRequests,
   } = useApp();
+
+  useEffect(() => {
+    refreshLeaveRequests();
+  }, [refreshLeaveRequests]);
 
   const userScope = useMemo(
     () => getUserRoleScope(currentUser, classes, subjects, teachers),
@@ -218,14 +223,42 @@ export const AbsensiView: React.FC = () => {
     );
   }, [classes, availableClasses, selectedClassId]);
 
+  const isClassMatch = (nameA?: string | null, nameB?: string | null) => {
+    if (!nameA || !nameB) return false;
+    const clean = (s: string) => s.toLowerCase().replace(/^(kelas|kls)\s+/i, '').replace(/[^a-z0-9]/g, '');
+    return clean(nameA) === clean(nameB);
+  };
+
   const pendingClassLeaveRequestsCount = useMemo(() => {
     return (leaveRequests || []).filter((r) => {
       if (r.status !== 'PENDING') return false;
-      if (activeTargetClass?.id && r.classId) return r.classId === activeTargetClass.id;
-      if (activeTargetClass?.name && r.className) return r.className.toLowerCase() === activeTargetClass.name.toLowerCase();
-      return true;
+      if (!activeTargetClass) return true;
+
+      // 1. Direct class ID match
+      if (r.classId && activeTargetClass.id && r.classId === activeTargetClass.id) return true;
+
+      // 2. Class name clean match (e.g. "6A" vs "Kelas 6A")
+      if (r.className && activeTargetClass.name && isClassMatch(r.className, activeTargetClass.name)) return true;
+
+      // 3. Match student enrollment in active target class
+      const stu = students.find((s) => 
+        s.id === r.studentId || 
+        (s.nisn && r.nisn && String(s.nisn).trim() === String(r.nisn).trim()) ||
+        (s.nama && r.studentName && s.nama.trim().toLowerCase() === r.studentName.trim().toLowerCase())
+      );
+      if (stu) {
+        if (stu.classId && activeTargetClass.id && stu.classId === activeTargetClass.id) return true;
+        if (stu.className && activeTargetClass.name && isClassMatch(stu.className, activeTargetClass.name)) return true;
+      }
+
+      // 4. Jika Wali Kelas melihat absensi kelas binaannya dan permohonan tanpa kelas eksplisit
+      if (userScope.isWaliKelas) {
+        if (!r.classId && !r.className) return true;
+      }
+
+      return false;
     }).length;
-  }, [leaveRequests, activeTargetClass]);
+  }, [leaveRequests, activeTargetClass, students, userScope.isWaliKelas]);
 
   const currentDayName = useMemo(() => {
     try {

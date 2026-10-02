@@ -223,6 +223,8 @@ export const TeacherLeaveApprovalModal: React.FC<TeacherLeaveApprovalModalProps>
                             ? 'bg-amber-200 text-amber-900'
                             : req.status === 'APPROVED'
                             ? 'bg-emerald-200 text-emerald-900'
+                            : req.status === 'CANCELLED'
+                            ? 'bg-slate-200 text-slate-700'
                             : 'bg-rose-200 text-rose-900'
                         }`}
                       >
@@ -230,6 +232,8 @@ export const TeacherLeaveApprovalModal: React.FC<TeacherLeaveApprovalModalProps>
                           ? '⏳ Menunggu Verifikasi'
                           : req.status === 'APPROVED'
                           ? '✅ Disetujui'
+                          : req.status === 'CANCELLED'
+                          ? '🚫 Dibatalkan Pengaju'
                           : '❌ Ditolak'}
                       </span>
                     </div>

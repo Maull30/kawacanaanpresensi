@@ -108,7 +108,7 @@ export interface Student {
   hubungannya?: 'Ayah' | 'Ibu' | 'Wali' | string;
 }
 
-export type LeaveRequestStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
+export type LeaveRequestStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
 
 export interface StudentLeaveRequest {
   id: string;

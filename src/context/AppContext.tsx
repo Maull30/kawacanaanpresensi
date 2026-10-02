@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, useMemo } from "react";
+import React, { createContext, useContext, useEffect, useState, useMemo, useCallback } from "react";
 import { supabase, usernameToEmail } from "../lib/supabase";
 import { signInWithEmail } from "../lib/supabaseClient";
 import {
@@ -240,6 +240,8 @@ interface AppContextType {
     status: "APPROVED" | "REJECTED",
     reviewNotes?: string
   ) => Promise<{ success: boolean; message?: string }>;
+  cancelLeaveRequest: (requestId: string) => Promise<{ success: boolean; message?: string }>;
+  refreshLeaveRequests: () => Promise<void>;
   updateStudentParentContact: (
     studentId: string,
     data: { namaWali?: string; noHpWali?: string; hubungannya?: string }
@@ -1074,6 +1076,135 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       return [];
     }
   });
+
+  const refreshLeaveRequests = useCallback(async () => {
+    try {
+      const schoolKey = currentUser?.schoolId || "";
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+      
+      let fetched: StudentLeaveRequest[] = [];
+      if (token) {
+        try {
+          const res = await fetch("/api/attendance", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              action: "get_leave_requests",
+              schoolId: schoolKey,
+            }),
+          });
+          const json = await res.json();
+          if (json?.ok && Array.isArray(json.requests)) {
+            fetched = json.requests;
+          }
+        } catch (_) {}
+      }
+
+      // Fallback langsung ke tabel database Supabase jika API belum mengembalikan
+      if (fetched.length === 0 && schoolKey) {
+        try {
+          const { data: dbRows } = await supabase
+            .from("leave_requests")
+            .select("*")
+            .eq("school_id", schoolKey)
+            .order("submitted_at", { ascending: false });
+          if (Array.isArray(dbRows) && dbRows.length > 0) {
+            fetched = dbRows.map((r: any) => ({
+              id: r.id,
+              schoolId: r.school_id,
+              studentId: r.student_id,
+              classId: r.class_id,
+              studentName: r.student_name,
+              nisn: r.nisn,
+              className: r.class_name,
+              requesterName: r.requester_name,
+              requesterRole: r.requester_role,
+              requesterPhone: r.requester_phone,
+              leaveType: r.leave_type,
+              subCategory: r.sub_category,
+              startDate: r.start_date,
+              endDate: r.end_date,
+              reason: r.reason,
+              attachmentUrl: r.attachment_url,
+              attachmentName: r.attachment_name,
+              status: r.status,
+              submittedAt: r.submitted_at,
+              reviewedBy: r.reviewed_by,
+              reviewedAt: r.reviewed_at,
+              reviewNotes: r.review_notes,
+            }));
+          }
+        } catch (_) {}
+      }
+
+      // Gabungkan dengan cache lokal untuk mendukung testing offline/mandiri
+      let localReqs: StudentLeaveRequest[] = [];
+      try {
+        const stored = localStorage.getItem("kawacanaan_leave_requests_global") || 
+                       (schoolKey ? localStorage.getItem(`kawacanaan_leave_requests_${schoolKey}`) : null);
+        if (stored) localReqs = JSON.parse(stored);
+      } catch (_) {}
+
+      const idMap = new Map<string, StudentLeaveRequest>();
+      localReqs.forEach((r) => idMap.set(r.id, r));
+      fetched.forEach((r) => idMap.set(r.id, r));
+      const combined = Array.from(idMap.values()).sort(
+        (a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime()
+      );
+
+      setLeaveRequests(combined);
+      try {
+        localStorage.setItem("kawacanaan_leave_requests_global", JSON.stringify(combined));
+        if (schoolKey) {
+          localStorage.setItem(`kawacanaan_leave_requests_${schoolKey}`, JSON.stringify(combined));
+        }
+      } catch (_) {}
+    } catch (_) {}
+  }, [currentUser?.schoolId]);
+
+  // Sinkronisasi realtime multi-tab & custom event
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key?.startsWith("kawacanaan_leave_requests")) {
+        try {
+          const updated = JSON.parse(e.newValue || "[]");
+          if (Array.isArray(updated)) {
+            setLeaveRequests(updated);
+          }
+        } catch (_) {}
+      }
+    };
+    const handleCustomSync = () => {
+      try {
+        const stored = localStorage.getItem("kawacanaan_leave_requests_global") || 
+                       (currentUser?.schoolId ? localStorage.getItem(`kawacanaan_leave_requests_${currentUser.schoolId}`) : null);
+        if (stored) {
+          setLeaveRequests(JSON.parse(stored));
+        }
+      } catch (_) {}
+    };
+
+    window.addEventListener("storage", handleStorageChange);
+    window.addEventListener("kawacanaan_leave_requests_updated", handleCustomSync);
+
+    // Initial fetch saat user aktif
+    refreshLeaveRequests();
+
+    // Polling interval setiap 10 detik agar surat izin dari siswa langsung memicu notifikasi di Wali Kelas
+    const intervalId = setInterval(() => {
+      refreshLeaveRequests();
+    }, 10000);
+
+    return () => {
+      window.removeEventListener("storage", handleStorageChange);
+      window.removeEventListener("kawacanaan_leave_requests_updated", handleCustomSync);
+      clearInterval(intervalId);
+    };
+  }, [currentUser?.schoolId, refreshLeaveRequests]);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [globalAnnouncement, setGlobalAnnouncement] = useState<{
     id?: string;
@@ -2062,6 +2193,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     setAttendanceRecords(
       finalAttendance.map((r: any) => dbAttendance(r, ss)),
     );
+    refreshLeaveRequests().catch(() => {});
 
     const { data: subjectRows, error: subjectRowsError } = await supabase
       .from("subjects")
@@ -7520,18 +7652,61 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
   ): Promise<{ success: boolean; message?: string }> => {
     try {
       const schoolKey = currentUser?.schoolId || "global";
-      const newReq: StudentLeaveRequest = {
+      let createdReq: StudentLeaveRequest = {
         ...req,
         id: `leave_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
         status: "PENDING",
         submittedAt: new Date().toISOString(),
       };
 
+      // Simpan ke database server via /api/attendance
+      try {
+        const { data: sessionData } = await supabase.auth.getSession();
+        const token = sessionData?.session?.access_token;
+        if (token) {
+          const res = await fetch("/api/attendance", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              action: "submit_leave_request",
+              schoolId: currentUser?.schoolId,
+              payload: {
+                studentId: req.studentId,
+                studentName: req.studentName,
+                nisn: req.nisn,
+                classId: req.classId,
+                className: req.className,
+                requesterName: req.requesterName,
+                requesterRole: req.requesterRole,
+                requesterPhone: req.requesterPhone,
+                leaveType: req.leaveType,
+                subCategory: req.subCategory,
+                startDate: req.startDate,
+                endDate: req.endDate,
+                reason: req.reason,
+                attachmentUrl: req.attachmentUrl,
+                attachmentName: req.attachmentName,
+              },
+            }),
+          });
+          const json = await res.json();
+          if (json?.ok && json?.request) {
+            createdReq = json.request;
+          }
+        }
+      } catch (apiErr) {
+        console.warn("[submitLeaveRequest] API error, using optimistic local record:", apiErr);
+      }
+
       setLeaveRequests((prev) => {
-        const next = [newReq, ...prev];
+        const next = [createdReq, ...prev.filter((p) => p.id !== createdReq.id)];
         try {
           localStorage.setItem(`kawacanaan_leave_requests_${schoolKey}`, JSON.stringify(next));
           localStorage.setItem("kawacanaan_leave_requests_global", JSON.stringify(next));
+          window.dispatchEvent(new CustomEvent("kawacanaan_leave_requests_updated"));
         } catch (_) {}
         return next;
       });
@@ -7557,6 +7732,63 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
+  const cancelLeaveRequest = async (
+    requestId: string
+  ): Promise<{ success: boolean; message?: string }> => {
+    try {
+      const schoolKey = currentUser?.schoolId || "global";
+      const targetReq = leaveRequests.find((r) => r.id === requestId);
+      if (!targetReq) {
+        return { success: false, message: "Data pengajuan tidak ditemukan." };
+      }
+
+      // Hubungi server untuk memperbarui status pembatalan di Supabase
+      try {
+        const { data: sessionData } = await supabase.auth.getSession();
+        const token = sessionData?.session?.access_token;
+        if (token) {
+          await fetch("/api/attendance", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              action: "cancel_leave_request",
+              requestId,
+            }),
+          });
+        }
+      } catch (apiErr) {
+        console.warn("[cancelLeaveRequest] API error, falling back locally:", apiErr);
+      }
+
+      const updated: StudentLeaveRequest = {
+        ...targetReq,
+        status: "CANCELLED",
+        reviewedAt: new Date().toISOString(),
+        reviewNotes: "Dibatalkan oleh pengguna / pemohon",
+      };
+
+      setLeaveRequests((prev) => {
+        const next = prev.map((r) => (r.id === requestId ? updated : r));
+        try {
+          localStorage.setItem(`kawacanaan_leave_requests_${schoolKey}`, JSON.stringify(next));
+          localStorage.setItem("kawacanaan_leave_requests_global", JSON.stringify(next));
+          window.dispatchEvent(new CustomEvent("kawacanaan_leave_requests_updated"));
+        } catch (_) {}
+        return next;
+      });
+
+      showToast("Pengajuan permohonan izin/sakit berhasil dibatalkan.", "success");
+      return { success: true, message: "Berhasil dibatalkan" };
+    } catch (err: any) {
+      const msg = err?.message || "Gagal membatalkan surat izin.";
+      showToast(msg, "error");
+      return { success: false, message: msg };
+    }
+  };
+
   const updateLeaveRequestStatus = async (
     requestId: string,
     status: "APPROVED" | "REJECTED",
@@ -7567,6 +7799,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       const targetReq = leaveRequests.find((r) => r.id === requestId);
       if (!targetReq) {
         return { success: false, message: "Data pengajuan tidak ditemukan." };
+      }
+
+      // Hubungi server untuk memperbarui status di Supabase & absensi otomatis
+      try {
+        const { data: sessionData } = await supabase.auth.getSession();
+        const token = sessionData?.session?.access_token;
+        if (token) {
+          await fetch("/api/attendance", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              action: "update_leave_request_status",
+              requestId,
+              status,
+              reviewNotes,
+              reviewedBy: currentUser?.name || "Wali Kelas",
+            }),
+          });
+        }
+      } catch (apiErr) {
+        console.warn("[updateLeaveRequestStatus] API error, falling back locally:", apiErr);
       }
 
       const updated: StudentLeaveRequest = {
@@ -7582,6 +7838,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
         try {
           localStorage.setItem(`kawacanaan_leave_requests_${schoolKey}`, JSON.stringify(next));
           localStorage.setItem("kawacanaan_leave_requests_global", JSON.stringify(next));
+          window.dispatchEvent(new CustomEvent("kawacanaan_leave_requests_updated"));
         } catch (_) {}
         return next;
       });
@@ -7609,7 +7866,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
         for (const targetD of datesToMark) {
           await submitStudentAttendance(
             targetReq.studentId,
-            targetReq.leaveType,
+            targetReq.leaveType === "sakit" ? "sakit" : "izin",
             note,
             targetD
           ).catch((e) => console.warn("Auto mark attendance failed for date " + targetD + ":", e));
@@ -8256,6 +8513,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
         leaveRequests,
         submitLeaveRequest,
         updateLeaveRequestStatus,
+        cancelLeaveRequest,
+        refreshLeaveRequests,
         updateStudentParentContact,
       }}
     >

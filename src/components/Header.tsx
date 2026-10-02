@@ -44,7 +44,8 @@ export const Header: React.FC = () => {
     logout,
     isSchoolPro,
     isTeacherPro,
-    openUpgradeModal
+    openUpgradeModal,
+    leaveRequests,
   } = useApp();
 
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
@@ -115,6 +116,21 @@ export const Header: React.FC = () => {
   const notificationItems = useMemo<HeaderNotificationItem[]>(() => {
     const list: HeaderNotificationItem[] = [];
 
+    const isTeacherOrAdmin = currentUser?.role === 'WALI KELAS' || currentUser?.role === 'ADMIN' || currentUser?.role === 'KEPALA SEKOLAH';
+    if (isTeacherOrAdmin && Array.isArray(leaveRequests)) {
+      const pendingLeaves = leaveRequests.filter((r) => r.status === 'PENDING');
+      if (pendingLeaves.length > 0) {
+        const first = pendingLeaves[0];
+        list.push({
+          id: `notif_leave_pending_${first.id}_${pendingLeaves.length}`,
+          title: 'Surat Izin / Sakit Menunggu Verifikasi',
+          message: `${pendingLeaves.length} surat izin/sakit (${first.studentName}${pendingLeaves.length > 1 ? ` dkk` : ''}) menunggu verifikasi Anda di menu Absensi Siswa.`,
+          type: 'warning',
+          time: 'Baru',
+        });
+      }
+    }
+
     if (globalAnnouncement?.active && globalAnnouncement.message) {
       // Dynamic ID based on content & update time to trigger red dot upon new announcements
       const msgHash = encodeURIComponent(globalAnnouncement.message.trim().slice(0, 40));
@@ -168,7 +184,7 @@ export const Header: React.FC = () => {
     });
 
     return list;
-  }, [globalAnnouncement, tenantLifecycle, academicEvents, schoolProfile.semester, schoolProfile.tahunPelajaran]);
+  }, [globalAnnouncement, tenantLifecycle, academicEvents, schoolProfile.semester, schoolProfile.tahunPelajaran, leaveRequests, currentUser?.role]);
 
   const unreadNotifications = useMemo(() => {
     return notificationItems.filter((item) => !readNotifIds.includes(item.id)).length;
@@ -434,11 +450,16 @@ export const Header: React.FC = () => {
                       <div className="space-y-2 max-h-72 overflow-y-auto pr-0.5">
                         {notificationItems.map((item) => {
                           const isUnread = !readNotifIds.includes(item.id);
-
                           return (
                             <div
                               key={item.id}
-                              onClick={() => markSingleAsRead(item.id)}
+                              onClick={() => {
+                                markSingleAsRead(item.id);
+                                if (item.id.startsWith('notif_leave_pending')) {
+                                  setActiveView('absensi');
+                                  setShowNotificationDropdown(false);
+                                }
+                              }}
                               className={`p-3 rounded-xl border transition-all cursor-pointer text-xs space-y-1 relative ${
                                 isUnread
                                   ? item.type === 'alert'

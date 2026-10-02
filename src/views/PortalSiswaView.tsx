@@ -55,6 +55,7 @@ export const PortalSiswaView: React.FC = () => {
     currentAttendanceDate,
     submitStudentAttendance,
     submitLeaveRequest,
+    leaveRequests,
     getDateStatus,
     showToast,
     setActiveView,
@@ -396,6 +397,14 @@ export const PortalSiswaView: React.FC = () => {
     }
   }, [activeStudent]);
 
+  // Filter leave requests for current active student
+  const myLeaveRequests = useMemo(() => {
+    if (!activeStudent || !leaveRequests) return [];
+    return leaveRequests
+      .filter((r) => r.studentId === activeStudent.id || (activeStudent.nisn && r.nisn === activeStudent.nisn))
+      .sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime());
+  }, [activeStudent, leaveRequests]);
+
   // Handle upload foto surat izin / surat dokter
   const handleLeaveFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -414,7 +423,7 @@ export const PortalSiswaView: React.FC = () => {
     reader.readAsDataURL(file);
   };
 
-  // Handle submit pengajuan izin / sakit mandiri
+  // Handle submit pengajuan izin / sakit mandiri (Menunggu Persetujuan Wali Kelas)
   const handleSubmitLeave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!leaveReason.trim()) {
@@ -425,7 +434,7 @@ export const PortalSiswaView: React.FC = () => {
 
     setIsSubmittingLeave(true);
     try {
-      // 1. Submit official leave request
+      // Submit official leave request for Wali Kelas approval
       await submitLeaveRequest({
         studentId: activeStudent.id,
         studentName: activeStudent.nama,
@@ -444,17 +453,12 @@ export const PortalSiswaView: React.FC = () => {
         attachmentName: leaveAttachmentName || undefined,
       });
 
-      // 2. Mark attendance immediately for the student
-      await submitStudentAttendance(
-        activeStudent.id,
-        leaveType,
-        `${leaveType === 'sakit' ? 'Sakit' : 'Izin'}: ${leaveReason}`,
-        leaveStartDate
-      );
-
       playChimeSuccess();
       triggerHaptic('success');
-      showToast(`Pengajuan ${leaveType === 'sakit' ? 'Sakit' : 'Izin'} berhasil dikirim dan dicatat ke sistem!`, 'success');
+      showToast(
+        `Surat ${leaveType === 'sakit' ? 'izin sakit' : 'permohonan izin'} berhasil diajukan! Menunggu verifikasi dan persetujuan Wali Kelas.`,
+        'success'
+      );
 
       // Reset form
       setLeaveReason('');
@@ -2053,7 +2057,7 @@ export const PortalSiswaView: React.FC = () => {
                 <div className="bg-blue-50/70 border border-blue-100 rounded-2xl p-3 flex items-start gap-2.5">
                   <ShieldAlert size={16} className="text-blue-600 shrink-0 mt-0.5" />
                   <p className="text-[11px] text-slate-600 leading-relaxed">
-                    Pengajuan akan langsung tercatat sebagai <b>{leaveType === 'sakit' ? 'Sakit' : 'Izin'}</b> pada data presensi harian dan otomatis diteruskan ke wali kelas {studentDisplayClassName}.
+                    Pengajuan resmi akan diteruskan ke Wali Kelas ({studentDisplayClassName}) untuk diverifikasi. Setelah disetujui, sistem otomatis mencatat presensi Anda sebagai <b>{leaveType === 'sakit' ? 'Sakit' : 'Izin'}</b>.
                   </p>
                 </div>
 
@@ -2069,6 +2073,85 @@ export const PortalSiswaView: React.FC = () => {
                   </span>
                 </button>
               </form>
+
+              {/* Riwayat Pengajuan Surat Izin Siswa */}
+              <div className="space-y-2.5 pt-3 border-t border-slate-100">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-black text-slate-900 tracking-tight">
+                    Riwayat Pengajuan Surat ({myLeaveRequests.length})
+                  </h3>
+                </div>
+
+                {myLeaveRequests.length === 0 ? (
+                  <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-3.5 text-center text-xs text-slate-500 font-medium">
+                    Belum ada pengajuan izin atau sakit yang diajukan.
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {myLeaveRequests.map((req) => (
+                      <div
+                        key={req.id}
+                        className="bg-white border border-slate-200/90 rounded-2xl p-3 shadow-2xs space-y-2"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-1.5">
+                            {req.leaveType === 'sakit' ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-rose-50 text-rose-700 border border-rose-200">
+                                <HeartPulse size={11} />
+                                <span>Sakit</span>
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-50 text-amber-700 border border-amber-200">
+                                <FileText size={11} />
+                                <span>Izin</span>
+                              </span>
+                            )}
+                            <span className="text-[11px] font-bold text-slate-500">
+                              {req.startDate}{req.endDate && req.endDate !== req.startDate ? ` s.d. ${req.endDate}` : ''}
+                            </span>
+                          </div>
+
+                          {/* Approval Status Badge */}
+                          {req.status === 'PENDING' ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-100 text-amber-900 border border-amber-300">
+                              <Clock size={10} />
+                              <span>Menunggu Wali Kelas</span>
+                            </span>
+                          ) : req.status === 'APPROVED' ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-900 border border-emerald-300">
+                              <CheckCircle2 size={10} />
+                              <span>Disetujui</span>
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-rose-100 text-rose-900 border border-rose-300">
+                              <XCircle size={10} />
+                              <span>Ditolak</span>
+                            </span>
+                          )}
+                        </div>
+
+                        <p className="text-xs text-slate-700 leading-relaxed font-medium bg-slate-50 rounded-xl p-2.5 border border-slate-100">
+                          {req.reason}
+                        </p>
+
+                        {/* Review info if approved or rejected */}
+                        {req.status === 'APPROVED' && (
+                          <div className="text-[10px] text-emerald-700 font-bold flex items-center gap-1">
+                            <Check size={12} strokeWidth={3} />
+                            <span>Diverifikasi oleh {req.reviewedBy || 'Wali Kelas'}. Presensi resmi dicatat.</span>
+                          </div>
+                        )}
+                        {req.status === 'REJECTED' && (
+                          <div className="text-[10px] text-rose-700 font-bold flex items-center gap-1">
+                            <AlertCircle size={12} />
+                            <span>Catatan Wali Kelas: {req.reviewNotes || 'Pengajuan tidak disetujui.'}</span>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           )}
 

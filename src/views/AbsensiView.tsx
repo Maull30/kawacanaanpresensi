@@ -1012,42 +1012,44 @@ export const AbsensiView: React.FC = () => {
         </div>
       )}
 
-      {/* Bulk Action Buttons - Compact Toolbar */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+      {/* Bulk Action Buttons - Compact Toolbar (Disejajarkan Layoutnya Secara Harmonis) */}
+      <div className={`grid gap-2 sm:gap-2.5 ${
+        attendanceMode === 'DAILY'
+          ? 'grid-cols-2 sm:grid-cols-3 md:grid-cols-5'
+          : 'grid-cols-2 sm:grid-cols-4'
+      }`}>
         <button
           type="button"
           onClick={handleHadirSemua}
           disabled={isDateLocked || isSaving}
           id="btn-hadir-semua"
           title="Atur semua siswa ke status Hadir. Siswa yang sudah scan QR akan tetap mempertahankan waktu aslinya."
-          className={`py-2 px-3 rounded-xl border font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-2xs min-h-[40px] ${
+          className={`w-full py-2.5 px-3 rounded-xl border font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-2xs min-h-[42px] ${
             isDateLocked || isSaving
               ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
               : 'border-emerald-300 bg-emerald-50 hover:bg-emerald-100 active:scale-95 text-emerald-700 cursor-pointer'
           }`}
         >
-          {isDateLocked ? <Lock size={14} /> : <CheckCircle2 size={14} />}
+          {isDateLocked ? <Lock size={15} /> : <CheckCircle2 size={15} />}
           <span>Hadir Semua</span>
         </button>
 
-        {attendanceMode === 'DAILY' ? (
+        {attendanceMode === 'DAILY' && (
           <button
             type="button"
             onClick={handlePulangMasal}
             disabled={isDateLocked || isSaving}
             id="btn-pulang-masal"
             title="Terapkan jam pulang standar bagi siswa hadir yang belum memiliki jam pulang (waktu checkout riil tetap dipertahankan)."
-            className={`py-2 px-3 rounded-xl border font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-2xs min-h-[40px] ${
+            className={`w-full py-2.5 px-3 rounded-xl border font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-2xs min-h-[42px] ${
               isDateLocked || isSaving
                 ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
                 : 'border-blue-300 bg-blue-50 hover:bg-blue-100 active:scale-95 text-blue-700 cursor-pointer'
             }`}
           >
-            {isDateLocked ? <Lock size={14} /> : <LogOut size={14} />}
+            {isDateLocked ? <Lock size={15} /> : <LogOut size={15} />}
             <span>Pulang Masal</span>
           </button>
-        ) : (
-          <div className="hidden sm:block" />
         )}
 
         <button
@@ -1055,14 +1057,14 @@ export const AbsensiView: React.FC = () => {
           onClick={() => setIsClassQrOpen(true)}
           disabled={!activeTargetClass}
           id="btn-qr-presensi-rombel"
-          className={`py-2 px-3 rounded-xl border font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-2xs min-h-[40px] ${
+          className={`w-full py-2.5 px-3 rounded-xl border font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-2xs min-h-[42px] ${
             !activeTargetClass
               ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
               : 'border-indigo-200 bg-indigo-50 hover:bg-indigo-100 active:scale-95 text-indigo-700 cursor-pointer'
           }`}
           title={`Tampilkan / Cetak QR Code Presensi ${activeTargetClass?.name || 'Rombel Kelas'}`}
         >
-          <QrCode size={14} />
+          <QrCode size={15} />
           <span>QR Presensi</span>
         </button>
 
@@ -1070,10 +1072,10 @@ export const AbsensiView: React.FC = () => {
           type="button"
           onClick={() => setIsLeaveApprovalOpen(true)}
           id="btn-verifikasi-surat-izin"
-          className="relative py-2 px-3 rounded-xl border border-amber-300 bg-amber-50 hover:bg-amber-100 active:scale-95 text-amber-900 font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-2xs min-h-[40px] cursor-pointer"
+          className="relative w-full py-2.5 px-3 rounded-xl border border-amber-300 bg-amber-50 hover:bg-amber-100 active:scale-95 text-amber-900 font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-2xs min-h-[42px] cursor-pointer"
           title="Verifikasi Surat Izin / Sakit dari Orang Tua Siswa"
         >
-          <FileText size={14} className="text-amber-700 shrink-0" />
+          <FileText size={15} className="text-amber-700 shrink-0" />
           <span>Surat Izin Wali</span>
           {pendingClassLeaveRequestsCount > 0 && (
             <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-rose-600 text-white text-[10px] font-black flex items-center justify-center shadow-xs animate-pulse">
@@ -1087,13 +1089,14 @@ export const AbsensiView: React.FC = () => {
           onClick={handleReset}
           disabled={isDateLocked || isSaving}
           id="btn-reset-absensi"
-          className={`py-2 px-3 rounded-xl border font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-2xs min-h-[40px] ${
+          className={`w-full col-span-2 sm:col-span-1 md:col-span-1 py-2.5 px-3 rounded-xl border font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-2xs min-h-[42px] ${
             isDateLocked || isSaving
               ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
               : 'border-rose-300 bg-rose-50 hover:bg-rose-100 active:scale-95 text-rose-700 cursor-pointer'
           }`}
+          title="Reset status kehadiran siswa"
         >
-          {isDateLocked ? <Lock size={14} /> : <RotateCcw size={14} />}
+          {isDateLocked ? <Lock size={15} /> : <RotateCcw size={15} />}
           <span>Reset</span>
         </button>
       </div>

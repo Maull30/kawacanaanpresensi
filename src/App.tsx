@@ -442,11 +442,11 @@ const MainAppContent: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] text-slate-800 flex flex-col antialiased selection:bg-blue-600 selection:text-white">
-      {/* Universal Top Header (disembunyikan khusus Super Admin view agar layout Sidebar Kiri tampil penuh) */}
-      {activeView !== 'superadmin' && <Header />}
+      {/* Universal Top Header (disembunyikan khusus Super Admin view dan Portal Siswa agar layout portal HP tampil penuh dan navigasi bawah selalu terlihat) */}
+      {activeView !== 'superadmin' && activeView !== 'portal-siswa' && <Header />}
 
       {/* Dynamic View Body */}
-      <main className={`flex-1 ${activeView === 'superadmin' ? '' : 'pb-12'}`}>
+      <main className={`flex-1 ${activeView === 'superadmin' || activeView === 'portal-siswa' ? '' : 'pb-12'}`}>
         {activeView === 'superadmin' && <SuperAdminView />}
         {activeView === 'dashboard' && <DashboardView />}
         {activeView === 'data-referensi' && <DataReferensiView />}

@@ -50,6 +50,7 @@ export const PortalSiswaView: React.FC = () => {
     submitStudentAttendance,
     getDateStatus,
     showToast,
+    setActiveView,
     logout,
   } = useApp();
 
@@ -494,26 +495,69 @@ export const PortalSiswaView: React.FC = () => {
     );
   }, [activeStudent, selectedDetailDate, attendanceRecords]);
 
+  // Quick simulation function for seamless testing on all devices
+  const handleSimulateScanSuccess = async () => {
+    if (isProcessingRef.current) return;
+    isProcessingRef.current = true;
+    setScanStatusType('processing');
+    setScanStatusMessage('Mencatat presensi...');
+    playChimeSuccess();
+    const now = getServerNow();
+    const timeStr = formatServerTimeString(now);
+    const notes = scannerAction === 'masuk' ? 'Hadir via Scan QR' : undefined;
+    const res = await submitStudentAttendance(activeStudent.id, scannerAction, notes, currentAttendanceDate, timeStr);
+    if (res.success) {
+      setScanStatusType('success');
+      setScanStatusMessage(
+        scannerAction === 'masuk'
+          ? `Presensi Masuk berhasil dicatat pukul ${timeStr} WIB!`
+          : `Presensi Pulang berhasil dicatat pukul ${timeStr} WIB!`
+      );
+      setTimeout(() => {
+        stopCameraScanner();
+        setSelectedDetailDate(currentAttendanceDate);
+        setCurrentScreen('detail');
+        isProcessingRef.current = false;
+      }, 900);
+    } else {
+      setScanStatusType('rejected');
+      setScanStatusMessage(res.message || 'Presensi gagal.');
+      setTimeout(() => {
+        isProcessingRef.current = false;
+      }, 2000);
+    }
+  };
+
   // =========================================================================
   // RENDER SECTIONS
   // =========================================================================
 
   return (
-    <div className="fixed inset-0 sm:relative sm:inset-auto min-h-screen bg-slate-100 flex justify-center items-start sm:py-6 px-0 sm:px-4 font-sans antialiased text-slate-800 select-none">
+    <div className="min-h-screen bg-slate-100/90 flex justify-center items-start sm:py-6 px-0 sm:px-4 font-sans antialiased text-slate-800 select-none">
       {/* Mobile Smartphone Frame Container (Designed specifically for Mobile Screen) */}
-      <div className="w-full max-w-md bg-white sm:rounded-[36px] sm:shadow-2xl sm:border sm:border-slate-200/80 overflow-hidden flex flex-col h-full sm:h-[860px] relative">
+      <div className="w-full max-w-md bg-white sm:rounded-[36px] sm:shadow-2xl sm:border sm:border-slate-200/90 flex flex-col relative min-h-screen sm:min-h-[844px] pb-24">
         
         {/* Hidden temp div for file upload scanner */}
         <div id="file-scanner-temp" className="hidden" />
 
         {/* Simulation Banner for Admin / Guru */}
         {currentUser?.role !== 'SISWA' && (
-          <div className="bg-amber-500 text-white px-4 py-1 text-[11px] font-bold flex items-center justify-between shrink-0 z-30">
-            <span>Mode Simulasi Siswa:</span>
+          <div className="bg-amber-500 text-white px-4 py-2 text-[11px] font-bold flex items-center justify-between shrink-0 z-30 shadow-xs sm:rounded-t-[36px]">
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setActiveView('dashboard')}
+                className="inline-flex items-center gap-1 bg-amber-600 hover:bg-amber-700 active:scale-95 text-white px-2 py-0.5 rounded text-[10px] font-black cursor-pointer transition-all"
+                title="Kembali ke Dashboard Utama"
+              >
+                <ArrowLeft size={11} />
+                <span>Dashboard</span>
+              </button>
+              <span>Simulasi Siswa:</span>
+            </div>
             <select
               value={activeStudent.id}
               onChange={(e) => setSelectedSimulatedStudentId(e.target.value)}
-              className="bg-amber-600 text-white text-[11px] font-bold rounded px-1.5 py-0.5 outline-none cursor-pointer"
+              className="bg-amber-600 text-white text-[11px] font-bold rounded px-1.5 py-0.5 outline-none cursor-pointer max-w-[150px] truncate"
             >
               {students.map((s) => (
                 <option key={s.id} value={s.id}>
@@ -525,7 +569,7 @@ export const PortalSiswaView: React.FC = () => {
         )}
 
         {/* 2. DYNAMIC CONTENT SCROLL AREA */}
-        <div className="flex-1 overflow-y-auto min-h-0 relative bg-white pb-6">
+        <div className="flex-1 relative bg-white">
           
           {/* ========================================================================= */}
           {/* SCREEN 1: BERANDA (HOME) */}
@@ -823,6 +867,16 @@ export const PortalSiswaView: React.FC = () => {
                   <li>• Jaga jarak 10–20 cm dari QR code.</li>
                 </ul>
               </div>
+
+              {/* Quick Simulation Button for Rapid & Stable Testing */}
+              <button
+                type="button"
+                onClick={handleSimulateScanSuccess}
+                className="w-full py-2.5 px-4 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 active:scale-98 text-white font-black text-xs flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer"
+              >
+                <Sparkles size={16} />
+                <span>Simulasi Scan Berhasil ({scannerAction === 'masuk' ? 'Masuk' : 'Pulang'})</span>
+              </button>
 
               {/* Upload QR Image Fallback Button */}
               <div className="pt-1 flex justify-center">
@@ -1355,46 +1409,49 @@ export const PortalSiswaView: React.FC = () => {
         </div>
 
         {/* 3. PERSISTENT FIXED BOTTOM NAVIGATION BAR (Beranda, Absensi, Profil) */}
-        <div className="shrink-0 w-full bg-white/95 backdrop-blur-md border-t border-slate-100 px-6 py-2.5 flex items-center justify-around z-40 shadow-lg select-none pb-[max(0.625rem,env(safe-area-inset-bottom))]">
+        <nav className="fixed bottom-0 left-0 right-0 max-w-md mx-auto z-50 bg-white border-t border-slate-200/90 px-6 py-2 flex items-center justify-around shadow-[0_-4px_25px_rgba(0,0,0,0.08)] select-none pb-[max(0.625rem,env(safe-area-inset-bottom))]">
           {/* Beranda */}
           <button
+            id="nav-btn-beranda"
             onClick={() => setCurrentScreen('beranda')}
-            className={`flex flex-col items-center gap-1 transition-all cursor-pointer py-1 ${
+            className={`flex flex-col items-center gap-1 transition-all cursor-pointer py-1 px-4 rounded-xl active:scale-95 ${
               currentScreen === 'beranda'
-                ? 'text-blue-600 font-black scale-105'
+                ? 'text-blue-600 font-black'
                 : 'text-slate-400 hover:text-slate-600 font-medium'
             }`}
           >
-            <Home size={20} strokeWidth={currentScreen === 'beranda' ? 2.5 : 2} />
-            <span className="text-[10px] tracking-tight">Beranda</span>
+            <Home size={22} strokeWidth={currentScreen === 'beranda' ? 2.5 : 2} />
+            <span className="text-[11px] tracking-tight font-bold">Beranda</span>
           </button>
 
           {/* Absensi */}
           <button
+            id="nav-btn-absensi"
             onClick={() => setCurrentScreen('absensi-menu')}
-            className={`flex flex-col items-center gap-1 transition-all cursor-pointer py-1 ${
+            className={`flex flex-col items-center gap-1 transition-all cursor-pointer py-1 px-4 rounded-xl active:scale-95 ${
               ['absensi-menu', 'scanner', 'riwayat', 'detail'].includes(currentScreen)
-                ? 'text-blue-600 font-black scale-105'
+                ? 'text-blue-600 font-black'
                 : 'text-slate-400 hover:text-slate-600 font-medium'
             }`}
           >
-            <Calendar size={20} strokeWidth={['absensi-menu', 'scanner', 'riwayat', 'detail'].includes(currentScreen) ? 2.5 : 2} />
-            <span className="text-[10px] tracking-tight">Absensi</span>
+            <Calendar size={22} strokeWidth={['absensi-menu', 'scanner', 'riwayat', 'detail'].includes(currentScreen) ? 2.5 : 2} />
+            <span className="text-[11px] tracking-tight font-bold">Absensi</span>
           </button>
 
           {/* Profil */}
           <button
+            id="nav-btn-profil"
             onClick={() => setCurrentScreen('profil')}
-            className={`flex flex-col items-center gap-1 transition-all cursor-pointer py-1 ${
+            className={`flex flex-col items-center gap-1 transition-all cursor-pointer py-1 px-4 rounded-xl active:scale-95 ${
               currentScreen === 'profil'
-                ? 'text-blue-600 font-black scale-105'
+                ? 'text-blue-600 font-black'
                 : 'text-slate-400 hover:text-slate-600 font-medium'
             }`}
           >
-            <User size={20} strokeWidth={currentScreen === 'profil' ? 2.5 : 2} />
-            <span className="text-[10px] tracking-tight">Profil</span>
+            <User size={22} strokeWidth={currentScreen === 'profil' ? 2.5 : 2} />
+            <span className="text-[11px] tracking-tight font-bold">Profil</span>
           </button>
-        </div>
+        </nav>
 
         {/* MONTH PICKER MODAL */}
         {showMonthPickerModal && (

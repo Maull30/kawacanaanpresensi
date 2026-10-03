@@ -364,6 +364,7 @@ const dbSubject = (
   const scheduleRows = scheduleMap?.get(x.id) || [];
 
   const classDaysMap = new Map<string, Set<string>>();
+  const classTimeMap = new Map<string, { startTime?: string; endTime?: string }>();
   const generalDaysSet = new Set<string>();
   let customLessonPeriod = "";
 
@@ -372,12 +373,20 @@ const dbSubject = (
     const lp = r.lesson_period || "";
     if (day) {
       if (lp.startsWith("cls:")) {
-        const classId = lp.replace(/^cls:/, "").trim();
+        const rawCls = lp.replace(/^cls:/, "").trim();
+        const [classId, timePart] = rawCls.split("@");
         if (classId) {
           if (!classDaysMap.has(classId)) {
             classDaysMap.set(classId, new Set());
           }
           classDaysMap.get(classId)!.add(day);
+
+          if (timePart && !classTimeMap.has(classId)) {
+            const [st, et] = timePart.split("-");
+            if (st && et) {
+              classTimeMap.set(classId, { startTime: st.trim(), endTime: et.trim() });
+            }
+          }
         }
       } else {
         generalDaysSet.add(day);
@@ -389,29 +398,38 @@ const dbSubject = (
   const classSchedules: SubjectClassSchedule[] = [];
   targetClassIds.forEach((cid: string) => {
     const clsName = classMap?.get(cid)?.name || "";
+    const times = classTimeMap.get(cid);
     if (classDaysMap.has(cid)) {
       classSchedules.push({
         classId: cid,
         className: clsName,
         days: Array.from(classDaysMap.get(cid)!),
+        startTime: times?.startTime,
+        endTime: times?.endTime,
       });
     } else if (generalDaysSet.size > 0) {
       classSchedules.push({
         classId: cid,
         className: clsName,
         days: Array.from(generalDaysSet),
+        startTime: times?.startTime,
+        endTime: times?.endTime,
       });
     } else {
       classSchedules.push({
         classId: cid,
         className: clsName,
         days: [],
+        startTime: times?.startTime,
+        endTime: times?.endTime,
       });
     }
   });
 
   const allUniqueDays = new Set<string>([...generalDaysSet]);
   classSchedules.forEach((cs) => cs.days.forEach((d) => allUniqueDays.add(d)));
+
+  const firstValidScheduleTime = classSchedules.find((cs) => cs.startTime && cs.endTime);
 
   return {
     id: x.id,
@@ -425,6 +443,8 @@ const dbSubject = (
     scheduleDays: Array.from(allUniqueDays),
     classSchedules,
     lessonPeriod: customLessonPeriod,
+    defaultStartTime: firstValidScheduleTime?.startTime || '07:30',
+    defaultEndTime: firstValidScheduleTime?.endTime || '09:00',
   };
 };
 
@@ -434,8 +454,8 @@ const dbAttendance = (r: any, students: Student[]): AttendanceRecord => ({
   studentId: r.student_id,
   studentName: students.find((s) => s.id === r.student_id)?.nama || "",
   status: r.status,
-  checkInTime: r.check_in_time ? String(r.check_in_time).slice(0, 5) : "-",
-  checkOutTime: r.check_out_time ? String(r.check_out_time).slice(0, 5) : "-",
+  checkInTime: r.check_in_time ? String(r.check_in_time).slice(0, 5) : "",
+  checkOutTime: r.check_out_time ? String(r.check_out_time).slice(0, 5) : "",
   notes: r.notes || "",
   type: r.type || "DAILY",
   subjectId: r.subject_id || null,
@@ -6709,12 +6729,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
 
       if (s.classSchedules && s.classSchedules.length > 0) {
         s.classSchedules.forEach((cs) => {
+          const timeSuffix = cs.startTime && cs.endTime ? `@${cs.startTime}-${cs.endTime}` : '';
           (cs.days || []).forEach((day) => {
             scheduleInserts.push({
               school_id: schoolId,
               subject_id: data.id,
               day_of_week: day,
-              lesson_period: `cls:${cs.classId}`,
+              lesson_period: `cls:${cs.classId}${timeSuffix}`,
             });
           });
         });
@@ -6866,12 +6887,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
 
       if (s.classSchedules && s.classSchedules.length > 0) {
         s.classSchedules.forEach((cs) => {
+          const timeSuffix = cs.startTime && cs.endTime ? `@${cs.startTime}-${cs.endTime}` : '';
           (cs.days || []).forEach((day) => {
             updateScheduleInserts.push({
               school_id: schoolId,
               subject_id: id,
               day_of_week: day,
-              lesson_period: `cls:${cs.classId}`,
+              lesson_period: `cls:${cs.classId}${timeSuffix}`,
             });
           });
         });

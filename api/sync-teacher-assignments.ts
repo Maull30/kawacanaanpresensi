@@ -186,8 +186,13 @@ export default async function handler(req: any, res: any) {
       const subjectCode = (String(body.code || '').trim() || subjectName.slice(0, 4)).toUpperCase();
       const targetClassIds: string[] = Array.isArray(body.targetClassIds) ? body.targetClassIds : [];
       const scheduleDays: string[] = Array.isArray(body.scheduleDays) ? body.scheduleDays : [];
-      const classSchedules: Array<{ classId: string; className?: string; days: string[] }> =
-        Array.isArray(body.classSchedules) ? body.classSchedules : [];
+      const classSchedules: Array<{
+        classId: string;
+        className?: string;
+        days: string[];
+        startTime?: string;
+        endTime?: string;
+      }> = Array.isArray(body.classSchedules) ? body.classSchedules : [];
 
       let teacherId = body.teacherId || null;
 
@@ -302,12 +307,13 @@ export default async function handler(req: any, res: any) {
 
       if (classSchedules.length > 0) {
         classSchedules.forEach((cs) => {
+          const timeInfo = cs.startTime && cs.endTime ? `@${cs.startTime}-${cs.endTime}` : '';
           (cs.days || []).forEach((d) => {
             scheduleInserts.push({
               school_id: schoolId,
               subject_id: subjectId,
               day_of_week: d,
-              lesson_period: `cls:${cs.classId}`,
+              lesson_period: `cls:${cs.classId}${timeInfo}`,
             });
           });
         });

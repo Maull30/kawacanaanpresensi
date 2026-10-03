@@ -1748,9 +1748,11 @@ export const PublicDailyReportViewer: React.FC<PublicDailyReportViewerProps> = (
                     <th className="border border-slate-400 p-1.5 text-left">NAMA SISWA</th>
                     <th className="border border-slate-400 p-1.5 w-10">L/P</th>
                     <th className="border border-slate-400 p-1.5 w-20">STATUS</th>
-                    <th className="border border-slate-400 p-1.5 w-20">MASUK</th>
-                    <th className="border border-slate-400 p-1.5 w-20">PULANG</th>
-                    <th className="border border-slate-400 p-1.5 text-left">KETERANGAN</th>
+                    <th className="border border-slate-400 p-1.5 w-20">{attendanceType === 'SUBJECT' ? 'MULAI' : 'MASUK'}</th>
+                    <th className="border border-slate-400 p-1.5 w-20">{attendanceType === 'SUBJECT' ? 'SELESAI' : 'PULANG'}</th>
+                    <th className="border border-slate-400 p-1.5 text-left">
+                      {attendanceType === 'SUBJECT' ? 'KETERANGAN / CATATAN MAPEL' : 'KETERANGAN'}
+                    </th>
                   </tr>
                 </thead>
                 <tbody>

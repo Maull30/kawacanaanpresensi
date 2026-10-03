@@ -507,8 +507,45 @@ export const AbsensiView: React.FC = () => {
     return null;
   }, [activeSubject, selectedClassId, activeTargetClass]);
 
-  const scheduledStartTime = activeClassSchedule?.startTime || activeSubject?.defaultStartTime || '07:30';
-  const scheduledEndTime = activeClassSchedule?.endTime || activeSubject?.defaultEndTime || '09:00';
+  // Parsing jam mulai & jam selesai dari format text lessonPeriod jika ada (misal: "07:30 - 09:00" atau "08.00-09.30")
+  const parsedLessonPeriod = useMemo(() => {
+    if (!activeSubject?.lessonPeriod) return null;
+    const match = activeSubject.lessonPeriod.match(/(\d{1,2}[:.]\d{2})\s*[-–—s.d]+\s*(\d{1,2}[:.]\d{2})/i);
+    if (match) {
+      return {
+        start: match[1].replace('.', ':').padStart(5, '0'),
+        end: match[2].replace('.', ':').padStart(5, '0'),
+      };
+    }
+    const singleMatch = activeSubject.lessonPeriod.match(/(\d{1,2}[:.]\d{2})/);
+    if (singleMatch) {
+      return {
+        start: singleMatch[1].replace('.', ':').padStart(5, '0'),
+        end: '09:00',
+      };
+    }
+    return null;
+  }, [activeSubject?.lessonPeriod]);
+
+  // Cari fallback waktu dari jadwal kelas manapun pada mata pelajaran ini jika belum diset khusus
+  const anyScheduleWithTime = useMemo(() => {
+    if (!activeSubject?.classSchedules) return null;
+    return activeSubject.classSchedules.find((cs) => cs.startTime && cs.endTime) || null;
+  }, [activeSubject]);
+
+  const scheduledStartTime =
+    activeClassSchedule?.startTime ||
+    activeSubject?.defaultStartTime ||
+    anyScheduleWithTime?.startTime ||
+    parsedLessonPeriod?.start ||
+    '07:30';
+
+  const scheduledEndTime =
+    activeClassSchedule?.endTime ||
+    activeSubject?.defaultEndTime ||
+    anyScheduleWithTime?.endTime ||
+    parsedLessonPeriod?.end ||
+    '09:00';
 
   const isScheduleConfigured = scheduledDaysForClass.length > 0;
 
@@ -2083,11 +2120,13 @@ export const AbsensiView: React.FC = () => {
                                   newStatus === 'Hadir' && !r.checkInTime
                                     ? attendanceMode === 'DAILY'
                                       ? systemConfig.defaultCheckInTime
-                                      : activeSubject?.lessonPeriod || '07:30'
+                                      : scheduledStartTime
                                     : r.checkInTime,
                                 checkOutTime:
-                                  newStatus === 'Hadir' && !r.checkOutTime && attendanceMode === 'DAILY'
-                                    ? systemConfig.defaultCheckOutTime
+                                  newStatus === 'Hadir' && !r.checkOutTime
+                                    ? attendanceMode === 'DAILY'
+                                      ? systemConfig.defaultCheckOutTime
+                                      : scheduledEndTime
                                     : r.checkOutTime,
                               });
                             }}
@@ -2099,58 +2138,63 @@ export const AbsensiView: React.FC = () => {
                       })}
                     </div>
 
-                    {/* Card Extra Fields: Times or Notes */}
-                    {attendanceMode === 'DAILY' ? (
-                      <div className="grid grid-cols-2 gap-2 pt-1 text-xs">
-                        <div className="flex items-center gap-1 bg-slate-50 px-2 py-1 rounded-lg border border-slate-200">
-                          <Clock size={11} className="text-slate-400 shrink-0" />
-                          <span className="text-[10px] text-slate-500 font-bold shrink-0">Masuk:</span>
-                          <input
-                            type="text"
-                            value={r.checkInTime || ''}
-                            disabled={isDateLocked}
-                            placeholder="07:00"
-                            onChange={(e) => updateRecord(r.studentId, { checkInTime: e.target.value })}
-                            className="w-full bg-transparent text-xs font-semibold text-slate-800 outline-none"
-                          />
-                        </div>
-
-                        <div className="flex items-center gap-1 bg-slate-50 px-2 py-1 rounded-lg border border-slate-200">
-                          <Clock size={11} className="text-slate-400 shrink-0" />
-                          <span className="text-[10px] text-slate-500 font-bold shrink-0">Pulang:</span>
-                          <input
-                            type="text"
-                            value={r.checkOutTime || ''}
-                            disabled={isDateLocked}
-                            placeholder="14:00"
-                            onChange={(e) => updateRecord(r.studentId, { checkOutTime: e.target.value })}
-                            className="w-full bg-transparent text-xs font-semibold text-slate-800 outline-none"
-                          />
-                        </div>
-
-                        <div className="col-span-2">
-                          <input
-                            type="text"
-                            value={r.notes || ''}
-                            disabled={isDateLocked}
-                            placeholder="Catatan / keterangan surat izin..."
-                            onChange={(e) => updateRecord(r.studentId, { notes: e.target.value })}
-                            className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800 placeholder-slate-400 outline-none focus:border-blue-500"
-                          />
-                        </div>
+                    {/* Card Extra Fields: Times and Notes (Diselaraskan format antara Wali Kelas dan Guru Mapel) */}
+                    <div className="grid grid-cols-2 gap-2 pt-1 text-xs">
+                      <div className="flex items-center gap-1 bg-slate-50 px-2 py-1 rounded-lg border border-slate-200">
+                        <Clock size={11} className="text-slate-400 shrink-0" />
+                        <span className="text-[10px] text-slate-500 font-bold shrink-0">
+                          {attendanceMode === 'DAILY' ? 'Masuk:' : 'Mulai:'}
+                        </span>
+                        <input
+                          type="text"
+                          value={r.checkInTime || ''}
+                          disabled={isDateLocked}
+                          placeholder={attendanceMode === 'DAILY' ? (systemConfig.defaultCheckInTime || '07:00') : scheduledStartTime}
+                          onChange={(e) => updateRecord(r.studentId, { checkInTime: e.target.value })}
+                          className="w-full bg-transparent text-xs font-semibold text-slate-800 outline-none"
+                          title={
+                            attendanceMode === 'DAILY'
+                              ? 'Jam Masuk Sekolah'
+                              : `Jam Mulai Pelajaran ${activeSubject?.name || 'Mapel'} (Terintegrasi: ${scheduledStartTime})`
+                          }
+                        />
                       </div>
-                    ) : (
-                      <div className="pt-1 text-xs space-y-1.5">
+
+                      <div className="flex items-center gap-1 bg-slate-50 px-2 py-1 rounded-lg border border-slate-200">
+                        <Clock size={11} className="text-slate-400 shrink-0" />
+                        <span className="text-[10px] text-slate-500 font-bold shrink-0">
+                          {attendanceMode === 'DAILY' ? 'Pulang:' : 'Selesai:'}
+                        </span>
+                        <input
+                          type="text"
+                          value={r.checkOutTime || ''}
+                          disabled={isDateLocked}
+                          placeholder={attendanceMode === 'DAILY' ? (systemConfig.defaultCheckOutTime || '14:00') : scheduledEndTime}
+                          onChange={(e) => updateRecord(r.studentId, { checkOutTime: e.target.value })}
+                          className="w-full bg-transparent text-xs font-semibold text-slate-800 outline-none"
+                          title={
+                            attendanceMode === 'DAILY'
+                              ? 'Jam Pulang Sekolah'
+                              : `Jam Selesai Pelajaran ${activeSubject?.name || 'Mapel'} (Terintegrasi: ${scheduledEndTime})`
+                          }
+                        />
+                      </div>
+
+                      <div className="col-span-2">
                         <input
                           type="text"
                           value={r.notes || ''}
                           disabled={isDateLocked}
-                          placeholder="Catatan keaktifan siswa saat jam pelajaran..."
+                          placeholder={
+                            attendanceMode === 'DAILY'
+                              ? 'Catatan / keterangan surat izin...'
+                              : 'Catatan keaktifan siswa saat jam pelajaran...'
+                          }
                           onChange={(e) => updateRecord(r.studentId, { notes: e.target.value })}
                           className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800 placeholder-slate-400 outline-none focus:border-blue-500"
                         />
                       </div>
-                    )}
+                    </div>
                   </div>
                 ))
               ) : (
@@ -2176,8 +2220,9 @@ export const AbsensiView: React.FC = () => {
                       </>
                     ) : (
                       <>
-                        <th className="py-2.5 px-3 w-32">JAM MAPEL</th>
-                        <th className="py-2.5 px-3.5">CATATAN KEAKTIFAN MAPEL</th>
+                        <th className="py-2.5 px-3 w-28">JAM MULAI</th>
+                        <th className="py-2.5 px-3 w-28">JAM SELESAI</th>
+                        <th className="py-2.5 px-3.5 w-52">KETERANGAN GURU MAPEL</th>
                       </>
                     )}
                   </tr>
@@ -2332,11 +2377,13 @@ export const AbsensiView: React.FC = () => {
                                   e.target.value === 'Hadir' && !r.checkInTime
                                     ? attendanceMode === 'DAILY'
                                       ? systemConfig.defaultCheckInTime
-                                      : activeSubject?.lessonPeriod || '07:30'
+                                      : scheduledStartTime
                                     : r.checkInTime,
                                 checkOutTime:
-                                  e.target.value === 'Hadir' && !r.checkOutTime && attendanceMode === 'DAILY'
-                                    ? systemConfig.defaultCheckOutTime
+                                  e.target.value === 'Hadir' && !r.checkOutTime
+                                    ? attendanceMode === 'DAILY'
+                                      ? systemConfig.defaultCheckOutTime
+                                      : scheduledEndTime
                                     : r.checkOutTime,
                               })
                             }
@@ -2364,12 +2411,13 @@ export const AbsensiView: React.FC = () => {
 
                         {attendanceMode === 'DAILY' ? (
                           <>
-                            {/* Masuk Time */}
+                            {/* Masuk Time (Wali Kelas) */}
                             <td className="py-2.5 px-3">
                               <div className="relative flex items-center">
                                 <input
                                   type="text"
                                   value={r.checkInTime || ''}
+                                  placeholder={systemConfig.defaultCheckInTime || '07:00'}
                                   disabled={isDateLocked}
                                   readOnly={isDateLocked}
                                   onChange={(e) => updateRecord(r.studentId, { checkInTime: e.target.value })}
@@ -2378,17 +2426,19 @@ export const AbsensiView: React.FC = () => {
                                       ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'
                                       : 'bg-slate-50 border-slate-200 text-slate-800 focus:border-blue-600 focus:bg-white'
                                   }`}
+                                  title="Jam Masuk Sekolah (Wali Kelas)"
                                 />
                                 <Clock size={11} className="absolute right-1.5 text-slate-400 pointer-events-none" />
                               </div>
                             </td>
 
-                            {/* Pulang Time */}
+                            {/* Pulang Time (Wali Kelas) */}
                             <td className="py-2.5 px-3">
                               <div className="relative flex items-center">
                                 <input
                                   type="text"
                                   value={r.checkOutTime || ''}
+                                  placeholder={systemConfig.defaultCheckOutTime || '14:00'}
                                   disabled={isDateLocked}
                                   readOnly={isDateLocked}
                                   onChange={(e) => updateRecord(r.studentId, { checkOutTime: e.target.value })}
@@ -2397,6 +2447,7 @@ export const AbsensiView: React.FC = () => {
                                       ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'
                                       : 'bg-slate-50 border-slate-200 text-slate-800 focus:border-blue-600 focus:bg-white'
                                   }`}
+                                  title="Jam Pulang Sekolah (Wali Kelas)"
                                 />
                                 <Clock size={11} className="absolute right-1.5 text-slate-400 pointer-events-none" />
                               </div>
@@ -2421,14 +2472,49 @@ export const AbsensiView: React.FC = () => {
                           </>
                         ) : (
                           <>
-                            {/* Jam Pelajaran Mapel */}
+                            {/* Jam Mulai (Guru Mapel - Terintegrasi dengan Data Referensi Mata Pelajaran) */}
                             <td className="py-2.5 px-3">
-                              <span className="text-[11px] font-semibold text-slate-700 bg-slate-100 px-2 py-0.5 rounded block text-center">
-                                {r.checkInTime || activeSubject?.lessonPeriod || 'Sesuai'}
-                              </span>
+                              <div className="relative flex items-center">
+                                <input
+                                  type="text"
+                                  value={r.checkInTime || ''}
+                                  placeholder={scheduledStartTime}
+                                  disabled={isDateLocked}
+                                  readOnly={isDateLocked}
+                                  onChange={(e) => updateRecord(r.studentId, { checkInTime: e.target.value })}
+                                  className={`w-full pl-2 pr-5 py-1 border rounded-lg text-xs font-semibold outline-none ${
+                                    isDateLocked
+                                      ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'
+                                      : 'bg-slate-50 border-slate-200 text-slate-800 focus:border-blue-600 focus:bg-white'
+                                  }`}
+                                  title={`Jam Mulai Pelajaran ${activeSubject?.name || 'Mapel'} (Terintegrasi Data Referensi: ${scheduledStartTime})`}
+                                />
+                                <Clock size={11} className="absolute right-1.5 text-slate-400 pointer-events-none" />
+                              </div>
                             </td>
 
-                            {/* Catatan / Penilaian Guru Mapel */}
+                            {/* Jam Selesai (Guru Mapel - Terintegrasi dengan Data Referensi Mata Pelajaran) */}
+                            <td className="py-2.5 px-3">
+                              <div className="relative flex items-center">
+                                <input
+                                  type="text"
+                                  value={r.checkOutTime || ''}
+                                  placeholder={scheduledEndTime}
+                                  disabled={isDateLocked}
+                                  readOnly={isDateLocked}
+                                  onChange={(e) => updateRecord(r.studentId, { checkOutTime: e.target.value })}
+                                  className={`w-full pl-2 pr-5 py-1 border rounded-lg text-xs font-semibold outline-none ${
+                                    isDateLocked
+                                      ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'
+                                      : 'bg-slate-50 border-slate-200 text-slate-800 focus:border-blue-600 focus:bg-white'
+                                  }`}
+                                  title={`Jam Selesai Pelajaran ${activeSubject?.name || 'Mapel'} (Terintegrasi Data Referensi: ${scheduledEndTime})`}
+                                />
+                                <Clock size={11} className="absolute right-1.5 text-slate-400 pointer-events-none" />
+                              </div>
+                            </td>
+
+                            {/* Catatan / Keterangan Guru Mapel */}
                             <td className="py-2.5 px-3.5">
                               <input
                                 type="text"
@@ -2451,7 +2537,7 @@ export const AbsensiView: React.FC = () => {
                   ) : (
                     <tr>
                       <td
-                        colSpan={attendanceMode === 'DAILY' ? 6 : 5}
+                        colSpan={6}
                         className="text-center py-8 text-slate-400 font-medium text-xs"
                       >
                         {searchQuery

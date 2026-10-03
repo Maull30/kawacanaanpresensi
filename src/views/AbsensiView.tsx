@@ -47,6 +47,30 @@ const isClassMatch = (nameA?: string | null, nameB?: string | null) => {
   return clean(nameA) === clean(nameB);
 };
 
+const checkClassSchedule = (
+  sub: { classSchedules?: { classId?: string; className?: string; days?: string[] }[]; scheduleDays?: string[]; targetClassIds?: string[]; targetClassNames?: string[] },
+  cls: { id: string; name: string },
+  day: string
+): boolean => {
+  if (!day) return false;
+  const hasSpecific = sub.classSchedules && sub.classSchedules.some((cs) => cs.days && cs.days.length > 0);
+  if (hasSpecific) {
+    const cs = sub.classSchedules!.find(
+      (item) => item.classId === cls.id || isClassMatch(item.className, cls.name)
+    );
+    return !!(cs && cs.days && cs.days.includes(day));
+  }
+  if (sub.scheduleDays && sub.scheduleDays.length > 0) {
+    const isTarget =
+      !sub.targetClassIds ||
+      sub.targetClassIds.length === 0 ||
+      sub.targetClassIds.includes(cls.id) ||
+      (sub.targetClassNames && sub.targetClassNames.some((cn) => isClassMatch(cn, cls.name)));
+    return isTarget && sub.scheduleDays.includes(day);
+  }
+  return false;
+};
+
 export const AbsensiView: React.FC = () => {
   const {
     students,
@@ -124,6 +148,19 @@ export const AbsensiView: React.FC = () => {
   // Subject state
   const [selectedSubjectId, setSelectedSubjectId] = useState<string>(() => {
     if (userScope.isGuruMapel && userScope.assignedSubjects.length > 0) {
+      let dayN = '';
+      try {
+        const [y, m, d] = currentAttendanceDate.split('-');
+        const dNames = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+        dayN = dNames[new Date(Number(y), Number(m) - 1, Number(d)).getDay()] || '';
+      } catch (_) {}
+
+      if (dayN) {
+        const subWithScheduleToday = userScope.assignedSubjects.find((sub) =>
+          userScope.accessibleClasses.some((c) => checkClassSchedule(sub, c, dayN))
+        );
+        if (subWithScheduleToday) return subWithScheduleToday.id;
+      }
       return userScope.assignedSubjects[0].id;
     }
     return subjects.find((s) => s.isSpecialized)?.id || subjects[0]?.id || '';
@@ -135,28 +172,17 @@ export const AbsensiView: React.FC = () => {
       return userScope.assignedWaliClassId;
     }
     if (userScope.isGuruMapel && userScope.accessibleClasses.length > 0) {
-      const firstSub = userScope.assignedSubjects[0] || subjects[0];
-      if (firstSub) {
-        let dayN = '';
-        try {
-          const [y, m, d] = currentAttendanceDate.split('-');
-          const dNames = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
-          dayN = dNames[new Date(Number(y), Number(m) - 1, Number(d)).getDay()] || '';
-        } catch (_) {}
+      let dayN = '';
+      try {
+        const [y, m, d] = currentAttendanceDate.split('-');
+        const dNames = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+        dayN = dNames[new Date(Number(y), Number(m) - 1, Number(d)).getDay()] || '';
+      } catch (_) {}
 
-        if (dayN) {
-          const scheduled = userScope.accessibleClasses.find((c) => {
-            if (firstSub.classSchedules && firstSub.classSchedules.length > 0) {
-              const cs = firstSub.classSchedules.find(
-                (item) => item.classId === c.id || isClassMatch(item.className, c.name)
-              );
-              if (cs && cs.days && cs.days.length > 0) return cs.days.includes(dayN);
-            }
-            if (firstSub.scheduleDays && firstSub.scheduleDays.length > 0) {
-              return firstSub.scheduleDays.includes(dayN);
-            }
-            return false;
-          });
+      if (dayN) {
+        const subsToCheck = userScope.assignedSubjects.length > 0 ? userScope.assignedSubjects : subjects;
+        for (const sub of subsToCheck) {
+          const scheduled = userScope.accessibleClasses.find((c) => checkClassSchedule(sub, c, dayN));
           if (scheduled) return scheduled.id;
         }
       }
@@ -239,22 +265,8 @@ export const AbsensiView: React.FC = () => {
       const targetDay = dayName || currentDayName;
       if (!targetDay) return false;
 
-      // 1. Cek jadwal spesifik per kelas di activeSubject.classSchedules
-      if (activeSubject.classSchedules && activeSubject.classSchedules.length > 0) {
-        const clsSched = activeSubject.classSchedules.find(
-          (cs) => cs.classId === clsId || (clsName && isClassMatch(cs.className, clsName))
-        );
-        if (clsSched && clsSched.days && clsSched.days.length > 0) {
-          return clsSched.days.includes(targetDay);
-        }
-      }
-
-      // 2. Cek jadwal umum mapel di activeSubject.scheduleDays
-      if (activeSubject.scheduleDays && activeSubject.scheduleDays.length > 0) {
-        return activeSubject.scheduleDays.includes(targetDay);
-      }
-
-      return false;
+      const clsObj = { id: clsId, name: clsName || '' };
+      return checkClassSchedule(activeSubject, clsObj, targetDay);
     };
   }, [activeSubject, currentDayName]);
 
@@ -335,6 +347,22 @@ export const AbsensiView: React.FC = () => {
       }
     }
   }, [date, currentDayName, availableClasses, userScope.isGuruMapel, attendanceMode, selectedClassId]);
+
+  // Otomatis sinkronkan mata pelajaran Guru Mapel jika mapel saat ini tidak ada jadwal tapi mapel lain ada
+  useEffect(() => {
+    if (userScope.isGuruMapel && userScope.assignedSubjects.length > 1) {
+      const currentHasClasses = availableClasses.length > 0;
+      if (!currentHasClasses && currentDayName) {
+        const otherSubToday = userScope.assignedSubjects.find((sub) =>
+          sub.id !== selectedSubjectId &&
+          userScope.accessibleClasses.some((c) => checkClassSchedule(sub, c, currentDayName))
+        );
+        if (otherSubToday) {
+          setSelectedSubjectId(otherSubToday.id);
+        }
+      }
+    }
+  }, [userScope.isGuruMapel, userScope.assignedSubjects, userScope.accessibleClasses, availableClasses.length, currentDayName, selectedSubjectId]);
 
   // Active target class for QR Presensi Rombel & modal
   const activeTargetClass = useMemo(() => {
@@ -442,17 +470,45 @@ export const AbsensiView: React.FC = () => {
   // Daftar hari jadwal mengajar resmi untuk rombel terpilih
   const scheduledDaysForClass = useMemo(() => {
     if (!activeSubject) return [];
-    if (selectedClassId && activeSubject.classSchedules && activeSubject.classSchedules.length > 0) {
-      const clsSched = activeSubject.classSchedules.find((cs) => cs.classId === selectedClassId);
-      if (clsSched && clsSched.days && clsSched.days.length > 0) {
-        return clsSched.days;
+    const hasSpecificClassSchedules =
+      activeSubject.classSchedules &&
+      activeSubject.classSchedules.some((cs) => cs.days && cs.days.length > 0);
+
+    if (hasSpecificClassSchedules) {
+      if (selectedClassId) {
+        const clsSched = activeSubject.classSchedules!.find(
+          (cs) =>
+            cs.classId === selectedClassId ||
+            (activeTargetClass?.name && isClassMatch(cs.className, activeTargetClass.name))
+        );
+        if (clsSched && clsSched.days && clsSched.days.length > 0) {
+          return clsSched.days;
+        }
       }
+      return [];
     }
+
     if (activeSubject.scheduleDays && activeSubject.scheduleDays.length > 0) {
       return activeSubject.scheduleDays;
     }
     return [];
-  }, [activeSubject, selectedClassId]);
+  }, [activeSubject, selectedClassId, activeTargetClass]);
+
+  // Jadwal spesifik untuk rombel terpilih (jam mulai dan jam selesai KBM)
+  const activeClassSchedule = useMemo(() => {
+    if (!activeSubject) return null;
+    if (selectedClassId && activeSubject.classSchedules && activeSubject.classSchedules.length > 0) {
+      return (
+        activeSubject.classSchedules.find(
+          (cs) => cs.classId === selectedClassId || (activeTargetClass?.name && isClassMatch(cs.className, activeTargetClass.name))
+        ) || null
+      );
+    }
+    return null;
+  }, [activeSubject, selectedClassId, activeTargetClass]);
+
+  const scheduledStartTime = activeClassSchedule?.startTime || activeSubject?.defaultStartTime || '07:30';
+  const scheduledEndTime = activeClassSchedule?.endTime || activeSubject?.defaultEndTime || '09:00';
 
   const isScheduleConfigured = scheduledDaysForClass.length > 0;
 
@@ -737,7 +793,11 @@ export const AbsensiView: React.FC = () => {
     const fallbackCheckIn =
       attendanceMode === 'DAILY'
         ? systemConfig.defaultCheckInTime
-        : activeSubject?.lessonPeriod || '07:30';
+        : scheduledStartTime;
+    const fallbackCheckOut =
+      attendanceMode === 'DAILY'
+        ? ''
+        : scheduledEndTime;
 
     let preservedCount = 0;
     let newlyMarkedCount = 0;
@@ -756,7 +816,7 @@ export const AbsensiView: React.FC = () => {
           status: 'Hadir',
           // PERTAHANKAN WAKTU SCAN QR: Hanya isi jam default jika siswa belum memiliki catatan jam masuk
           checkInTime: hasExistingCheckIn ? r.checkInTime : fallbackCheckIn,
-          checkOutTime: r.checkOutTime || '',
+          checkOutTime: r.checkOutTime || fallbackCheckOut,
         };
       });
       try {
@@ -768,7 +828,11 @@ export const AbsensiView: React.FC = () => {
     if (preservedCount > 0) {
       showToast(`Semua siswa diatur Hadir (${preservedCount} jam scan QR tetap dipertahankan)`);
     } else {
-      showToast('Semua siswa diatur ke status Hadir');
+      showToast(
+        attendanceMode === 'DAILY'
+          ? 'Semua siswa diatur ke status Hadir'
+          : `Semua siswa diatur Hadir KBM (${scheduledStartTime} - ${scheduledEndTime})`
+      );
     }
   };
 
@@ -784,16 +848,18 @@ export const AbsensiView: React.FC = () => {
     setIsDirty(true);
     isDirtyRef.current = true;
 
+    const targetEndTime = attendanceMode === 'DAILY' ? systemConfig.defaultCheckOutTime : scheduledEndTime;
+
     setRecords((prev) => {
       const updated = prev.map((r) => {
-        // Hanya terapkan jam pulang default bagi siswa yang Hadir
+        // Hanya terapkan jam pulang / jam selesai KBM default bagi siswa yang Hadir
         if (r.status !== 'Hadir') return r;
 
         // Pertahankan jika sudah ada jam checkout riil (misal scan QR pulang)
         const hasExistingCheckOut = Boolean(r.checkOutTime && r.checkOutTime.trim() !== '');
         return {
           ...r,
-          checkOutTime: hasExistingCheckOut ? r.checkOutTime : systemConfig.defaultCheckOutTime,
+          checkOutTime: hasExistingCheckOut ? r.checkOutTime : targetEndTime,
         };
       });
       try {
@@ -801,7 +867,11 @@ export const AbsensiView: React.FC = () => {
       } catch (_) {}
       return updated;
     });
-    showToast(`Jam pulang masal (${systemConfig.defaultCheckOutTime}) diterapkan`);
+    showToast(
+      attendanceMode === 'DAILY'
+        ? `Jam pulang masal (${targetEndTime}) diterapkan`
+        : `Jam selesai KBM masal (${targetEndTime}) diterapkan ke seluruh siswa hadir`
+    );
   };
 
   const handleReset = async () => {
@@ -1305,6 +1375,10 @@ export const AbsensiView: React.FC = () => {
                       </div>
                     </div>
                   )}
+                  <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-50 border border-blue-200 text-blue-900 font-bold text-[11px]">
+                    <Clock size={12} className="text-blue-600 shrink-0" />
+                    <span>Jam KBM: <strong>{scheduledStartTime} - {scheduledEndTime}</strong></span>
+                  </div>
                 </div>
 
                 {isGuruMapelOffOrNonTeaching ? (
@@ -1566,13 +1640,7 @@ export const AbsensiView: React.FC = () => {
           )}
 
           {/* Bulk Action Buttons - Compact Toolbar (Disejajarkan Layoutnya Secara Harmonis) */}
-          <div
-            className={`grid gap-2 sm:gap-2.5 ${
-              attendanceMode === 'DAILY'
-                ? 'grid-cols-2 sm:grid-cols-3 md:grid-cols-5'
-                : 'grid-cols-2 sm:grid-cols-4'
-            }`}
-          >
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 sm:gap-2.5">
             <button
               type="button"
               onClick={handleHadirSemua}
@@ -1589,7 +1657,7 @@ export const AbsensiView: React.FC = () => {
               <span>Hadir Semua</span>
             </button>
 
-            {attendanceMode === 'DAILY' && (
+            {attendanceMode === 'DAILY' ? (
               <button
                 type="button"
                 onClick={handlePulangMasal}
@@ -1604,6 +1672,22 @@ export const AbsensiView: React.FC = () => {
               >
                 {isDateLocked ? <Lock size={15} /> : <LogOut size={15} />}
                 <span>Pulang Masal</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handlePulangMasal}
+                disabled={isDateLocked || isSaving}
+                id="btn-selesai-kbm-masal"
+                title={`Terapkan jam selesai KBM (${scheduledEndTime}) serentak untuk seluruh siswa yang hadir`}
+                className={`w-full py-2.5 px-3 rounded-xl border font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-2xs min-h-[42px] ${
+                  isDateLocked || isSaving
+                    ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
+                    : 'border-blue-300 bg-blue-50 hover:bg-blue-100 active:scale-95 text-blue-700 cursor-pointer'
+                }`}
+              >
+                {isDateLocked ? <Lock size={15} /> : <Clock size={15} />}
+                <span>Selesai KBM Masal</span>
               </button>
             )}
 

@@ -141,6 +141,8 @@ export const DataMapelView: React.FC = () => {
   const [selectedClassIds, setSelectedClassIds] = useState<string[]>([]);
   // Mapping: classId -> array of days (e.g. { 'cls-1': ['Senin'], 'cls-2': ['Rabu'] })
   const [classSchedulesMap, setClassSchedulesMap] = useState<Record<string, string[]>>({});
+  // Mapping: classId -> { startTime: string; endTime: string }
+  const [classTimesMap, setClassTimesMap] = useState<Record<string, { startTime: string; endTime: string }>>({});
 
   // Delete Confirmation Modal
   const [deletingSubject, setDeletingSubject] = useState<Subject | null>(null);
@@ -226,12 +228,15 @@ export const DataMapelView: React.FC = () => {
       : classes.map((c) => c.id);
     setSelectedClassIds(initialClassIds);
 
-    // Default jadwal: setiap kelas default ke Senin
+    // Default jadwal: setiap kelas default ke Senin & jam 07:30 - 09:00
     const initialMap: Record<string, string[]> = {};
+    const initialTimes: Record<string, { startTime: string; endTime: string }> = {};
     initialClassIds.forEach((cid) => {
       initialMap[cid] = ['Senin'];
+      initialTimes[cid] = { startTime: '07:30', endTime: '09:00' };
     });
     setClassSchedulesMap(initialMap);
+    setClassTimesMap(initialTimes);
 
     setOpenModal(true);
   };
@@ -247,21 +252,38 @@ export const DataMapelView: React.FC = () => {
     setSelectedClassIds(cids);
 
     const initialMap: Record<string, string[]> = {};
+    const initialTimes: Record<string, { startTime: string; endTime: string }> = {};
+
     if (sub.classSchedules && sub.classSchedules.length > 0) {
       sub.classSchedules.forEach((cs) => {
         initialMap[cs.classId] = cs.days || [];
+        initialTimes[cs.classId] = {
+          startTime: cs.startTime || sub.defaultStartTime || '07:30',
+          endTime: cs.endTime || sub.defaultEndTime || '09:00',
+        };
       });
       cids.forEach((cid) => {
         if (!initialMap[cid]) {
           initialMap[cid] = sub.scheduleDays && sub.scheduleDays.length > 0 ? [...sub.scheduleDays] : ['Senin'];
         }
+        if (!initialTimes[cid]) {
+          initialTimes[cid] = {
+            startTime: sub.defaultStartTime || '07:30',
+            endTime: sub.defaultEndTime || '09:00',
+          };
+        }
       });
     } else {
       cids.forEach((cid) => {
         initialMap[cid] = sub.scheduleDays && sub.scheduleDays.length > 0 ? [...sub.scheduleDays] : ['Senin'];
+        initialTimes[cid] = {
+          startTime: sub.defaultStartTime || '07:30',
+          endTime: sub.defaultEndTime || '09:00',
+        };
       });
     }
     setClassSchedulesMap(initialMap);
+    setClassTimesMap(initialTimes);
 
     setOpenModal(true);
   };
@@ -278,6 +300,12 @@ export const DataMapelView: React.FC = () => {
           }
           return m;
         });
+        setClassTimesMap((tm) => {
+          if (!tm[classId]) {
+            return { ...tm, [classId]: { startTime: '07:30', endTime: '09:00' } };
+          }
+          return tm;
+        });
         return [...prev, classId];
       }
     });
@@ -291,6 +319,15 @@ export const DataMapelView: React.FC = () => {
       allIds.forEach((cid) => {
         if (!next[cid] || next[cid].length === 0) {
           next[cid] = ['Senin'];
+        }
+      });
+      return next;
+    });
+    setClassTimesMap((prev) => {
+      const next = { ...prev };
+      allIds.forEach((cid) => {
+        if (!next[cid]) {
+          next[cid] = { startTime: '07:30', endTime: '09:00' };
         }
       });
       return next;
@@ -321,6 +358,30 @@ export const DataMapelView: React.FC = () => {
     });
   };
 
+  const updateTimeForClass = (classId: string, field: 'startTime' | 'endTime', value: string) => {
+    setClassTimesMap((prev) => {
+      const current = prev[classId] || { startTime: '07:30', endTime: '09:00' };
+      return {
+        ...prev,
+        [classId]: {
+          ...current,
+          [field]: value,
+        },
+      };
+    });
+  };
+
+  const applyBulkTimesToAllSelected = (startTime: string, endTime: string) => {
+    setClassTimesMap((prev) => {
+      const next = { ...prev };
+      selectedClassIds.forEach((cid) => {
+        next[cid] = { startTime, endTime };
+      });
+      return next;
+    });
+    showToast(`Jam KBM (${startTime} s.d. ${endTime}) diterapkan ke seluruh kelas`);
+  };
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedTeacherId) {
@@ -348,10 +409,13 @@ export const DataMapelView: React.FC = () => {
       const days = classSchedulesMap[cid] && classSchedulesMap[cid].length > 0
         ? classSchedulesMap[cid]
         : ['Senin'];
+      const timeInfo = classTimesMap[cid] || { startTime: '07:30', endTime: '09:00' };
       return {
         classId: cid,
         className: cls?.name || '',
         days,
+        startTime: timeInfo.startTime || '07:30',
+        endTime: timeInfo.endTime || '09:00',
       };
     });
 
@@ -367,6 +431,8 @@ export const DataMapelView: React.FC = () => {
       targetClassNames,
       scheduleDays: allUniqueDays,
       classSchedules,
+      defaultStartTime: classSchedules[0]?.startTime || '07:30',
+      defaultEndTime: classSchedules[0]?.endTime || '09:00',
     };
 
     if (editingSubject) {
@@ -738,6 +804,12 @@ export const DataMapelView: React.FC = () => {
                                 ) : (
                                   <span className="text-[10px] text-slate-400 italic">Belum diatur</span>
                                 )}
+                                {clsSched?.startTime && clsSched?.endTime && (
+                                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-blue-50 text-blue-800 border border-blue-200 font-bold text-[10px]">
+                                    <Clock size={10} className="text-blue-600" />
+                                    <span>{clsSched.startTime} - {clsSched.endTime}</span>
+                                  </span>
+                                )}
                               </div>
                             </div>
                           );
@@ -1025,16 +1097,46 @@ export const DataMapelView: React.FC = () => {
                       </div>
                     </div>
 
-                    <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                    <div className="flex flex-wrap items-center justify-between gap-1 text-xs pt-1.5 border-t border-blue-100">
+                      <span className="text-[10px] text-blue-900 font-bold">
+                        Set Jam KBM ke Semua Kelas:
+                      </span>
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => applyBulkTimesToAllSelected('07:30', '09:00')}
+                          className="px-2 py-0.5 rounded bg-white hover:bg-blue-100 text-blue-800 font-bold border border-blue-200 text-[10px] cursor-pointer"
+                        >
+                          07:30 - 09:00
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => applyBulkTimesToAllSelected('09:15', '10:45')}
+                          className="px-2 py-0.5 rounded bg-white hover:bg-blue-100 text-blue-800 font-bold border border-blue-200 text-[10px] cursor-pointer"
+                        >
+                          09:15 - 10:45
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => applyBulkTimesToAllSelected('10:00', '11:30')}
+                          className="px-2 py-0.5 rounded bg-white hover:bg-blue-100 text-blue-800 font-bold border border-blue-200 text-[10px] cursor-pointer"
+                        >
+                          10:00 - 11:30
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
                       {selectedClassIds.map((cid) => {
                         const clsObj = classes.find((c) => c.id === cid);
                         const clsName = clsObj?.name || 'Kelas';
                         const currentDays = classSchedulesMap[cid] || [];
+                        const currentTime = classTimesMap[cid] || { startTime: '07:30', endTime: '09:00' };
 
                         return (
                           <div
                             key={cid}
-                            className="p-2.5 bg-white rounded-xl border border-slate-200 space-y-1.5 shadow-2xs"
+                            className="p-2.5 bg-white rounded-xl border border-slate-200 space-y-2 shadow-2xs"
                           >
                             <div className="flex items-center justify-between">
                               <span className="font-extrabold text-slate-900 text-xs">
@@ -1043,7 +1145,7 @@ export const DataMapelView: React.FC = () => {
                               <span className="text-[10px] text-slate-500 font-medium">
                                 {currentDays.length > 0 ? (
                                   <span className="text-blue-700 font-bold">
-                                    {currentDays.join(', ')}
+                                    {currentDays.join(', ')} ({currentTime.startTime} - {currentTime.endTime})
                                   </span>
                                 ) : (
                                   <span className="text-rose-500 italic">Pilih hari</span>
@@ -1069,6 +1171,31 @@ export const DataMapelView: React.FC = () => {
                                   </button>
                                 );
                               })}
+                            </div>
+
+                            {/* Pengaturan Jam Mulai & Jam Selesai per Kelas */}
+                            <div className="flex flex-wrap items-center justify-between gap-2 pt-1.5 border-t border-slate-100">
+                              <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider flex items-center gap-1">
+                                <Clock size={11} className="text-slate-400" />
+                                <span>Jam KBM Mapel:</span>
+                              </span>
+                              <div className="flex items-center gap-1.5 text-xs">
+                                <input
+                                  type="time"
+                                  value={currentTime.startTime || '07:30'}
+                                  onChange={(e) => updateTimeForClass(cid, 'startTime', e.target.value)}
+                                  className="px-2 py-0.5 bg-slate-50 border border-slate-200 rounded-lg font-bold text-slate-800 text-xs outline-none focus:border-blue-500 focus:bg-white text-center shadow-2xs"
+                                  title="Jam Mulai Pelajaran"
+                                />
+                                <span className="text-slate-400 font-bold">s.d.</span>
+                                <input
+                                  type="time"
+                                  value={currentTime.endTime || '09:00'}
+                                  onChange={(e) => updateTimeForClass(cid, 'endTime', e.target.value)}
+                                  className="px-2 py-0.5 bg-slate-50 border border-slate-200 rounded-lg font-bold text-slate-800 text-xs outline-none focus:border-blue-500 focus:bg-white text-center shadow-2xs"
+                                  title="Jam Selesai Pelajaran"
+                                />
+                              </div>
                             </div>
                           </div>
                         );

@@ -292,21 +292,20 @@ export const DashboardView: React.FC = () => {
     let hasAnyScheduleConfigured = false;
 
     userScope.assignedSubjects.forEach((sub) => {
+      const hasSpecificClassSchedules =
+        sub.classSchedules && sub.classSchedules.some((cs) => cs.days && cs.days.length > 0);
+
       // 1. Cek classSchedules spesifik per kelas
-      if (sub.classSchedules && sub.classSchedules.length > 0) {
-        sub.classSchedules.forEach((cs) => {
-          if (cs.days && cs.days.length > 0) {
-            hasAnyScheduleConfigured = true;
-            if (cs.days.includes(currentDayName)) {
-              if (cs.classId) matchedClassIds.add(cs.classId);
-              if (cs.className) matchedClassNames.add(cs.className.trim().toLowerCase());
-            }
+      if (hasSpecificClassSchedules) {
+        hasAnyScheduleConfigured = true;
+        sub.classSchedules!.forEach((cs) => {
+          if (cs.days && cs.days.length > 0 && cs.days.includes(currentDayName)) {
+            if (cs.classId) matchedClassIds.add(cs.classId);
+            if (cs.className) matchedClassNames.add(cs.className.trim().toLowerCase());
           }
         });
-      }
-
-      // 2. Cek scheduleDays umum mapel
-      if (sub.scheduleDays && sub.scheduleDays.length > 0) {
+      } else if (sub.scheduleDays && sub.scheduleDays.length > 0) {
+        // 2. Cek scheduleDays umum mapel (hanya jika jadwal per kelas belum diatur)
         hasAnyScheduleConfigured = true;
         if (sub.scheduleDays.includes(currentDayName)) {
           (sub.targetClassIds || []).forEach((cid) => matchedClassIds.add(cid));

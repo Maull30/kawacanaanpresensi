@@ -141,6 +141,8 @@ export interface SubjectClassSchedule {
   classId: string;
   className?: string;
   days: string[]; // e.g. ['Senin'] or ['Senin', 'Kamis']
+  startTime?: string; // e.g. "07:30"
+  endTime?: string; // e.g. "09:00"
 }
 
 export interface Subject {
@@ -155,6 +157,8 @@ export interface Subject {
   scheduleDays?: string[]; // Hari jadwal diajarkan (Senin, Selasa, ...)
   classSchedules?: SubjectClassSchedule[]; // Jadwal per kelas dan hari (e.g. Kelas 6A: Senin, Kelas 6B: Rabu)
   lessonPeriod?: string; // Jam/pertemuan ke (e.g. Jam ke 1-2)
+  defaultStartTime?: string; // Default jam mulai (e.g. "07:30")
+  defaultEndTime?: string; // Default jam selesai (e.g. "09:00")
 }
 
 export interface AttendanceRecord {

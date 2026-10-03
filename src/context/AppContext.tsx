@@ -7033,6 +7033,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
         const inheritedStatus = isPermitOrSick
           ? (dailyRec?.status || leaveStatus)
           : ("" as AttendanceStatus);
+        const finalStatus = existing?.status || inheritedStatus;
+        const isAbsent = finalStatus === "Sakit" || finalStatus === "Izin" || finalStatus === "Alfa";
         const inheritedNotes = isPermitOrSick
           ? (dailyRec?.notes || (leaveNote ? `(Surat Izin: ${leaveNote})` : `(Sinkron Wali Kelas: ${dailyRec?.status || leaveStatus})`))
           : "";
@@ -7042,23 +7044,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
           date,
           studentId: s.id,
           studentName: s.nama,
-          status: existing?.status || inheritedStatus,
-          checkInTime: existing?.checkInTime || (isPermitOrSick ? dailyRec?.checkInTime || "" : ""),
-          checkOutTime: existing?.checkOutTime || (isPermitOrSick ? dailyRec?.checkOutTime || "" : ""),
+          status: finalStatus,
+          checkInTime: isAbsent ? "" : (existing?.checkInTime && existing.checkInTime !== '-' ? existing.checkInTime : ""),
+          checkOutTime: isAbsent ? "" : (existing?.checkOutTime && existing.checkOutTime !== '-' ? existing.checkOutTime : ""),
           notes: existing?.notes || inheritedNotes,
           type: "SUBJECT" as AttendanceType,
           subjectId: targetSubjectId,
           classId: targetClassId || s.classId || null,
         };
       }
+      const finalDailyStatus = existing?.status || leaveStatus;
+      const isDailyAbsent = finalDailyStatus === "Sakit" || finalDailyStatus === "Izin" || finalDailyStatus === "Alfa";
       return {
         id: existing?.id || "att-" + date + "-" + s.id,
         date,
         studentId: s.id,
         studentName: s.nama,
-        status: existing?.status || leaveStatus,
-        checkInTime: existing?.checkInTime || "",
-        checkOutTime: existing?.checkOutTime || "",
+        status: finalDailyStatus,
+        checkInTime: isDailyAbsent ? "" : (existing?.checkInTime && existing.checkInTime !== '-' ? existing.checkInTime : ""),
+        checkOutTime: isDailyAbsent ? "" : (existing?.checkOutTime && existing.checkOutTime !== '-' ? existing.checkOutTime : ""),
         notes: existing?.notes || (leaveNote ? `Surat ${leaveStatus}: ${leaveNote}` : ""),
         type: "DAILY" as AttendanceType,
         classId: targetClassId || s.classId || null,

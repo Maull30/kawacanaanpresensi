@@ -761,7 +761,16 @@ export const AbsensiView: React.FC = () => {
     setIsDirty(true);
     isDirtyRef.current = true;
     setRecords((prev) => {
-      const updated = prev.map((r) => (r.studentId === studentId ? { ...r, ...updates } : r));
+      const updated = prev.map((r) => {
+        if (r.studentId !== studentId) return r;
+        const merged = { ...r, ...updates };
+        // Aturan: Siswa dengan status Izin, Sakit, atau Alfa tidak memiliki jam masuk/mulai & pulang/selesai (kolom waktu dikunci)
+        if (merged.status === 'Sakit' || merged.status === 'Izin' || merged.status === 'Alfa') {
+          merged.checkInTime = '';
+          merged.checkOutTime = '';
+        }
+        return merged;
+      });
       try {
         sessionStorage.setItem(draftStorageKey, JSON.stringify(updated));
       } catch (_) {}
@@ -831,16 +840,23 @@ export const AbsensiView: React.FC = () => {
       attendanceMode === 'DAILY'
         ? systemConfig.defaultCheckInTime
         : scheduledStartTime;
-    const fallbackCheckOut =
-      attendanceMode === 'DAILY'
-        ? ''
-        : scheduledEndTime;
 
     let preservedCount = 0;
     let newlyMarkedCount = 0;
+    let skippedAbsentCount = 0;
 
     setRecords((prev) => {
       const updated = prev.map((r) => {
+        // Jangan timpa status dan jangan isi waktu bagi siswa yang berstatus Izin, Sakit, atau Alfa
+        if (r.status === 'Sakit' || r.status === 'Izin' || r.status === 'Alfa') {
+          skippedAbsentCount++;
+          return {
+            ...r,
+            checkInTime: '',
+            checkOutTime: '',
+          };
+        }
+
         const hasExistingCheckIn = Boolean(r.checkInTime && r.checkInTime.trim() !== '');
         if (hasExistingCheckIn) {
           preservedCount++;
@@ -853,7 +869,8 @@ export const AbsensiView: React.FC = () => {
           status: 'Hadir',
           // PERTAHANKAN WAKTU SCAN QR: Hanya isi jam default jika siswa belum memiliki catatan jam masuk
           checkInTime: hasExistingCheckIn ? r.checkInTime : fallbackCheckIn,
-          checkOutTime: r.checkOutTime || fallbackCheckOut,
+          // Saat menekan tombol Hadir Semua: Yang terisi HANYA kolom status kehadiran dan jam mulai / masuk (jam selesai/pulang tetap kosong)
+          checkOutTime: '',
         };
       });
       try {
@@ -863,12 +880,12 @@ export const AbsensiView: React.FC = () => {
     });
 
     if (preservedCount > 0) {
-      showToast(`Semua siswa diatur Hadir (${preservedCount} jam scan QR tetap dipertahankan)`);
+      showToast(`Siswa diatur Hadir (${preservedCount} jam scan QR tetap dipertahankan${skippedAbsentCount > 0 ? `, ${skippedAbsentCount} siswa izin/sakit/alfa tidak ditimpa` : ''})`);
     } else {
       showToast(
         attendanceMode === 'DAILY'
-          ? 'Semua siswa diatur ke status Hadir'
-          : `Semua siswa diatur Hadir KBM (${scheduledStartTime} - ${scheduledEndTime})`
+          ? `Siswa diatur ke status Hadir (Jam Masuk: ${fallbackCheckIn}${skippedAbsentCount > 0 ? `, ${skippedAbsentCount} siswa izin/sakit/alfa tidak ditimpa` : ''})`
+          : `Siswa diatur Hadir KBM (Jam Mulai: ${scheduledStartTime}${skippedAbsentCount > 0 ? `, ${skippedAbsentCount} siswa izin/sakit/alfa tidak ditimpa` : ''})`
       );
     }
   };
@@ -890,7 +907,12 @@ export const AbsensiView: React.FC = () => {
     setRecords((prev) => {
       const updated = prev.map((r) => {
         // Hanya terapkan jam pulang / jam selesai KBM default bagi siswa yang Hadir
-        if (r.status !== 'Hadir') return r;
+        if (r.status !== 'Hadir') {
+          if (r.status === 'Sakit' || r.status === 'Izin' || r.status === 'Alfa') {
+            return { ...r, checkInTime: '', checkOutTime: '' };
+          }
+          return r;
+        }
 
         // Pertahankan jika sudah ada jam checkout riil (misal scan QR pulang)
         const hasExistingCheckOut = Boolean(r.checkOutTime && r.checkOutTime.trim() !== '');
@@ -906,8 +928,8 @@ export const AbsensiView: React.FC = () => {
     });
     showToast(
       attendanceMode === 'DAILY'
-        ? `Jam pulang masal (${targetEndTime}) diterapkan`
-        : `Jam selesai KBM masal (${targetEndTime}) diterapkan ke seluruh siswa hadir`
+        ? `Jam pulang masal (${targetEndTime}) diterapkan bagi siswa hadir`
+        : `Jam selesai KBM masal (${targetEndTime}) diterapkan bagi seluruh siswa hadir`
     );
   };
 
@@ -2114,20 +2136,21 @@ export const AbsensiView: React.FC = () => {
                             disabled={isDateLocked}
                             onClick={() => {
                               const newStatus = isSelected ? '' : statusOption;
+                              const isAbsent = newStatus === 'Sakit' || newStatus === 'Izin' || newStatus === 'Alfa';
                               updateRecord(r.studentId, {
                                 status: newStatus as AttendanceStatus,
-                                checkInTime:
-                                  newStatus === 'Hadir' && !r.checkInTime
-                                    ? attendanceMode === 'DAILY'
-                                      ? systemConfig.defaultCheckInTime
-                                      : scheduledStartTime
-                                    : r.checkInTime,
-                                checkOutTime:
-                                  newStatus === 'Hadir' && !r.checkOutTime
-                                    ? attendanceMode === 'DAILY'
-                                      ? systemConfig.defaultCheckOutTime
-                                      : scheduledEndTime
-                                    : r.checkOutTime,
+                                checkInTime: isAbsent
+                                  ? ''
+                                  : newStatus === 'Hadir' && !r.checkInTime
+                                  ? attendanceMode === 'DAILY'
+                                    ? systemConfig.defaultCheckInTime
+                                    : scheduledStartTime
+                                  : r.checkInTime,
+                                checkOutTime: isAbsent
+                                  ? ''
+                                  : newStatus === 'Hadir'
+                                  ? ''
+                                  : r.checkOutTime,
                               });
                             }}
                             className={`py-2 px-1 rounded-xl text-xs border text-center transition-all cursor-pointer min-h-[38px] active:scale-95 ${activeColor}`}
@@ -2139,62 +2162,94 @@ export const AbsensiView: React.FC = () => {
                     </div>
 
                     {/* Card Extra Fields: Times and Notes (Diselaraskan format antara Wali Kelas dan Guru Mapel) */}
-                    <div className="grid grid-cols-2 gap-2 pt-1 text-xs">
-                      <div className="flex items-center gap-1 bg-slate-50 px-2 py-1 rounded-lg border border-slate-200">
-                        <Clock size={11} className="text-slate-400 shrink-0" />
-                        <span className="text-[10px] text-slate-500 font-bold shrink-0">
-                          {attendanceMode === 'DAILY' ? 'Masuk:' : 'Mulai:'}
-                        </span>
-                        <input
-                          type="text"
-                          value={r.checkInTime || ''}
-                          disabled={isDateLocked}
-                          placeholder={attendanceMode === 'DAILY' ? (systemConfig.defaultCheckInTime || '07:00') : scheduledStartTime}
-                          onChange={(e) => updateRecord(r.studentId, { checkInTime: e.target.value })}
-                          className="w-full bg-transparent text-xs font-semibold text-slate-800 outline-none"
-                          title={
-                            attendanceMode === 'DAILY'
-                              ? 'Jam Masuk Sekolah'
-                              : `Jam Mulai Pelajaran ${activeSubject?.name || 'Mapel'} (Terintegrasi: ${scheduledStartTime})`
-                          }
-                        />
-                      </div>
+                    {(() => {
+                      const isAbsentStatus = r.status === 'Sakit' || r.status === 'Izin' || r.status === 'Alfa';
+                      const isTimeDisabled = isDateLocked || isAbsentStatus;
+                      return (
+                        <div className="grid grid-cols-2 gap-2 pt-1 text-xs">
+                          <div className={`flex items-center gap-1 px-2 py-1 rounded-lg border transition-colors ${
+                            isTimeDisabled
+                              ? 'bg-slate-100/90 border-slate-200 text-slate-400 cursor-not-allowed'
+                              : 'bg-slate-50 border-slate-200'
+                          }`}>
+                            {isAbsentStatus ? (
+                              <Lock size={11} className="text-slate-400 shrink-0" />
+                            ) : (
+                              <Clock size={11} className="text-slate-400 shrink-0" />
+                            )}
+                            <span className="text-[10px] text-slate-500 font-bold shrink-0">
+                              {attendanceMode === 'DAILY' ? 'Masuk:' : 'Mulai:'}
+                            </span>
+                            <input
+                              type="text"
+                              value={isAbsentStatus ? '' : (r.checkInTime || '')}
+                              disabled={isTimeDisabled}
+                              readOnly={isTimeDisabled}
+                              placeholder={isAbsentStatus ? '-' : (attendanceMode === 'DAILY' ? (systemConfig.defaultCheckInTime || '07:00') : scheduledStartTime)}
+                              onChange={(e) => updateRecord(r.studentId, { checkInTime: e.target.value })}
+                              className={`w-full bg-transparent text-xs font-semibold outline-none ${
+                                isTimeDisabled ? 'cursor-not-allowed text-slate-400' : 'text-slate-800'
+                              }`}
+                              title={
+                                isAbsentStatus
+                                  ? `Waktu dikunci untuk status ${r.status}`
+                                  : attendanceMode === 'DAILY'
+                                  ? 'Jam Masuk Sekolah'
+                                  : `Jam Mulai Pelajaran ${activeSubject?.name || 'Mapel'} (Terintegrasi: ${scheduledStartTime})`
+                              }
+                            />
+                          </div>
 
-                      <div className="flex items-center gap-1 bg-slate-50 px-2 py-1 rounded-lg border border-slate-200">
-                        <Clock size={11} className="text-slate-400 shrink-0" />
-                        <span className="text-[10px] text-slate-500 font-bold shrink-0">
-                          {attendanceMode === 'DAILY' ? 'Pulang:' : 'Selesai:'}
-                        </span>
-                        <input
-                          type="text"
-                          value={r.checkOutTime || ''}
-                          disabled={isDateLocked}
-                          placeholder={attendanceMode === 'DAILY' ? (systemConfig.defaultCheckOutTime || '14:00') : scheduledEndTime}
-                          onChange={(e) => updateRecord(r.studentId, { checkOutTime: e.target.value })}
-                          className="w-full bg-transparent text-xs font-semibold text-slate-800 outline-none"
-                          title={
-                            attendanceMode === 'DAILY'
-                              ? 'Jam Pulang Sekolah'
-                              : `Jam Selesai Pelajaran ${activeSubject?.name || 'Mapel'} (Terintegrasi: ${scheduledEndTime})`
-                          }
-                        />
-                      </div>
+                          <div className={`flex items-center gap-1 px-2 py-1 rounded-lg border transition-colors ${
+                            isTimeDisabled
+                              ? 'bg-slate-100/90 border-slate-200 text-slate-400 cursor-not-allowed'
+                              : 'bg-slate-50 border-slate-200'
+                          }`}>
+                            {isAbsentStatus ? (
+                              <Lock size={11} className="text-slate-400 shrink-0" />
+                            ) : (
+                              <Clock size={11} className="text-slate-400 shrink-0" />
+                            )}
+                            <span className="text-[10px] text-slate-500 font-bold shrink-0">
+                              {attendanceMode === 'DAILY' ? 'Pulang:' : 'Selesai:'}
+                            </span>
+                            <input
+                              type="text"
+                              value={isAbsentStatus ? '' : (r.checkOutTime || '')}
+                              disabled={isTimeDisabled}
+                              readOnly={isTimeDisabled}
+                              placeholder={isAbsentStatus ? '-' : (attendanceMode === 'DAILY' ? (systemConfig.defaultCheckOutTime || '14:00') : scheduledEndTime)}
+                              onChange={(e) => updateRecord(r.studentId, { checkOutTime: e.target.value })}
+                              className={`w-full bg-transparent text-xs font-semibold outline-none ${
+                                isTimeDisabled ? 'cursor-not-allowed text-slate-400' : 'text-slate-800'
+                              }`}
+                              title={
+                                isAbsentStatus
+                                  ? `Waktu dikunci untuk status ${r.status}`
+                                  : attendanceMode === 'DAILY'
+                                  ? 'Jam Pulang Sekolah'
+                                  : `Jam Selesai Pelajaran ${activeSubject?.name || 'Mapel'} (Terintegrasi: ${scheduledEndTime})`
+                              }
+                            />
+                          </div>
 
-                      <div className="col-span-2">
-                        <input
-                          type="text"
-                          value={r.notes || ''}
-                          disabled={isDateLocked}
-                          placeholder={
-                            attendanceMode === 'DAILY'
-                              ? 'Catatan / keterangan surat izin...'
-                              : 'Catatan keaktifan siswa saat jam pelajaran...'
-                          }
-                          onChange={(e) => updateRecord(r.studentId, { notes: e.target.value })}
-                          className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800 placeholder-slate-400 outline-none focus:border-blue-500"
-                        />
-                      </div>
-                    </div>
+                          <div className="col-span-2">
+                            <input
+                              type="text"
+                              value={r.notes || ''}
+                              disabled={isDateLocked}
+                              placeholder={
+                                attendanceMode === 'DAILY'
+                                  ? 'Catatan / keterangan surat izin...'
+                                  : 'Catatan keaktifan siswa saat jam pelajaran...'
+                              }
+                              onChange={(e) => updateRecord(r.studentId, { notes: e.target.value })}
+                              className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800 placeholder-slate-400 outline-none focus:border-blue-500"
+                            />
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </div>
                 ))
               ) : (
@@ -2370,23 +2425,25 @@ export const AbsensiView: React.FC = () => {
                           <select
                             value={r.status}
                             disabled={isDateLocked}
-                            onChange={(e) =>
+                            onChange={(e) => {
+                              const newStatus = e.target.value as AttendanceStatus;
+                              const isAbsent = newStatus === 'Sakit' || newStatus === 'Izin' || newStatus === 'Alfa';
                               updateRecord(r.studentId, {
-                                status: e.target.value as AttendanceStatus,
-                                checkInTime:
-                                  e.target.value === 'Hadir' && !r.checkInTime
-                                    ? attendanceMode === 'DAILY'
-                                      ? systemConfig.defaultCheckInTime
-                                      : scheduledStartTime
-                                    : r.checkInTime,
-                                checkOutTime:
-                                  e.target.value === 'Hadir' && !r.checkOutTime
-                                    ? attendanceMode === 'DAILY'
-                                      ? systemConfig.defaultCheckOutTime
-                                      : scheduledEndTime
-                                    : r.checkOutTime,
-                              })
-                            }
+                                status: newStatus,
+                                checkInTime: isAbsent
+                                  ? ''
+                                  : newStatus === 'Hadir' && !r.checkInTime
+                                  ? attendanceMode === 'DAILY'
+                                    ? systemConfig.defaultCheckInTime
+                                    : scheduledStartTime
+                                  : r.checkInTime,
+                                checkOutTime: isAbsent
+                                  ? ''
+                                  : newStatus === 'Hadir'
+                                  ? ''
+                                  : r.checkOutTime,
+                              });
+                            }}
                             className={`w-full px-2 py-1 rounded-lg text-xs font-bold border transition-colors outline-none cursor-pointer ${
                               isDateLocked
                                 ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
@@ -2409,129 +2466,150 @@ export const AbsensiView: React.FC = () => {
                           </select>
                         </td>
 
-                        {attendanceMode === 'DAILY' ? (
-                          <>
-                            {/* Masuk Time (Wali Kelas) */}
-                            <td className="py-2.5 px-3">
-                              <div className="relative flex items-center">
+                        {(() => {
+                          const isAbsentStatus = r.status === 'Sakit' || r.status === 'Izin' || r.status === 'Alfa';
+                          const isTimeLocked = isDateLocked || isAbsentStatus;
+
+                          return attendanceMode === 'DAILY' ? (
+                            <>
+                              {/* Masuk Time (Wali Kelas) */}
+                              <td className="py-2.5 px-3">
+                                <div className="relative flex items-center">
+                                  <input
+                                    type="text"
+                                    value={isAbsentStatus ? '' : (r.checkInTime || '')}
+                                    placeholder={isAbsentStatus ? '-' : (systemConfig.defaultCheckInTime || '07:00')}
+                                    disabled={isTimeLocked}
+                                    readOnly={isTimeLocked}
+                                    onChange={(e) => updateRecord(r.studentId, { checkInTime: e.target.value })}
+                                    className={`w-full pl-2 pr-5 py-1 border rounded-lg text-xs font-semibold outline-none transition-colors ${
+                                      isTimeLocked
+                                        ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed text-center'
+                                        : 'bg-slate-50 border-slate-200 text-slate-800 focus:border-blue-600 focus:bg-white'
+                                    }`}
+                                    title={isAbsentStatus ? `Waktu dikunci untuk status ${r.status}` : 'Jam Masuk Sekolah (Wali Kelas)'}
+                                  />
+                                  {isAbsentStatus ? (
+                                    <Lock size={10} className="absolute right-1.5 text-slate-400 pointer-events-none" />
+                                  ) : (
+                                    <Clock size={11} className="absolute right-1.5 text-slate-400 pointer-events-none" />
+                                  )}
+                                </div>
+                              </td>
+
+                              {/* Pulang Time (Wali Kelas) */}
+                              <td className="py-2.5 px-3">
+                                <div className="relative flex items-center">
+                                  <input
+                                    type="text"
+                                    value={isAbsentStatus ? '' : (r.checkOutTime || '')}
+                                    placeholder={isAbsentStatus ? '-' : (systemConfig.defaultCheckOutTime || '14:00')}
+                                    disabled={isTimeLocked}
+                                    readOnly={isTimeLocked}
+                                    onChange={(e) => updateRecord(r.studentId, { checkOutTime: e.target.value })}
+                                    className={`w-full pl-2 pr-5 py-1 border rounded-lg text-xs font-semibold outline-none transition-colors ${
+                                      isTimeLocked
+                                        ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed text-center'
+                                        : 'bg-slate-50 border-slate-200 text-slate-800 focus:border-blue-600 focus:bg-white'
+                                    }`}
+                                    title={isAbsentStatus ? `Waktu dikunci untuk status ${r.status}` : 'Jam Pulang Sekolah (Wali Kelas)'}
+                                  />
+                                  {isAbsentStatus ? (
+                                    <Lock size={10} className="absolute right-1.5 text-slate-400 pointer-events-none" />
+                                  ) : (
+                                    <Clock size={11} className="absolute right-1.5 text-slate-400 pointer-events-none" />
+                                  )}
+                                </div>
+                              </td>
+
+                              {/* Catatan Wali Kelas */}
+                              <td className="py-2.5 px-3.5">
                                 <input
                                   type="text"
-                                  value={r.checkInTime || ''}
-                                  placeholder={systemConfig.defaultCheckInTime || '07:00'}
+                                  value={r.notes || ''}
                                   disabled={isDateLocked}
                                   readOnly={isDateLocked}
-                                  onChange={(e) => updateRecord(r.studentId, { checkInTime: e.target.value })}
-                                  className={`w-full pl-2 pr-5 py-1 border rounded-lg text-xs font-semibold outline-none ${
+                                  onChange={(e) => updateRecord(r.studentId, { notes: e.target.value })}
+                                  placeholder="Keterangan surat / izin..."
+                                  className={`w-full px-2 py-1 rounded-lg text-xs outline-none transition-colors ${
                                     isDateLocked
-                                      ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'
-                                      : 'bg-slate-50 border-slate-200 text-slate-800 focus:border-blue-600 focus:bg-white'
+                                      ? 'bg-slate-100 border border-slate-200 text-slate-400 cursor-not-allowed placeholder-slate-400'
+                                      : 'bg-slate-50 border border-slate-200 text-slate-800 placeholder-slate-400 focus:border-blue-600 focus:bg-white'
                                   }`}
-                                  title="Jam Masuk Sekolah (Wali Kelas)"
                                 />
-                                <Clock size={11} className="absolute right-1.5 text-slate-400 pointer-events-none" />
-                              </div>
-                            </td>
+                              </td>
+                            </>
+                          ) : (
+                            <>
+                              {/* Jam Mulai (Guru Mapel - Terintegrasi dengan Data Referensi Mata Pelajaran) */}
+                              <td className="py-2.5 px-3">
+                                <div className="relative flex items-center">
+                                  <input
+                                    type="text"
+                                    value={isAbsentStatus ? '' : (r.checkInTime || '')}
+                                    placeholder={isAbsentStatus ? '-' : scheduledStartTime}
+                                    disabled={isTimeLocked}
+                                    readOnly={isTimeLocked}
+                                    onChange={(e) => updateRecord(r.studentId, { checkInTime: e.target.value })}
+                                    className={`w-full pl-2 pr-5 py-1 border rounded-lg text-xs font-semibold outline-none transition-colors ${
+                                      isTimeLocked
+                                        ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed text-center'
+                                        : 'bg-slate-50 border-slate-200 text-slate-800 focus:border-blue-600 focus:bg-white'
+                                    }`}
+                                    title={isAbsentStatus ? `Waktu dikunci untuk status ${r.status}` : `Jam Mulai Pelajaran ${activeSubject?.name || 'Mapel'} (Terintegrasi Data Referensi: ${scheduledStartTime})`}
+                                  />
+                                  {isAbsentStatus ? (
+                                    <Lock size={10} className="absolute right-1.5 text-slate-400 pointer-events-none" />
+                                  ) : (
+                                    <Clock size={11} className="absolute right-1.5 text-slate-400 pointer-events-none" />
+                                  )}
+                                </div>
+                              </td>
 
-                            {/* Pulang Time (Wali Kelas) */}
-                            <td className="py-2.5 px-3">
-                              <div className="relative flex items-center">
+                              {/* Jam Selesai (Guru Mapel - Terintegrasi dengan Data Referensi Mata Pelajaran) */}
+                              <td className="py-2.5 px-3">
+                                <div className="relative flex items-center">
+                                  <input
+                                    type="text"
+                                    value={isAbsentStatus ? '' : (r.checkOutTime || '')}
+                                    placeholder={isAbsentStatus ? '-' : scheduledEndTime}
+                                    disabled={isTimeLocked}
+                                    readOnly={isTimeLocked}
+                                    onChange={(e) => updateRecord(r.studentId, { checkOutTime: e.target.value })}
+                                    className={`w-full pl-2 pr-5 py-1 border rounded-lg text-xs font-semibold outline-none transition-colors ${
+                                      isTimeLocked
+                                        ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed text-center'
+                                        : 'bg-slate-50 border-slate-200 text-slate-800 focus:border-blue-600 focus:bg-white'
+                                    }`}
+                                    title={isAbsentStatus ? `Waktu dikunci untuk status ${r.status}` : `Jam Selesai Pelajaran ${activeSubject?.name || 'Mapel'} (Terintegrasi Data Referensi: ${scheduledEndTime})`}
+                                  />
+                                  {isAbsentStatus ? (
+                                    <Lock size={10} className="absolute right-1.5 text-slate-400 pointer-events-none" />
+                                  ) : (
+                                    <Clock size={11} className="absolute right-1.5 text-slate-400 pointer-events-none" />
+                                  )}
+                                </div>
+                              </td>
+
+                              {/* Catatan / Keterangan Guru Mapel */}
+                              <td className="py-2.5 px-3.5">
                                 <input
                                   type="text"
-                                  value={r.checkOutTime || ''}
-                                  placeholder={systemConfig.defaultCheckOutTime || '14:00'}
+                                  value={r.notes || ''}
                                   disabled={isDateLocked}
                                   readOnly={isDateLocked}
-                                  onChange={(e) => updateRecord(r.studentId, { checkOutTime: e.target.value })}
-                                  className={`w-full pl-2 pr-5 py-1 border rounded-lg text-xs font-semibold outline-none ${
+                                  onChange={(e) => updateRecord(r.studentId, { notes: e.target.value })}
+                                  placeholder="Catatan keaktifan siswa saat jam pelajaran..."
+                                  className={`w-full px-2 py-1 rounded-lg text-xs outline-none transition-colors ${
                                     isDateLocked
-                                      ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'
-                                      : 'bg-slate-50 border-slate-200 text-slate-800 focus:border-blue-600 focus:bg-white'
+                                      ? 'bg-slate-100 border border-slate-200 text-slate-400 cursor-not-allowed placeholder-slate-400'
+                                      : 'bg-slate-50 border border-slate-200 text-slate-800 placeholder-slate-400 focus:border-blue-600 focus:bg-white'
                                   }`}
-                                  title="Jam Pulang Sekolah (Wali Kelas)"
                                 />
-                                <Clock size={11} className="absolute right-1.5 text-slate-400 pointer-events-none" />
-                              </div>
-                            </td>
-
-                            {/* Catatan Wali Kelas */}
-                            <td className="py-2.5 px-3.5">
-                              <input
-                                type="text"
-                                value={r.notes || ''}
-                                disabled={isDateLocked}
-                                readOnly={isDateLocked}
-                                onChange={(e) => updateRecord(r.studentId, { notes: e.target.value })}
-                                placeholder="Keterangan surat / izin..."
-                                className={`w-full px-2 py-1 rounded-lg text-xs outline-none transition-colors ${
-                                  isDateLocked
-                                    ? 'bg-slate-100 border border-slate-200 text-slate-400 cursor-not-allowed placeholder-slate-400'
-                                    : 'bg-slate-50 border border-slate-200 text-slate-800 placeholder-slate-400 focus:border-blue-600 focus:bg-white'
-                                }`}
-                              />
-                            </td>
-                          </>
-                        ) : (
-                          <>
-                            {/* Jam Mulai (Guru Mapel - Terintegrasi dengan Data Referensi Mata Pelajaran) */}
-                            <td className="py-2.5 px-3">
-                              <div className="relative flex items-center">
-                                <input
-                                  type="text"
-                                  value={r.checkInTime || ''}
-                                  placeholder={scheduledStartTime}
-                                  disabled={isDateLocked}
-                                  readOnly={isDateLocked}
-                                  onChange={(e) => updateRecord(r.studentId, { checkInTime: e.target.value })}
-                                  className={`w-full pl-2 pr-5 py-1 border rounded-lg text-xs font-semibold outline-none ${
-                                    isDateLocked
-                                      ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'
-                                      : 'bg-slate-50 border-slate-200 text-slate-800 focus:border-blue-600 focus:bg-white'
-                                  }`}
-                                  title={`Jam Mulai Pelajaran ${activeSubject?.name || 'Mapel'} (Terintegrasi Data Referensi: ${scheduledStartTime})`}
-                                />
-                                <Clock size={11} className="absolute right-1.5 text-slate-400 pointer-events-none" />
-                              </div>
-                            </td>
-
-                            {/* Jam Selesai (Guru Mapel - Terintegrasi dengan Data Referensi Mata Pelajaran) */}
-                            <td className="py-2.5 px-3">
-                              <div className="relative flex items-center">
-                                <input
-                                  type="text"
-                                  value={r.checkOutTime || ''}
-                                  placeholder={scheduledEndTime}
-                                  disabled={isDateLocked}
-                                  readOnly={isDateLocked}
-                                  onChange={(e) => updateRecord(r.studentId, { checkOutTime: e.target.value })}
-                                  className={`w-full pl-2 pr-5 py-1 border rounded-lg text-xs font-semibold outline-none ${
-                                    isDateLocked
-                                      ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'
-                                      : 'bg-slate-50 border-slate-200 text-slate-800 focus:border-blue-600 focus:bg-white'
-                                  }`}
-                                  title={`Jam Selesai Pelajaran ${activeSubject?.name || 'Mapel'} (Terintegrasi Data Referensi: ${scheduledEndTime})`}
-                                />
-                                <Clock size={11} className="absolute right-1.5 text-slate-400 pointer-events-none" />
-                              </div>
-                            </td>
-
-                            {/* Catatan / Keterangan Guru Mapel */}
-                            <td className="py-2.5 px-3.5">
-                              <input
-                                type="text"
-                                value={r.notes || ''}
-                                disabled={isDateLocked}
-                                readOnly={isDateLocked}
-                                onChange={(e) => updateRecord(r.studentId, { notes: e.target.value })}
-                                placeholder="Catatan keaktifan siswa saat jam pelajaran..."
-                                className={`w-full px-2 py-1 rounded-lg text-xs outline-none transition-colors ${
-                                  isDateLocked
-                                    ? 'bg-slate-100 border border-slate-200 text-slate-400 cursor-not-allowed placeholder-slate-400'
-                                    : 'bg-slate-50 border border-slate-200 text-slate-800 placeholder-slate-400 focus:border-blue-600 focus:bg-white'
-                                }`}
-                              />
-                            </td>
-                          </>
-                        )}
+                              </td>
+                            </>
+                          );
+                        })()}
                       </tr>
                     ))
                   ) : (

@@ -1081,19 +1081,16 @@ export const AbsensiView: React.FC = () => {
           <span>Dashboard</span>
         </button>
 
-        <div className="flex items-center gap-1.5">
-          <span className="text-[11px] font-bold text-slate-500 hidden sm:inline">
-            Rombel:
-          </span>
-          <span className="px-2.5 py-1 rounded-lg bg-blue-50 border border-blue-200 text-blue-800 text-xs font-extrabold shadow-2xs">
-            {currentSelectedClassName}
-          </span>
-          {attendanceMode === 'SUBJECT' && activeSubject && (
-            <span className="px-2.5 py-1 rounded-lg bg-indigo-50 border border-indigo-200 text-indigo-800 text-xs font-bold shadow-2xs">
-              {activeSubject.name}
+        {!userScope.isGuruMapel && attendanceMode === 'DAILY' && (
+          <div className="flex items-center gap-1.5">
+            <span className="text-[11px] font-bold text-slate-500 hidden sm:inline">
+              Rombel:
             </span>
-          )}
-        </div>
+            <span className="px-2.5 py-1 rounded-lg bg-blue-50 border border-blue-200 text-blue-800 text-xs font-extrabold shadow-2xs">
+              {currentSelectedClassName}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Header Info & Responsive Date Picker */}
@@ -1116,12 +1113,6 @@ export const AbsensiView: React.FC = () => {
                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-rose-100 text-rose-800 border border-rose-300">
                   <Lock size={10} />
                   <span>Terkunci</span>
-                </span>
-              )}
-              {userScope.isGuruMapel && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-800 border border-indigo-200">
-                  <ShieldCheck size={10} />
-                  <span>Guru Mapel</span>
                 </span>
               )}
             </div>
@@ -1333,11 +1324,6 @@ export const AbsensiView: React.FC = () => {
                       <div className="px-3.5 py-2 bg-indigo-50 border border-indigo-200 text-indigo-900 text-xs font-black rounded-xl shadow-xs inline-flex items-center gap-2">
                         <BookOpen size={14} className="text-indigo-600" />
                         <span>{selectableSubjects[0].name}</span>
-                        {selectableSubjects[0].code && (
-                          <span className="text-[10px] bg-indigo-200 text-indigo-800 px-1.5 py-0.5 rounded font-bold">
-                            {selectableSubjects[0].code}
-                          </span>
-                        )}
                       </div>
                     ) : (
                       <select
@@ -1348,7 +1334,7 @@ export const AbsensiView: React.FC = () => {
                       >
                         {selectableSubjects.map((sub) => (
                           <option key={sub.id} value={sub.id}>
-                            {sub.name} {sub.code ? `(${sub.code})` : ''} {sub.teacherName ? `• ${sub.teacherName}` : ''}
+                            {sub.name} {sub.teacherName ? `• ${sub.teacherName}` : ''}
                           </option>
                         ))}
                       </select>
@@ -1357,7 +1343,7 @@ export const AbsensiView: React.FC = () => {
 
                   <div className="flex flex-col">
                     <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">
-                      {userScope.isGuruMapel ? 'PILIH ROMBEL YANG DIAJAR' : 'KELAS YANG DIAJAR'}
+                      PILIH KELAS
                     </label>
                     <div className="flex items-center gap-1.5">
                       {availableClasses.length > 0 ? (
@@ -1379,7 +1365,7 @@ export const AbsensiView: React.FC = () => {
                       ) : (
                         <div className="px-3 py-1.5 bg-amber-50 border border-amber-200 text-amber-900 text-xs font-bold rounded-xl flex items-center gap-1.5">
                           <AlertCircle size={13} className="text-amber-600 shrink-0" />
-                          <span>Tidak ada rombel terjadwal hari {currentDayName}</span>
+                          <span>Tidak ada kelas terjadwal hari {currentDayName}</span>
                         </div>
                       )}
                       {activeTargetClass && availableClasses.length > 0 && (
@@ -1402,56 +1388,33 @@ export const AbsensiView: React.FC = () => {
 
           {/* Dynamic Context Header (Guru Mapel) */}
           {attendanceMode === 'SUBJECT' && (
-            <div className="space-y-3 pt-2 border-t border-slate-200">
+            <div className="pt-2 border-t border-slate-200">
               {/* Subject Schedule & Teacher Info Box */}
-              <div className="flex flex-wrap items-center justify-between gap-3 p-3 bg-white rounded-xl border border-blue-200 text-xs">
+              <div className="flex flex-wrap items-center justify-between gap-3 p-3 bg-white rounded-xl border border-blue-200 text-xs shadow-2xs">
                 <div className="flex flex-wrap items-center gap-3">
-                  <div className="flex items-center gap-1.5 font-extrabold text-slate-900">
-                    <UserCheck size={15} className="text-blue-600" />
+                  <div className="flex items-center gap-1.5 font-extrabold text-slate-800">
+                    <UserCheck size={15} className="text-blue-600 shrink-0" />
                     <span>Pengajar: {activeSubject?.teacherName || 'Guru Mapel'}</span>
                   </div>
-                  {activeSubject?.code && (
-                    <span className="px-2 py-0.5 rounded-md bg-blue-100 text-blue-800 font-bold text-[10px]">
-                      {activeSubject.code}
-                    </span>
-                  )}
-                  {activeSubject?.scheduleDays && activeSubject.scheduleDays.length > 0 && (
-                    <div className="flex items-center gap-1">
-                      <span className="text-slate-400 text-[11px]">Jadwal Mengajar:</span>
-                      <div className="flex flex-wrap gap-1">
-                        {activeSubject.scheduleDays.map((d) => (
-                          <span
-                            key={d}
-                            className={`px-2 py-0.5 rounded text-[10px] font-extrabold ${
-                              d === currentDayName
-                                ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
-                                : 'bg-slate-100 text-slate-600'
-                            }`}
-                          >
-                            {d}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-50 border border-blue-200 text-blue-900 font-bold text-[11px]">
-                    <Clock size={12} className="text-blue-600 shrink-0" />
-                    <span>Jam KBM: <strong>{scheduledStartTime} - {scheduledEndTime}</strong></span>
+
+                  <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 border border-blue-200 text-blue-900 font-bold text-xs shadow-2xs">
+                    <Clock size={13} className="text-blue-600 shrink-0" />
+                    <span>Jam KBM: <strong className="font-extrabold text-blue-950">{scheduledStartTime} - {scheduledEndTime}</strong></span>
                   </div>
                 </div>
 
                 {isGuruMapelOffOrNonTeaching ? (
-                  <span className="px-2.5 py-1 rounded-md bg-rose-100 text-rose-800 font-bold text-[10px] flex items-center gap-1">
+                  <span className="px-2.5 py-1 rounded-lg bg-rose-100 text-rose-800 font-bold text-[11px] flex items-center gap-1.5 border border-rose-200">
                     <Lock size={12} />
                     <span>{isHoliday ? 'Hari Libur' : !isScheduledToday ? 'Bukan Hari Mengajar' : 'Bukan Hari Efektif'}</span>
                   </span>
                 ) : isScheduledToday ? (
-                  <span className="px-2.5 py-1 rounded-md bg-emerald-100 text-emerald-800 font-bold text-[10px] flex items-center gap-1">
+                  <span className="px-2.5 py-1 rounded-lg bg-emerald-100 text-emerald-800 font-bold text-[11px] flex items-center gap-1.5 border border-emerald-200">
                     <CheckCircle2 size={12} />
                     <span>Sesuai Jadwal Mengajar</span>
                   </span>
                 ) : (
-                  <span className="px-2.5 py-1 rounded-md bg-amber-100 text-amber-800 font-bold text-[10px]">
+                  <span className="px-2.5 py-1 rounded-lg bg-amber-100 text-amber-800 font-bold text-[11px] border border-amber-200">
                     KBM Tambahan (Hari {currentDayName})
                   </span>
                 )}

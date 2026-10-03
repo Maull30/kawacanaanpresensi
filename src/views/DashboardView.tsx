@@ -715,6 +715,13 @@ export const DashboardView: React.FC = () => {
   const allowedMenuItems = useMemo(() => {
     return menuItems.filter((item) => {
       if (!currentUser) return false;
+
+      // Aturan menu 'portal-siswa' (Portal Siswa & Wali Murid):
+      // Ruang kerja sekolah: hapus/hilangkan menu portal siswa & wali untuk role ADMIN
+      if (item.id === 'portal-siswa') {
+        if (currentUser.role === 'ADMIN') return false;
+      }
+
       if (currentUser.role === 'ADMIN' || currentUser.role === 'SUPER_ADMIN') return true;
 
       // Aturan menu 'data-pengguna' (Data Pengguna & Hak Akses):
@@ -1526,7 +1533,13 @@ export const DashboardView: React.FC = () => {
           </span>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-6 gap-2.5 sm:gap-3">
+        <div className={`grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 ${
+          allowedMenuItems.length === 7
+            ? 'xl:grid-cols-7'
+            : allowedMenuItems.length === 5
+            ? 'xl:grid-cols-5'
+            : 'xl:grid-cols-6'
+        } gap-2.5 sm:gap-3`}>
           {allowedMenuItems.map((item) => {
             const Icon = item.icon;
             return (

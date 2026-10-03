@@ -718,7 +718,7 @@ export const VIEW_ROLE_PERMISSIONS: Record<ActiveView, UserRole[] | "all"> = {
   rekapitulasi: ["ADMIN", "KEPALA SEKOLAH", "WALI KELAS", "GURU MAPEL"],
   laporan: ["ADMIN", "KEPALA SEKOLAH", "WALI KELAS", "GURU MAPEL"],
   pengaturan: ["ADMIN", "KEPALA SEKOLAH", "WALI KELAS", "GURU MAPEL"],
-  "portal-siswa": ["SISWA", "ADMIN", "KEPALA SEKOLAH", "WALI KELAS"],
+  "portal-siswa": ["SISWA", "KEPALA SEKOLAH", "WALI KELAS"],
 };
 
 export const isViewAllowedForRole = (

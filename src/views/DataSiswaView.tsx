@@ -635,19 +635,22 @@ export const DataSiswaView: React.FC = () => {
             {/* Buttons: Import Siswa (CSV/Excel) & Add Single Student */}
             {canInputStudents && (
               <div className="flex items-center gap-2 justify-end">
-                <button
-                  onClick={() => {
-                    setParsedStudents([]);
-                    setPasteText('');
-                    setFileName('');
-                    setIsImportModalOpen(true);
-                  }}
-                  id="btn-import-siswa-modal"
-                  className="px-3.5 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-extrabold text-xs rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
-                >
-                  <FileSpreadsheet size={15} />
-                  <span>Import Siswa</span>
-                </button>
+                {/* Sembunyikan fitur import siswa pada ruang kerja sekolah untuk role Guru Mapel */}
+                {!(isGuru && !isPersonalWorkspace) && (
+                  <button
+                    onClick={() => {
+                      setParsedStudents([]);
+                      setPasteText('');
+                      setFileName('');
+                      setIsImportModalOpen(true);
+                    }}
+                    id="btn-import-siswa-modal"
+                    className="px-3.5 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-extrabold text-xs rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <FileSpreadsheet size={15} />
+                    <span>Import Siswa</span>
+                  </button>
+                )}
 
                 <button
                   onClick={openAddModal}
@@ -834,14 +837,6 @@ export const DataSiswaView: React.FC = () => {
                             }`}
                           >
                             {getFaseByClassName(s.className)}
-                          </span>
-                        )}
-                        {!isAdmin && !isPersonalWorkspace && !isWaliKelas && (
-                          (s.classId && accessibleClassIds.has(s.classId)) ||
-                          (s.className && accessibleClassNames.has(s.className.trim().toLowerCase()))
-                        ) && (
-                          <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 border border-blue-200">
-                            Siswa Diajar
                           </span>
                         )}
                       </div>

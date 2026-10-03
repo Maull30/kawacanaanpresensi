@@ -58,15 +58,29 @@ export const DataMapelView: React.FC = () => {
 
   // Find teacher record linked to currentUser
   const currentTeacher = useMemo(() => {
-    if (!currentUser?.teacherId) return null;
-    return teachers.find((t) => t.id === currentUser.teacherId) || null;
-  }, [currentUser?.teacherId, teachers]);
+    if (userScope.currentTeacher) return userScope.currentTeacher;
+    if (currentUser?.teacherId) {
+      return teachers.find((t) => t.id === currentUser.teacherId) || null;
+    }
+    const cleanName = (currentUser?.name || '').toLowerCase().trim();
+    return teachers.find((t) => t.nama.toLowerCase().trim() === cleanName) || null;
+  }, [currentUser, teachers, userScope.currentTeacher]);
 
   // Check if a specific subject is taught by current user
   const isMySubject = (sub: Subject) => {
     if (!currentUser) return false;
     if (sub.teacherId && currentUser.teacherId && sub.teacherId === currentUser.teacherId) return true;
-    return userScope.assignedSubjectIds.includes(sub.id);
+    if (currentTeacher?.id && sub.teacherId && sub.teacherId === currentTeacher.id) return true;
+    if (currentUser.subjectId && sub.id === currentUser.subjectId) return true;
+    if (userScope.assignedSubjectIds.includes(sub.id)) return true;
+    if (sub.teacherName) {
+      const cleanSubTeacher = sub.teacherName.toLowerCase().trim();
+      const cleanUserName = (currentUser.name || '').toLowerCase().trim();
+      const cleanTeacherName = (currentTeacher?.nama || '').toLowerCase().trim();
+      if (cleanUserName && cleanSubTeacher === cleanUserName) return true;
+      if (cleanTeacherName && cleanSubTeacher === cleanTeacherName) return true;
+    }
+    return false;
   };
 
   const mySubjectsCount = useMemo(() => {
@@ -159,6 +173,11 @@ export const DataMapelView: React.FC = () => {
       // Untuk Wali Kelas di Ruang Kerja Sekolah: HANYA tampilkan mata pelajaran yang ada dalam penugasannya saja
       if (isWaliKelas && !isAdmin) {
         if (!isSubjectInWaliAssignment(sub)) return false;
+      }
+
+      // Untuk Guru Mapel di Ruang Kerja Sekolah: HANYA menampilkan akun yang bersangkutan
+      if (isGuruMapel && !isAdmin && !isPersonalWorkspace) {
+        if (!isMySubject(sub)) return false;
       }
 
       // Filter tab Mapel Saya
@@ -401,7 +420,9 @@ export const DataMapelView: React.FC = () => {
               )}
             </div>
             <p className="text-xs text-slate-500">
-              {isWaliKelas && assignedWaliClass
+              {isGuruMapel && !isPersonalWorkspace
+                ? `Menampilkan daftar mata pelajaran yang Anda ampu (${filteredSubjects.length} mata pelajaran).`
+                : isWaliKelas && assignedWaliClass
                 ? `Menampilkan daftar mata pelajaran yang diinput dan diajar oleh Guru Mapel untuk kelas ${assignedWaliClass.name}.`
                 : isGuruMapel
                 ? 'Kelola mata pelajaran yang Anda ampu, tentukan rombel kelas binaan/sasaran yang diajar, dan atur hari jadwal KBM.'
@@ -478,8 +499,8 @@ export const DataMapelView: React.FC = () => {
       {/* Toolbar: Search & Scope Filter & Class Filter */}
       <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 pt-2 border-t border-slate-100">
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 flex-1 max-w-3xl">
-          {/* Quick Scope Filter for Guru Mapel */}
-          {isGuruMapel && (
+          {/* Quick Scope Filter for Guru Mapel: hanya tampil di personal workspace */}
+          {isGuruMapel && isPersonalWorkspace && (
             <div className="flex items-center p-1 bg-slate-100 rounded-xl border border-slate-200 shrink-0">
               <button
                 type="button"
@@ -528,7 +549,16 @@ export const DataMapelView: React.FC = () => {
                 onChange={(e) => setSelectedClassFilter(e.target.value)}
                 className="bg-transparent font-extrabold text-blue-900 outline-none cursor-pointer text-xs"
               >
-                {isWaliKelas && !isAdmin ? (
+                {isGuruMapel && !isPersonalWorkspace && !isAdmin ? (
+                  <>
+                    <option value="ALL">Semua Kelas Yang Diajar</option>
+                    {userScope.accessibleClasses.map((cls) => (
+                      <option key={cls.id} value={cls.id}>
+                        {cls.name} ({getFaseByClassName(cls.name, cls.grade)})
+                      </option>
+                    ))}
+                  </>
+                ) : isWaliKelas && !isAdmin ? (
                   <>
                     <option value="ALL">
                       {assignedWaliClass ? `Semua Mapel Kelas ${assignedWaliClass.name}` : 'Semua Mapel Penugasan'}

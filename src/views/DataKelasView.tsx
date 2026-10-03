@@ -969,15 +969,7 @@ export const DataKelasView: React.FC = () => {
                     )}
                   </div>
                 )
-              ) : (
-                !isAdmin && isGuru ? (
-                  <div className="flex flex-wrap items-center gap-2 mt-2">
-                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 border border-slate-200 text-[11px] font-bold">
-                      {`Diajar: ${accessibleClasses.map((c) => c.name).join(', ') || 'Belum ditugaskan'}`}
-                    </span>
-                  </div>
-                ) : null
-              )}
+              ) : null}
             </div>
           </div>
 
@@ -1201,11 +1193,6 @@ export const DataKelasView: React.FC = () => {
                               >
                                 {fase}
                               </span>
-                              {!isAdmin && !isPersonalWorkspace && !isWaliKelas && accessibleClassIds.has(c.id) && (
-                                <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-blue-100 text-blue-800 border border-blue-200">
-                                  Kelas Diajar
-                                </span>
-                              )}
                             </div>
                           </td>
                           <td className="py-3.5 px-4 text-center font-bold text-blue-600 bg-blue-50/20">

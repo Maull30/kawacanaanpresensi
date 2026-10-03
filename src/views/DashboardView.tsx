@@ -33,6 +33,7 @@ import {
   ChevronDown,
   Printer,
   PieChart,
+  CalendarX,
 } from 'lucide-react';
 import disneySchoolBuildingBanner from '../assets/images/disney_school_building_1790204694548.jpg';
 import { TeacherLeaveApprovalModal } from '../components/TeacherLeaveApprovalModal';
@@ -77,6 +78,7 @@ export const DashboardView: React.FC = () => {
     leaveRequests,
     updateLeaveRequestStatus,
     refreshLeaveRequests,
+    getDateStatus,
   } = useApp();
 
   const [copiedCode, setCopiedCode] = useState(false);
@@ -265,6 +267,21 @@ export const DashboardView: React.FC = () => {
   }, [todayDate, currentDayName, monthShortIndo]);
 
   const isCacheValidForToday = cachedSummary?.cachedDate === todayFormatted;
+
+  const todayDateStatus = useMemo(() => {
+    if (getDateStatus) {
+      return getDateStatus(todayFormatted);
+    }
+    return {
+      isStudyDay: true,
+      isHoliday: false,
+      isEffective: true,
+      label: 'Hari Efektif Belajar',
+      badgeColor: 'text-emerald-700 bg-emerald-50 border-emerald-200',
+    };
+  }, [getDateStatus, todayFormatted]);
+
+  const isTodayHoliday = !todayDateStatus.isEffective || todayDateStatus.isHoliday;
 
   // Daftar kelas yang diajar Guru Mapel pada hari berjalan (today)
   const classesTaughtToday = useMemo(() => {
@@ -1245,61 +1262,107 @@ export const DashboardView: React.FC = () => {
             </span>
           </div>
 
-          {/* 4 Status Cards in 2x2 Grid */}
-          <div className="grid grid-cols-2 gap-1.5 my-auto">
-            {/* Hadir */}
+          {/* Widget Content: 4 Status Cards or Explanation for Guru Mapel on Holiday / Off-Day */}
+          {userScope.isGuruMapel && isTodayHoliday ? (
             <div
               onClick={() => setActiveView('absensi')}
-              className="p-2 rounded-lg bg-emerald-50/70 border border-emerald-100 hover:border-emerald-300 transition-colors cursor-pointer text-left"
+              className="my-auto p-3 rounded-xl bg-rose-50/80 border border-rose-200/80 flex items-center gap-3 cursor-pointer hover:bg-rose-100/70 transition-colors shadow-2xs"
             >
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-bold text-emerald-700">Hadir</span>
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+              <div className="w-9 h-9 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center shrink-0 border border-rose-200">
+                <CalendarX size={18} />
               </div>
-              <p className="text-base font-black text-slate-900 mt-0.5">{hadirCount}</p>
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <p className="text-xs font-black text-rose-950 truncate">Hari Libur Sekolah</p>
+                  <span className="px-1.5 py-0.2 rounded text-[9px] font-extrabold bg-rose-200 text-rose-800">
+                    Libur
+                  </span>
+                </div>
+                <p className="text-[10px] text-rose-800 line-clamp-1 mt-0.5">
+                  {todayDateStatus.eventTitle || todayDateStatus.label || 'KBM Diliburkan'}
+                </p>
+              </div>
             </div>
+          ) : userScope.isGuruMapel && classesTaughtToday.length === 0 ? (
+            <div
+              onClick={() => setActiveView('absensi')}
+              className="my-auto p-3 rounded-xl bg-slate-50 border border-slate-200/90 flex items-center gap-3 cursor-pointer hover:bg-slate-100 transition-colors shadow-2xs"
+            >
+              <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center shrink-0 border border-blue-200">
+                <BookOpen size={18} />
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <p className="text-xs font-black text-slate-900 truncate">Bukan Hari Mengajar</p>
+                  <span className="px-1.5 py-0.2 rounded text-[9px] font-extrabold bg-slate-200 text-slate-700">
+                    {currentDayName}
+                  </span>
+                </div>
+                <p className="text-[10px] text-slate-600 line-clamp-1 mt-0.5">
+                  {classesTaughtTodaySubtext || `Tidak ada jadwal mengajar pada hari ${currentDayName}`}
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-1.5 my-auto">
+              {/* Hadir */}
+              <div
+                onClick={() => setActiveView('absensi')}
+                className="p-2 rounded-lg bg-emerald-50/70 border border-emerald-100 hover:border-emerald-300 transition-colors cursor-pointer text-left"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-emerald-700">Hadir</span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                </div>
+                <p className="text-base font-black text-slate-900 mt-0.5">{hadirCount}</p>
+              </div>
 
-            {/* Sakit */}
-            <div
-              onClick={() => setActiveView('absensi')}
-              className="p-2 rounded-lg bg-sky-50/70 border border-sky-100 hover:border-sky-300 transition-colors cursor-pointer text-left"
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-bold text-sky-700">Sakit</span>
-                <span className="w-1.5 h-1.5 rounded-full bg-sky-500" />
+              {/* Sakit */}
+              <div
+                onClick={() => setActiveView('absensi')}
+                className="p-2 rounded-lg bg-sky-50/70 border border-sky-100 hover:border-sky-300 transition-colors cursor-pointer text-left"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-sky-700">Sakit</span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-sky-500" />
+                </div>
+                <p className="text-base font-black text-slate-900 mt-0.5">{sakitCount}</p>
               </div>
-              <p className="text-base font-black text-slate-900 mt-0.5">{sakitCount}</p>
-            </div>
 
-            {/* Izin */}
-            <div
-              onClick={() => setActiveView('absensi')}
-              className="p-2 rounded-lg bg-amber-50/70 border border-amber-100 hover:border-amber-300 transition-colors cursor-pointer text-left"
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-bold text-amber-700">Izin</span>
-                <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+              {/* Izin */}
+              <div
+                onClick={() => setActiveView('absensi')}
+                className="p-2 rounded-lg bg-amber-50/70 border border-amber-100 hover:border-amber-300 transition-colors cursor-pointer text-left"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-amber-700">Izin</span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                </div>
+                <p className="text-base font-black text-slate-900 mt-0.5">{izinCount}</p>
               </div>
-              <p className="text-base font-black text-slate-900 mt-0.5">{izinCount}</p>
-            </div>
 
-            {/* Alfa */}
-            <div
-              onClick={() => setActiveView('absensi')}
-              className="p-2 rounded-lg bg-rose-50/70 border border-rose-100 hover:border-rose-300 transition-colors cursor-pointer text-left"
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-bold text-rose-700">Alfa</span>
-                <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+              {/* Alfa */}
+              <div
+                onClick={() => setActiveView('absensi')}
+                className="p-2 rounded-lg bg-rose-50/70 border border-rose-100 hover:border-rose-300 transition-colors cursor-pointer text-left"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-rose-700">Alfa</span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                </div>
+                <p className="text-base font-black text-slate-900 mt-0.5">{alfaCount}</p>
               </div>
-              <p className="text-base font-black text-slate-900 mt-0.5">{alfaCount}</p>
             </div>
-          </div>
+          )}
 
           {/* Footer */}
           <div className="flex items-center justify-between pt-1 border-t border-slate-100 text-[10px] text-slate-500">
             <span className="truncate">
-              {totalInputted === 0
+              {userScope.isGuruMapel && isTodayHoliday
+                ? 'KBM & Presensi Ditiadakan'
+                : userScope.isGuruMapel && classesTaughtToday.length === 0
+                ? `Tidak ada jadwal hari ${currentDayName}`
+                : totalInputted === 0
                 ? 'Belum ada presensi diinput'
                 : isAttendanceFullyInputted
                 ? '✓ Seluruh siswa terdata'
@@ -1320,7 +1383,11 @@ export const DashboardView: React.FC = () => {
                 onClick={() => setActiveView('absensi')}
                 className="font-bold text-blue-600 hover:text-blue-800 hover:underline shrink-0 cursor-pointer"
               >
-                {totalInputted > 0 && isAttendanceFullyInputted ? 'Detail' : 'Input Presensi'}
+                {userScope.isGuruMapel && (isTodayHoliday || classesTaughtToday.length === 0)
+                  ? 'Buka Presensi'
+                  : totalInputted > 0 && isAttendanceFullyInputted
+                  ? 'Detail'
+                  : 'Input Presensi'}
               </button>
             </div>
           </div>

@@ -30,6 +30,11 @@ import {
   CheckCircle,
   AlertCircle,
   X,
+  CalendarX,
+  CalendarCheck,
+  Eye,
+  EyeOff,
+  ExternalLink,
 } from 'lucide-react';
 import { ClassQrModal } from '../components/ClassQrModal';
 import { TeacherLeaveApprovalModal } from '../components/TeacherLeaveApprovalModal';
@@ -41,6 +46,7 @@ export const AbsensiView: React.FC = () => {
     classes,
     teachers,
     currentUser,
+    activeWorkspace,
     systemConfig,
     activeStudyDays,
     schoolProfile,
@@ -58,6 +64,12 @@ export const AbsensiView: React.FC = () => {
     refreshLeaveRequests,
   } = useApp();
 
+  const isPersonalWorkspace =
+    activeWorkspace?.workspaceType === 'personal' ||
+    activeWorkspace?.workspaceType === 'individu' ||
+    (currentUser?.subscriptionPlan === 'mulai' && !currentUser?.schoolId) ||
+    !currentUser?.schoolId;
+
   useEffect(() => {
     refreshLeaveRequests();
   }, [refreshLeaveRequests]);
@@ -66,6 +78,9 @@ export const AbsensiView: React.FC = () => {
     () => getUserRoleScope(currentUser, classes, subjects, teachers),
     [currentUser, classes, subjects, teachers]
   );
+
+  const isGuruMapelRole =
+    currentUser?.role === 'GURU MAPEL' || userScope.isGuruMapel;
 
   const isTeacherOrWali = useMemo(() => {
     return (
@@ -76,11 +91,15 @@ export const AbsensiView: React.FC = () => {
     );
   }, [currentUser?.role, userScope.isWaliKelas, userScope.isGuruMapel]);
 
-  const initialMode: AttendanceType = userScope.isGuruMapel ? 'SUBJECT' : 'DAILY';
+  const initialMode: AttendanceType = isGuruMapelRole ? 'SUBJECT' : 'DAILY';
 
   const [date, setDate] = useState<string>(currentAttendanceDate);
   const [attendanceMode, setAttendanceMode] = useState<AttendanceType>(initialMode);
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [showArchivedRecords, setShowArchivedRecords] = useState<boolean>(false);
+  const [allowExtraSession, setAllowExtraSession] = useState<boolean>(false);
+
+  const isGuruMapel = isGuruMapelRole || attendanceMode === 'SUBJECT';
   
   // Subject state
   const [selectedSubjectId, setSelectedSubjectId] = useState<string>(() => {
@@ -271,42 +290,137 @@ export const AbsensiView: React.FC = () => {
     }
   }, [date]);
 
+  // Daftar hari jadwal mengajar resmi untuk rombel terpilih
+  const scheduledDaysForClass = useMemo(() => {
+    if (!activeSubject) return [];
+    if (selectedClassId && activeSubject.classSchedules && activeSubject.classSchedules.length > 0) {
+      const clsSched = activeSubject.classSchedules.find((cs) => cs.classId === selectedClassId);
+      if (clsSched && clsSched.days && clsSched.days.length > 0) {
+        return clsSched.days;
+      }
+    }
+    if (activeSubject.scheduleDays && activeSubject.scheduleDays.length > 0) {
+      return activeSubject.scheduleDays;
+    }
+    return [];
+  }, [activeSubject, selectedClassId]);
+
+  const isScheduleConfigured = scheduledDaysForClass.length > 0;
+
+  const scheduledDaysText = useMemo(() => {
+    if (scheduledDaysForClass.length === 0) return 'Belum diatur';
+    return scheduledDaysForClass.join(', ');
+  }, [scheduledDaysForClass]);
+
   const isScheduledToday = useMemo(() => {
     if (attendanceMode !== 'SUBJECT' || !activeSubject) {
       return true;
     }
-    // Check class-specific schedule if available for the selected class
-    if (selectedClassId && activeSubject.classSchedules && activeSubject.classSchedules.length > 0) {
-      const clsSched = activeSubject.classSchedules.find((cs) => cs.classId === selectedClassId);
-      if (clsSched && clsSched.days && clsSched.days.length > 0) {
-        return clsSched.days.includes(currentDayName);
-      }
+    if (!isScheduleConfigured) {
+      return false;
     }
-    if (!activeSubject.scheduleDays || activeSubject.scheduleDays.length === 0) {
-      return true;
-    }
-    return activeSubject.scheduleDays.includes(currentDayName);
-  }, [attendanceMode, activeSubject, selectedClassId, currentDayName]);
+    return scheduledDaysForClass.includes(currentDayName);
+  }, [attendanceMode, activeSubject, isScheduleConfigured, scheduledDaysForClass, currentDayName]);
 
   // Auto-lock for Guru Mapel if selected day is not a scheduled teaching day
   const isLockedForGuruMapel = useMemo(() => {
-    if (userScope.isGuruMapel) {
-      if (selectedClassId && activeSubject?.classSchedules && activeSubject.classSchedules.length > 0) {
-        const clsSched = activeSubject.classSchedules.find((cs) => cs.classId === selectedClassId);
-        if (clsSched && clsSched.days && clsSched.days.length > 0) {
-          return !clsSched.days.includes(currentDayName);
-        }
-      }
-      if (activeSubject?.scheduleDays && activeSubject.scheduleDays.length > 0) {
-        return !activeSubject.scheduleDays.includes(currentDayName);
-      }
+    if (isGuruMapel) {
       if (currentDayName === 'Minggu') return true;
+      if (allowExtraSession) return false;
+      if (scheduledDaysForClass.length > 0) {
+        return !scheduledDaysForClass.includes(currentDayName);
+      }
+      return true;
     }
     return false;
-  }, [userScope, activeSubject, selectedClassId, currentDayName]);
+  }, [isGuruMapel, currentDayName, allowExtraSession, scheduledDaysForClass]);
 
   // Combined Lock Status (Locked if Holiday, Non-Effective Day, or Non-Teaching Day for Guru Mapel)
   const isDateLocked = isNonEffectiveDay || isLockedForGuruMapel;
+  const isGuruMapelOffOrNonTeaching = isGuruMapel && (isNonEffectiveDay || !isScheduledToday);
+
+  // Cek apakah ada kelas lain dari mapel ini yang memiliki jadwal hari ini
+  const otherClassScheduledToday = useMemo(() => {
+    if (!isGuruMapel || !activeSubject) return null;
+    return availableClasses.find((c) => {
+      if (c.id === selectedClassId) return false;
+      const clsSched = activeSubject.classSchedules?.find((cs) => cs.classId === c.id);
+      if (clsSched && clsSched.days && clsSched.days.length > 0) {
+        return clsSched.days.includes(currentDayName);
+      }
+      return false;
+    });
+  }, [isGuruMapel, activeSubject, availableClasses, selectedClassId, currentDayName]);
+
+  // Informasi hari jadwal mengajar terdekat untuk rombel ini
+  const nextTeachingDayInfo = useMemo(() => {
+    if (scheduledDaysForClass.length === 0) return null;
+    const dayNames = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+    try {
+      const [y, m, d] = date.split('-');
+      const curr = new Date(Number(y), Number(m) - 1, Number(d));
+      for (let i = 1; i <= 7; i++) {
+        const next = new Date(curr);
+        next.setDate(next.getDate() + i);
+        const dayName = dayNames[next.getDay()];
+        if (scheduledDaysForClass.includes(dayName)) {
+          const nextY = next.getFullYear();
+          const nextM = String(next.getMonth() + 1).padStart(2, '0');
+          const nextD = String(next.getDate()).padStart(2, '0');
+          return {
+            dateStr: `${nextY}-${nextM}-${nextD}`,
+            dayName,
+            formatted: `${dayName}, ${nextD}/${nextM}/${nextY}`,
+          };
+        }
+      }
+    } catch (_) {}
+    return null;
+  }, [date, scheduledDaysForClass]);
+
+  // Helper untuk melompat langsung ke hari mengajar terdekat
+  const jumpToNextTeachingDay = () => {
+    if (!nextTeachingDayInfo) return;
+    handleDateChange(nextTeachingDayInfo.dateStr);
+    showToast(`Beralih ke hari jadwal mengajar: ${nextTeachingDayInfo.formatted}`);
+  };
+
+  // Jumlah catatan presensi tersimpan pada tanggal ini
+  const savedRecordsCount = useMemo(() => {
+    return records.filter((r) => r.status && r.status !== '-').length;
+  }, [records]);
+  const hasSavedRecordsForDate = savedRecordsCount > 0;
+
+  // Apakah isi visualisasi dan daftar absensi siswa boleh ditampilkan:
+  // Untuk Guru Mapel: HANYA menampilkan absensi jika sesuai dengan jadwalnya atau harinya
+  // Jika libur atau bukan hari mengajar, berikan keterangannya.
+  const shouldShowAttendanceContent = useMemo(() => {
+    if (!isGuruMapel) {
+      if (isNonEffectiveDay) return showArchivedRecords;
+      return true;
+    }
+    // Hari libur / bukan hari efektif belajar
+    if (isNonEffectiveDay) {
+      return showArchivedRecords;
+    }
+    // Jadwal belum dikonfigurasi
+    if (!isScheduleConfigured) {
+      return allowExtraSession;
+    }
+    // Bukan hari mengajar sesuai jadwal
+    if (!isScheduledToday) {
+      return allowExtraSession || showArchivedRecords;
+    }
+    // Sesuai jadwal mengajar dan hari efektif belajar
+    return true;
+  }, [
+    isGuruMapel,
+    isNonEffectiveDay,
+    isScheduleConfigured,
+    isScheduledToday,
+    allowExtraSession,
+    showArchivedRecords,
+  ]);
 
   // Load records for the chosen date, mode, and subject with dirty-protection and draft restore
   useEffect(() => {
@@ -389,6 +503,8 @@ export const AbsensiView: React.FC = () => {
     }
     setDate(newDate);
     setCurrentAttendanceDate(newDate);
+    setShowArchivedRecords(false);
+    setAllowExtraSession(false);
   };
 
   const updateRecord = (studentId: string, updates: Partial<AttendanceRecord>) => {
@@ -990,10 +1106,10 @@ export const AbsensiView: React.FC = () => {
                   )}
                 </div>
 
-                {isLockedForGuruMapel ? (
+                {isGuruMapelOffOrNonTeaching ? (
                   <span className="px-2.5 py-1 rounded-md bg-rose-100 text-rose-800 font-bold text-[10px] flex items-center gap-1">
                     <Lock size={12} />
-                    <span>Bukan Jadwal Mengajar (Terkunci)</span>
+                    <span>{isHoliday ? 'Hari Libur' : !isScheduledToday ? 'Bukan Hari Mengajar' : 'Bukan Hari Efektif'}</span>
                   </span>
                 ) : isScheduledToday ? (
                   <span className="px-2.5 py-1 rounded-md bg-emerald-100 text-emerald-800 font-bold text-[10px] flex items-center gap-1">
@@ -1006,32 +1122,6 @@ export const AbsensiView: React.FC = () => {
                   </span>
                 )}
               </div>
-
-              {/* Locked Warning for Guru Mapel on Non-Teaching Days */}
-              {isLockedForGuruMapel && (
-                <div className="flex items-start gap-3 p-3.5 bg-amber-50 border border-amber-300 rounded-xl text-amber-900 shadow-xs">
-                  <div className="w-8 h-8 rounded-lg bg-amber-100 border border-amber-300 text-amber-700 flex items-center justify-center shrink-0 mt-0.5">
-                    <Lock size={16} />
-                  </div>
-                  <div className="space-y-0.5">
-                    <h4 className="text-xs font-black text-amber-950 flex items-center gap-2">
-                      <span>Fitur Absensi Siswa Dikunci Otomatis</span>
-                      <span className="text-[10px] bg-amber-200 text-amber-900 px-2 py-0.5 rounded font-black">
-                        Bukan Hari Mengajar
-                      </span>
-                    </h4>
-                    <p className="text-xs text-amber-800 leading-relaxed font-medium">
-                      Hari <strong>{currentDayName}</strong> bukan merupakan jadwal mengajar mata pelajaran <strong>{activeSubject?.name}</strong>.
-                      {activeSubject?.scheduleDays && activeSubject.scheduleDays.length > 0 ? (
-                        <span> Jadwal resmi mata pelajaran ini adalah: <strong>{activeSubject.scheduleDays.join(', ')}</strong>.</span>
-                      ) : (
-                        <span> Tidak ada jadwal mengajar pada hari ini.</span>
-                      )}
-                      {' '}Sistem otomatis menonaktifkan pengisian dan perubahan data absensi.
-                    </p>
-                  </div>
-                </div>
-              )}
             </div>
           )}
         </div>
@@ -1045,656 +1135,913 @@ export const AbsensiView: React.FC = () => {
         </div>
       )}
 
-      {/* Bulk Action Buttons - Compact Toolbar (Disejajarkan Layoutnya Secara Harmonis) */}
-      <div className={`grid gap-2 sm:gap-2.5 ${
-        attendanceMode === 'DAILY'
-          ? 'grid-cols-2 sm:grid-cols-3 md:grid-cols-5'
-          : 'grid-cols-2 sm:grid-cols-4'
-      }`}>
-        <button
-          type="button"
-          onClick={handleHadirSemua}
-          disabled={isDateLocked || isSaving}
-          id="btn-hadir-semua"
-          title="Atur semua siswa ke status Hadir. Siswa yang sudah scan QR akan tetap mempertahankan waktu aslinya."
-          className={`w-full py-2.5 px-3 rounded-xl border font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-2xs min-h-[42px] ${
-            isDateLocked || isSaving
-              ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
-              : 'border-emerald-300 bg-emerald-50 hover:bg-emerald-100 active:scale-95 text-emerald-700 cursor-pointer'
-          }`}
-        >
-          {isDateLocked ? <Lock size={15} /> : <CheckCircle2 size={15} />}
-          <span>Hadir Semua</span>
-        </button>
+      {/* Visualisasi Presensi atau Keterangan Jadwal Mengajar & Hari Libur */}
+      {!shouldShowAttendanceContent ? (
+        <div className="bg-white rounded-2xl border border-slate-200 p-5 sm:p-7 shadow-xs space-y-5 animate-in fade-in duration-300">
+          <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4">
+            <div
+              className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 shadow-xs ${
+                isNonEffectiveDay
+                  ? 'bg-rose-100 text-rose-700 border border-rose-200'
+                  : !isScheduleConfigured
+                  ? 'bg-amber-100 text-amber-800 border border-amber-200'
+                  : 'bg-blue-100 text-blue-700 border border-blue-200'
+              }`}
+            >
+              {isNonEffectiveDay ? (
+                <CalendarX size={24} />
+              ) : !isScheduleConfigured ? (
+                <Info size={24} />
+              ) : (
+                <Clock size={24} />
+              )}
+            </div>
 
-        {attendanceMode === 'DAILY' && (
-          <button
-            type="button"
-            onClick={handlePulangMasal}
-            disabled={isDateLocked || isSaving}
-            id="btn-pulang-masal"
-            title="Terapkan jam pulang standar bagi siswa hadir yang belum memiliki jam pulang (waktu checkout riil tetap dipertahankan)."
-            className={`w-full py-2.5 px-3 rounded-xl border font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-2xs min-h-[42px] ${
-              isDateLocked || isSaving
-                ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
-                : 'border-blue-300 bg-blue-50 hover:bg-blue-100 active:scale-95 text-blue-700 cursor-pointer'
-            }`}
-          >
-            {isDateLocked ? <Lock size={15} /> : <LogOut size={15} />}
-            <span>Pulang Masal</span>
-          </button>
-        )}
+            <div className="space-y-1 text-center sm:text-left min-w-0 flex-1">
+              <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
+                <h2 className="text-base sm:text-lg font-black text-slate-900 tracking-tight">
+                  {isNonEffectiveDay
+                    ? `Presensi Ditiadakan: ${dateStatus.eventTitle || dateStatus.label}`
+                    : !isScheduleConfigured
+                    ? `Jadwal Mengajar Belum Dikonfigurasi`
+                    : `Bukan Hari Jadwal Mengajar ${activeSubject?.name || 'Mata Pelajaran'}`}
+                </h2>
+                <span
+                  className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider border ${
+                    isNonEffectiveDay
+                      ? 'bg-rose-100 text-rose-800 border-rose-300'
+                      : !isScheduleConfigured
+                      ? 'bg-amber-100 text-amber-800 border-amber-300'
+                      : 'bg-slate-100 text-slate-700 border-slate-300'
+                  }`}
+                >
+                  {isNonEffectiveDay
+                    ? 'Hari Libur'
+                    : !isScheduleConfigured
+                    ? 'Belum Ada Jadwal'
+                    : `Tidak Ada Jadwal Hari ${currentDayName}`}
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 font-medium">
+                {currentSelectedClassName} • {activeSubject?.name || 'Mapel'} •{' '}
+                <strong className="text-slate-700">{formatDateIndo(date)}</strong>
+              </p>
+            </div>
+          </div>
 
-        <button
-          type="button"
-          onClick={() => setIsClassQrOpen(true)}
-          disabled={!activeTargetClass}
-          id="btn-qr-presensi-rombel"
-          className={`w-full py-2.5 px-3 rounded-xl border font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-2xs min-h-[42px] ${
-            !activeTargetClass
-              ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
-              : 'border-indigo-200 bg-indigo-50 hover:bg-indigo-100 active:scale-95 text-indigo-700 cursor-pointer'
-          }`}
-          title={`Tampilkan / Cetak QR Code Presensi ${activeTargetClass?.name || 'Rombel Kelas'}`}
-        >
-          <QrCode size={15} />
-          <span>QR Presensi</span>
-        </button>
+          {/* Details Box */}
+          {isNonEffectiveDay ? (
+            <div className="p-4 rounded-xl bg-rose-50/70 border border-rose-200 text-xs text-rose-950 space-y-2">
+              <p className="leading-relaxed font-medium">
+                Tanggal <strong>{formatDateIndo(date)}</strong> tercatat sebagai{' '}
+                <strong>{dateStatus.eventTitle || dateStatus.label}</strong> pada Kalender Akademik.
+              </p>
+              <p className="text-rose-800 text-[11px] leading-relaxed">
+                Sesuai ketentuan hari efektif belajar sekolah ({activeStudyDaysText}), kegiatan belajar mengajar (KBM) tidak dilaksanakan pada hari libur sehingga penginputan presensi siswa ditiadakan.
+              </p>
+            </div>
+          ) : !isScheduleConfigured ? (
+            <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-950 space-y-2">
+              <p className="leading-relaxed font-medium">
+                Mata pelajaran <strong>{activeSubject?.name}</strong> untuk rombel{' '}
+                <strong>{currentSelectedClassName}</strong> belum memiliki jadwal hari mengajar resmi.
+              </p>
+              <p className="text-amber-800 text-[11px] leading-relaxed">
+                Silakan atur hari jadwal mengajar di menu <strong>Data Referensi ➔ Mata Pelajaran</strong> agar absensi siswa muncul secara otomatis mengikuti hari mengajarnya, atau klik tombol di bawah untuk membuka presensi khusus.
+              </p>
+            </div>
+          ) : (
+            <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 text-xs space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2.5 border-b border-slate-200">
+                <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500">
+                  Jadwal Resmi Mengajar {currentSelectedClassName}:
+                </span>
+                <div className="flex flex-wrap gap-1.5">
+                  {scheduledDaysForClass.map((d) => (
+                    <span
+                      key={d}
+                      className="px-2.5 py-1 rounded-lg bg-blue-100 border border-blue-200 text-blue-900 font-extrabold text-xs"
+                    >
+                      Hari {d}
+                    </span>
+                  ))}
+                  {activeSubject?.lessonPeriod && (
+                    <span className="px-2.5 py-1 rounded-lg bg-slate-200/80 text-slate-700 font-bold text-xs">
+                      {activeSubject.lessonPeriod}
+                    </span>
+                  )}
+                </div>
+              </div>
 
-        <button
-          type="button"
-          onClick={() => setIsLeaveApprovalOpen(true)}
-          id="btn-verifikasi-surat-izin"
-          className="relative w-full py-2.5 px-3 rounded-xl border border-amber-300 bg-amber-50 hover:bg-amber-100 active:scale-95 text-amber-900 font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-2xs min-h-[42px] cursor-pointer"
-          title="Verifikasi Surat Izin / Sakit dari Orang Tua Siswa"
-        >
-          <FileText size={15} className="text-amber-700 shrink-0" />
-          <span>Surat Izin Wali</span>
-          {pendingClassLeaveRequestsCount > 0 && (
-            <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-rose-600 text-white text-[10px] font-black flex items-center justify-center shadow-xs animate-pulse">
-              {pendingClassLeaveRequestsCount}
-            </span>
+              <p className="text-slate-600 leading-relaxed font-medium">
+                Hari ini adalah hari <strong>{currentDayName}</strong>. Karena bukan merupakan hari jadwal mengajar mata pelajaran <strong>{activeSubject?.name}</strong> untuk kelas <strong>{currentSelectedClassName}</strong>, daftar presensi siswa dinonaktifkan sesuai jadwal resmi KBM.
+              </p>
+
+              {otherClassScheduledToday && (
+                <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                  <div className="flex items-center gap-2 text-emerald-950 text-xs font-bold">
+                    <Sparkles size={16} className="text-emerald-600 shrink-0" />
+                    <span>
+                      Hari ini ({currentDayName}) Anda memiliki jadwal mengajar di kelas{' '}
+                      <strong>{otherClassScheduledToday.name}</strong>.
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedClassId(otherClassScheduledToday.id)}
+                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold shrink-0 cursor-pointer shadow-2xs transition active:scale-95"
+                  >
+                    Buka Presensi {otherClassScheduledToday.name}
+                  </button>
+                </div>
+              )}
+            </div>
           )}
-        </button>
 
-        <button
-          type="button"
-          onClick={handleReset}
-          disabled={isDateLocked || isSaving}
-          id="btn-reset-absensi"
-          className={`w-full col-span-2 sm:col-span-1 md:col-span-1 py-2.5 px-3 rounded-xl border font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-2xs min-h-[42px] ${
-            isDateLocked || isSaving
-              ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
-              : 'border-rose-300 bg-rose-50 hover:bg-rose-100 active:scale-95 text-rose-700 cursor-pointer'
-          }`}
-          title="Reset status kehadiran siswa"
-        >
-          {isDateLocked ? <Lock size={15} /> : <RotateCcw size={15} />}
-          <span>Reset</span>
-        </button>
-      </div>
-
-      {/* Unified Status Ribbon & Completion Meter */}
-      <div className="bg-white p-3 sm:p-4 rounded-2xl border border-slate-200 shadow-xs space-y-2.5">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          {/* Status Pills */}
-          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold shadow-2xs">
-              <span className="w-2 h-2 rounded-full bg-emerald-500" />
-              <span>Hadir:</span>
-              <strong className="text-emerald-950">{countHadir}</strong>
-            </span>
-
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-sky-50 border border-sky-200 text-sky-800 text-xs font-bold shadow-2xs">
-              <span className="w-2 h-2 rounded-full bg-sky-500" />
-              <span>Sakit:</span>
-              <strong className="text-sky-950">{countSakit}</strong>
-            </span>
-
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-xs font-bold shadow-2xs">
-              <span className="w-2 h-2 rounded-full bg-amber-500" />
-              <span>Izin:</span>
-              <strong className="text-amber-950">{countIzin}</strong>
-            </span>
-
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-rose-50 border border-rose-200 text-rose-800 text-xs font-bold shadow-2xs">
-              <span className="w-2 h-2 rounded-full bg-rose-500" />
-              <span>Alfa:</span>
-              <strong className="text-rose-950">{countAlfa}</strong>
-            </span>
-
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 border border-slate-200 text-slate-700 text-xs font-bold shadow-2xs">
-              <span className="w-2 h-2 rounded-full bg-slate-400" />
-              <span>Belum:</span>
-              <strong className="text-slate-900">{countBelum}</strong>
-            </span>
-          </div>
-
-          {/* Progress Percent */}
-          <div className="text-xs font-extrabold text-slate-700 flex items-center gap-2">
-            <span>{countTotalDiabsen} / {records.length} Diabsen</span>
-            <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 text-[11px] font-black">
-              {percentageDiabsen}%
-            </span>
-          </div>
-        </div>
-
-        {/* Progress Bar Line */}
-        <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
-          <div
-            className="bg-blue-600 h-1.5 rounded-full transition-all duration-300"
-            style={{ width: `${percentageDiabsen}%` }}
-          />
-        </div>
-      </div>
-
-      {/* Student List Container with Search Bar */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden space-y-0">
-        {/* Header & Quick Search Bar */}
-        <div className="p-3 sm:p-4 border-b border-slate-100 bg-slate-50/80 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-extrabold text-slate-800">
-              Daftar Siswa {currentSelectedClassName}
-            </span>
-            <span className="px-2 py-0.5 rounded-md bg-slate-200/80 text-slate-700 text-[11px] font-bold">
-              {filteredRecords.length} dari {records.length}
-            </span>
-          </div>
-
-          {/* Search Box */}
-          <div className="relative flex items-center min-w-[200px] sm:max-w-xs w-full sm:w-auto">
-            <Search size={14} className="absolute left-3 text-slate-400 pointer-events-none" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Cari nama siswa..."
-              className="w-full pl-8 pr-7 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-800 placeholder-slate-400 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 shadow-2xs"
-            />
-            {searchQuery && (
+          {/* Quick Action Navigation Buttons */}
+          <div className="flex flex-wrap items-center gap-2.5 pt-1">
+            {nextTeachingDayInfo && (
               <button
                 type="button"
-                onClick={() => setSearchQuery('')}
-                className="absolute right-2 text-slate-400 hover:text-slate-600 p-0.5"
-                title="Hapus pencarian"
+                onClick={jumpToNextTeachingDay}
+                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-xs transition active:scale-95 cursor-pointer"
+                title={`Lompat ke tanggal ${nextTeachingDayInfo.formatted}`}
               >
-                <X size={13} />
+                <CalendarCheck size={15} />
+                <span>Beralih ke Jadwal Mengajar Terdekat ({nextTeachingDayInfo.formatted})</span>
+              </button>
+            )}
+
+            {isNonEffectiveDay ? (
+              <button
+                type="button"
+                onClick={() => setActiveView('kalender-akademik')}
+                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition active:scale-95 cursor-pointer"
+              >
+                <Calendar size={15} />
+                <span>Buka Kalender Akademik</span>
+              </button>
+            ) : !isScheduleConfigured ? (
+              <button
+                type="button"
+                onClick={() => setAllowExtraSession(true)}
+                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-bold transition active:scale-95 cursor-pointer"
+              >
+                <BookOpen size={15} />
+                <span>Buka Presensi Khusus Kelas Ini</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setAllowExtraSession(true)}
+                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition active:scale-95 cursor-pointer"
+                title="Buka penginputan presensi jika terdapat jam pelajaran tambahan atau KBM pengganti"
+              >
+                <BookOpen size={15} />
+                <span>Buka Presensi Tambahan / Pengganti</span>
+              </button>
+            )}
+
+            {hasSavedRecordsForDate && (
+              <button
+                type="button"
+                onClick={() => setShowArchivedRecords(true)}
+                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 text-xs font-bold transition active:scale-95 cursor-pointer"
+                title="Lihat data presensi yang pernah tersimpan pada tanggal ini"
+              >
+                <Eye size={15} />
+                <span>Lihat Catatan Tersimpan ({savedRecordsCount} Siswa)</span>
               </button>
             )}
           </div>
         </div>
-
-        {/* 1. Mobile Phone Touch Card View (< md) */}
-        <div className="block md:hidden divide-y divide-slate-100">
-          {filteredRecords.length > 0 ? (
-            filteredRecords.map((r, idx) => (
-              <div key={r.studentId} className="p-3.5 space-y-2.5 hover:bg-slate-50/60 transition-colors">
-                  {/* Card Top: Number + Name + Subject Sync Badge */}
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span className="w-5 h-5 rounded-full bg-slate-100 text-slate-600 text-[10px] font-black flex items-center justify-center shrink-0">
-                      {idx + 1}
-                    </span>
-                    <span className="font-extrabold text-xs text-slate-900 truncate">
-                      {r.studentName}
-                    </span>
-                  </div>
-
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    {/* Status Surat Izin / Sakit Orang Tua */}
-                    {(() => {
-                      const activeLeave = (leaveRequests || []).find(
-                        (lr) =>
-                          lr.studentId === r.studentId &&
-                          lr.startDate <= date &&
-                          (lr.endDate || lr.startDate) >= date
-                      );
-                      if (!activeLeave) return null;
-                      if (activeLeave.status === 'PENDING') {
-                        return (
-                          <button
-                            type="button"
-                            onClick={() => setIsLeaveApprovalOpen(true)}
-                            className="inline-flex items-center gap-1 text-[10px] font-black bg-amber-100 text-amber-900 border border-amber-300 px-1.5 py-0.5 rounded-full hover:bg-amber-200 transition-colors shrink-0 shadow-2xs cursor-pointer animate-pulse"
-                            title={`Ada permohonan surat izin/sakit: "${activeLeave.reason}". Klik untuk verifikasi.`}
-                          >
-                            <FileText size={10} className="text-amber-700" />
-                            <span>Surat Izin</span>
-                          </button>
-                        );
-                      }
-                      if (activeLeave.status === 'APPROVED') {
-                        return (
-                          <span
-                            className="inline-flex items-center gap-1 text-[10px] font-bold bg-sky-50 text-sky-800 border border-sky-200 px-1.5 py-0.5 rounded-full shrink-0"
-                            title={`Surat izin disetujui: ${activeLeave.subCategory || activeLeave.leaveType} (${activeLeave.reason})`}
-                          >
-                            <CheckCircle2 size={10} className="text-sky-600" />
-                            <span>{activeLeave.leaveType === 'sakit' ? 'Sakit Resmi' : 'Izin Resmi'}</span>
-                          </span>
-                        );
-                      }
-                      return null;
-                    })()}
-
-                    {attendanceMode === 'SUBJECT' && (() => {
-                      const dailyRec = attendanceRecords.find(
-                        (ar) => ar.studentId === r.studentId && ar.date === date && (!ar.type || ar.type === 'DAILY')
-                      );
-                      if (dailyRec?.status === 'Hadir') {
-                        return (
-                          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded-md shrink-0">
-                            <span className="w-1 h-1 rounded-full bg-emerald-500" />
-                            Hadir Wali
-                          </span>
-                        );
-                      }
-                      if (dailyRec?.status === 'Sakit' || dailyRec?.status === 'Izin') {
-                        return (
-                          <span className="inline-flex items-center text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-md shrink-0">
-                            {dailyRec.status} (Wali)
-                          </span>
-                        );
-                      }
-                      return null;
-                    })()}
-                  </div>
-                </div>
-
-                {/* Card 1-Tap Quick Attendance Buttons */}
-                <div className="grid grid-cols-4 gap-1.5">
-                  {(['Hadir', 'Sakit', 'Izin', 'Alfa'] as AttendanceStatus[]).map((statusOption) => {
-                    const isSelected = r.status === statusOption;
-                    let activeColor = '';
-                    if (isSelected) {
-                      if (statusOption === 'Hadir') activeColor = 'bg-emerald-600 text-white border-emerald-600 shadow-xs font-black';
-                      else if (statusOption === 'Sakit') activeColor = 'bg-sky-600 text-white border-sky-600 shadow-xs font-black';
-                      else if (statusOption === 'Izin') activeColor = 'bg-amber-600 text-white border-amber-600 shadow-xs font-black';
-                      else if (statusOption === 'Alfa') activeColor = 'bg-rose-600 text-white border-rose-600 shadow-xs font-black';
-                    } else {
-                      activeColor = 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200 font-bold';
-                    }
-
-                    return (
-                      <button
-                        key={statusOption}
-                        type="button"
-                        disabled={isDateLocked}
-                        onClick={() => {
-                          const newStatus = isSelected ? '' : statusOption;
-                          updateRecord(r.studentId, {
-                            status: newStatus as AttendanceStatus,
-                            checkInTime:
-                              newStatus === 'Hadir' && !r.checkInTime
-                                ? (attendanceMode === 'DAILY' ? systemConfig.defaultCheckInTime : (activeSubject?.lessonPeriod || '07:30'))
-                                : r.checkInTime,
-                            checkOutTime:
-                              newStatus === 'Hadir' && !r.checkOutTime && attendanceMode === 'DAILY'
-                                ? systemConfig.defaultCheckOutTime
-                                : r.checkOutTime,
-                          });
-                        }}
-                        className={`py-2 px-1 rounded-xl text-xs border text-center transition-all cursor-pointer min-h-[38px] active:scale-95 ${activeColor}`}
-                      >
-                        {statusOption}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {/* Card Extra Fields: Times or Notes */}
-                {attendanceMode === 'DAILY' ? (
-                  <div className="grid grid-cols-2 gap-2 pt-1 text-xs">
-                    <div className="flex items-center gap-1 bg-slate-50 px-2 py-1 rounded-lg border border-slate-200">
-                      <Clock size={11} className="text-slate-400 shrink-0" />
-                      <span className="text-[10px] text-slate-500 font-bold shrink-0">Masuk:</span>
-                      <input
-                        type="text"
-                        value={r.checkInTime || ''}
-                        disabled={isDateLocked}
-                        placeholder="07:00"
-                        onChange={(e) => updateRecord(r.studentId, { checkInTime: e.target.value })}
-                        className="w-full bg-transparent text-xs font-semibold text-slate-800 outline-none"
-                      />
-                    </div>
-
-                    <div className="flex items-center gap-1 bg-slate-50 px-2 py-1 rounded-lg border border-slate-200">
-                      <Clock size={11} className="text-slate-400 shrink-0" />
-                      <span className="text-[10px] text-slate-500 font-bold shrink-0">Pulang:</span>
-                      <input
-                        type="text"
-                        value={r.checkOutTime || ''}
-                        disabled={isDateLocked}
-                        placeholder="14:00"
-                        onChange={(e) => updateRecord(r.studentId, { checkOutTime: e.target.value })}
-                        className="w-full bg-transparent text-xs font-semibold text-slate-800 outline-none"
-                      />
-                    </div>
-
-                    <div className="col-span-2">
-                      <input
-                        type="text"
-                        value={r.notes || ''}
-                        disabled={isDateLocked}
-                        placeholder="Catatan / keterangan surat izin..."
-                        onChange={(e) => updateRecord(r.studentId, { notes: e.target.value })}
-                        className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800 placeholder-slate-400 outline-none focus:border-blue-500"
-                      />
-                    </div>
-                  </div>
-                ) : (
-                  <div className="pt-1 text-xs space-y-1.5">
-                    <input
-                      type="text"
-                      value={r.notes || ''}
-                      disabled={isDateLocked}
-                      placeholder="Catatan keaktifan siswa saat jam pelajaran..."
-                      onChange={(e) => updateRecord(r.studentId, { notes: e.target.value })}
-                      className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800 placeholder-slate-400 outline-none focus:border-blue-500"
-                    />
-                  </div>
-                )}
+      ) : (
+        <>
+          {/* Active Session Notice Banners */}
+          {allowExtraSession && (
+            <div className="flex flex-wrap items-center justify-between gap-2 p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-950">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                <span className="font-bold">
+                  Sesi KBM Tambahan / Pengganti Aktif (Hari {currentDayName}). Anda dapat menginput dan menyimpan presensi siswa untuk sesi ini.
+                </span>
               </div>
-            ))
-          ) : (
-            <div className="p-8 text-center text-slate-400 text-xs">
-              Tidak ada siswa yang sesuai dengan filter atau pencarian.
+              <button
+                type="button"
+                onClick={() => setAllowExtraSession(false)}
+                className="px-2.5 py-1 bg-amber-200/80 hover:bg-amber-300 text-amber-900 rounded-lg font-bold text-[11px] cursor-pointer"
+              >
+                Tutup Sesi Tambahan
+              </button>
             </div>
           )}
-        </div>
 
-        {/* 2. Desktop & Tablet Compact High-Density Table (≥ md) */}
-        <div className="hidden md:block overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="border-b border-slate-200 text-[10px] font-bold text-blue-700 uppercase tracking-widest bg-blue-50/60">
-                <th className="py-2.5 px-3 w-10 text-center">NO</th>
-                <th className="py-2.5 px-3.5">NAMA SISWA</th>
-                <th className="py-2.5 px-3 w-38">STATUS KEHADIRAN</th>
-                {attendanceMode === 'DAILY' ? (
-                  <>
-                    <th className="py-2.5 px-3 w-28">JAM MASUK</th>
-                    <th className="py-2.5 px-3 w-28">JAM PULANG</th>
-                    <th className="py-2.5 px-3.5 w-52">KETERANGAN WALI KELAS</th>
-                  </>
-                ) : (
-                  <>
-                    <th className="py-2.5 px-3 w-32">JAM MAPEL</th>
-                    <th className="py-2.5 px-3.5">CATATAN KEAKTIFAN MAPEL</th>
-                  </>
+          {showArchivedRecords && (
+            <div className="flex flex-wrap items-center justify-between gap-2 p-3 bg-indigo-50 border border-indigo-200 rounded-xl text-xs text-indigo-950">
+              <div className="flex items-center gap-2">
+                <Eye size={14} className="text-indigo-600" />
+                <span className="font-bold">
+                  Menampilkan arsip catatan presensi tersimpan pada tanggal {formatDateIndo(date)} (Mode Hanya Baca).
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowArchivedRecords(false)}
+                className="px-2.5 py-1 bg-indigo-200/80 hover:bg-indigo-300 text-indigo-900 rounded-lg font-bold text-[11px] cursor-pointer"
+              >
+                Sembunyikan Arsip
+              </button>
+            </div>
+          )}
+
+          {/* Sesuai Jadwal Mengajar Banner untuk Guru Mapel */}
+          {isGuruMapel && isScheduledToday && !isNonEffectiveDay && !allowExtraSession && !showArchivedRecords && (
+            <div className="flex items-center gap-2 px-3.5 py-2 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-900 text-xs font-bold shadow-2xs">
+              <CheckCircle2 size={15} className="text-emerald-600 shrink-0" />
+              <span>
+                Sesuai Jadwal Mengajar Resmi: Hari {currentDayName} • {activeSubject?.name} ({currentSelectedClassName})
+              </span>
+            </div>
+          )}
+
+          {/* Bulk Action Buttons - Compact Toolbar (Disejajarkan Layoutnya Secara Harmonis) */}
+          <div
+            className={`grid gap-2 sm:gap-2.5 ${
+              attendanceMode === 'DAILY'
+                ? 'grid-cols-2 sm:grid-cols-3 md:grid-cols-5'
+                : 'grid-cols-2 sm:grid-cols-4'
+            }`}
+          >
+            <button
+              type="button"
+              onClick={handleHadirSemua}
+              disabled={isDateLocked || isSaving}
+              id="btn-hadir-semua"
+              title="Atur semua siswa ke status Hadir. Siswa yang sudah scan QR akan tetap mempertahankan waktu aslinya."
+              className={`w-full py-2.5 px-3 rounded-xl border font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-2xs min-h-[42px] ${
+                isDateLocked || isSaving
+                  ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
+                  : 'border-emerald-300 bg-emerald-50 hover:bg-emerald-100 active:scale-95 text-emerald-700 cursor-pointer'
+              }`}
+            >
+              {isDateLocked ? <Lock size={15} /> : <CheckCircle2 size={15} />}
+              <span>Hadir Semua</span>
+            </button>
+
+            {attendanceMode === 'DAILY' && (
+              <button
+                type="button"
+                onClick={handlePulangMasal}
+                disabled={isDateLocked || isSaving}
+                id="btn-pulang-masal"
+                title="Terapkan jam pulang standar bagi siswa hadir yang belum memiliki jam pulang (waktu checkout riil tetap dipertahankan)."
+                className={`w-full py-2.5 px-3 rounded-xl border font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-2xs min-h-[42px] ${
+                  isDateLocked || isSaving
+                    ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
+                    : 'border-blue-300 bg-blue-50 hover:bg-blue-100 active:scale-95 text-blue-700 cursor-pointer'
+                }`}
+              >
+                {isDateLocked ? <Lock size={15} /> : <LogOut size={15} />}
+                <span>Pulang Masal</span>
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={() => setIsClassQrOpen(true)}
+              disabled={!activeTargetClass}
+              id="btn-qr-presensi-rombel"
+              className={`w-full py-2.5 px-3 rounded-xl border font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-2xs min-h-[42px] ${
+                !activeTargetClass
+                  ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
+                  : 'border-indigo-200 bg-indigo-50 hover:bg-indigo-100 active:scale-95 text-indigo-700 cursor-pointer'
+              }`}
+              title={`Tampilkan / Cetak QR Code Presensi ${activeTargetClass?.name || 'Rombel Kelas'}`}
+            >
+              <QrCode size={15} />
+              <span>QR Presensi</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setIsLeaveApprovalOpen(true)}
+              id="btn-verifikasi-surat-izin"
+              className="relative w-full py-2.5 px-3 rounded-xl border border-amber-300 bg-amber-50 hover:bg-amber-100 active:scale-95 text-amber-900 font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-2xs min-h-[42px] cursor-pointer"
+              title="Verifikasi Surat Izin / Sakit dari Orang Tua Siswa"
+            >
+              <FileText size={15} className="text-amber-700 shrink-0" />
+              <span>Surat Izin Wali</span>
+              {pendingClassLeaveRequestsCount > 0 && (
+                <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-rose-600 text-white text-[10px] font-black flex items-center justify-center shadow-xs animate-pulse">
+                  {pendingClassLeaveRequestsCount}
+                </span>
+              )}
+            </button>
+
+            <button
+              type="button"
+              onClick={handleReset}
+              disabled={isDateLocked || isSaving}
+              id="btn-reset-absensi"
+              className={`w-full col-span-2 sm:col-span-1 md:col-span-1 py-2.5 px-3 rounded-xl border font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-2xs min-h-[42px] ${
+                isDateLocked || isSaving
+                  ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
+                  : 'border-rose-300 bg-rose-50 hover:bg-rose-100 active:scale-95 text-rose-700 cursor-pointer'
+              }`}
+              title="Reset status kehadiran siswa"
+            >
+              {isDateLocked ? <Lock size={15} /> : <RotateCcw size={15} />}
+              <span>Reset</span>
+            </button>
+          </div>
+
+          {/* Unified Status Ribbon & Completion Meter */}
+          <div className="bg-white p-3 sm:p-4 rounded-2xl border border-slate-200 shadow-xs space-y-2.5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              {/* Status Pills */}
+              <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold shadow-2xs">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                  <span>Hadir:</span>
+                  <strong className="text-emerald-950">{countHadir}</strong>
+                </span>
+
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-sky-50 border border-sky-200 text-sky-800 text-xs font-bold shadow-2xs">
+                  <span className="w-2 h-2 rounded-full bg-sky-500" />
+                  <span>Sakit:</span>
+                  <strong className="text-sky-950">{countSakit}</strong>
+                </span>
+
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-xs font-bold shadow-2xs">
+                  <span className="w-2 h-2 rounded-full bg-amber-500" />
+                  <span>Izin:</span>
+                  <strong className="text-amber-950">{countIzin}</strong>
+                </span>
+
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-rose-50 border border-rose-200 text-rose-800 text-xs font-bold shadow-2xs">
+                  <span className="w-2 h-2 rounded-full bg-rose-500" />
+                  <span>Alfa:</span>
+                  <strong className="text-rose-950">{countAlfa}</strong>
+                </span>
+
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 border border-slate-200 text-slate-700 text-xs font-bold shadow-2xs">
+                  <span className="w-2 h-2 rounded-full bg-slate-400" />
+                  <span>Belum:</span>
+                  <strong className="text-slate-900">{countBelum}</strong>
+                </span>
+              </div>
+
+              {/* Progress Percent */}
+              <div className="text-xs font-extrabold text-slate-700 flex items-center gap-2">
+                <span>
+                  {countTotalDiabsen} / {records.length} Diabsen
+                </span>
+                <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 text-[11px] font-black">
+                  {percentageDiabsen}%
+                </span>
+              </div>
+            </div>
+
+            {/* Progress Bar Line */}
+            <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+              <div
+                className="bg-blue-600 h-1.5 rounded-full transition-all duration-300"
+                style={{ width: `${percentageDiabsen}%` }}
+              />
+            </div>
+          </div>
+
+          {/* Student List Container with Search Bar */}
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden space-y-0">
+            {/* Header & Quick Search Bar */}
+            <div className="p-3 sm:p-4 border-b border-slate-100 bg-slate-50/80 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-extrabold text-slate-800">
+                  Daftar Siswa {currentSelectedClassName}
+                </span>
+                <span className="px-2 py-0.5 rounded-md bg-slate-200/80 text-slate-700 text-[11px] font-bold">
+                  {filteredRecords.length} dari {records.length}
+                </span>
+              </div>
+
+              {/* Search Box */}
+              <div className="relative flex items-center min-w-[200px] sm:max-w-xs w-full sm:w-auto">
+                <Search size={14} className="absolute left-3 text-slate-400 pointer-events-none" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Cari nama siswa..."
+                  className="w-full pl-8 pr-7 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-800 placeholder-slate-400 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 shadow-2xs"
+                />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery('')}
+                    className="absolute right-2 text-slate-400 hover:text-slate-600 p-0.5"
+                    title="Hapus pencarian"
+                  >
+                    <X size={13} />
+                  </button>
                 )}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 text-xs">
+              </div>
+            </div>
+
+            {/* 1. Mobile Phone Touch Card View (< md) */}
+            <div className="block md:hidden divide-y divide-slate-100">
               {filteredRecords.length > 0 ? (
                 filteredRecords.map((r, idx) => (
-                  <tr key={r.studentId} className="hover:bg-slate-50/80 transition-colors">
-                    {/* No */}
-                    <td className="py-2.5 px-3 text-center font-bold text-slate-400">
-                      {idx + 1}
-                    </td>
+                  <div key={r.studentId} className="p-3.5 space-y-2.5 hover:bg-slate-50/60 transition-colors">
+                    {/* Card Top: Number + Name + Subject Sync Badge */}
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="w-5 h-5 rounded-full bg-slate-100 text-slate-600 text-[10px] font-black flex items-center justify-center shrink-0">
+                          {idx + 1}
+                        </span>
+                        <span className="font-extrabold text-xs text-slate-900 truncate">
+                          {r.studentName}
+                        </span>
+                      </div>
 
-                    {/* Nama Siswa */}
-                    <td className="py-2.5 px-3.5 font-bold text-slate-900 tracking-tight">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="truncate">{r.studentName}</span>
-
-                        <div className="flex items-center gap-1.5 shrink-0">
-                          {/* Status Surat Izin / Sakit Orang Tua */}
-                          {(() => {
-                            const activeLeave = (leaveRequests || []).find(
-                              (lr) =>
-                                lr.studentId === r.studentId &&
-                                lr.startDate <= date &&
-                                (lr.endDate || lr.startDate) >= date
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {/* Status Surat Izin / Sakit Orang Tua */}
+                        {(() => {
+                          const activeLeave = (leaveRequests || []).find(
+                            (lr) =>
+                              lr.studentId === r.studentId &&
+                              lr.startDate <= date &&
+                              (lr.endDate || lr.startDate) >= date
+                          );
+                          if (!activeLeave) return null;
+                          if (activeLeave.status === 'PENDING') {
+                            return (
+                              <button
+                                type="button"
+                                onClick={() => setIsLeaveApprovalOpen(true)}
+                                className="inline-flex items-center gap-1 text-[10px] font-black bg-amber-100 text-amber-900 border border-amber-300 px-1.5 py-0.5 rounded-full hover:bg-amber-200 transition-colors shrink-0 shadow-2xs cursor-pointer animate-pulse"
+                                title={`Ada permohonan surat izin/sakit: "${activeLeave.reason}". Klik untuk verifikasi.`}
+                              >
+                                <FileText size={10} className="text-amber-700" />
+                                <span>Surat Izin</span>
+                              </button>
                             );
-                            if (!activeLeave) return null;
-                            if (activeLeave.status === 'PENDING') {
-                              return (
-                                <button
-                                  type="button"
-                                  onClick={() => setIsLeaveApprovalOpen(true)}
-                                  className="inline-flex items-center gap-1 text-[10px] font-black bg-amber-100 text-amber-900 border border-amber-300 px-2 py-0.5 rounded-full hover:bg-amber-200 transition-colors shadow-2xs cursor-pointer animate-pulse"
-                                  title={`Ada permohonan surat izin/sakit: "${activeLeave.reason}". Klik untuk verifikasi.`}
-                                >
-                                  <FileText size={10} className="text-amber-700" />
-                                  <span>Surat Izin</span>
-                                </button>
-                              );
-                            }
-                            if (activeLeave.status === 'APPROVED') {
-                              return (
-                                <span
-                                  className="inline-flex items-center gap-1 text-[10px] font-bold bg-sky-50 text-sky-800 border border-sky-200 px-2 py-0.5 rounded-full"
-                                  title={`Surat izin disetujui: ${activeLeave.subCategory || activeLeave.leaveType} (${activeLeave.reason})`}
-                                >
-                                  <CheckCircle2 size={10} className="text-sky-600" />
-                                  <span>{activeLeave.leaveType === 'sakit' ? 'Sakit Resmi' : 'Izin Resmi'}</span>
-                                </span>
-                              );
-                            }
-                            return null;
-                          })()}
+                          }
+                          if (activeLeave.status === 'APPROVED') {
+                            return (
+                              <span
+                                className="inline-flex items-center gap-1 text-[10px] font-bold bg-sky-50 text-sky-800 border border-sky-200 px-1.5 py-0.5 rounded-full shrink-0"
+                                title={`Surat izin disetujui: ${activeLeave.subCategory || activeLeave.leaveType} (${activeLeave.reason})`}
+                              >
+                                <CheckCircle2 size={10} className="text-sky-600" />
+                                <span>{activeLeave.leaveType === 'sakit' ? 'Sakit Resmi' : 'Izin Resmi'}</span>
+                              </span>
+                            );
+                          }
+                          return null;
+                        })()}
 
-                          {attendanceMode === 'SUBJECT' && (() => {
+                        {attendanceMode === 'SUBJECT' &&
+                          (() => {
                             const dailyRec = attendanceRecords.find(
-                              (ar) => ar.studentId === r.studentId && ar.date === date && (!ar.type || ar.type === 'DAILY')
+                              (ar) =>
+                                ar.studentId === r.studentId &&
+                                ar.date === date &&
+                                (!ar.type || ar.type === 'DAILY')
                             );
                             if (dailyRec?.status === 'Hadir') {
                               return (
-                                <span
-                                  className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.2 rounded shrink-0"
-                                  title={`Siswa hadir di sekolah (dicatat Wali Kelas)`}
-                                >
-                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                                  Hadir
+                                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded-md shrink-0">
+                                  <span className="w-1 h-1 rounded-full bg-emerald-500" />
+                                  Hadir Wali
                                 </span>
                               );
                             }
                             if (dailyRec?.status === 'Sakit' || dailyRec?.status === 'Izin') {
                               return (
-                                <span className="inline-flex items-center text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.2 rounded shrink-0">
+                                <span className="inline-flex items-center text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-md shrink-0">
                                   {dailyRec.status} (Wali)
                                 </span>
                               );
                             }
                             return null;
                           })()}
-                        </div>
                       </div>
-                    </td>
+                    </div>
 
-                    {/* Status Dropdown */}
-                    <td className="py-2.5 px-3">
-                      <select
-                        value={r.status}
-                        disabled={isDateLocked}
-                        onChange={(e) =>
-                          updateRecord(r.studentId, {
-                            status: e.target.value as AttendanceStatus,
-                            checkInTime:
-                              e.target.value === 'Hadir' && !r.checkInTime
-                                ? (attendanceMode === 'DAILY' ? systemConfig.defaultCheckInTime : (activeSubject?.lessonPeriod || '07:30'))
-                                : r.checkInTime,
-                            checkOutTime:
-                              e.target.value === 'Hadir' && !r.checkOutTime && attendanceMode === 'DAILY'
-                                ? systemConfig.defaultCheckOutTime
-                                : r.checkOutTime,
-                          })
+                    {/* Card 1-Tap Quick Attendance Buttons */}
+                    <div className="grid grid-cols-4 gap-1.5">
+                      {(['Hadir', 'Sakit', 'Izin', 'Alfa'] as AttendanceStatus[]).map((statusOption) => {
+                        const isSelected = r.status === statusOption;
+                        let activeColor = '';
+                        if (isSelected) {
+                          if (statusOption === 'Hadir')
+                            activeColor = 'bg-emerald-600 text-white border-emerald-600 shadow-xs font-black';
+                          else if (statusOption === 'Sakit')
+                            activeColor = 'bg-sky-600 text-white border-sky-600 shadow-xs font-black';
+                          else if (statusOption === 'Izin')
+                            activeColor = 'bg-amber-600 text-white border-amber-600 shadow-xs font-black';
+                          else if (statusOption === 'Alfa')
+                            activeColor = 'bg-rose-600 text-white border-rose-600 shadow-xs font-black';
+                        } else {
+                          activeColor =
+                            'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200 font-bold';
                         }
-                        className={`w-full px-2 py-1 rounded-lg text-xs font-bold border transition-colors outline-none cursor-pointer ${
-                          isDateLocked
-                            ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
-                            : r.status === 'Hadir'
-                            ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
-                            : r.status === 'Sakit'
-                            ? 'bg-sky-50 text-sky-700 border-sky-300'
-                            : r.status === 'Izin'
-                            ? 'bg-amber-50 text-amber-700 border-amber-300'
-                            : r.status === 'Alfa'
-                            ? 'bg-rose-50 text-rose-700 border-rose-300'
-                            : 'bg-slate-50 text-slate-500 border-slate-200'
-                        }`}
-                      >
-                        <option value="">- Belum Diabsen -</option>
-                        <option value="Hadir">Hadir</option>
-                        <option value="Sakit">Sakit</option>
-                        <option value="Izin">Izin</option>
-                        <option value="Alfa">Alfa</option>
-                      </select>
-                    </td>
 
+                        return (
+                          <button
+                            key={statusOption}
+                            type="button"
+                            disabled={isDateLocked}
+                            onClick={() => {
+                              const newStatus = isSelected ? '' : statusOption;
+                              updateRecord(r.studentId, {
+                                status: newStatus as AttendanceStatus,
+                                checkInTime:
+                                  newStatus === 'Hadir' && !r.checkInTime
+                                    ? attendanceMode === 'DAILY'
+                                      ? systemConfig.defaultCheckInTime
+                                      : activeSubject?.lessonPeriod || '07:30'
+                                    : r.checkInTime,
+                                checkOutTime:
+                                  newStatus === 'Hadir' && !r.checkOutTime && attendanceMode === 'DAILY'
+                                    ? systemConfig.defaultCheckOutTime
+                                    : r.checkOutTime,
+                              });
+                            }}
+                            className={`py-2 px-1 rounded-xl text-xs border text-center transition-all cursor-pointer min-h-[38px] active:scale-95 ${activeColor}`}
+                          >
+                            {statusOption}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Card Extra Fields: Times or Notes */}
                     {attendanceMode === 'DAILY' ? (
-                      <>
-                        {/* Masuk Time */}
-                        <td className="py-2.5 px-3">
-                          <div className="relative flex items-center">
-                            <input
-                              type="text"
-                              value={r.checkInTime || ''}
-                              disabled={isDateLocked}
-                              readOnly={isDateLocked}
-                              onChange={(e) => updateRecord(r.studentId, { checkInTime: e.target.value })}
-                              className={`w-full pl-2 pr-5 py-1 border rounded-lg text-xs font-semibold outline-none ${
-                                isDateLocked
-                                  ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'
-                                  : 'bg-slate-50 border-slate-200 text-slate-800 focus:border-blue-600 focus:bg-white'
-                              }`}
-                            />
-                            <Clock size={11} className="absolute right-1.5 text-slate-400 pointer-events-none" />
-                          </div>
-                        </td>
+                      <div className="grid grid-cols-2 gap-2 pt-1 text-xs">
+                        <div className="flex items-center gap-1 bg-slate-50 px-2 py-1 rounded-lg border border-slate-200">
+                          <Clock size={11} className="text-slate-400 shrink-0" />
+                          <span className="text-[10px] text-slate-500 font-bold shrink-0">Masuk:</span>
+                          <input
+                            type="text"
+                            value={r.checkInTime || ''}
+                            disabled={isDateLocked}
+                            placeholder="07:00"
+                            onChange={(e) => updateRecord(r.studentId, { checkInTime: e.target.value })}
+                            className="w-full bg-transparent text-xs font-semibold text-slate-800 outline-none"
+                          />
+                        </div>
 
-                        {/* Pulang Time */}
-                        <td className="py-2.5 px-3">
-                          <div className="relative flex items-center">
-                            <input
-                              type="text"
-                              value={r.checkOutTime || ''}
-                              disabled={isDateLocked}
-                              readOnly={isDateLocked}
-                              onChange={(e) => updateRecord(r.studentId, { checkOutTime: e.target.value })}
-                              className={`w-full pl-2 pr-5 py-1 border rounded-lg text-xs font-semibold outline-none ${
-                                isDateLocked
-                                  ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'
-                                  : 'bg-slate-50 border-slate-200 text-slate-800 focus:border-blue-600 focus:bg-white'
-                              }`}
-                            />
-                            <Clock size={11} className="absolute right-1.5 text-slate-400 pointer-events-none" />
-                          </div>
-                        </td>
+                        <div className="flex items-center gap-1 bg-slate-50 px-2 py-1 rounded-lg border border-slate-200">
+                          <Clock size={11} className="text-slate-400 shrink-0" />
+                          <span className="text-[10px] text-slate-500 font-bold shrink-0">Pulang:</span>
+                          <input
+                            type="text"
+                            value={r.checkOutTime || ''}
+                            disabled={isDateLocked}
+                            placeholder="14:00"
+                            onChange={(e) => updateRecord(r.studentId, { checkOutTime: e.target.value })}
+                            className="w-full bg-transparent text-xs font-semibold text-slate-800 outline-none"
+                          />
+                        </div>
 
-                        {/* Catatan Wali Kelas */}
-                        <td className="py-2.5 px-3.5">
+                        <div className="col-span-2">
                           <input
                             type="text"
                             value={r.notes || ''}
                             disabled={isDateLocked}
-                            readOnly={isDateLocked}
+                            placeholder="Catatan / keterangan surat izin..."
                             onChange={(e) => updateRecord(r.studentId, { notes: e.target.value })}
-                            placeholder="Keterangan surat / izin..."
-                            className={`w-full px-2 py-1 rounded-lg text-xs outline-none transition-colors ${
-                              isDateLocked
-                                ? 'bg-slate-100 border border-slate-200 text-slate-400 cursor-not-allowed placeholder-slate-400'
-                                : 'bg-slate-50 border border-slate-200 text-slate-800 placeholder-slate-400 focus:border-blue-600 focus:bg-white'
-                            }`}
+                            className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800 placeholder-slate-400 outline-none focus:border-blue-500"
                           />
-                        </td>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="pt-1 text-xs space-y-1.5">
+                        <input
+                          type="text"
+                          value={r.notes || ''}
+                          disabled={isDateLocked}
+                          placeholder="Catatan keaktifan siswa saat jam pelajaran..."
+                          onChange={(e) => updateRecord(r.studentId, { notes: e.target.value })}
+                          className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800 placeholder-slate-400 outline-none focus:border-blue-500"
+                        />
+                      </div>
+                    )}
+                  </div>
+                ))
+              ) : (
+                <div className="p-8 text-center text-slate-400 text-xs">
+                  Tidak ada siswa yang sesuai dengan filter atau pencarian.
+                </div>
+              )}
+            </div>
+
+            {/* 2. Desktop & Tablet Compact High-Density Table (≥ md) */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-slate-200 text-[10px] font-bold text-blue-700 uppercase tracking-widest bg-blue-50/60">
+                    <th className="py-2.5 px-3 w-10 text-center">NO</th>
+                    <th className="py-2.5 px-3.5">NAMA SISWA</th>
+                    <th className="py-2.5 px-3 w-38">STATUS KEHADIRAN</th>
+                    {attendanceMode === 'DAILY' ? (
+                      <>
+                        <th className="py-2.5 px-3 w-28">JAM MASUK</th>
+                        <th className="py-2.5 px-3 w-28">JAM PULANG</th>
+                        <th className="py-2.5 px-3.5 w-52">KETERANGAN WALI KELAS</th>
                       </>
                     ) : (
                       <>
-                        {/* Jam Pelajaran Mapel */}
-                        <td className="py-2.5 px-3">
-                          <span className="text-[11px] font-semibold text-slate-700 bg-slate-100 px-2 py-0.5 rounded block text-center">
-                            {r.checkInTime || activeSubject?.lessonPeriod || 'Sesuai'}
-                          </span>
-                        </td>
-
-                        {/* Catatan / Penilaian Guru Mapel */}
-                        <td className="py-2.5 px-3.5">
-                          <input
-                            type="text"
-                            value={r.notes || ''}
-                            disabled={isDateLocked}
-                            readOnly={isDateLocked}
-                            onChange={(e) => updateRecord(r.studentId, { notes: e.target.value })}
-                            placeholder="Catatan keaktifan siswa saat jam pelajaran..."
-                            className={`w-full px-2 py-1 rounded-lg text-xs outline-none transition-colors ${
-                              isDateLocked
-                                ? 'bg-slate-100 border border-slate-200 text-slate-400 cursor-not-allowed placeholder-slate-400'
-                                : 'bg-slate-50 border border-slate-200 text-slate-800 placeholder-slate-400 focus:border-blue-600 focus:bg-white'
-                            }`}
-                          />
-                        </td>
+                        <th className="py-2.5 px-3 w-32">JAM MAPEL</th>
+                        <th className="py-2.5 px-3.5">CATATAN KEAKTIFAN MAPEL</th>
                       </>
                     )}
                   </tr>
-                ))
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-xs">
+                  {filteredRecords.length > 0 ? (
+                    filteredRecords.map((r, idx) => (
+                      <tr key={r.studentId} className="hover:bg-slate-50/80 transition-colors">
+                        {/* No */}
+                        <td className="py-2.5 px-3 text-center font-bold text-slate-400">
+                          {idx + 1}
+                        </td>
+
+                        {/* Nama Siswa */}
+                        <td className="py-2.5 px-3.5 font-bold text-slate-900 tracking-tight">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="truncate">{r.studentName}</span>
+
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              {/* Status Surat Izin / Sakit Orang Tua */}
+                              {(() => {
+                                const activeLeave = (leaveRequests || []).find(
+                                  (lr) =>
+                                    lr.studentId === r.studentId &&
+                                    lr.startDate <= date &&
+                                    (lr.endDate || lr.startDate) >= date
+                                );
+                                if (!activeLeave) return null;
+                                if (activeLeave.status === 'PENDING') {
+                                  return (
+                                    <button
+                                      type="button"
+                                      onClick={() => setIsLeaveApprovalOpen(true)}
+                                      className="inline-flex items-center gap-1 text-[10px] font-black bg-amber-100 text-amber-900 border border-amber-300 px-2 py-0.5 rounded-full hover:bg-amber-200 transition-colors shadow-2xs cursor-pointer animate-pulse"
+                                      title={`Ada permohonan surat izin/sakit: "${activeLeave.reason}". Klik untuk verifikasi.`}
+                                    >
+                                      <FileText size={10} className="text-amber-700" />
+                                      <span>Surat Izin</span>
+                                    </button>
+                                  );
+                                }
+                                if (activeLeave.status === 'APPROVED') {
+                                  return (
+                                    <span
+                                      className="inline-flex items-center gap-1 text-[10px] font-bold bg-sky-50 text-sky-800 border border-sky-200 px-2 py-0.5 rounded-full"
+                                      title={`Surat izin disetujui: ${activeLeave.subCategory || activeLeave.leaveType} (${activeLeave.reason})`}
+                                    >
+                                      <CheckCircle2 size={10} className="text-sky-600" />
+                                      <span>
+                                        {activeLeave.leaveType === 'sakit' ? 'Sakit Resmi' : 'Izin Resmi'}
+                                      </span>
+                                    </span>
+                                  );
+                                }
+                                return null;
+                              })()}
+
+                              {attendanceMode === 'SUBJECT' &&
+                                (() => {
+                                  const dailyRec = attendanceRecords.find(
+                                    (ar) =>
+                                      ar.studentId === r.studentId &&
+                                      ar.date === date &&
+                                      (!ar.type || ar.type === 'DAILY')
+                                  );
+                                  if (dailyRec?.status === 'Hadir') {
+                                    return (
+                                      <span
+                                        className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.2 rounded shrink-0"
+                                        title={`Siswa hadir di sekolah (dicatat Wali Kelas)`}
+                                      >
+                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                        Hadir
+                                      </span>
+                                    );
+                                  }
+                                  if (dailyRec?.status === 'Sakit' || dailyRec?.status === 'Izin') {
+                                    return (
+                                      <span className="inline-flex items-center text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.2 rounded shrink-0">
+                                        {dailyRec.status} (Wali)
+                                      </span>
+                                    );
+                                  }
+                                  return null;
+                                })()}
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* Status Dropdown */}
+                        <td className="py-2.5 px-3">
+                          <select
+                            value={r.status}
+                            disabled={isDateLocked}
+                            onChange={(e) =>
+                              updateRecord(r.studentId, {
+                                status: e.target.value as AttendanceStatus,
+                                checkInTime:
+                                  e.target.value === 'Hadir' && !r.checkInTime
+                                    ? attendanceMode === 'DAILY'
+                                      ? systemConfig.defaultCheckInTime
+                                      : activeSubject?.lessonPeriod || '07:30'
+                                    : r.checkInTime,
+                                checkOutTime:
+                                  e.target.value === 'Hadir' && !r.checkOutTime && attendanceMode === 'DAILY'
+                                    ? systemConfig.defaultCheckOutTime
+                                    : r.checkOutTime,
+                              })
+                            }
+                            className={`w-full px-2 py-1 rounded-lg text-xs font-bold border transition-colors outline-none cursor-pointer ${
+                              isDateLocked
+                                ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
+                                : r.status === 'Hadir'
+                                ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
+                                : r.status === 'Sakit'
+                                ? 'bg-sky-50 text-sky-700 border-sky-300'
+                                : r.status === 'Izin'
+                                ? 'bg-amber-50 text-amber-700 border-amber-300'
+                                : r.status === 'Alfa'
+                                ? 'bg-rose-50 text-rose-700 border-rose-300'
+                                : 'bg-slate-50 text-slate-500 border-slate-200'
+                            }`}
+                          >
+                            <option value="">- Belum Diabsen -</option>
+                            <option value="Hadir">Hadir</option>
+                            <option value="Sakit">Sakit</option>
+                            <option value="Izin">Izin</option>
+                            <option value="Alfa">Alfa</option>
+                          </select>
+                        </td>
+
+                        {attendanceMode === 'DAILY' ? (
+                          <>
+                            {/* Masuk Time */}
+                            <td className="py-2.5 px-3">
+                              <div className="relative flex items-center">
+                                <input
+                                  type="text"
+                                  value={r.checkInTime || ''}
+                                  disabled={isDateLocked}
+                                  readOnly={isDateLocked}
+                                  onChange={(e) => updateRecord(r.studentId, { checkInTime: e.target.value })}
+                                  className={`w-full pl-2 pr-5 py-1 border rounded-lg text-xs font-semibold outline-none ${
+                                    isDateLocked
+                                      ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'
+                                      : 'bg-slate-50 border-slate-200 text-slate-800 focus:border-blue-600 focus:bg-white'
+                                  }`}
+                                />
+                                <Clock size={11} className="absolute right-1.5 text-slate-400 pointer-events-none" />
+                              </div>
+                            </td>
+
+                            {/* Pulang Time */}
+                            <td className="py-2.5 px-3">
+                              <div className="relative flex items-center">
+                                <input
+                                  type="text"
+                                  value={r.checkOutTime || ''}
+                                  disabled={isDateLocked}
+                                  readOnly={isDateLocked}
+                                  onChange={(e) => updateRecord(r.studentId, { checkOutTime: e.target.value })}
+                                  className={`w-full pl-2 pr-5 py-1 border rounded-lg text-xs font-semibold outline-none ${
+                                    isDateLocked
+                                      ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'
+                                      : 'bg-slate-50 border-slate-200 text-slate-800 focus:border-blue-600 focus:bg-white'
+                                  }`}
+                                />
+                                <Clock size={11} className="absolute right-1.5 text-slate-400 pointer-events-none" />
+                              </div>
+                            </td>
+
+                            {/* Catatan Wali Kelas */}
+                            <td className="py-2.5 px-3.5">
+                              <input
+                                type="text"
+                                value={r.notes || ''}
+                                disabled={isDateLocked}
+                                readOnly={isDateLocked}
+                                onChange={(e) => updateRecord(r.studentId, { notes: e.target.value })}
+                                placeholder="Keterangan surat / izin..."
+                                className={`w-full px-2 py-1 rounded-lg text-xs outline-none transition-colors ${
+                                  isDateLocked
+                                    ? 'bg-slate-100 border border-slate-200 text-slate-400 cursor-not-allowed placeholder-slate-400'
+                                    : 'bg-slate-50 border border-slate-200 text-slate-800 placeholder-slate-400 focus:border-blue-600 focus:bg-white'
+                                }`}
+                              />
+                            </td>
+                          </>
+                        ) : (
+                          <>
+                            {/* Jam Pelajaran Mapel */}
+                            <td className="py-2.5 px-3">
+                              <span className="text-[11px] font-semibold text-slate-700 bg-slate-100 px-2 py-0.5 rounded block text-center">
+                                {r.checkInTime || activeSubject?.lessonPeriod || 'Sesuai'}
+                              </span>
+                            </td>
+
+                            {/* Catatan / Penilaian Guru Mapel */}
+                            <td className="py-2.5 px-3.5">
+                              <input
+                                type="text"
+                                value={r.notes || ''}
+                                disabled={isDateLocked}
+                                readOnly={isDateLocked}
+                                onChange={(e) => updateRecord(r.studentId, { notes: e.target.value })}
+                                placeholder="Catatan keaktifan siswa saat jam pelajaran..."
+                                className={`w-full px-2 py-1 rounded-lg text-xs outline-none transition-colors ${
+                                  isDateLocked
+                                    ? 'bg-slate-100 border border-slate-200 text-slate-400 cursor-not-allowed placeholder-slate-400'
+                                    : 'bg-slate-50 border border-slate-200 text-slate-800 placeholder-slate-400 focus:border-blue-600 focus:bg-white'
+                                }`}
+                              />
+                            </td>
+                          </>
+                        )}
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td
+                        colSpan={attendanceMode === 'DAILY' ? 6 : 5}
+                        className="text-center py-8 text-slate-400 font-medium text-xs"
+                      >
+                        {searchQuery
+                          ? 'Tidak ada siswa yang cocok dengan kata kunci pencarian.'
+                          : `Belum ada siswa di kelas ${currentSelectedClassName}.`}
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Floating Sticky Bottom Save Bar */}
+          <div className="sticky bottom-3 z-30 bg-white/95 backdrop-blur-md rounded-2xl border border-slate-200/90 shadow-xl p-3 sm:p-3.5 flex flex-col sm:flex-row items-center justify-between gap-2.5">
+            <div className="flex items-center gap-2 text-xs font-bold text-slate-700 self-start sm:self-auto">
+              {isDirty && !isDateLocked ? (
+                <span className="inline-flex items-center gap-1.5 text-amber-600 font-extrabold text-xs">
+                  <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                  <span>Ada perubahan belum disimpan</span>
+                </span>
               ) : (
-                <tr>
-                  <td colSpan={attendanceMode === 'DAILY' ? 6 : 5} className="text-center py-8 text-slate-400 font-medium text-xs">
-                    {searchQuery
-                      ? 'Tidak ada siswa yang cocok dengan kata kunci pencarian.'
-                      : `Belum ada siswa di kelas ${currentSelectedClassName}.`}
-                  </td>
-                </tr>
+                <span className="inline-flex items-center gap-1.5 text-emerald-700 text-xs">
+                  <CheckCircle2 size={13} className="text-emerald-600" />
+                  <span>Semua data tersinkron</span>
+                </span>
               )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+              <span className="text-slate-300">•</span>
+              <span className="text-[11px] text-slate-500 font-medium">
+                {countTotalDiabsen} / {records.length} terisi
+              </span>
+            </div>
 
-      {/* Floating Sticky Bottom Save Bar */}
-      <div className="sticky bottom-3 z-30 bg-white/95 backdrop-blur-md rounded-2xl border border-slate-200/90 shadow-xl p-3 sm:p-3.5 flex flex-col sm:flex-row items-center justify-between gap-2.5">
-        <div className="flex items-center gap-2 text-xs font-bold text-slate-700 self-start sm:self-auto">
-          {isDirty && !isDateLocked ? (
-            <span className="inline-flex items-center gap-1.5 text-amber-600 font-extrabold text-xs">
-              <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-              <span>Ada perubahan belum disimpan</span>
-            </span>
-          ) : (
-            <span className="inline-flex items-center gap-1.5 text-emerald-700 text-xs">
-              <CheckCircle2 size={13} className="text-emerald-600" />
-              <span>Semua data tersinkron</span>
-            </span>
-          )}
-          <span className="text-slate-300">•</span>
-          <span className="text-[11px] text-slate-500 font-medium">
-            {countTotalDiabsen} / {records.length} terisi
-          </span>
-        </div>
-
-        <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end">
-          <button
-            type="button"
-            onClick={handleSave}
-            disabled={isDateLocked || isSaving}
-            id="btn-simpan-absensi"
-            className={`flex-1 sm:flex-none px-5 py-2.5 font-extrabold text-xs sm:text-sm rounded-xl shadow-xs transition-all flex items-center justify-center gap-2 min-h-[42px] cursor-pointer ${
-              isDateLocked || isSaving
-                ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
-                : 'bg-blue-600 hover:bg-blue-700 active:scale-95 text-white hover:shadow-md'
-            }`}
-          >
-            {isSaving ? (
-              <Loader2 size={16} className="animate-spin" />
-            ) : isDateLocked ? (
-              <Lock size={16} />
-            ) : (
-              <Save size={16} />
-            )}
-            <span>
-              {isSaving
-                ? 'Menyimpan...'
-                : isNonEffectiveDay
-                ? 'Presensi Terkunci (Hari Libur)'
-                : isLockedForGuruMapel
-                ? 'Terkunci (Bukan Jadwal Mengajar)'
-                : 'Simpan Presensi'}
-            </span>
-          </button>
-        </div>
-      </div>
+            <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end">
+              <button
+                type="button"
+                onClick={handleSave}
+                disabled={isDateLocked || isSaving}
+                id="btn-simpan-absensi"
+                className={`flex-1 sm:flex-none px-5 py-2.5 font-extrabold text-xs sm:text-sm rounded-xl shadow-xs transition-all flex items-center justify-center gap-2 min-h-[42px] cursor-pointer ${
+                  isDateLocked || isSaving
+                    ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
+                    : 'bg-blue-600 hover:bg-blue-700 active:scale-95 text-white hover:shadow-md'
+                }`}
+              >
+                {isSaving ? (
+                  <Loader2 size={16} className="animate-spin" />
+                ) : isDateLocked ? (
+                  <Lock size={16} />
+                ) : (
+                  <Save size={16} />
+                )}
+                <span>
+                  {isSaving
+                    ? 'Menyimpan...'
+                    : isNonEffectiveDay
+                    ? 'Presensi Terkunci (Hari Libur)'
+                    : isLockedForGuruMapel
+                    ? 'Terkunci (Bukan Jadwal Mengajar)'
+                    : 'Simpan Presensi'}
+                </span>
+              </button>
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Class QR Attendance Code Modal */}
       {isClassQrOpen && activeTargetClass && (

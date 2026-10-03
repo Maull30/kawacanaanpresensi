@@ -29,6 +29,8 @@ import {
   Search,
   CheckCircle,
   AlertCircle,
+  AlertTriangle,
+  ArrowRightLeft,
   X,
   CalendarX,
   CalendarCheck,
@@ -279,6 +281,67 @@ export const AbsensiView: React.FC = () => {
     }).length;
   }, [leaveRequests, activeTargetClass, students, userScope.isWaliKelas]);
 
+  // State toggle rincian perbedaan presensi di banner peringatan
+  const [showDiscrepancyDetails, setShowDiscrepancyDetails] = useState<boolean>(false);
+
+  // Peta catatan presensi Guru Mapel hari ini untuk setiap siswa
+  const subjectRecordsTodayByStudent = useMemo(() => {
+    const map = new Map<string, Array<{ record: AttendanceRecord; subjectName: string }>>();
+    (attendanceRecords || []).forEach((ar) => {
+      if (ar.date === date && ar.type === 'SUBJECT' && ar.status && ar.status !== '-') {
+        const sub = subjects.find((s) => s.id === ar.subjectId);
+        const subjectName = ar.subjectName || sub?.code || sub?.name || 'Mapel';
+        const list = map.get(ar.studentId) || [];
+        list.push({ record: ar, subjectName });
+        map.set(ar.studentId, list);
+      }
+    });
+    return map;
+  }, [attendanceRecords, date, subjects]);
+
+  // Peringatan Pilihan 3: Daftar siswa dengan perbedaan status antara Wali Kelas (Harian) dan Guru Mapel
+  const discrepancyList = useMemo(() => {
+    if (attendanceMode !== 'DAILY') return [];
+    const list: Array<{
+      studentId: string;
+      studentName: string;
+      dailyStatus: AttendanceStatus;
+      subjectDiscrepancies: Array<{
+        subjectName: string;
+        subjectStatus: AttendanceStatus;
+        notes?: string;
+      }>;
+    }> = [];
+
+    records.forEach((r) => {
+      const mapelItems = subjectRecordsTodayByStudent.get(r.studentId) || [];
+      if (mapelItems.length === 0) return;
+
+      const diffs = mapelItems.filter((item) => {
+        // Jika status harian sudah ada dan status mapel berbeda
+        if (r.status && item.record.status !== r.status) return true;
+        // Jika status harian belum diisi tapi guru mapel sudah menandai Sakit, Izin, atau Alfa
+        if (!r.status && item.record.status && item.record.status !== 'Hadir') return true;
+        return false;
+      });
+
+      if (diffs.length > 0) {
+        list.push({
+          studentId: r.studentId,
+          studentName: r.studentName,
+          dailyStatus: r.status,
+          subjectDiscrepancies: diffs.map((d) => ({
+            subjectName: d.subjectName,
+            subjectStatus: d.record.status,
+            notes: d.record.notes,
+          })),
+        });
+      }
+    });
+
+    return list;
+  }, [attendanceMode, records, subjectRecordsTodayByStudent]);
+
   const currentDayName = useMemo(() => {
     try {
       const [y, m, d] = date.split('-');
@@ -525,6 +588,51 @@ export const AbsensiView: React.FC = () => {
       } catch (_) {}
       return updated;
     });
+  };
+
+  // Handler Pilihan 3: Menyelaraskan status presensi harian siswa dengan catatan Guru Mapel
+  const handleApplySubjectStatusToDaily = (
+    studentId: string,
+    targetStatus: AttendanceStatus,
+    subjectName: string,
+    notes?: string
+  ) => {
+    const combinedNotes = notes 
+      ? `(Catatan Mapel ${subjectName}: ${notes})` 
+      : `(Diselaraskan dari Mapel ${subjectName})`;
+    updateRecord(studentId, {
+      status: targetStatus,
+      notes: combinedNotes,
+    });
+    showToast(`Status diselaraskan ke "${targetStatus}" dari Guru Mapel ${subjectName}`);
+  };
+
+  // Handler Pilihan 3: Menyelaraskan seluruh selisih yang ditemukan dengan 1 klik
+  const handleSyncAllDiscrepancies = () => {
+    if (discrepancyList.length === 0) return;
+    setIsDirty(true);
+    isDirtyRef.current = true;
+    setRecords((prev) => {
+      const updated = prev.map((r) => {
+        const item = discrepancyList.find((d) => d.studentId === r.studentId);
+        if (item && item.subjectDiscrepancies.length > 0) {
+          const first = item.subjectDiscrepancies[0];
+          return {
+            ...r,
+            status: first.subjectStatus,
+            notes: first.notes 
+              ? `(Catatan Mapel ${first.subjectName}: ${first.notes})` 
+              : `(Diselaraskan dari Mapel ${first.subjectName})`,
+          };
+        }
+        return r;
+      });
+      try {
+        sessionStorage.setItem(draftStorageKey, JSON.stringify(updated));
+      } catch (_) {}
+      return updated;
+    });
+    showToast(`${discrepancyList.length} siswa berhasil diselaraskan dengan catatan Guru Mapel`);
   };
 
   // Bulk Actions
@@ -1511,6 +1619,91 @@ export const AbsensiView: React.FC = () => {
             </div>
           </div>
 
+          {/* Peringatan Selisih Presensi Antara Wali Kelas & Guru Mapel (Pilihan 3) */}
+          {attendanceMode === 'DAILY' && discrepancyList.length > 0 && (
+            <div className="bg-amber-50/90 border border-amber-300/80 rounded-2xl p-3.5 sm:p-4 shadow-2xs space-y-3 animate-in fade-in duration-200">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-start sm:items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-amber-100 border border-amber-300 flex items-center justify-center text-amber-700 shrink-0 shadow-2xs">
+                    <AlertTriangle size={18} />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h4 className="text-xs font-black text-amber-950">
+                        Peringatan Selisih Presensi dengan Guru Mapel
+                      </h4>
+                      <span className="px-2 py-0.5 rounded-full bg-amber-200 text-amber-950 text-[10px] font-black">
+                        {discrepancyList.length} Siswa Berbeda
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-amber-800 leading-snug mt-0.5 font-medium">
+                      Guru Mata Pelajaran mencatat status kehadiran berbeda pada jam pelajarannya hari ini. Anda dapat meninjau rincian atau menyelaraskannya dengan satu klik.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+                  <button
+                    type="button"
+                    onClick={() => setShowDiscrepancyDetails((prev) => !prev)}
+                    className="px-3 py-1.5 rounded-xl border border-amber-300 bg-white hover:bg-amber-100/60 active:scale-95 text-amber-950 text-xs font-bold transition-all cursor-pointer shadow-2xs"
+                  >
+                    {showDiscrepancyDetails ? 'Tutup Rincian' : `Lihat Rincian (${discrepancyList.length})`}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSyncAllDiscrepancies}
+                    disabled={isDateLocked || isSaving}
+                    className="px-3 py-1.5 rounded-xl border border-amber-500 bg-amber-500 hover:bg-amber-600 active:scale-95 text-white text-xs font-black transition-all cursor-pointer shadow-2xs flex items-center gap-1.5"
+                    title="Terapkan status dari Guru Mapel ke buku presensi harian untuk seluruh siswa yang berselisih"
+                  >
+                    <ArrowRightLeft size={13} />
+                    <span>Selaraskan Semua</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Rincian Selisih per Siswa (Bila Dibuka) */}
+              {showDiscrepancyDetails && (
+                <div className="pt-2.5 border-t border-amber-200/80 divide-y divide-amber-200/50">
+                  {discrepancyList.map((item) => (
+                    <div key={item.studentId} className="py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+                      <div>
+                        <span className="font-extrabold text-slate-900">{item.studentName}</span>
+                        <div className="flex flex-wrap items-center gap-2 mt-0.5 text-[11px]">
+                          <span className="text-slate-600">
+                            Wali Kelas: <strong className="text-slate-900">{item.dailyStatus || '(Belum Diabsen)'}</strong>
+                          </span>
+                          <span className="text-amber-400">•</span>
+                          {item.subjectDiscrepancies.map((sd, i) => (
+                            <span key={i} className="text-amber-900 font-semibold">
+                              Mapel {sd.subjectName}: <strong className="text-amber-950 font-black">{sd.subjectStatus}</strong>
+                              {sd.notes && <span className="text-amber-700 ml-1">({sd.notes})</span>}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1.5 shrink-0 self-end sm:self-auto">
+                        {item.subjectDiscrepancies.map((sd, i) => (
+                          <button
+                            key={i}
+                            type="button"
+                            onClick={() => handleApplySubjectStatusToDaily(item.studentId, sd.subjectStatus, sd.subjectName, sd.notes)}
+                            disabled={isDateLocked || isSaving}
+                            className="px-2.5 py-1 rounded-lg bg-amber-200 hover:bg-amber-300 text-amber-950 text-[11px] font-black cursor-pointer transition-colors shadow-2xs"
+                          >
+                            Terapkan {sd.subjectStatus} ({sd.subjectName})
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Student List Container with Search Bar */}
           <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden space-y-0">
             {/* Header & Quick Search Bar */}
@@ -1600,6 +1793,52 @@ export const AbsensiView: React.FC = () => {
                           return null;
                         })()}
 
+                        {attendanceMode === 'DAILY' &&
+                          (() => {
+                            const mapelList = subjectRecordsTodayByStudent.get(r.studentId) || [];
+                            if (mapelList.length === 0) return null;
+                            return (
+                              <div className="flex flex-wrap items-center gap-1">
+                                {mapelList.map(({ record: ar, subjectName }) => {
+                                  const isDifferent = r.status && ar.status !== r.status;
+                                  if (isDifferent) {
+                                    return (
+                                      <div
+                                        key={ar.id || subjectName}
+                                        className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-extrabold bg-amber-50 border border-amber-300 text-amber-900 shadow-2xs"
+                                        title={`Guru Mapel ${subjectName} mencatat: ${ar.status}${ar.notes ? ` (${ar.notes})` : ''}`}
+                                      >
+                                        <AlertTriangle size={10} className="text-amber-600 shrink-0" />
+                                        <span>{subjectName}: <strong>{ar.status}</strong></span>
+                                        <button
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleApplySubjectStatusToDaily(r.studentId, ar.status, subjectName, ar.notes);
+                                          }}
+                                          className="ml-0.5 px-1 py-0.2 rounded bg-amber-200 hover:bg-amber-300 text-amber-950 font-black text-[9px] cursor-pointer"
+                                          title={`Terapkan status ${ar.status} dari ${subjectName} ke presensi harian`}
+                                        >
+                                          Samakan
+                                        </button>
+                                      </div>
+                                    );
+                                  }
+                                  return (
+                                    <span
+                                      key={ar.id || subjectName}
+                                      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-emerald-50 border border-emerald-200 text-emerald-800"
+                                      title={`Sesuai dengan Guru Mapel ${subjectName}: ${ar.status}`}
+                                    >
+                                      <span className="w-1 h-1 rounded-full bg-emerald-500" />
+                                      {subjectName}: {ar.status}
+                                    </span>
+                                  );
+                                })}
+                              </div>
+                            );
+                          })()}
+
                         {attendanceMode === 'SUBJECT' &&
                           (() => {
                             const dailyRec = attendanceRecords.find(
@@ -1620,6 +1859,13 @@ export const AbsensiView: React.FC = () => {
                               return (
                                 <span className="inline-flex items-center text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-md shrink-0">
                                   {dailyRec.status} (Wali)
+                                </span>
+                              );
+                            }
+                            if (dailyRec?.status === 'Alfa') {
+                              return (
+                                <span className="inline-flex items-center text-[10px] font-bold text-rose-700 bg-rose-50 border border-rose-200 px-1.5 py-0.5 rounded-md shrink-0">
+                                  Alfa (Wali)
                                 </span>
                               );
                             }
@@ -1812,6 +2058,52 @@ export const AbsensiView: React.FC = () => {
                                 return null;
                               })()}
 
+                              {attendanceMode === 'DAILY' &&
+                                (() => {
+                                  const mapelList = subjectRecordsTodayByStudent.get(r.studentId) || [];
+                                  if (mapelList.length === 0) return null;
+                                  return (
+                                    <div className="flex flex-wrap items-center gap-1">
+                                      {mapelList.map(({ record: ar, subjectName }) => {
+                                        const isDifferent = r.status && ar.status !== r.status;
+                                        if (isDifferent) {
+                                          return (
+                                            <div
+                                              key={ar.id || subjectName}
+                                              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-extrabold bg-amber-50 border border-amber-300 text-amber-900 shadow-2xs"
+                                              title={`Guru Mapel ${subjectName} mencatat: ${ar.status}${ar.notes ? ` (${ar.notes})` : ''}`}
+                                            >
+                                              <AlertTriangle size={10} className="text-amber-600 shrink-0" />
+                                              <span>{subjectName}: <strong>{ar.status}</strong></span>
+                                              <button
+                                                type="button"
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  handleApplySubjectStatusToDaily(r.studentId, ar.status, subjectName, ar.notes);
+                                                }}
+                                                className="ml-0.5 px-1 py-0.2 rounded bg-amber-200 hover:bg-amber-300 text-amber-950 font-black text-[9px] cursor-pointer"
+                                                title={`Terapkan status ${ar.status} dari ${subjectName} ke presensi harian`}
+                                              >
+                                                Samakan
+                                              </button>
+                                            </div>
+                                          );
+                                        }
+                                        return (
+                                          <span
+                                            key={ar.id || subjectName}
+                                            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-emerald-50 border border-emerald-200 text-emerald-800"
+                                            title={`Sesuai dengan Guru Mapel ${subjectName}: ${ar.status}`}
+                                          >
+                                            <span className="w-1 h-1 rounded-full bg-emerald-500" />
+                                            {subjectName}: {ar.status}
+                                          </span>
+                                        );
+                                      })}
+                                    </div>
+                                  );
+                                })()}
+
                               {attendanceMode === 'SUBJECT' &&
                                 (() => {
                                   const dailyRec = attendanceRecords.find(
@@ -1835,6 +2127,13 @@ export const AbsensiView: React.FC = () => {
                                     return (
                                       <span className="inline-flex items-center text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.2 rounded shrink-0">
                                         {dailyRec.status} (Wali)
+                                      </span>
+                                    );
+                                  }
+                                  if (dailyRec?.status === 'Alfa') {
+                                    return (
+                                      <span className="inline-flex items-center text-[10px] font-bold text-rose-700 bg-rose-50 border border-rose-200 px-1.5 py-0.2 rounded shrink-0">
+                                        Alfa (Wali)
                                       </span>
                                     );
                                   }

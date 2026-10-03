@@ -190,11 +190,17 @@ export const DashboardView: React.FC = () => {
     }
     if (userScope.isGuruMapel) {
       const accessibleClassIds = userScope.accessibleClasses.map((c) => c.id);
-      if (accessibleClassIds.length > 0) {
-        const byAcc = students.filter((s) => accessibleClassIds.includes(s.classId || ''));
-        if (byAcc.length > 0) return byAcc;
+      const accessibleClassNames = new Set(
+        userScope.accessibleClasses.map((c) => normalizeClassStr(c.name)).filter(Boolean)
+      );
+      if (accessibleClassIds.length > 0 || accessibleClassNames.size > 0) {
+        return students.filter((s) => {
+          if (s.classId && accessibleClassIds.includes(s.classId)) return true;
+          if (s.className && accessibleClassNames.has(normalizeClassStr(s.className))) return true;
+          return false;
+        });
       }
-      return students;
+      return isPersonalWorkspace ? students : [];
     }
     return students;
   }, [isSchoolAdminOrKS, isPersonalWorkspace, userScope, students, currentUser]);
@@ -886,6 +892,8 @@ export const DashboardView: React.FC = () => {
                 ? `${classes.length} Rombel`
                 : userScope.isWaliKelas
                 ? `Rombel ${userScope.assignedWaliClassName || '6A'}`
+                : userScope.isGuruMapel
+                ? `${userScope.accessibleClasses.length} Rombel Diajar`
                 : 'Siswa Aktif'}
             </span>
             <span className="inline-flex items-center text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100/80 shrink-0">

@@ -302,16 +302,15 @@ export const DataKelasView: React.FC = () => {
 
   const accessibleClasses = useMemo(() => {
     if (isAdmin || isPersonalWorkspace) return classes;
-    if (isWaliKelas) {
-      // Wali Kelas di Ruang Kerja Sekolah: HANYA menampilkan kelas binaan yang ditugaskan
+    if (isWaliKelas || isGuru || isGuruMapel) {
+      // Wali Kelas & Guru Mapel di Ruang Kerja Sekolah: HANYA menampilkan kelas binaan / diajarkan
       return myAssignedClasses;
     }
     if (classScopeFilter === 'my' && myAssignedClasses.length > 0) {
       return myAssignedClasses;
     }
-    // Di Ruang Kerja Sekolah, tampilkan seluruh kelas dari Admin Sekolah agar data referensi tidak kosong
     return classes;
-  }, [isAdmin, isPersonalWorkspace, isWaliKelas, classes, myAssignedClasses, classScopeFilter]);
+  }, [isAdmin, isPersonalWorkspace, isWaliKelas, isGuru, isGuruMapel, classes, myAssignedClasses, classScopeFilter]);
 
   const canAddClass = isAdmin || isPersonalWorkspace;
   const canEditClass = isAdmin || isPersonalWorkspace;
@@ -942,11 +941,21 @@ export const DataKelasView: React.FC = () => {
             </div>
             <div>
               <h2 className="text-lg font-black text-slate-900">
-                {isPersonalWorkspace ? 'Data Kelas Binaan Saya' : 'Data Rombongan Belajar & Penugasan Kelas'}
+                {isPersonalWorkspace
+                  ? 'Data Kelas Binaan Saya'
+                  : isGuru || isGuruMapel
+                  ? 'Data Kelas Yang Diajar'
+                  : isWaliKelas
+                  ? 'Data Kelas Binaan'
+                  : 'Data Rombongan Belajar & Penugasan Kelas'}
               </h2>
               <p className="text-xs text-slate-500">
                 {isPersonalWorkspace
                   ? 'Data rombongan belajar Anda di Ruang Kerja Individu. Anda dapat melihat dan mengelola siswa kelas ini.'
+                  : isGuru || isGuruMapel
+                  ? `Menampilkan daftar rombongan belajar kelas yang Anda ajar (${accessibleClasses.length} kelas).`
+                  : isWaliKelas
+                  ? 'Data rombongan belajar kelas binaan Anda.'
                   : 'Kelola data rombel kelas, penetapan wali kelas, dan penugasan guru mata pelajaran terintegrasi.'}
               </p>
               {isPersonalWorkspace ? (
@@ -1072,7 +1081,7 @@ export const DataKelasView: React.FC = () => {
               </div>
 
               <div className="flex flex-wrap items-center gap-2 text-xs font-bold text-slate-600">
-                {!isAdmin && !isPersonalWorkspace && !isWaliKelas && (
+                {!isAdmin && !isPersonalWorkspace && !isWaliKelas && !isGuru && !isGuruMapel && (
                   <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200">
                     <button
                       type="button"

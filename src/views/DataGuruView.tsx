@@ -355,8 +355,8 @@ export const DataGuruView: React.FC = () => {
       return t;
     });
 
-    // Ruang Kerja Sekolah: Untuk Wali Kelas, HANYA tampilkan akun/data guru yang bersangkutan saja
-    if (isWaliKelas && !isAdmin) {
+    // Ruang Kerja Sekolah: Untuk Wali Kelas dan Guru Mapel, HANYA tampilkan akun/data guru yang bersangkutan saja
+    if ((isWaliKelas || isGuruMapel) && !isAdmin) {
       const myOnly = allEnrichedTeachers.filter((t) => {
         if (currentUser?.teacherId && t.id === currentUser.teacherId) return true;
         if (userNip && normalizeNip(t.nip) === userNip) return true;
@@ -365,46 +365,23 @@ export const DataGuruView: React.FC = () => {
       });
       if (myOnly.length > 0) return myOnly;
       if (currentUser) {
+        const defaultDuty = isGuruMapel ? 'Guru Mapel' : 'Wali Kelas';
         return [
           {
             id: currentUser.teacherId || currentUser.id || 'teacher-self',
             nama: effectiveName,
             nip: userNip || currentUser.nip || '-',
-            jenisKelamin: 'L' as const,
-            jabatan: 'Wali Kelas',
-            tugasUtama: 'Wali Kelas',
-            tugas_utama: 'Wali Kelas',
-          },
-        ];
-      }
-    }
-
-    // Jika filter profil saya dipilih oleh Guru Mapel
-    if (!isAdmin && isGuruMapel && teacherScopeFilter === 'my') {
-      const myOnly = allEnrichedTeachers.filter((t) => {
-        if (currentUser?.teacherId && t.id === currentUser.teacherId) return true;
-        if (userNip && normalizeNip(t.nip) === userNip) return true;
-        if (cleanUserName && normalizeTeacherName(t.nama) === cleanUserName) return true;
-        return false;
-      });
-      if (myOnly.length > 0) return myOnly;
-      if (currentUser) {
-        return [
-          {
-            id: currentUser.teacherId || currentUser.id || 'teacher-self',
-            nama: effectiveName,
-            nip: userNip || currentUser.nip || '-',
-            jenisKelamin: 'L' as const,
-            jabatan: 'Guru Mapel',
-            tugasUtama: 'Guru Mapel',
-            tugas_utama: 'Guru Mapel',
+            jenisKelamin: ((currentUser as any)?.jenisKelamin || (currentUser as any)?.gender || 'L') as 'L' | 'P',
+            jabatan: defaultDuty,
+            tugasUtama: defaultDuty,
+            tugas_utama: defaultDuty,
           },
         ];
       }
     }
 
     return allEnrichedTeachers;
-  }, [isAdmin, isWaliKelas, isGuruMapel, isPersonalWorkspace, teachers, currentUser, teacherScopeFilter]);
+  }, [isAdmin, isWaliKelas, isGuruMapel, isPersonalWorkspace, teachers, currentUser]);
 
   const filteredTeachers = useMemo(() => {
     const q = (searchTerm || '').trim().toLowerCase();
@@ -856,7 +833,7 @@ export const DataGuruView: React.FC = () => {
           />
         </div>
 
-        {!isAdmin && !isPersonalWorkspace && !isWaliKelas && (
+        {!isAdmin && !isPersonalWorkspace && !isWaliKelas && !isGuruMapel && (
           <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs self-start sm:self-auto">
             <button
               type="button"

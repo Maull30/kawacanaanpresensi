@@ -221,11 +221,14 @@ export function getUserRoleScope(
     if (currentUser.classIds && currentUser.classIds.length > 0) {
       currentUser.classIds.forEach((cid) => targetClassIds.add(cid));
     }
+    if (currentUser.assignedClassIds && currentUser.assignedClassIds.length > 0) {
+      currentUser.assignedClassIds.forEach((cid) => targetClassIds.add(cid));
+    }
     
     let matched = classes.filter((schoolClass) => targetClassIds.has(schoolClass.id));
-    // Jika belum ada pemetaan spesifik di ruang kerja guru mapel, berikan akses rombel yang tersedia hingga 6 kelas
-    if (matched.length === 0 && classes.length > 0) {
-      matched = classes;
+    // Ruang kerja individu: jika belum ada pemetaan spesifik, berikan kelas default pertama
+    if (matched.length === 0 && !currentUser.schoolId && classes.length > 0) {
+      matched = classes.slice(0, 1);
     }
     accessibleClasses = matched.slice(0, 6);
   } else if (isSiswa) {

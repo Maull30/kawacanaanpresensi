@@ -150,30 +150,19 @@ export const DataSiswaView: React.FC = () => {
 
   // Data siswa yang diizinkan untuk diakses:
   // Wali Kelas: HANYA menampilkan siswa di rombel binaan/penugasannya saja
-  // Guru Mapel: menampilkan siswa di rombel yang diajar atau seluruh siswa sekolah
+  // Guru Mapel: HANYA menampilkan siswa dari kelas yang diajarkannya (dibina)
   const accessibleStudents = useMemo(() => {
     if (isAdmin || isPersonalWorkspace) return students;
-    if (isWaliKelas) {
-      // Wali Kelas: strictly hanya menampilkan siswa binaannya
+    if (isWaliKelas || isGuru) {
+      // Wali Kelas & Guru Mapel: strictly hanya menampilkan siswa dari kelas binaan/diajarkan
       return students.filter(
         (s) =>
           (s.classId && accessibleClassIds.has(s.classId)) ||
           (s.className && accessibleClassNames.has(s.className.trim().toLowerCase()))
       );
     }
-    if (isGuru) {
-      if (studentScopeFilter === 'my' && myAssignedClasses.length > 0) {
-        return students.filter(
-          (s) =>
-            (s.classId && accessibleClassIds.has(s.classId)) ||
-            (s.className && accessibleClassNames.has(s.className.trim().toLowerCase()))
-        );
-      }
-      // Tampilkan seluruh siswa sekolah terintegrasi dari Admin Sekolah
-      return students;
-    }
     return students;
-  }, [isAdmin, isPersonalWorkspace, isWaliKelas, isGuru, students, myAssignedClasses.length, accessibleClassIds, accessibleClassNames, studentScopeFilter]);
+  }, [isAdmin, isPersonalWorkspace, isWaliKelas, isGuru, students, accessibleClassIds, accessibleClassNames]);
 
   const myAssignedStudentsCount = useMemo(() => {
     if (!myAssignedClasses || myAssignedClasses.length === 0) return 0;
@@ -241,14 +230,11 @@ export const DataSiswaView: React.FC = () => {
 
   // Available classes: integrated from onboarding registration / workspace classes
   const availableClasses = useMemo(() => {
-    if (isWaliKelas) {
-      return myAssignedClasses && myAssignedClasses.length > 0 ? myAssignedClasses : classes || [];
-    }
-    if (studentScopeFilter === 'my' && myAssignedClasses && myAssignedClasses.length > 0) {
-      return myAssignedClasses;
+    if (isWaliKelas || isGuru) {
+      return myAssignedClasses && myAssignedClasses.length > 0 ? myAssignedClasses : [];
     }
     return classes || [];
-  }, [isWaliKelas, studentScopeFilter, myAssignedClasses, classes]);
+  }, [isWaliKelas, isGuru, myAssignedClasses, classes]);
 
   // Filter and sort students (otomatis urut alfabetis A - Z)
   const filteredStudents = useMemo(() => {
@@ -616,7 +602,14 @@ export const DataSiswaView: React.FC = () => {
         <div className="w-8 h-8 rounded-lg bg-blue-50 border border-blue-200 text-blue-600 flex items-center justify-center shadow-xs">
           <Users size={18} />
         </div>
-        <span>Data Siswa</span>
+        <div>
+          <span>Data Siswa</span>
+          {isGuru && (
+            <p className="text-xs text-slate-500 font-medium">
+              Menampilkan siswa dari kelas yang Anda ajar ({accessibleStudents.length} siswa).
+            </p>
+          )}
+        </div>
       </div>
 
       {/* Main Container Card */}
@@ -671,7 +664,7 @@ export const DataSiswaView: React.FC = () => {
           {/* Secondary Controls Bar: Filter by Class and Show Entries */}
           <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-100">
             <div className="flex flex-wrap items-center gap-2.5">
-              {!isAdmin && !isPersonalWorkspace && !isWaliKelas && (
+              {!isAdmin && !isPersonalWorkspace && !isWaliKelas && !isGuru && (
                 <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs">
                   <button
                     type="button"

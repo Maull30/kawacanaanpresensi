@@ -41,6 +41,12 @@ import {
 import { ClassQrModal } from '../components/ClassQrModal';
 import { TeacherLeaveApprovalModal } from '../components/TeacherLeaveApprovalModal';
 
+const isClassMatch = (nameA?: string | null, nameB?: string | null) => {
+  if (!nameA || !nameB) return false;
+  const clean = (s: string) => s.toLowerCase().replace(/^(kelas|kls)\s+/i, '').replace(/[^a-z0-9]/g, '');
+  return clean(nameA) === clean(nameB);
+};
+
 export const AbsensiView: React.FC = () => {
   const {
     students,
@@ -102,6 +108,18 @@ export const AbsensiView: React.FC = () => {
   const [allowExtraSession, setAllowExtraSession] = useState<boolean>(false);
 
   const isGuruMapel = isGuruMapelRole || attendanceMode === 'SUBJECT';
+
+  // Nama hari dari tanggal aktif
+  const currentDayName = useMemo(() => {
+    try {
+      const [y, m, d] = date.split('-');
+      const dayNames = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+      const dObj = new Date(Number(y), Number(m) - 1, Number(d));
+      return dayNames[dObj.getDay()] || '';
+    } catch {
+      return '';
+    }
+  }, [date]);
   
   // Subject state
   const [selectedSubjectId, setSelectedSubjectId] = useState<string>(() => {
@@ -111,12 +129,37 @@ export const AbsensiView: React.FC = () => {
     return subjects.find((s) => s.isSpecialized)?.id || subjects[0]?.id || '';
   });
 
-  // Class state
+  // Class state: Untuk Guru Mapel, prioritaskan kelas yang terjadwal pada hari ini sebagai tampilan default
   const [selectedClassId, setSelectedClassId] = useState<string>(() => {
     if (userScope.isWaliKelas && userScope.assignedWaliClassId) {
       return userScope.assignedWaliClassId;
     }
     if (userScope.isGuruMapel && userScope.accessibleClasses.length > 0) {
+      const firstSub = userScope.assignedSubjects[0] || subjects[0];
+      if (firstSub) {
+        let dayN = '';
+        try {
+          const [y, m, d] = currentAttendanceDate.split('-');
+          const dNames = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+          dayN = dNames[new Date(Number(y), Number(m) - 1, Number(d)).getDay()] || '';
+        } catch (_) {}
+
+        if (dayN) {
+          const scheduled = userScope.accessibleClasses.find((c) => {
+            if (firstSub.classSchedules && firstSub.classSchedules.length > 0) {
+              const cs = firstSub.classSchedules.find(
+                (item) => item.classId === c.id || isClassMatch(item.className, c.name)
+              );
+              if (cs && cs.days && cs.days.length > 0) return cs.days.includes(dayN);
+            }
+            if (firstSub.scheduleDays && firstSub.scheduleDays.length > 0) {
+              return firstSub.scheduleDays.includes(dayN);
+            }
+            return false;
+          });
+          if (scheduled) return scheduled.id;
+        }
+      }
       return userScope.accessibleClasses[0].id;
     }
     return classes[0]?.id || '';
@@ -189,24 +232,70 @@ export const AbsensiView: React.FC = () => {
 
   const activeSubject = selectableSubjects.find((s) => s.id === selectedSubjectId) || selectableSubjects[0];
 
+  // Cek apakah sebuah rombel memiliki jadwal mengajar resmi pada hari target
+  const isClassScheduledOnDay = useMemo(() => {
+    return (clsId: string, clsName?: string, dayName?: string) => {
+      if (!activeSubject) return false;
+      const targetDay = dayName || currentDayName;
+      if (!targetDay) return false;
+
+      // 1. Cek jadwal spesifik per kelas di activeSubject.classSchedules
+      if (activeSubject.classSchedules && activeSubject.classSchedules.length > 0) {
+        const clsSched = activeSubject.classSchedules.find(
+          (cs) => cs.classId === clsId || (clsName && isClassMatch(cs.className, clsName))
+        );
+        if (clsSched && clsSched.days && clsSched.days.length > 0) {
+          return clsSched.days.includes(targetDay);
+        }
+      }
+
+      // 2. Cek jadwal umum mapel di activeSubject.scheduleDays
+      if (activeSubject.scheduleDays && activeSubject.scheduleDays.length > 0) {
+        return activeSubject.scheduleDays.includes(targetDay);
+      }
+
+      return false;
+    };
+  }, [activeSubject, currentDayName]);
+
   // Available classes for current selection and mode
+  // Sesuai instruksi:
+  // "Role guru mapel ; dashboard ; absensi siswa ; pilih rombel yang di ajar ; hanya menampilkan pilihan kelas sesuai dengan hari jadwal absensinya hari itu"
   const availableClasses = useMemo(() => {
     if (userScope.isWaliKelas) {
       return userScope.assignedWaliClass ? [userScope.assignedWaliClass] : classes.slice(0, 1);
     }
-    if (userScope.isGuruMapel) {
-      if (activeSubject?.targetClassIds && activeSubject.targetClassIds.length > 0) {
-        const filtered = userScope.accessibleClasses.filter((c) => activeSubject.targetClassIds?.includes(c.id));
-        if (filtered.length > 0) return filtered;
+
+    let baseClasses = userScope.isGuruMapel ? userScope.accessibleClasses : classes;
+    if (activeSubject?.targetClassIds && activeSubject.targetClassIds.length > 0) {
+      const filtered = baseClasses.filter((c) => activeSubject.targetClassIds?.includes(c.id));
+      if (filtered.length > 0) baseClasses = filtered;
+    }
+
+    if (userScope.isGuruMapel || attendanceMode === 'SUBJECT') {
+      const hasAnyScheduleConfigured =
+        (activeSubject?.classSchedules && activeSubject.classSchedules.some((cs) => cs.days && cs.days.length > 0)) ||
+        (activeSubject?.scheduleDays && activeSubject.scheduleDays.length > 0);
+
+      // Jika belum ada jadwal sama sekali yang diatur admin, tetap tampilkan rombel binaan
+      if (!hasAnyScheduleConfigured) {
+        return baseClasses;
       }
-      return userScope.accessibleClasses;
+
+      // Filter HANYA rombel yang sesuai jadwal hari ini
+      const scheduledToday = baseClasses.filter((c) => isClassScheduledOnDay(c.id, c.name, currentDayName));
+
+      // Jika ada sesi ekstra/pengganti yang diaktifkan secara sadar oleh guru:
+      if (allowExtraSession) {
+        return baseClasses;
+      }
+
+      // HANYA menampilkan pilihan kelas sesuai dengan hari jadwal absensinya hari itu
+      return scheduledToday;
     }
-    if (attendanceMode === 'SUBJECT' && activeSubject?.targetClassIds && activeSubject.targetClassIds.length > 0) {
-      const filtered = classes.filter((c) => activeSubject.targetClassIds?.includes(c.id));
-      if (filtered.length > 0) return filtered;
-    }
-    return classes;
-  }, [userScope, attendanceMode, activeSubject, classes]);
+
+    return baseClasses;
+  }, [userScope, attendanceMode, activeSubject, classes, currentDayName, isClassScheduledOnDay, allowExtraSession]);
 
   // Synchronize mode and selected class/subject when role scope changes
   useEffect(() => {
@@ -222,8 +311,11 @@ export const AbsensiView: React.FC = () => {
       if (userScope.assignedSubjects.length > 0 && !userScope.assignedSubjects.some((s) => s.id === selectedSubjectId)) {
         setSelectedSubjectId(userScope.assignedSubjects[0].id);
       }
-      if (availableClasses.length > 0 && !availableClasses.some((c) => c.id === selectedClassId)) {
-        setSelectedClassId(availableClasses[0].id);
+      // "jika hari belajar tampilkan absensi kelas yang sesuai hari mengajar jadwalnya/ hari itu (default tampilan)"
+      if (availableClasses.length > 0) {
+        if (!availableClasses.some((c) => c.id === selectedClassId)) {
+          setSelectedClassId(availableClasses[0].id);
+        }
       }
     } else {
       // Admin / KS
@@ -232,6 +324,17 @@ export const AbsensiView: React.FC = () => {
       }
     }
   }, [userScope, availableClasses, selectedClassId, selectedSubjectId, selectableSubjects]);
+
+  // Otomatis sinkronkan kelas default Guru Mapel ketika tanggal atau daftar rombel terjadwal berubah
+  useEffect(() => {
+    if (userScope.isGuruMapel || attendanceMode === 'SUBJECT') {
+      if (availableClasses.length > 0) {
+        if (!availableClasses.some((c) => c.id === selectedClassId)) {
+          setSelectedClassId(availableClasses[0].id);
+        }
+      }
+    }
+  }, [date, currentDayName, availableClasses, userScope.isGuruMapel, attendanceMode, selectedClassId]);
 
   // Active target class for QR Presensi Rombel & modal
   const activeTargetClass = useMemo(() => {
@@ -243,12 +346,6 @@ export const AbsensiView: React.FC = () => {
       null
     );
   }, [classes, availableClasses, selectedClassId]);
-
-  const isClassMatch = (nameA?: string | null, nameB?: string | null) => {
-    if (!nameA || !nameB) return false;
-    const clean = (s: string) => s.toLowerCase().replace(/^(kelas|kls)\s+/i, '').replace(/[^a-z0-9]/g, '');
-    return clean(nameA) === clean(nameB);
-  };
 
   const pendingClassLeaveRequestsCount = useMemo(() => {
     return (leaveRequests || []).filter((r) => {
@@ -341,17 +438,6 @@ export const AbsensiView: React.FC = () => {
 
     return list;
   }, [attendanceMode, records, subjectRecordsTodayByStudent]);
-
-  const currentDayName = useMemo(() => {
-    try {
-      const [y, m, d] = date.split('-');
-      const dayNames = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
-      const dObj = new Date(Number(y), Number(m) - 1, Number(d));
-      return dayNames[dObj.getDay()] || '';
-    } catch {
-      return '';
-    }
-  }, [date]);
 
   // Daftar hari jadwal mengajar resmi untuk rombel terpilih
   const scheduledDaysForClass = useMemo(() => {
@@ -1145,22 +1231,29 @@ export const AbsensiView: React.FC = () => {
                       {userScope.isGuruMapel ? 'PILIH ROMBEL YANG DIAJAR' : 'KELAS YANG DIAJAR'}
                     </label>
                     <div className="flex items-center gap-1.5">
-                      <select
-                        value={selectedClassId}
-                        onChange={(e) => setSelectedClassId(e.target.value)}
-                        id="select-class"
-                        className="px-3.5 py-2 bg-white border border-blue-300 text-blue-900 text-xs font-bold rounded-xl shadow-xs outline-none focus:ring-2 focus:ring-blue-500/20 cursor-pointer min-w-[140px]"
-                      >
-                        {availableClasses.map((cls) => {
-                          const label = `${formatClassDisplay(cls.name).toUpperCase()} (${getFaseByClassName(cls.name, cls.grade)})`;
-                          return (
-                            <option key={cls.id} value={cls.id}>
-                              {userScope.isGuruMapel ? label : `${cls.name} (${getFaseByClassName(cls.name, cls.grade)}) ${cls.waliKelasName ? `• Wali: ${cls.waliKelasName}` : ''}`}
-                            </option>
-                          );
-                        })}
-                      </select>
-                      {activeTargetClass && (
+                      {availableClasses.length > 0 ? (
+                        <select
+                          value={selectedClassId}
+                          onChange={(e) => setSelectedClassId(e.target.value)}
+                          id="select-class"
+                          className="px-3.5 py-2 bg-white border border-blue-300 text-blue-900 text-xs font-bold rounded-xl shadow-xs outline-none focus:ring-2 focus:ring-blue-500/20 cursor-pointer min-w-[140px]"
+                        >
+                          {availableClasses.map((cls) => {
+                            const label = `${formatClassDisplay(cls.name).toUpperCase()} (${getFaseByClassName(cls.name, cls.grade)})`;
+                            return (
+                              <option key={cls.id} value={cls.id}>
+                                {userScope.isGuruMapel ? label : `${cls.name} (${getFaseByClassName(cls.name, cls.grade)}) ${cls.waliKelasName ? `• Wali: ${cls.waliKelasName}` : ''}`}
+                              </option>
+                            );
+                          })}
+                        </select>
+                      ) : (
+                        <div className="px-3 py-1.5 bg-amber-50 border border-amber-200 text-amber-900 text-xs font-bold rounded-xl flex items-center gap-1.5">
+                          <AlertCircle size={13} className="text-amber-600 shrink-0" />
+                          <span>Tidak ada rombel terjadwal hari {currentDayName}</span>
+                        </div>
+                      )}
+                      {activeTargetClass && availableClasses.length > 0 && (
                         <button
                           type="button"
                           onClick={() => setIsClassQrOpen(true)}

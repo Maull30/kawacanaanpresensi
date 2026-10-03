@@ -745,13 +745,12 @@ export const DashboardView: React.FC = () => {
         ].includes(item.id);
       }
       if (
-        currentUser.role === 'GURU MAPEL'
+        currentUser.role === 'GURU MAPEL' || userScope.isGuruMapel
       ) {
         return [
           'data-referensi',
           'kalender-akademik',
           'absensi',
-          'portal-siswa',
           'rekapitulasi',
           'laporan',
         ].includes(item.id);
@@ -1369,16 +1368,20 @@ export const DashboardView: React.FC = () => {
                 : `${totalInputted} terdata • ${totalBelumInput} belum`}
             </span>
             <div className="flex items-center gap-1.5 shrink-0 ml-1">
-              <button
-                type="button"
-                onClick={() => setIsLeaveModalOpen(true)}
-                className="font-bold text-amber-700 hover:text-amber-800 hover:underline flex items-center gap-0.5 cursor-pointer"
-                title="Buka permohonan surat izin / sakit siswa"
-              >
-                <FileText size={11} />
-                <span>Surat Izin{pendingWaliLeaveRequests.length > 0 ? ` (${pendingWaliLeaveRequests.length})` : ''}</span>
-              </button>
-              <span className="text-slate-300">•</span>
+              {(userScope.isWaliKelas || isSchoolAdminOrKS) && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setIsLeaveModalOpen(true)}
+                    className="font-bold text-amber-700 hover:text-amber-800 hover:underline flex items-center gap-0.5 cursor-pointer"
+                    title="Buka permohonan surat izin / sakit siswa"
+                  >
+                    <FileText size={11} />
+                    <span>Surat Izin{pendingWaliLeaveRequests.length > 0 ? ` (${pendingWaliLeaveRequests.length})` : ''}</span>
+                  </button>
+                  <span className="text-slate-300">•</span>
+                </>
+              )}
               <button
                 onClick={() => setActiveView('absensi')}
                 className="font-bold text-blue-600 hover:text-blue-800 hover:underline shrink-0 cursor-pointer"

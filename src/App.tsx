@@ -46,7 +46,7 @@ const VIEW_ACCESS: Record<ActiveView, UserRole[] | 'all'> = {
   rekapitulasi: ['ADMIN', 'KEPALA SEKOLAH', 'WALI KELAS', 'GURU MAPEL'],
   laporan: ['ADMIN', 'KEPALA SEKOLAH', 'WALI KELAS', 'GURU MAPEL'],
   pengaturan: ['ADMIN', 'KEPALA SEKOLAH', 'WALI KELAS', 'GURU MAPEL'],
-  'portal-siswa': ['SISWA', 'ADMIN', 'KEPALA SEKOLAH', 'WALI KELAS', 'GURU MAPEL'],
+  'portal-siswa': ['SISWA', 'ADMIN', 'KEPALA SEKOLAH', 'WALI KELAS'],
 };
 
 const defaultViewForRole = (role: UserRole): ActiveView => role === 'SUPER_ADMIN' ? 'superadmin' : (role === 'SISWA' ? 'portal-siswa' : 'dashboard');

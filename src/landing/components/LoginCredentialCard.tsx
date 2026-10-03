@@ -3,6 +3,7 @@ import QRCode from 'qrcode';
 import html2canvas from 'html2canvas';
 import {
   Shield,
+  ShieldCheck,
   MapPin,
   Lock,
   User,
@@ -25,6 +26,7 @@ export interface LoginCredentialCardData {
   personInCharge: string;
   username: string;
   password: string;
+  role?: string;
   schoolCode?: string;
   expiryDateText?: string;
   invoiceNo?: string;
@@ -82,8 +84,14 @@ export const LoginCredentialCard: React.FC<LoginCredentialCardProps> = ({
       year: 'numeric',
     });
 
-  const codeDisplay =
-    data.schoolCode || (data.workspaceType === 'school' ? 'SCH-UTAMA' : 'MANDIRI-PRO');
+  const roleDisplay = (() => {
+    if (data.role) return data.role.toUpperCase();
+    if (data.workspaceType === 'school') return 'ADMINISTRATOR';
+    const picLower = (data.personInCharge || '').toLowerCase();
+    if (picLower.includes('wali kelas')) return 'WALI KELAS';
+    if (picLower.includes('guru mapel')) return 'GURU MAPEL';
+    return 'PENDIDIK';
+  })();
 
   // Normalisasi teks masa aktif lisensi: bagi pengguna gratis cukup "Aktif Selamanya"
   const cleanExpiryText = (() => {
@@ -303,8 +311,8 @@ export const LoginCredentialCard: React.FC<LoginCredentialCardProps> = ({
     drawInfoBox(420, 80, 245, 72, 'USERNAME LOGIN', data.username, true);
     // Box 2: Password
     drawInfoBox(685, 80, 245, 72, 'PASSWORD LOGIN', data.password, true);
-    // Box 3: Kode Akses
-    drawInfoBox(420, 166, 245, 72, data.workspaceType === 'school' ? 'KODE AKSES SEKOLAH' : 'KODE RUANG KERJA', codeDisplay, true);
+    // Box 3: Hak Akses / Peran
+    drawInfoBox(420, 166, 245, 72, 'HAK AKSES / PERAN', roleDisplay, false);
     // Box 4: Masa Aktif
     drawInfoBox(685, 166, 245, 72, 'MASA AKTIF LISENSI', cleanExpiryText, false);
 
@@ -483,10 +491,10 @@ export const LoginCredentialCard: React.FC<LoginCredentialCardProps> = ({
   const handleCopyCredentials = () => {
     const text = `KREDENSIAL LOGIN KAWACANAAN PRESENSI SD\n${
       data.workspaceType === 'school' ? 'Ruang Kerja Sekolah' : 'Ruang Kerja Individu'
-    }: ${data.schoolName}\nPenanggung Jawab: ${data.personInCharge}\nUsername: ${
+    }: ${data.schoolName}\nPenanggung Jawab: ${data.personInCharge}\nPeran / Hak Akses: ${roleDisplay}\nUsername: ${
       data.username
-    }\nPassword: ${data.password}\nKode Akses: ${codeDisplay}\nMasa Aktif: ${
-      data.expiryDateText || 'Aktif'
+    }\nPassword: ${data.password}\nMasa Aktif: ${
+      cleanExpiryText
     }\nPortal Akses: ${portalUrl}`;
 
     navigator.clipboard.writeText(text);
@@ -628,14 +636,14 @@ export const LoginCredentialCard: React.FC<LoginCredentialCardProps> = ({
                 </div>
               </div>
 
-              {/* Box 3: Kode Akses Sekolah / Ruang Kerja */}
+              {/* Box 3: Hak Akses / Peran (Menggantikan Kode Akses) */}
               <div className="bg-[#f0f5fc] border border-[#e0ebf9] rounded-lg p-1.5">
                 <div className="flex items-center gap-1 text-[6.5px] font-bold text-slate-500 uppercase tracking-wider">
-                  <Building2 size={8} className="text-blue-600 shrink-0" />
-                  <span>{data.workspaceType === 'school' ? 'KODE AKSES SEKOLAH' : 'KODE RUANG KERJA'}</span>
+                  <ShieldCheck size={8} className="text-blue-600 shrink-0" />
+                  <span>PERAN / HAK AKSES</span>
                 </div>
-                <div className="font-mono text-[10px] font-black text-slate-900 truncate mt-0.5 tracking-wider">
-                  {codeDisplay}
+                <div className="font-sans text-[10px] font-black text-slate-900 truncate mt-0.5 tracking-tight">
+                  {roleDisplay}
                 </div>
               </div>
 

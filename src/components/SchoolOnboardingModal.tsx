@@ -629,15 +629,15 @@ export const SchoolOnboardingModal: React.FC<SchoolOnboardingModalProps> = ({
       ctx.font = 'bold 24px monospace';
       ctx.fillText(data.password, 755, 296);
 
-      // Box row 2: School Code & Duration
+      // Box row 2: Role & Duration
       ctx.fillStyle = '#94a3b8';
       ctx.font = 'bold 12px sans-serif';
-      ctx.fillText('KODE AKSES SEKOLAH', 345, 355);
+      ctx.fillText('PERAN / HAK AKSES', 345, 355);
       ctx.fillText('MASA AKTIF LISENSI', 755, 355);
 
       ctx.fillStyle = '#ffffff';
-      ctx.font = 'bold 20px monospace';
-      ctx.fillText(data.schoolCode, 345, 388);
+      ctx.font = 'bold 18px sans-serif';
+      ctx.fillText(data.role === 'ADMIN' ? 'ADMINISTRATOR' : (data.role || 'ADMINISTRATOR'), 345, 388);
 
       ctx.fillStyle = '#e2e8f0';
       ctx.font = 'bold 16px sans-serif';
@@ -827,7 +827,6 @@ KREDENSIAL RESMI KAWACANAAN SD
 Satuan Pendidikan: ${createdData.schoolName}
 Tipe Ruang Kerja : ${createdData.workspaceType === 'school' ? 'Ruang Kerja Sekolah (Terpadu)' : 'Ruang Kerja Individu (Guru Mandiri)'}
 Peran Pengguna   : ${roleLabel}
-Kode Akses       : ${createdData.schoolCode}
 ${createdData.npsn ? `NPSN             : ${createdData.npsn}\n` : ''}Penanggung Jawab : ${createdData.adminName}
 -----------------------------------------
 USERNAME LOGIN   : ${createdData.username}
@@ -1903,10 +1902,10 @@ Portal Masuk     : ${window.location.origin}/login
 
                       <div>
                         <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">
-                          Kode Akses Sekolah
+                          Peran / Hak Akses
                         </span>
-                        <span className="font-mono font-bold text-white text-xs mt-0.5 block select-all">
-                          {createdData.schoolCode}
+                        <span className="font-sans font-bold text-white text-xs mt-0.5 block select-all">
+                          {createdData.role === 'ADMIN' ? 'ADMINISTRATOR' : createdData.role}
                         </span>
                       </div>
 

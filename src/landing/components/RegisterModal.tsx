@@ -216,7 +216,6 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
   // 4. SUCCESS ACTIVATION STATE
   const [registrationSuccessData, setRegistrationSuccessData] = useState<RegistrationSuccessData | null>(null);
   const [copiedCredentials, setCopiedCredentials] = useState(false);
-  const [copiedSchoolCode, setCopiedSchoolCode] = useState(false);
   const [copiedInvoice, setCopiedInvoice] = useState(false);
 
   // Midtrans Client Key & Snap script loader (Hanya diperlukan di Landing Page flow)
@@ -263,7 +262,6 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
       setSubscriptionExpiresAt(defaultExp.toISOString().slice(0, 10));
       setBillingCycle(initialBillingCycle || 'yearly');
       setCopiedCredentials(false);
-      setCopiedSchoolCode(false);
       setCopiedInvoice(false);
     } else {
       if (pollingRef.current) {
@@ -847,9 +845,9 @@ ${isSuperadmin ? 'Metode: Direct Subscription (Super Admin)' : `Invoice: ${regis
                 workspaceType: 'school', // Teks pill: RUANG KERJA SEKOLAH
                 schoolName: registrationSuccessData.schoolName,
                 personInCharge: `${registrationSuccessData.adminName} (Administrator)`,
+                role: 'ADMINISTRATOR',
                 username: registrationSuccessData.username,
                 password: registrationSuccessData.password,
-                schoolCode: registrationSuccessData.schoolCode,
                 expiryDateText:
                   registrationSuccessData.expiryDays >= 9000
                     ? 'Permanen (Seumur Hidup)'
@@ -865,43 +863,19 @@ ${isSuperadmin ? 'Metode: Direct Subscription (Super Admin)' : `Invoice: ${regis
               onEnterSystem={isSuperadmin ? handleFinishSuperadmin : handleEnterDashboard}
             />
 
-            {/* School Invitation Code Card (Untuk dibagikan ke Dewan Guru) */}
-            <div className="max-w-[480px] mx-auto bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200/90 rounded-xl p-3 shadow-2xs flex items-center justify-between gap-3">
+            {/* Informasi Alur Pembuatan Akun Guru oleh Administrator */}
+            <div className="max-w-[480px] mx-auto bg-slate-50 border border-slate-200/90 rounded-xl p-3 shadow-2xs flex items-center gap-2.5 text-left">
+              <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center shrink-0">
+                <Building2 size={16} />
+              </div>
               <div className="min-w-0">
-                <div className="text-[10px] font-bold uppercase tracking-wider text-blue-900 flex items-center gap-1">
-                  <KeyRound size={12} className="text-blue-700 shrink-0" />
-                  <span>Kode Undangan Bergabung Guru</span>
+                <div className="text-[11px] font-bold text-slate-800">
+                  Manajemen Akun Terpusat
                 </div>
-                <div className="font-mono text-sm font-black text-blue-950 mt-0.5 tracking-wider">
-                  {registrationSuccessData.schoolCode}
-                </div>
-                <div className="text-[10px] text-slate-500 truncate">
-                  Bagikan kode ini kepada rekan Wali Kelas & Guru Mapel untuk terhubung ke sekolah ini.
+                <div className="text-[10px] text-slate-500 leading-snug">
+                  Akun Wali Kelas dan Guru Mata Pelajaran dapat langsung dibuat dan dikelola oleh Administrator melalui menu <strong>Data Pengguna</strong> di dalam dashboard.
                 </div>
               </div>
-
-              <button
-                type="button"
-                id="btn-copy-school-code"
-                onClick={() => {
-                  navigator.clipboard.writeText(registrationSuccessData.schoolCode);
-                  setCopiedSchoolCode(true);
-                  setTimeout(() => setCopiedSchoolCode(false), 2000);
-                }}
-                className="shrink-0 inline-flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-lg bg-blue-700 hover:bg-blue-800 text-white font-bold text-[11px] shadow-xs transition-all cursor-pointer"
-              >
-                {copiedSchoolCode ? (
-                  <>
-                    <Check size={12} className="text-emerald-300" />
-                    <span>Tersalin!</span>
-                  </>
-                ) : (
-                  <>
-                    <Copy size={12} />
-                    <span>Salin Kode</span>
-                  </>
-                )}
-              </button>
             </div>
           </div>
         ) : paymentSession ? (
